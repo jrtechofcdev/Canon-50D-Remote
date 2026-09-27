@@ -2,6 +2,8 @@ package com.example.ui.photos
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +18,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -25,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -43,22 +46,23 @@ import com.example.ui.theme.Tone
 
 enum class PhotoFilter(val label: String) { All("Todas"), Session("Sessão atual"), Favorites("Favoritas") }
 
-fun List<Photo>.filtered(filter: PhotoFilter, settings: Settings): List<Photo> = when (filter) {
+fun List<Photo>.filtered(filter: PhotoFilter, minStars: Int, settings: Settings): List<Photo> = when (filter) {
     PhotoFilter.All -> this
     PhotoFilter.Session -> filter { it.session == settings.sessionKey }
     PhotoFilter.Favorites -> filter { it.favorite }
-}
+}.filter { minStars == 0 || it.rating >= minStars }
 
 @Composable
 fun PhotosScreen(app: TetherApp, onOpenPhoto: (Long) -> Unit) {
     val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = emptyList())
     val settings by app.settings.settings.collectAsState(initial = Settings())
     var filter by rememberSaveable { mutableStateOf(PhotoFilter.All) }
-    val photos = all.filtered(filter, settings)
+    var minStars by rememberSaveable { mutableIntStateOf(0) }
+    val photos = all.filtered(filter, if (settings.ratingEnabled) minStars else 0, settings)
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             PhotoFilter.entries.forEach {
@@ -73,13 +77,27 @@ fun PhotosScreen(app: TetherApp, onOpenPhoto: (Long) -> Unit) {
                     ),
                 )
             }
+            if (settings.ratingEnabled) {
+                (1..5).forEach { stars ->
+                    FilterChip(
+                        selected = minStars == stars,
+                        onClick = { minStars = if (minStars == stars) 0 else stars },
+                        label = { Text("★ $stars+") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Tone.Accent,
+                            selectedLabelColor = Tone.OnAccent,
+                            labelColor = Tone.TextMuted,
+                        ),
+                    )
+                }
+            }
         }
 
         if (photos.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
                     when (filter) {
-                        PhotoFilter.Favorites -> "Nenhuma favorita ainda. Toque na estrela ao ver uma foto."
+                        PhotoFilter.Favorites -> "Nenhuma favorita ainda. Toque no coração ao ver uma foto."
                         else -> "Nenhuma foto recebida. Conecte a 50D e dispare."
                     },
                     color = Tone.TextMuted,
@@ -111,8 +129,16 @@ fun PhotosScreen(app: TetherApp, onOpenPhoto: (Long) -> Unit) {
                     FormatTag(photo.rawUri != null, photo.jpgUri != null, Modifier.align(Alignment.BottomStart).padding(4.dp))
                     if (photo.favorite) {
                         Icon(
-                            Icons.Filled.Star, contentDescription = "Favorita", tint = Tone.Accent,
+                            Icons.Filled.Favorite, contentDescription = "Favorita", tint = Tone.Accent,
                             modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(16.dp),
+                        )
+                    }
+                    if (settings.ratingEnabled && photo.rating > 0) {
+                        Text(
+                            "★".repeat(photo.rating),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Tone.Accent,
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp),
                         )
                     }
                 }

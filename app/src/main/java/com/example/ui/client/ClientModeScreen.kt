@@ -1,0 +1,168 @@
+package com.example.ui.client
+
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import coil.compose.AsyncImage
+import com.example.TetherApp
+import com.example.core.data.Settings
+import com.example.ui.theme.Tone
+import kotlinx.coroutines.delay
+
+/**
+ * Full-screen photos for the client to follow along. No bars, no settings, no delete.
+ * Exit: hold a finger on the screen for 3 s (plus the PIN when one is set).
+ */
+@Composable
+fun ClientModeScreen(app: TetherApp, onExit: () -> Unit) {
+    val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
+    val s by app.settings.settings.collectAsState(initial = null)
+    val settings = s ?: return
+    val photos = (all ?: return).filter {
+        it.session == settings.sessionKey && (!settings.clientOnlyFavorites || it.favorite) && it.displayUri != null
+    }
+    var askPin by remember { mutableStateOf(false) }
+
+    ImmersiveMode()
+    // Back does nothing here, so a client can't leave by accident.
+    BackHandler { }
+
+    val requestExit = { if (settings.clientPin.isEmpty()) onExit() else askPin = true }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    // Lifting the finger or swiping (the pager takes the drag) both end the wait early;
+                    // only a 3 s hold runs into the timeout.
+                    var ended = false
+                    withTimeoutOrNull(3_000) {
+                        waitForUpOrCancellation()
+                        ended = true
+                    }
+                    if (!ended) requestExit()
+                }
+            },
+    ) {
+        if (photos.isEmpty()) {
+            Text(
+                "As fotos aparecem aqui assim que forem feitas.",
+                color = Color(0xFF8A8A8A),
+                modifier = Modifier.align(Alignment.Center).padding(32.dp),
+            )
+        } else {
+            ClientPager(app, photos.map { it.id to it }, settings)
+        }
+    }
+
+    if (askPin) {
+        PinDialog(expected = settings.clientPin, onOk = { askPin = false; onExit() }, onCancel = { askPin = false })
+    }
+}
+
+@Composable
+private fun ClientPager(app: TetherApp, entries: List<Pair<Long, com.example.core.data.Photo>>, settings: Settings) {
+    val pager = rememberPagerState { entries.size }
+    // New photo: jump to it (the list is newest first).
+    LaunchedEffect(Unit) {
+        app.tether.saved.collect {
+            delay(300)
+            pager.animateScrollToPage(0)
+        }
+    }
+    // Optional slideshow through the session.
+    LaunchedEffect(settings.clientSlideSeconds, entries.size) {
+        if (settings.clientSlideSeconds <= 0 || entries.size < 2) return@LaunchedEffect
+        while (true) {
+            delay(settings.clientSlideSeconds * 1000L)
+            pager.animateScrollToPage((pager.currentPage + 1) % entries.size)
+        }
+    }
+    HorizontalPager(state = pager, key = { entries[it].first }, modifier = Modifier.fillMaxSize()) { page ->
+        val photo = entries[page].second
+        Box(Modifier.fillMaxSize()) {
+            AsyncImage(model = photo.displayUri, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+            if (settings.clientShowInfo) {
+                Text(
+                    listOfNotNull(photo.savedBase, photo.shutter, photo.aperture, photo.iso).joinToString("   "),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color(0xFFBDBDBD),
+                    modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PinDialog(expected: String, onOk: () -> Unit, onCancel: () -> Unit) {
+    var pin by remember { mutableStateOf("") }
+    var wrong by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onCancel,
+        containerColor = Tone.Surface,
+        title = { Text("PIN para sair") },
+        text = {
+            OutlinedTextField(
+                value = pin,
+                onValueChange = { pin = it.filter(Char::isDigit).take(6); wrong = false },
+                isError = wrong,
+                supportingText = { if (wrong) Text("PIN incorreto") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            )
+        },
+        confirmButton = { TextButton(onClick = { if (pin == expected) onOk() else wrong = true }) { Text("Sair") } },
+        dismissButton = { TextButton(onClick = onCancel) { Text("Cancelar") } },
+    )
+}
+
+/** Hides status and navigation bars while the client mode is on screen. */
+@Composable
+private fun ImmersiveMode() {
+    val activity = LocalActivity.current ?: return
+    DisposableEffect(Unit) {
+        val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        onDispose { controller.show(WindowInsetsCompat.Type.systemBars()) }
+    }
+}

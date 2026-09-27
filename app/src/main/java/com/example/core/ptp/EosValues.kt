@@ -49,6 +49,13 @@ object EosValues {
         15 to "Retrato noturno", 16 to "Sem flash",
     )
 
+    // Canon reports battery in coarse steps; codes as mapped by libgphoto2.
+    private val battery = mapOf(0 to "Baixa", 5 to "25%", 1 to "50%", 4 to "75%", 2 to "100%", 3 to "Cheia")
+
+    fun batteryLabel(value: Int): String = battery[value] ?: "--"
+
+    fun batteryIsLow(value: Int): Boolean = value == 0 || value == 5
+
     fun label(prop: Int, value: Int): String = when (prop) {
         EosProp.APERTURE -> aperture[value]?.let { "f/$it" } ?: "--"
         EosProp.SHUTTER_SPEED -> shutter[value] ?: "--"
@@ -56,6 +63,7 @@ object EosValues {
         EosProp.EXPOSURE_COMPENSATION -> exposureCompensation(value)
         EosProp.WHITE_BALANCE -> whiteBalance[value] ?: "--"
         EosProp.SHOOTING_MODE -> shootingMode[value] ?: "--"
+        EosProp.BATTERY_POWER -> batteryLabel(value)
         else -> value.toString()
     }
 
@@ -79,6 +87,31 @@ object EosValues {
         }
         return sign + body
     }
+
+    /** Canon code offset for a step in thirds of a stop: 1/3 = 3, 2/3 = 5, 1 = 8 (eighths with Canon's rounding). */
+    fun thirdsToCode(thirds: Int): Int {
+        val sign = if (thirds < 0) -1 else 1
+        val a = kotlin.math.abs(thirds)
+        return sign * ((a / 3) * 8 + intArrayOf(0, 3, 5)[a % 3])
+    }
+
+    /** Inverse of [thirdsToCode]; half-stop codes (4) round to 2/3. */
+    fun codeToThirds(code: Int): Int {
+        val sign = if (code < 0) -1 else 1
+        val a = kotlin.math.abs(code)
+        val rem = when (a % 8) {
+            0 -> 0
+            1, 2, 3 -> 1
+            4, 5 -> 2
+            else -> 3
+        }
+        return sign * ((a / 8) * 3 + rem)
+    }
+
+    /** Shutter speed in seconds for a Tv code (used to wait long enough during bracketing). */
+    fun shutterSeconds(code: Int): Double = Math.pow(2.0, (0x38 - code) / 8.0)
+
+    fun isKnownShutter(code: Int) = code in shutter && code != 0x0C
 
     /** Default choices shown before the camera reports its own list through AvailListChanged. */
     fun defaultValues(prop: Int): List<Int> = when (prop) {

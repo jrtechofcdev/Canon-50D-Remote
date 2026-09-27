@@ -40,6 +40,16 @@ import com.example.ui.photos.PhotosScreen
 import com.example.ui.photos.ViewerScreen
 import com.example.ui.session.SessionScreen
 import com.example.ui.settings.SettingsScreen
+import com.example.ui.settings.SettingsSection
+import com.example.ui.settings.SettingsSectionScreen
+import com.example.ui.card.CardScreen
+import com.example.ui.client.ClientModeScreen
+import com.example.core.data.Settings
+import android.view.WindowManager
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.activity.compose.LocalActivity
 import com.example.ui.theme.Tone
 import com.example.ui.theme.TetherTheme
 import kotlinx.coroutines.flow.merge
@@ -54,10 +64,16 @@ class MainActivity : ComponentActivity() {
         askNotificationPermissionOnce()
         app.camera.findAndConnect()
 
-        val actions = PhotoActions(this, app.store)
+        val actions = PhotoActions(this, app.store, app.export)
 
         setContent {
-            TetherTheme {
+            val settings by app.settings.settings.collectAsState(initial = Settings())
+            val cameraState by app.camera.state.collectAsState()
+            WindowPreferences(
+                nightBrightness = if (settings.nightMode) settings.nightBrightness else null,
+                keepScreenOn = settings.keepScreenOn && cameraState is ConnectionState.Connected,
+            )
+            TetherTheme(night = settings.nightMode) {
                 val nav = rememberNavController()
                 val entry by nav.currentBackStackEntryAsState()
                 val route = entry?.destination?.route ?: Tab.Session.route
@@ -103,14 +119,24 @@ class MainActivity : ComponentActivity() {
                         composable(Tab.Session.route) {
                             SessionScreen(
                                 app = app,
-                                onOpenPhoto = { nav.navigate("photo/$it") },
-                                onOpenSettings = { nav.navigate(Tab.Settings.route) { launchSingleTop = true } },
+                                actions = actions,
+                                onOpenPhoto = { nav.navigate("photo/$it") { launchSingleTop = true } },
+                                onOpenSettings = { nav.navigate("settings/${SettingsSection.Save.route}") },
+                                onOpenCard = { nav.navigate("card") },
+                                onOpenClient = { nav.navigate("client") },
                             )
+                        }
+                        composable("card") { CardScreen(app = app, onBack = { nav.popBackStack() }) }
+                        composable("client") { ClientModeScreen(app = app, onExit = { nav.popBackStack() }) }
+                        composable("settings/{section}") { entry ->
+                            val section = SettingsSection.entries.firstOrNull { it.route == entry.arguments?.getString("section") }
+                                ?: SettingsSection.Save
+                            SettingsSectionScreen(app = app, section = section, onBack = { nav.popBackStack() })
                         }
                         composable(Tab.Photos.route) {
                             PhotosScreen(app = app, onOpenPhoto = { nav.navigate("photo/$it") })
                         }
-                        composable(Tab.Settings.route) { SettingsScreen(app = app) }
+                        composable(Tab.Settings.route) { SettingsScreen(onOpen = { nav.navigate("settings/${it.route}") }) }
                         composable("photo/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
                             ViewerScreen(
                                 app = app,
@@ -143,6 +169,22 @@ class MainActivity : ComponentActivity() {
         val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
         if (!granted) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+    }
+}
+
+/** Night-mode brightness and keep-screen-on, applied to this activity's window only. */
+@Composable
+private fun WindowPreferences(nightBrightness: Int?, keepScreenOn: Boolean) {
+    val activity = LocalActivity.current ?: return
+    DisposableEffect(nightBrightness, keepScreenOn) {
+        val window = activity.window
+        window.attributes = window.attributes.apply {
+            screenBrightness = nightBrightness?.let { it.coerceIn(1, 100) / 100f }
+                ?: WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        }
+        if (keepScreenOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { }
     }
 }
 

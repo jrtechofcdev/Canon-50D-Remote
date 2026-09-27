@@ -55,3 +55,30 @@ class DeviceInfoAndValuesTest {
         assertEquals("−1", EosValues.exposureCompensation(0xFFFFFFF8.toInt()))
     }
 }
+
+class ObjectInfoAndBatteryTest {
+    @org.junit.Test
+    fun parsesObjectInfoDataset() {
+        val b = java.nio.ByteBuffer.allocate(256).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        b.putInt(0x00010001); b.putShort(PtpFormat.CANON_CR2.toShort()); b.putShort(0)
+        b.putInt(15_000_000); b.putShort(PtpFormat.EXIF_JPEG.toShort()); b.putInt(5000)
+        b.putInt(160); b.putInt(120); b.putInt(4752); b.putInt(3168); b.putInt(0)
+        b.putInt(0x90000000.toInt()); b.putShort(0); b.putInt(0); b.putInt(0)
+        fun str(s: String) { b.put((s.length + 1).toByte()); s.forEach { b.putShort(it.code.toShort()) }; b.putShort(0) }
+        str("IMG_0042.CR2"); str("20260927T101500")
+        val info = ObjectInfo.parse(7, b.array().copyOf(b.position()))
+        org.junit.Assert.assertEquals("IMG_0042.CR2", info.filename)
+        org.junit.Assert.assertEquals(15_000_000L, info.size)
+        org.junit.Assert.assertEquals("20260927T101500", info.captureDate)
+        org.junit.Assert.assertTrue(info.isRaw)
+        org.junit.Assert.assertEquals(7, info.asObjectAdded().handle)
+    }
+
+    @org.junit.Test
+    fun batteryLevels() {
+        org.junit.Assert.assertEquals("100%", EosValues.batteryLabel(2))
+        org.junit.Assert.assertTrue(EosValues.batteryIsLow(0))
+        org.junit.Assert.assertTrue(EosValues.batteryIsLow(5))
+        org.junit.Assert.assertEquals(false, EosValues.batteryIsLow(4))
+    }
+}

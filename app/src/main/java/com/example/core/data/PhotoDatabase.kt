@@ -1,6 +1,7 @@
 package com.example.core.data
 
 import android.content.Context
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -11,6 +12,8 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Update
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -36,6 +39,11 @@ data class Photo(
     val shutter: String? = null,
     val iso: String? = null,
     val favorite: Boolean = false,
+    /** 0 = no stars, 1..5. */
+    @ColumnInfo(defaultValue = "0") val rating: Int = 0,
+    /** File names on the camera card (e.g. IMG_1234.CR2), used to find frames still missing after a reconnect. */
+    val rawCameraName: String? = null,
+    val jpgCameraName: String? = null,
 ) {
     /** What the viewer shows: the JPG when there is one, else the preview pulled out of the RAW. */
     val displayUri: String? get() = jpgUri ?: previewPath?.let { "file://$it" }
@@ -64,19 +72,38 @@ interface PhotoDao {
     @Query("UPDATE photos SET favorite = :favorite WHERE id = :id")
     suspend fun setFavorite(id: Long, favorite: Boolean)
 
+    @Query("UPDATE photos SET rating = :rating WHERE id = :id")
+    suspend fun setRating(id: Long, rating: Int)
+
     @Query("DELETE FROM photos WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("SELECT * FROM photos WHERE session = :session ORDER BY capturedAt ASC")
+    suspend fun inSession(session: String): List<Photo>
+
+    @Query("SELECT rawCameraName FROM photos WHERE rawCameraName IS NOT NULL UNION SELECT jpgCameraName FROM photos WHERE jpgCameraName IS NOT NULL")
+    suspend fun knownCameraNames(): List<String>
 }
 
-@Database(entities = [Photo::class], version = 2, exportSchema = false)
+@Database(entities = [Photo::class], version = 3, exportSchema = false)
 abstract class PhotoDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
 
     companion object {
         fun create(context: Context): PhotoDatabase =
             Room.databaseBuilder(context, PhotoDatabase::class.java, "tether50d.db")
+                .addMigrations(MIGRATION_2_3)
                 // Version 1 only ever held simulator entries, so dropping it loses nothing real.
-                .fallbackToDestructiveMigration(dropAllTables = true)
+                .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1)
                 .build()
+
+        /** Adds stars and camera file names without touching existing photos. */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE photos ADD COLUMN rating INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE photos ADD COLUMN rawCameraName TEXT")
+                db.execSQL("ALTER TABLE photos ADD COLUMN jpgCameraName TEXT")
+            }
+        }
     }
 }

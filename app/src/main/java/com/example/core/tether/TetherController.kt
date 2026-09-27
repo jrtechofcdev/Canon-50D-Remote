@@ -5,10 +5,12 @@ import android.net.Uri
 import android.util.Log
 import androidx.exifinterface.media.ExifInterface
 import com.example.core.camera.CameraManager
+import com.example.core.camera.ConnectionState
 import com.example.core.data.Photo
 import com.example.core.data.PhotoDao
 import com.example.core.data.SettingsRepository
 import com.example.core.ptp.EosEventRecord
+import com.example.core.ptp.ObjectInfo
 import com.example.core.ptp.StreamSink
 import com.example.core.storage.Cr2Preview
 import com.example.core.storage.FileKind
@@ -17,6 +19,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -45,7 +48,9 @@ class TetherController(
     private val dao: PhotoDao,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val queue = Channel<EosEventRecord.ObjectAdded>(Channel.UNLIMITED)
+    private class Job(val obj: EosEventRecord.ObjectAdded, val force: Boolean, val attempt: Int = 0)
+
+    private val queue = Channel<Job>(Channel.UNLIMITED)
     private val queued = AtomicInteger(0)
 
     private val _transfer = MutableStateFlow<Transfer?>(null)
@@ -60,20 +65,31 @@ class TetherController(
     private val _errors = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val errors: SharedFlow<String> = _errors.asSharedFlow()
 
+    /** Frames found on the card after a reconnect, waiting for the user to confirm (when "perguntar antes" is on). */
+    private val _pendingOnCard = MutableStateFlow<List<ObjectInfo>>(emptyList())
+    val pendingOnCard: StateFlow<List<ObjectInfo>> = _pendingOnCard.asStateFlow()
+
     init {
         scope.launch {
-            camera.newObjects.collect {
-                queued.incrementAndGet()
-                queue.send(it)
-            }
+            camera.newObjects.collect { enqueue(it, force = false) }
         }
         scope.launch {
-            for (obj in queue) {
+            camera.state.collect { if (it is ConnectionState.Connected) checkForMissedFrames() }
+        }
+        scope.launch {
+            for (job in queue) {
                 try {
-                    process(obj)
+                    process(job.obj, job.force)
                 } catch (e: Exception) {
                     Log.e(TAG, "Download failed", e)
-                    _errors.tryEmit("Falha ao salvar ${obj.filename}: ${e.message}")
+                    if (job.attempt < MAX_RETRIES && camera.state.value is ConnectionState.Connected) {
+                        // Usually a busy camera or a brief USB hiccup: try again after the queue drains a bit.
+                        delay(1_000L * (job.attempt + 1))
+                        queued.incrementAndGet()
+                        queue.send(Job(job.obj, job.force, job.attempt + 1))
+                    } else {
+                        _errors.tryEmit("Falha ao salvar ${job.obj.filename}: ${e.message}")
+                    }
                 } finally {
                     queued.decrementAndGet()
                     _transfer.value = null
@@ -82,15 +98,56 @@ class TetherController(
         }
     }
 
-    private suspend fun process(obj: EosEventRecord.ObjectAdded) {
+    /** Adds a frame to the download queue. [force] ignores the RAW/JPG filter (manual picks from the card). */
+    fun enqueue(obj: EosEventRecord.ObjectAdded, force: Boolean) {
+        queued.incrementAndGet()
+        queue.trySend(Job(obj, force))
+    }
+
+    fun downloadPending() {
+        _pendingOnCard.value.forEach { enqueue(it.asObjectAdded(), force = false) }
+        _pendingOnCard.value = emptyList()
+    }
+
+    fun dismissPending() {
+        _pendingOnCard.value = emptyList()
+    }
+
+    /**
+     * After a reconnect, finds frames shot while the cable was out (or whose download failed):
+     * files on the card numbered after the newest one already received in this session.
+     */
+    private suspend fun checkForMissedFrames() {
+        val settings = settingsRepository.current()
+        if (!settings.autoResend || !camera.supportsCardListing) return
+        val sessionPhotos = dao.inSession(settings.sessionKey)
+        val lastNumber = sessionPhotos.flatMap { listOfNotNull(it.rawCameraName, it.jpgCameraName) }
+            .mapNotNull(::frameNumber).maxOrNull() ?: return
+        val known = dao.knownCameraNames().toSet()
+        val missing = runCatching { camera.listCardFiles() }.getOrElse { return }
+            .filter { file ->
+                val n = frameNumber(file.filename) ?: return@filter false
+                n > lastNumber && file.filename !in known &&
+                    ((file.isRaw && settings.downloadMode.raw) || (file.isJpeg && settings.downloadMode.jpg))
+            }
+        if (missing.isEmpty()) return
+        if (settings.resendAsk) {
+            _pendingOnCard.value = missing
+        } else {
+            _errors.tryEmit("Baixando ${missing.size} arquivo(s) feitos enquanto o cabo estava solto")
+            missing.forEach { enqueue(it.asObjectAdded(), force = false) }
+        }
+    }
+
+    private suspend fun process(obj: EosEventRecord.ObjectAdded, force: Boolean) {
         val settings = settingsRepository.current()
         val kind = when {
             obj.isRaw -> FileKind.RAW
             obj.isJpeg -> FileKind.JPG
             else -> return
         }
-        if (kind == FileKind.RAW && !settings.downloadMode.raw) return
-        if (kind == FileKind.JPG && !settings.downloadMode.jpg) return
+        if (!force && kind == FileKind.RAW && !settings.downloadMode.raw) return
+        if (!force && kind == FileKind.JPG && !settings.downloadMode.jpg) return
 
         val session = settings.sessionKey
         val cameraBase = obj.filename.substringBeforeLast('.').ifBlank { "IMG_${obj.handle}" }
@@ -122,8 +179,8 @@ class TetherController(
         val exif = readExif(target.uri)
         var photo = existing ?: Photo(session = session, baseName = cameraBase, savedBase = savedBase, capturedAt = System.currentTimeMillis())
         photo = when (kind) {
-            FileKind.JPG -> photo.copy(jpgUri = uri, jpgSize = obj.size)
-            FileKind.RAW -> photo.copy(rawUri = uri, rawSize = obj.size)
+            FileKind.JPG -> photo.copy(jpgUri = uri, jpgSize = obj.size, jpgCameraName = obj.filename)
+            FileKind.RAW -> photo.copy(rawUri = uri, rawSize = obj.size, rawCameraName = obj.filename)
         }
         photo = photo.copy(
             aperture = exif?.aperture ?: photo.aperture,
@@ -177,6 +234,10 @@ class TetherController(
 
     companion object {
         private const val TAG = "TetherController"
+        private const val MAX_RETRIES = 2
+
+        /** 1234 from IMG_1234.CR2 or _MG_1234.JPG. */
+        fun frameNumber(name: String): Int? = Regex("(\\d{4})\\.[A-Za-z0-9]+$").find(name)?.groupValues?.get(1)?.toIntOrNull()
         private const val PAIR_WINDOW_MS = 120_000L
     }
 }

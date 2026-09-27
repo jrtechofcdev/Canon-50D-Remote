@@ -1,10 +1,13 @@
 package com.example.ui.photos
 
-import android.content.Context
-import android.graphics.BitmapFactory
-import android.net.Uri
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
@@ -19,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
@@ -26,10 +30,13 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -46,24 +53,32 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.TetherApp
+import com.example.core.analysis.Analysis
+import com.example.core.analysis.ImageAnalyzer
 import com.example.core.data.Photo
 import com.example.ui.PhotoActions
 import com.example.ui.ShareSet
@@ -78,7 +93,9 @@ import java.util.Locale
 @Composable
 fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: () -> Unit) {
     val photos by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
+    val s by app.settings.settings.collectAsState(initial = null)
     val list = photos ?: return
+    val settings = s ?: return
     if (list.isEmpty()) {
         LaunchedEffect(Unit) { onBack() }
         return
@@ -87,10 +104,45 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
     val pager = rememberPagerState(initialPage = start) { list.size }
     val scope = rememberCoroutineScope()
     var confirmDelete by remember { mutableStateOf<Photo?>(null) }
+    val zoomed = remember { mutableStateMapOf<Long, Boolean>() }
+    var showClipping by remember { mutableStateOf(settings.highlightAlert) }
+
+    // Slide to a frame that just arrived. New photos are inserted at index 0; the pager keeps the
+    // current photo in place by key, so "was on the latest" means we were on index 0 before it.
+    val currentList by rememberUpdatedState(list)
+    val currentSettings by rememberUpdatedState(settings)
+    LaunchedEffect(Unit) {
+        var latestId = currentList.first().id
+        app.tether.saved.collect { saved ->
+            val cfg = currentSettings
+            val viewingId = currentList.getOrNull(pager.currentPage)?.id
+            val wasOnLatest = viewingId == latestId
+            latestId = saved.id
+            if (!cfg.autoSlideToNew) return@collect
+            if (cfg.autoSlideOnlyAtLatest && !wasOnLatest) return@collect
+            if (viewingId != null && zoomed[viewingId] == true) return@collect
+            // Wait for the new row to reach the list before scrolling to it.
+            repeat(20) {
+                if (currentList.firstOrNull()?.id == saved.id) {
+                    pager.animateScrollToPage(0)
+                    return@collect
+                }
+                kotlinx.coroutines.delay(50)
+            }
+        }
+    }
+
+    // One reduced decode per viewed photo feeds both the histogram and the highlight mask.
+    val viewing = list.getOrNull(pager.currentPage)
+    val analysis = if (settings.histogramEnabled || showClipping) {
+        rememberAnalysis(viewing?.displayUri, settings.highlightThreshold)
+    } else null
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { list[it].id }) { page ->
-            ZoomableImage(list[page])
+            val photo = list[page]
+            val mask = if (showClipping && photo.id == viewing?.id) analysis?.clippedMask else null
+            PhotoPage(photo, mask) { zoomed[photo.id] = it }
         }
 
         val current = list.getOrNull(pager.currentPage) ?: return@Box
@@ -108,9 +160,16 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
                     color = Tone.TextMuted,
                 )
             }
+            IconButton(onClick = { showClipping = !showClipping }) {
+                Icon(
+                    Icons.Outlined.WbSunny,
+                    contentDescription = if (showClipping) "Esconder alerta de estouro" else "Mostrar alerta de estouro",
+                    tint = if (showClipping) Tone.Accent else Tone.TextMuted,
+                )
+            }
             IconButton(onClick = { scope.launch { app.database.photoDao().setFavorite(current.id, !current.favorite) } }) {
                 Icon(
-                    if (current.favorite) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                    if (current.favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                     contentDescription = "Favorita",
                     tint = if (current.favorite) Tone.Accent else Tone.Text,
                 )
@@ -122,6 +181,12 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Tone.Background.copy(alpha = 0.85f))
                 .navigationBarsPadding().padding(16.dp),
         ) {
+            if (settings.ratingEnabled) {
+                RatingBar(current.rating) { stars ->
+                    scope.launch { app.database.photoDao().setRating(current.id, if (stars == current.rating) 0 else stars) }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -130,23 +195,25 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
                     )
                     Text(fileSummary(current), style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
                 }
-                Histogram(current.displayUri, Modifier.width(120.dp).height(48.dp))
+                if (settings.histogramEnabled) {
+                    Histogram(analysis, settings.histogramRgb, Modifier.width(128.dp).height(52.dp))
+                }
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SetMenuButton(
                     label = "Lightroom",
                     primary = true,
-                    sets = actions.availableSets(current),
+                    sets = actions.availableSets(current, settings, includeLight = false),
                     modifier = Modifier.weight(1f),
-                ) { actions.openInLightroom(current, it) }
+                ) { scope.launch { actions.openInLightroom(listOf(current), it, settings) } }
                 SetMenuButton(
                     label = "Enviar",
                     primary = false,
                     icon = { Icon(Icons.Outlined.Share, contentDescription = null) },
-                    sets = actions.availableSets(current),
+                    sets = actions.availableSets(current, settings),
                     modifier = Modifier.weight(1f),
-                ) { actions.share(current, it) }
+                ) { scope.launch { actions.share(listOf(current), it, settings) } }
                 OutlinedButton(onClick = { actions.openWith(current) }) {
                     Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = "Abrir com")
                 }
@@ -175,7 +242,34 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
     }
 }
 
-/** A button that asks which files to send when the frame has both RAW and JPG on the phone. */
+@Composable
+fun RatingBar(rating: Int, onRate: (Int) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        for (star in 1..5) {
+            IconButton(
+                onClick = { onRate(star) },
+                modifier = Modifier.size(40.dp).semantics { contentDescription = "$star estrela(s)" },
+            ) {
+                Icon(
+                    if (star <= rating) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                    contentDescription = null,
+                    tint = if (star <= rating) Tone.Accent else Tone.TextMuted,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun rememberAnalysis(uri: String?, threshold: Int): Analysis? {
+    val context = LocalContext.current
+    val analysis by produceState<Analysis?>(initialValue = null, uri, threshold) {
+        value = uri?.let { withContext(Dispatchers.Default) { ImageAnalyzer.analyze(context, it, threshold) } }
+    }
+    return analysis
+}
+
+/** A button that asks which files to send when there is more than one option. */
 @Composable
 private fun SetMenuButton(
     label: String,
@@ -211,25 +305,30 @@ private fun SetMenuButton(
     }
 }
 
+/** One page of the pager: zoomable photo with the blinking highlight mask on top (same transform). */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ZoomableImage(photo: Photo) {
+private fun PhotoPage(photo: Photo, mask: android.graphics.Bitmap?, onZoomChanged: (Boolean) -> Unit) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     val state = rememberTransformableState { zoom, pan, _ ->
         scale = (scale * zoom).coerceIn(1f, 8f)
         offset = if (scale == 1f) Offset.Zero else offset + pan
+        onZoomChanged(scale > 1f)
     }
-    AsyncImage(
-        model = photo.displayUri,
-        contentDescription = photo.savedBase,
-        contentScale = ContentScale.Fit,
-        modifier = Modifier
+    val blink by rememberInfiniteTransition(label = "blink").animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(450), RepeatMode.Reverse), label = "blinkAlpha",
+    )
+
+    Box(
+        Modifier
             .fillMaxSize()
             .pointerInput(Unit) {
-                // Double tap toggles 100%-ish zoom to check focus.
+                // Double tap toggles a 3× zoom to check focus.
                 detectTapGestures(onDoubleTap = {
                     if (scale > 1f) { scale = 1f; offset = Offset.Zero } else scale = 3f
+                    onZoomChanged(scale > 1f)
                 })
             }
             // Only take gestures while zoomed, so swiping between photos keeps working at fit size.
@@ -240,7 +339,23 @@ private fun ZoomableImage(photo: Photo) {
                 translationX = offset.x
                 translationY = offset.y
             },
-    )
+    ) {
+        AsyncImage(
+            model = photo.displayUri,
+            contentDescription = photo.savedBase,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (mask != null) {
+            val image = remember(mask) { mask.asImageBitmap() }
+            Image(
+                bitmap = image,
+                contentDescription = "Áreas estouradas",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = blink },
+            )
+        }
+    }
 }
 
 private fun fileSummary(photo: Photo): String {
@@ -251,44 +366,26 @@ private fun fileSummary(photo: Photo): String {
     ).joinToString(" · ")
 }
 
-/** Luminance histogram, drawn from a downscaled decode so it's quick even for 15 MP files. */
 @Composable
-private fun Histogram(uri: String?, modifier: Modifier) {
-    val context = LocalContext.current
-    val bins by produceState<IntArray?>(initialValue = null, uri) {
-        value = uri?.let { withContext(Dispatchers.Default) { computeHistogram(context, it) } }
-    }
-    Canvas(modifier.background(Tone.Surface)) {
-        val data = bins ?: return@Canvas
-        val max = data.maxOrNull()?.takeIf { it > 0 } ?: return@Canvas
-        val barWidth = size.width / data.size
-        data.forEachIndexed { i, count ->
-            val h = size.height * count / max
-            drawRect(Tone.TextMuted, topLeft = Offset(i * barWidth, size.height - h), size = Size(barWidth, h))
+private fun Histogram(analysis: Analysis?, rgb: Boolean, modifier: Modifier) {
+    val background = Tone.Surface
+    val luma = Tone.TextMuted
+    Canvas(modifier.background(background)) {
+        val a = analysis ?: return@Canvas
+        val channels = if (rgb) {
+            listOf(a.red to Color(0xFFE5484D), a.green to Color(0xFF46A758), a.blue to Color(0xFF3E63DD))
+        } else {
+            listOf(a.luma to luma)
+        }
+        val max = channels.maxOf { (bins, _) -> bins.max() }.takeIf { it > 0 } ?: return@Canvas
+        val barWidth = size.width / 64
+        for ((bins, color) in channels) {
+            bins.forEachIndexed { i, count ->
+                val h = size.height * count / max
+                // Additive blend so overlapping channels read as white/cyan/magenta like a camera histogram.
+                drawRect(color, topLeft = Offset(i * barWidth, size.height - h), size = Size(barWidth, h),
+                    blendMode = if (rgb) BlendMode.Plus else BlendMode.SrcOver)
+            }
         }
     }
 }
-
-private fun computeHistogram(context: Context, uri: String): IntArray? = runCatching {
-    val resolver = context.contentResolver
-    val parsed = Uri.parse(uri)
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    resolver.openInputStream(parsed)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-    var sample = 1
-    while (bounds.outWidth / (sample * 2) >= 256) sample *= 2
-    val bitmap = resolver.openInputStream(parsed)?.use {
-        BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
-    } ?: return null
-    val pixels = IntArray(bitmap.width * bitmap.height)
-    bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-    bitmap.recycle()
-    val bins = IntArray(64)
-    for (p in pixels) {
-        val r = (p shr 16) and 0xFF
-        val g = (p shr 8) and 0xFF
-        val b = p and 0xFF
-        val y = (r * 299 + g * 587 + b * 114) / 1000
-        bins[y shr 2]++
-    }
-    bins
-}.getOrNull()

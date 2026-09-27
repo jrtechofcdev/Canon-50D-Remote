@@ -11,6 +11,12 @@ class PtpDataReader(private val data: ByteArray, var pos: Int = 0) {
 
     fun u32(): Int = u16() or (u16() shl 16)
 
+    fun u32Array(): IntArray {
+        val n = u32()
+        if (n < 0 || n * 4 > remaining) throw PtpProtocolException("Array inválido ($n itens)")
+        return IntArray(n) { u32() }
+    }
+
     fun u16Array(): IntArray {
         val n = u32()
         if (n < 0 || n * 2 > remaining) throw PtpProtocolException("Array inválido ($n itens)")
@@ -81,6 +87,46 @@ data class DeviceInfo(
                 serial = r.string(),
                 operations = ops,
             )
+        }
+    }
+}
+
+/** Standard PTP ObjectInfo dataset, trimmed to what the card browser needs. */
+data class ObjectInfo(
+    val handle: Int,
+    val storageId: Int,
+    val format: Int,
+    val size: Long,
+    val parent: Int,
+    val filename: String,
+    /** "YYYYMMDDThhmmss" as written by the camera clock. */
+    val captureDate: String,
+) {
+    val isFolder get() = format == PtpFormat.ASSOCIATION
+    val isRaw get() = format == PtpFormat.CANON_CR2 || format == PtpFormat.CANON_CRW || filename.endsWith(".CR2", true)
+    val isJpeg get() = format == PtpFormat.EXIF_JPEG || filename.endsWith(".JPG", true)
+
+    /** Same shape as a capture event, so the downloader treats both alike. */
+    fun asObjectAdded() = EosEventRecord.ObjectAdded(handle, storageId, format, size, parent, filename)
+
+    companion object {
+        fun parse(handle: Int, data: ByteArray): ObjectInfo {
+            val r = PtpDataReader(data)
+            val storage = r.u32()
+            val format = r.u16()
+            r.u16() // protection
+            val size = r.u32().toLong() and 0xFFFFFFFFL
+            r.u16() // thumb format
+            r.u32() // thumb size
+            r.u32(); r.u32() // thumb width/height
+            r.u32(); r.u32(); r.u32() // image width/height/depth
+            val parent = r.u32()
+            r.u16() // association type
+            r.u32() // association desc
+            r.u32() // sequence number
+            val name = r.string()
+            val date = if (r.remaining > 0) r.string() else ""
+            return ObjectInfo(handle, storage, format, size, parent, name, date)
         }
     }
 }

@@ -10,6 +10,20 @@ Com a câmera ligada ao celular por um cabo USB OTG:
 - A tela **Sessão** mostra a última foto, a fila de download, a exposição atual (Tv, Av, ISO, ±EV, WB) e um disparador remoto.
 - No visualizador você tem zoom para conferir o foco, histograma, **Enviar** (WhatsApp, Drive…) e **Lightroom**. Para quadros com RAW + JPG, dá para escolher mandar só o JPG, só o RAW ou os dois.
 
+### Novidades da versão 2.1
+
+Todas podem ser ligadas, desligadas ou ajustadas em **Ajustes**, que agora é dividido por categoria:
+
+| Categoria | O que tem |
+|---|---|
+| **Salvamento** | Formato (JPG, RAW ou os dois), pasta de cada formato, subpasta e renomeação por sessão |
+| **Revisão** | Ir sozinho para a foto nova (com opção "só se eu estiver na última"), abrir em tela cheia ao receber, estrelas de 1 a 5, histograma RGB, alerta de estouro piscando (com limite ajustável) |
+| **Câmera** | Manter a câmera ligada, bateria da 50D, navegar no cartão e baixar só as escolhidas, presets de exposição, bracketing (AEB) de 3, 5 ou 7 fotos |
+| **Envio e cliente** | "JPG leve" para WhatsApp (1080 a 2048 px, qualidade ajustável), marca d'água com o seu logo (posição, tamanho, opacidade, margem), modo cliente em tela cheia com PIN opcional |
+| **Alertas** | Vibrar a cada foto, alerta forte se o cabo soltar, cartão e memória quase cheios, reenvio automático das fotos pendentes, resumo ao finalizar a sessão |
+| **Tela** | Modo escuro total com brilho próprio, tela sempre ligada durante a sessão |
+| **Diagnóstico** | Log da conexão USB com botão de copiar |
+
 O app não tem Wi-Fi, FTP nem Live View. Ele usa só a USB, só com a 50D.
 
 ---
@@ -66,7 +80,10 @@ app/src/main/java/com/example/
 │   ├── camera/CameraManager.kt  conecta na 50D, lê eventos, dispara, muda ISO/Av/Tv…
 │   ├── tether/TetherController.kt  auto-save: baixa cada foto nova e grava na pasta certa
 │   ├── storage/                 gravação nas pastas escolhidas + preview extraído do CR2
-│   ├── data/                    banco de fotos (Room) e configurações (DataStore)
+│   ├── data/                    banco de fotos (Room), configurações e presets (DataStore)
+│   ├── analysis/                histograma e máscara de estouro
+│   ├── export/                  cópia leve para WhatsApp + marca d'água
+│   ├── alerts/                  vibração e notificações de alerta
 │   └── service/                 notificação que mantém a conexão com a tela apagada
 └── ui/                          telas em Jetpack Compose
 ```
@@ -82,6 +99,8 @@ app/src/main/java/com/example/
 | Textos das telas | arquivos em `ui/session`, `ui/photos`, `ui/settings` |
 | Formato padrão (RAW+JPG) | `core/data/AppSettings.kt` → `Settings.downloadMode` |
 | Padrão do nome renomeado (`Sessão_0001`) | `core/tether/TetherController.kt` → `savedBase` |
+| Padrões de todas as opções (ligado/desligado) | `core/data/AppSettings.kt` → `Settings` |
+| Cores do modo escuro total | `ui/theme/Theme.kt` → `NightPalette` |
 | Velocidade da leitura de eventos | `core/camera/CameraManager.kt` → `POLL_IDLE_MS` |
 
 ---

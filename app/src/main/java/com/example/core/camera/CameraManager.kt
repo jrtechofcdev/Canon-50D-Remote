@@ -12,7 +12,11 @@ import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
+import com.example.core.data.ExposurePreset
 import com.example.core.ptp.DeviceInfo
+import com.example.core.ptp.EosValues
+import com.example.core.ptp.ObjectInfo
+import com.example.core.ptp.PtpDataReader
 import com.example.core.ptp.EosEventParser
 import com.example.core.ptp.EosEventRecord
 import com.example.core.ptp.EosProp
@@ -25,6 +29,7 @@ import com.example.core.ptp.PtpResponseException
 import com.example.core.ptp.PtpSession
 import com.example.core.ptp.UsbPtpTransport
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -35,6 +40,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -60,6 +66,8 @@ data class CameraStatus(
     fun options(prop: Int): List<Int> = options[prop].orEmpty()
     val shotsLeft: Int? get() = values[EosProp.AVAILABLE_SHOTS]
 }
+
+data class BracketState(val shot: Int, val total: Int)
 
 data class IntervalState(val running: Boolean = false, val done: Int = 0, val total: Int = 0, val seconds: Int = 0)
 
@@ -92,6 +100,13 @@ class CameraManager(
     private val _interval = MutableStateFlow(IntervalState())
     val interval: StateFlow<IntervalState> = _interval.asStateFlow()
 
+    /** Fires when the link drops without the user asking (cable pulled, camera switched off, USB error). */
+    private val _lostConnection = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    val lostConnection: SharedFlow<String> = _lostConnection.asSharedFlow()
+
+    private val _bracketing = MutableStateFlow<BracketState?>(null)
+    val bracketing: StateFlow<BracketState?> = _bracketing.asStateFlow()
+
     private val _log = MutableStateFlow<List<String>>(emptyList())
     val log: StateFlow<List<String>> = _log.asStateFlow()
 
@@ -115,8 +130,10 @@ class CameraManager(
                 UsbManager.ACTION_USB_DEVICE_ATTACHED -> findAndConnect()
                 UsbManager.ACTION_USB_DEVICE_DETACHED -> if (dev != null && dev.deviceName == device?.deviceName) {
                     log("Cabo desconectado")
+                    val wasConnected = _state.value is ConnectionState.Connected
                     closeSession()
                     _state.value = ConnectionState.NoCamera
+                    if (wasConnected) _lostConnection.tryEmit("Cabo USB desconectado")
                 }
             }
         }
@@ -205,8 +222,10 @@ class CameraManager(
         } catch (e: Exception) {
             if (session === ptp) {
                 log("Erro: ${e.message}")
+                val wasConnected = _state.value is ConnectionState.Connected
                 closeSession()
                 _state.value = ConnectionState.Failed(e.message ?: "Falha na comunicação com a câmera")
+                if (wasConnected) _lostConnection.tryEmit("Conexão com a câmera perdida")
             }
         }
     }
@@ -294,8 +313,112 @@ class CameraManager(
     }
 
     private suspend fun setPropertyNow(ptp: PtpSession, prop: Int, value: Int) {
-        ptp.transact(PtpOp.EOS_SET_DEVICE_PROP_VALUE_EX, dataOut = PtpContainer.eosPropValue(prop, value))
+        repeat(4) { attempt ->
+            try {
+                ptp.transact(PtpOp.EOS_SET_DEVICE_PROP_VALUE_EX, dataOut = PtpContainer.eosPropValue(prop, value))
+                return
+            } catch (e: PtpResponseException) {
+                if (e.code != PtpResponse.DEVICE_BUSY || attempt == 3) throw e
+                delay(200)
+            }
+        }
     }
+
+    /** Applies a saved preset, skipping values the current dial mode doesn't let the camera change. */
+    fun applyPreset(preset: ExposurePreset) {
+        val ptp = session ?: return
+        scope.launch {
+            val mode = _status.value.value(EosProp.SHOOTING_MODE)
+            val steps = listOfNotNull(
+                preset.iso?.let { EosProp.ISO to it },
+                preset.shutter?.takeIf { mode in TV_MODES }?.let { EosProp.SHUTTER_SPEED to it },
+                preset.aperture?.takeIf { mode in AV_MODES }?.let { EosProp.APERTURE to it },
+                preset.exposureCompensation?.takeIf { mode != MODE_M }?.let { EosProp.EXPOSURE_COMPENSATION to it },
+                preset.whiteBalance?.let { EosProp.WHITE_BALANCE to it },
+            )
+            var failed = 0
+            for ((prop, value) in steps) {
+                try {
+                    setPropertyNow(ptp, prop, value)
+                    _status.update { it.copy(values = it.values + (prop to value)) }
+                } catch (e: PtpException) {
+                    failed++
+                }
+            }
+            _messages.tryEmit(if (failed == 0) "Preset \"${preset.name}\" aplicado" else "Preset aplicado em parte ($failed ajuste(s) recusado(s))")
+        }
+    }
+
+    /**
+     * Bracketing done by the app: shifts ±EV (or the shutter speed in M) per frame, fires, and restores
+     * the starting value at the end, so it works whatever the camera's own AEB setting is.
+     */
+    fun startBracket(shots: Int, stepThirds: Int) {
+        val ptp = session ?: return
+        val info = deviceInfo ?: return
+        if (_bracketing.value != null) return
+        scope.launch {
+            val mode = _status.value.value(EosProp.SHOOTING_MODE)
+            val useShutter = mode == MODE_M
+            val prop = if (useShutter) EosProp.SHUTTER_SPEED else EosProp.EXPOSURE_COMPENSATION
+            val base = _status.value.value(prop)
+            if (base == null || (useShutter && !EosValues.isKnownShutter(base))) {
+                _messages.tryEmit("Bracketing indisponível: a câmera ainda não informou a exposição")
+                return@launch
+            }
+            val offsets = Bracket.offsets(shots, stepThirds)
+            try {
+                offsets.forEachIndexed { i, offset ->
+                    _bracketing.value = BracketState(i + 1, offsets.size)
+                    val value = if (useShutter) Bracket.shutter(base, offset) else Bracket.compensation(base, offset)
+                    setPropertyNow(ptp, prop, value)
+                    val seconds = if (useShutter) EosValues.shutterSeconds(value) else 0.0
+                    // Subscribe before firing so the new-file event can't slip past between release and collect.
+                    val arrived = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                        withTimeoutOrNull((seconds * 1000).toLong() + 6_000) { newObjects.first() }
+                    }
+                    releaseShutter(ptp, info)
+                    arrived.join()
+                }
+            } catch (e: PtpException) {
+                _messages.tryEmit("Bracketing interrompido: ${e.message}")
+            } finally {
+                runCatching { setPropertyNow(ptp, prop, base) }
+                _status.update { it.copy(values = it.values + (prop to base)) }
+                _bracketing.value = null
+            }
+        }
+    }
+
+    /** All files on the card (folders excluded), newest name last. Uses standard PTP listing. */
+    suspend fun listCardFiles(onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): List<ObjectInfo> {
+        val ptp = session ?: throw PtpException("Câmera desconectada")
+        val info = deviceInfo ?: throw PtpException("Câmera desconectada")
+        if (!info.supports(PtpOp.GET_OBJECT_HANDLES) || !info.supports(PtpOp.GET_OBJECT_INFO)) {
+            throw PtpException("Esta câmera não permite listar o cartão pela USB")
+        }
+        val storages = PtpDataReader(ptp.transactForData(PtpOp.GET_STORAGE_IDS)).u32Array()
+        val files = mutableListOf<ObjectInfo>()
+        for (storage in storages) {
+            // Parent 0 = every object in the storage, flat, whatever folder it is in.
+            val handles = PtpDataReader(ptp.transactForData(PtpOp.GET_OBJECT_HANDLES, storage, 0, 0)).u32Array()
+            handles.forEachIndexed { i, handle ->
+                val obj = ObjectInfo.parse(handle, ptp.transactForData(PtpOp.GET_OBJECT_INFO, handle))
+                if (!obj.isFolder) files += obj
+                onProgress(i + 1, handles.size)
+            }
+        }
+        return files.sortedBy { it.filename }
+    }
+
+    /** Small JPEG the camera keeps for each file (about 160×120). */
+    suspend fun thumbnail(handle: Int): ByteArray? {
+        val ptp = session ?: return null
+        return runCatching { ptp.transactForData(PtpOp.GET_THUMB, handle) }.getOrNull()
+    }
+
+    val supportsCardListing: Boolean
+        get() = deviceInfo?.let { it.supports(PtpOp.GET_OBJECT_HANDLES) && it.supports(PtpOp.GET_OBJECT_INFO) } == true
 
     fun startInterval(seconds: Int, shots: Int) {
         intervalJob?.cancel()
@@ -360,6 +483,9 @@ class CameraManager(
 
     companion object {
         private const val TAG = "CameraManager"
+        private const val MODE_M = 3
+        private val TV_MODES = setOf(1, 3, 4)
+        private val AV_MODES = setOf(2, 3, 4)
         private const val ACTION_USB_PERMISSION = "com.jrtechofc.tether50d.USB_PERMISSION"
         const val CANON_VENDOR_ID = 0x04A9
         private const val POLL_IDLE_MS = 200L

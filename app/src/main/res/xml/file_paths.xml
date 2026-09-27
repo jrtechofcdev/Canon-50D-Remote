@@ -2,4 +2,5 @@
 <paths>
     <external-files-path name="photos" path="Pictures/" />
     <cache-path name="previews" path="previews/" />
+    <cache-path name="export" path="export/" />
 </paths>

@@ -66,10 +66,23 @@ import com.example.ui.components.FormatTag
 import com.example.ui.components.Readout
 import com.example.ui.components.SectionLabel
 import com.example.ui.components.ValuePickerSheet
+import com.example.core.data.SettingKeys
+import com.example.ui.PhotoActions
 import com.example.ui.theme.Tone
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import kotlinx.coroutines.launch
 
 @Composable
-fun SessionScreen(app: TetherApp, onOpenPhoto: (Long) -> Unit, onOpenSettings: () -> Unit) {
+fun SessionScreen(
+    app: TetherApp,
+    actions: PhotoActions,
+    onOpenPhoto: (Long) -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenCard: () -> Unit,
+    onOpenClient: () -> Unit,
+) {
     val state by app.camera.state.collectAsState()
     val status by app.camera.status.collectAsState()
     val interval by app.camera.interval.collectAsState()
@@ -78,9 +91,20 @@ fun SessionScreen(app: TetherApp, onOpenPhoto: (Long) -> Unit, onOpenSettings: (
     val settings by app.settings.settings.collectAsState(initial = Settings())
     val photos by remember { app.database.photoDao().observeAll() }.collectAsState(initial = emptyList())
     val connected = state is ConnectionState.Connected
+    val scope = rememberCoroutineScope()
+
+    val bracket by app.camera.bracketing.collectAsState()
+    val pending by app.tether.pendingOnCard.collectAsState()
 
     var picker by remember { mutableStateOf<Pair<String, Int>?>(null) }
     var showInterval by remember { mutableStateOf(false) }
+    var showPresets by remember { mutableStateOf(false) }
+    var showSummary by remember { mutableStateOf(false) }
+
+    val currentSettings by rememberUpdatedState(settings)
+    LaunchedEffect(Unit) {
+        app.tether.saved.collect { if (currentSettings.autoOpenViewer) onOpenPhoto(it.id) }
+    }
 
     BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
         val wide = maxWidth >= 720.dp
@@ -95,8 +119,9 @@ fun SessionScreen(app: TetherApp, onOpenPhoto: (Long) -> Unit, onOpenSettings: (
         }
         val controls: @Composable (Modifier) -> Unit = { mod ->
             Column(mod) {
-                ConnectionHeader(state, received, status, onConnect = app.camera::findAndConnect)
+                ConnectionHeader(state, received, status, settings.showBattery, onConnect = app.camera::findAndConnect)
                 FolderNotice(settings, onOpenSettings)
+                PendingBanner(pending.size, onDownload = app.tether::downloadPending, onDismiss = app.tether::dismissPending)
                 Spacer(Modifier.height(16.dp))
                 ExposureBar(status, connected) { title, prop -> picker = title to prop }
                 Spacer(Modifier.height(20.dp))
@@ -105,6 +130,19 @@ fun SessionScreen(app: TetherApp, onOpenPhoto: (Long) -> Unit, onOpenSettings: (
                     interval = interval,
                     onShoot = app.camera::capture,
                     onInterval = { if (interval.running) app.camera.stopInterval() else showInterval = true },
+                )
+                Spacer(Modifier.height(16.dp))
+                ToolsRow(
+                    settings = settings,
+                    connected = connected,
+                    bracket = bracket,
+                    hasSessionPhotos = photos.any { it.session == settings.sessionKey },
+                    onPresets = { showPresets = true },
+                    onBracket = { app.camera.startBracket(settings.aebShots, settings.aebStepThirds) },
+                    onCard = onOpenCard,
+                    onClient = onOpenClient,
+                    onNight = { scope.launch { app.settings.set(SettingKeys.nightMode, !settings.nightMode) } },
+                    onSummary = { showSummary = true },
                 )
             }
         }
@@ -138,6 +176,33 @@ fun SessionScreen(app: TetherApp, onOpenPhoto: (Long) -> Unit, onOpenSettings: (
         )
     }
 
+    if (showPresets) {
+        PresetsSheet(
+            presets = settings.exposurePresets,
+            status = status,
+            connected = connected,
+            onApply = {
+                app.camera.applyPreset(it)
+                showPresets = false
+            },
+            onSave = { preset -> scope.launch { app.settings.savePresets(settings.exposurePresets + preset) } },
+            onDismiss = { showPresets = false },
+        )
+    }
+
+    if (showSummary) {
+        SessionSummaryDialog(
+            app = app,
+            actions = actions,
+            settings = settings,
+            onEnd = {
+                showSummary = false
+                if (connected) app.camera.disconnect()
+            },
+            onDismiss = { showSummary = false },
+        )
+    }
+
     if (showInterval) {
         IntervalDialog(
             onStart = { seconds, shots ->
@@ -150,11 +215,12 @@ fun SessionScreen(app: TetherApp, onOpenPhoto: (Long) -> Unit, onOpenSettings: (
 }
 
 @Composable
-private fun ConnectionHeader(state: ConnectionState, received: Int, status: CameraStatus, onConnect: () -> Unit) {
+private fun ConnectionHeader(state: ConnectionState, received: Int, status: CameraStatus, showBattery: Boolean, onConnect: () -> Unit) {
     val (title, detail) = when (state) {
         is ConnectionState.Connected -> state.model to buildString {
             append(if (received == 1) "1 foto recebida" else "$received fotos recebidas")
             status.shotsLeft?.let { append(" · cartão: $it disparos") }
+            if (showBattery) status.value(EosProp.BATTERY_POWER)?.let { append(" · bateria: ${EosValues.batteryLabel(it)}") }
         }
         ConnectionState.Connecting -> "Conectando…" to "Abrindo sessão com a câmera"
         ConnectionState.WaitingPermission -> "Permissão USB" to "Toque em Permitir no aviso do Android"
