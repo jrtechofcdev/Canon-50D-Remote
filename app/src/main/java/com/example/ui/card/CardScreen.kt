@@ -110,7 +110,7 @@ fun CardScreen(app: TetherApp, onBack: () -> Unit) {
                 LinearProgressIndicator(
                     progress = { if (l.total > 0) l.done.toFloat() / l.total else 0f },
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    color = Tone.Accent, trackColor = Tone.SurfaceHigh,
+                    color = Tone.Info, trackColor = Tone.SurfaceHigh,
                 )
             }
             is CardLoad.Error -> Text(l.message, color = Tone.Error, modifier = Modifier.padding(24.dp))

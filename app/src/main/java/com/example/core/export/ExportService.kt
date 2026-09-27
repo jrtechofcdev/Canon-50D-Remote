@@ -10,6 +10,7 @@ import android.graphics.Rect
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
 import com.example.core.data.Settings
+import com.example.core.data.WatermarkSource
 import java.io.File
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -94,9 +95,18 @@ class ExportService(private val context: Context) {
         out
     }.getOrNull()
 
+    /** The logo chosen in Ajustes: one of the bundled Jr_Tech_OFC files, or the user's PNG. */
+    fun loadLogo(settings: Settings): Bitmap? {
+        val source = WatermarkSource.of(settings.watermarkSource)
+        return if (source.asset != null) {
+            runCatching { context.assets.open(source.asset).use { BitmapFactory.decodeStream(it) } }.getOrNull()
+        } else {
+            settings.watermarkPath?.let { BitmapFactory.decodeFile(it) }
+        }
+    }
+
     private fun drawWatermark(bitmap: Bitmap, settings: Settings) {
-        val path = settings.watermarkPath ?: return
-        val logo = BitmapFactory.decodeFile(path) ?: return
+        val logo = loadLogo(settings) ?: return
         val rect = WatermarkLayout.place(
             bitmap.width, bitmap.height, logo.width, logo.height,
             settings.watermarkPosition, settings.watermarkSizePct, settings.watermarkMarginPct,

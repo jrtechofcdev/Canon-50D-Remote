@@ -84,8 +84,8 @@ fun PhotosScreen(app: TetherApp, onOpenPhoto: (Long) -> Unit) {
                         onClick = { minStars = if (minStars == stars) 0 else stars },
                         label = { Text("★ $stars+") },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Tone.Accent,
-                            selectedLabelColor = Tone.OnAccent,
+                            selectedContainerColor = Tone.SurfaceHigh,
+                            selectedLabelColor = Tone.Text,
                             labelColor = Tone.TextMuted,
                         ),
                     )
@@ -129,7 +129,7 @@ fun PhotosScreen(app: TetherApp, onOpenPhoto: (Long) -> Unit) {
                     FormatTag(photo.rawUri != null, photo.jpgUri != null, Modifier.align(Alignment.BottomStart).padding(4.dp))
                     if (photo.favorite) {
                         Icon(
-                            Icons.Filled.Favorite, contentDescription = "Favorita", tint = Tone.Accent,
+                            Icons.Filled.Favorite, contentDescription = "Favorita", tint = Tone.Text,
                             modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(16.dp),
                         )
                     }
@@ -137,7 +137,7 @@ fun PhotosScreen(app: TetherApp, onOpenPhoto: (Long) -> Unit) {
                         Text(
                             "★".repeat(photo.rating),
                             style = MaterialTheme.typography.labelSmall,
-                            color = Tone.Accent,
+                            color = Tone.Text,
                             modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp),
                         )
                     }

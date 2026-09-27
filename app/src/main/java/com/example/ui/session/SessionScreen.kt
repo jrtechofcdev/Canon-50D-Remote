@@ -69,6 +69,10 @@ import com.example.ui.components.ValuePickerSheet
 import com.example.core.data.SettingKeys
 import com.example.ui.PhotoActions
 import com.example.ui.theme.Tone
+import com.example.ui.theme.BrandGradient
+import com.example.ui.components.BrandMark
+import com.example.ui.components.BrandSymbol
+import com.example.ui.components.StateTile
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -119,6 +123,8 @@ fun SessionScreen(
         }
         val controls: @Composable (Modifier) -> Unit = { mod ->
             Column(mod) {
+                BrandMark(subtitle = "Captura vinculada · Canon 50D")
+                Spacer(Modifier.height(20.dp))
                 ConnectionHeader(state, received, status, settings.showBattery, onConnect = app.camera::findAndConnect)
                 FolderNotice(settings, onOpenSettings)
                 PendingBanner(pending.size, onDownload = app.tether::downloadPending, onDismiss = app.tether::dismissPending)
@@ -128,8 +134,10 @@ fun SessionScreen(
                 ShutterRow(
                     connected = connected,
                     interval = interval,
+                    latest = photos.firstOrNull(),
                     onShoot = app.camera::capture,
                     onInterval = { if (interval.running) app.camera.stopInterval() else showInterval = true },
+                    onOpenLatest = onOpenPhoto,
                 )
                 Spacer(Modifier.height(16.dp))
                 ToolsRow(
@@ -230,18 +238,12 @@ private fun ConnectionHeader(state: ConnectionState, received: Int, status: Came
     val live = state is ConnectionState.Connected
 
     Row(verticalAlignment = Alignment.CenterVertically) {
-        // Real state indicator: amber only while the tether is live.
-        Box(
-            Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(
-                    when (state) {
-                        is ConnectionState.Connected -> Tone.Accent
-                        is ConnectionState.Failed -> Tone.Error
-                        else -> Tone.Line
-                    },
-                ),
+        StateTile(
+            when (state) {
+                is ConnectionState.Connected -> Tone.Accent
+                is ConnectionState.Failed -> Tone.Error
+                else -> Tone.Line
+            },
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
@@ -297,7 +299,7 @@ private fun ExposureBar(status: CameraStatus, connected: Boolean, onPick: (Strin
             .padding(4.dp),
     ) {
         Row(Modifier.fillMaxWidth()) {
-            Readout("MODO", text(EosProp.SHOOTING_MODE), false, {}, Modifier.weight(1f))
+            Readout("Modo", text(EosProp.SHOOTING_MODE), false, {}, Modifier.weight(1f))
             Readout("Tv", text(EosProp.SHUTTER_SPEED), tvEditable, { onPick("Velocidade", EosProp.SHUTTER_SPEED) }, Modifier.weight(1.2f))
             Readout("Av", text(EosProp.APERTURE), avEditable, { onPick("Abertura", EosProp.APERTURE) }, Modifier.weight(1.2f))
         }
@@ -309,29 +311,50 @@ private fun ExposureBar(status: CameraStatus, connected: Boolean, onPick: (Strin
     }
 }
 
+/** Camera-app layout: interval timer left, shutter centred, latest frame right (tap to review). */
 @Composable
-private fun ShutterRow(connected: Boolean, interval: IntervalState, onShoot: () -> Unit, onInterval: () -> Unit) {
+private fun ShutterRow(
+    connected: Boolean,
+    interval: IntervalState,
+    latest: Photo?,
+    onShoot: () -> Unit,
+    onInterval: () -> Unit,
+    onOpenLatest: (Long) -> Unit,
+) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        OutlinedButton(onClick = onInterval, enabled = connected, modifier = Modifier.weight(1f)) {
-            Icon(Icons.Outlined.Timer, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(if (interval.running) "Parar ${interval.done}/${interval.total}" else "Intervalômetro")
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            OutlinedButton(onClick = onInterval, enabled = connected) {
+                Icon(Icons.Outlined.Timer, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(if (interval.running) "${interval.done}/${interval.total}" else "Intervalo", maxLines = 1)
+            }
         }
-        Spacer(Modifier.width(20.dp))
         Box(
             Modifier
                 .size(76.dp)
                 .clip(CircleShape)
-                .border(3.dp, if (connected) Tone.Accent else Tone.Line, CircleShape)
+                .border(2.dp, if (connected) Tone.Accent else Tone.Line, CircleShape)
                 .padding(7.dp)
                 .clip(CircleShape)
-                .background(if (connected) Tone.Accent else Tone.SurfaceHigh)
+                // The logo's gradient lives on the one control that matters most.
+                .then(if (connected) Modifier.background(BrandGradient) else Modifier.background(Tone.SurfaceHigh))
                 .clickable(enabled = connected, onClick = onShoot)
                 .semantics { contentDescription = "Disparar" },
         )
-        Spacer(Modifier.width(20.dp))
-        // Keeps the shutter visually centred between the two sides.
-        Spacer(Modifier.weight(1f))
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+            Box(
+                Modifier
+                    .size(56.dp)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(Tone.Surface)
+                    .border(1.dp, Tone.Line, MaterialTheme.shapes.small)
+                    .clickable(enabled = latest != null) { latest?.let { onOpenLatest(it.id) } },
+            ) {
+                latest?.displayUri?.let {
+                    AsyncImage(model = it, contentDescription = "Última foto", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                }
+            }
+        }
     }
 }
 
@@ -350,11 +373,18 @@ private fun LatestPhoto(photo: Photo?, transfer: Transfer?, onOpen: (Long) -> Un
             if (uri != null) {
                 AsyncImage(model = uri, contentDescription = photo?.savedBase, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
             } else {
-                Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                Column(
+                    Modifier.fillMaxSize().padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    BrandSymbol(40.dp, tint = Tone.Line)
+                    Spacer(Modifier.height(12.dp))
                     Text(
-                        "Cada foto feita pelo botão da câmera ou pelo disparador acima aparece aqui e é salva sozinha no celular.",
+                        "Cada foto feita pelo botão da câmera ou pelo disparador aparece aqui e é salva sozinha no celular.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Tone.TextMuted,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     )
                 }
             }
@@ -385,7 +415,7 @@ private fun LatestPhoto(photo: Photo?, transfer: Transfer?, onOpen: (Long) -> Un
         LinearProgressIndicator(
             progress = { transfer.progress },
             modifier = Modifier.fillMaxWidth(),
-            color = Tone.Accent,
+            color = Tone.Info,
             trackColor = Tone.SurfaceHigh,
         )
     }

@@ -100,7 +100,13 @@ fun SliderRow(
             valueRange = range.first.toFloat()..range.last.toFloat(),
             steps = ((range.last - range.first) / step - 1).coerceAtLeast(0),
             enabled = enabled,
-            colors = SliderDefaults.colors(thumbColor = Tone.Accent, activeTrackColor = Tone.Accent, inactiveTrackColor = Tone.SurfaceHigh),
+            colors = SliderDefaults.colors(
+                thumbColor = Tone.Accent,
+                activeTrackColor = Tone.TextMuted,
+                inactiveTrackColor = Tone.SurfaceHigh,
+                activeTickColor = androidx.compose.ui.graphics.Color.Transparent,
+                inactiveTickColor = androidx.compose.ui.graphics.Color.Transparent,
+            ),
         )
     }
 }
@@ -114,15 +120,23 @@ fun <T> ChoiceRow(title: String, options: List<Pair<T, String>>, selected: T, en
         Spacer(Modifier.height(6.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             options.forEach { (value, label) ->
+                val isSelected = value == selected
                 FilterChip(
-                    selected = value == selected,
+                    selected = isSelected,
                     onClick = { onPick(value) },
                     enabled = enabled,
                     label = { Text(label) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Tone.Accent,
-                        selectedLabelColor = Tone.OnAccent,
-                        labelColor = Tone.Text,
+                        selectedContainerColor = Tone.SurfaceHigh,
+                        selectedLabelColor = Tone.Accent,
+                        labelColor = Tone.TextMuted,
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = enabled,
+                        selected = isSelected,
+                        borderColor = Tone.Line,
+                        selectedBorderColor = Tone.Accent,
+                        selectedBorderWidth = 1.dp,
                     ),
                 )
             }

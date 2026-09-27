@@ -67,7 +67,9 @@ data class Settings(
     val lightShareEnabled: Boolean = true,
     val lightShareSize: Int = 2048,
     val lightShareQuality: Int = 85,
-    val watermarkEnabled: Boolean = false,
+    val watermarkEnabled: Boolean = true,
+    /** One of [WatermarkSource] ids; "custom" uses [watermarkPath]. */
+    val watermarkSource: String = WatermarkSource.HorizontalWhite.id,
     val watermarkPath: String? = null,
     val watermarkPosition: Int = 8,
     val watermarkSizePct: Int = 20,
@@ -75,6 +77,7 @@ data class Settings(
     val watermarkMarginPct: Int = 3,
     val clientModeEnabled: Boolean = true,
     val clientShowInfo: Boolean = false,
+    val clientShowBrand: Boolean = true,
     val clientSlideSeconds: Int = 0,
     val clientOnlyFavorites: Boolean = false,
     val clientPin: String = "",
@@ -88,6 +91,19 @@ data class Settings(
     val sessionKey: String get() = sessionName.trim().ifEmpty { "Geral" }
 
     val exposurePresets: List<ExposurePreset> get() = ExposurePreset.decode(presets)
+}
+
+/** Jr_Tech_OFC logos bundled in assets/watermarks, plus the user's own PNG. */
+enum class WatermarkSource(val id: String, val label: String, val asset: String?) {
+    HorizontalWhite("horizontal_branco", "Logo horizontal branco", "watermarks/horizontal_branco.png"),
+    HorizontalBrand("horizontal_cores", "Logo horizontal nas cores", "watermarks/horizontal_cores.png"),
+    Stacked("empilhado", "Logo completo", "watermarks/empilhado.png"),
+    Symbol("simbolo", "Só o símbolo", "watermarks/simbolo.png"),
+    Custom("custom", "Meu PNG", null);
+
+    companion object {
+        fun of(id: String) = entries.firstOrNull { it.id == id } ?: HorizontalWhite
+    }
 }
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
@@ -133,6 +149,7 @@ object SettingKeys {
     val lightShareSize = intPreferencesKey("light_share_size")
     val lightShareQuality = intPreferencesKey("light_share_quality")
     val watermarkEnabled = booleanPreferencesKey("watermark_enabled")
+    val watermarkSource = stringPreferencesKey("watermark_source")
     val watermarkPath = stringPreferencesKey("watermark_path")
     val watermarkPosition = intPreferencesKey("watermark_position")
     val watermarkSizePct = intPreferencesKey("watermark_size_pct")
@@ -140,6 +157,7 @@ object SettingKeys {
     val watermarkMarginPct = intPreferencesKey("watermark_margin_pct")
     val clientModeEnabled = booleanPreferencesKey("client_mode_enabled")
     val clientShowInfo = booleanPreferencesKey("client_show_info")
+    val clientShowBrand = booleanPreferencesKey("client_show_brand")
     val clientSlideSeconds = intPreferencesKey("client_slide_seconds")
     val clientOnlyFavorites = booleanPreferencesKey("client_only_favorites")
     val clientPin = stringPreferencesKey("client_pin")
@@ -211,6 +229,7 @@ class SettingsRepository(private val context: Context) {
             lightShareSize = this[k.lightShareSize] ?: d.lightShareSize,
             lightShareQuality = this[k.lightShareQuality] ?: d.lightShareQuality,
             watermarkEnabled = this[k.watermarkEnabled] ?: d.watermarkEnabled,
+            watermarkSource = this[k.watermarkSource] ?: d.watermarkSource,
             watermarkPath = this[k.watermarkPath],
             watermarkPosition = this[k.watermarkPosition] ?: d.watermarkPosition,
             watermarkSizePct = this[k.watermarkSizePct] ?: d.watermarkSizePct,
@@ -218,6 +237,7 @@ class SettingsRepository(private val context: Context) {
             watermarkMarginPct = this[k.watermarkMarginPct] ?: d.watermarkMarginPct,
             clientModeEnabled = this[k.clientModeEnabled] ?: d.clientModeEnabled,
             clientShowInfo = this[k.clientShowInfo] ?: d.clientShowInfo,
+            clientShowBrand = this[k.clientShowBrand] ?: d.clientShowBrand,
             clientSlideSeconds = this[k.clientSlideSeconds] ?: d.clientSlideSeconds,
             clientOnlyFavorites = this[k.clientOnlyFavorites] ?: d.clientOnlyFavorites,
             clientPin = this[k.clientPin] ?: d.clientPin,

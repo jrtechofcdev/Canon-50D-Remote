@@ -12,8 +12,8 @@ android {
     applicationId = "com.jrtechofc.tether50d"
     minSdk = 24
     targetSdk = 36
-    versionCode = 3
-    versionName = "2.1"
+    versionCode = 4
+    versionName = "2.2"
   }
 
   signingConfigs {
@@ -72,6 +72,9 @@ dependencies {
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.robolectric)
   testImplementation(libs.androidx.test.core)
+  testImplementation(platform(libs.androidx.compose.bom))
+  testImplementation(libs.androidx.compose.ui.test.junit4)
+  debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
 }

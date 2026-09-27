@@ -34,7 +34,7 @@ class CameraForegroundService : LifecycleService() {
         ServiceCompat.startForeground(this, NOTIFICATION_ID, notification("Conectando à câmera…"), type)
 
         wakeLock = (getSystemService(Context.POWER_SERVICE) as PowerManager)
-            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "tether50d:session")
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "jrlink:session")
             .apply { acquire(6 * 60 * 60 * 1000L) }
 
         val app = application as TetherApp
@@ -65,8 +65,9 @@ class CameraForegroundService : LifecycleService() {
     }
 
     private fun notification(text: String) = NotificationCompat.Builder(this, CHANNEL_ID)
-        .setSmallIcon(android.R.drawable.ic_menu_camera)
-        .setContentTitle("Captura vinculada")
+        .setSmallIcon(com.example.R.drawable.ic_stat_symbol)
+        .setContentTitle("Jr_Link · captura vinculada")
+        .setColor(0xFF00FCA8.toInt())
         .setContentText(text)
         .setOngoing(true)
         .setOnlyAlertOnce(true)

@@ -41,6 +41,14 @@ import coil.compose.AsyncImage
 import com.example.TetherApp
 import com.example.core.data.Settings
 import com.example.ui.theme.Tone
+import com.example.ui.theme.WordmarkStyle
+import com.example.ui.components.BrandSymbol
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
 /**
@@ -89,6 +97,16 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit) {
             )
         } else {
             ClientPager(app, photos.map { it.id to it }, settings)
+        }
+        if (settings.clientShowBrand) {
+            Row(
+                Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(16.dp).alpha(0.8f),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BrandSymbol(20.dp)
+                Spacer(Modifier.width(8.dp))
+                Text("Jr_Tech_OFC", style = WordmarkStyle.copy(fontSize = 14.sp), color = Color.White)
+            }
         }
     }
 

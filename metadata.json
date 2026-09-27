@@ -1,6 +1,6 @@
 {
-  "name": "Tether 50D",
-  "description": "Captura vinculada USB para a Canon EOS 50D: auto-save de RAW e JPG em pastas escolhidas, preview e envio para o Lightroom.",
+  "name": "Jr_Link",
+  "description": "Jr_Link (Jr_Tech_OFC): captura vinculada USB para a Canon EOS 50D: auto-save de RAW e JPG em pastas escolhidas, preview e envio para o Lightroom.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

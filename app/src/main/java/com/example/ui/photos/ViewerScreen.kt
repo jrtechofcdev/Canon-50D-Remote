@@ -164,14 +164,14 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
                 Icon(
                     Icons.Outlined.WbSunny,
                     contentDescription = if (showClipping) "Esconder alerta de estouro" else "Mostrar alerta de estouro",
-                    tint = if (showClipping) Tone.Accent else Tone.TextMuted,
+                    tint = if (showClipping) Tone.Info else Tone.TextMuted,
                 )
             }
             IconButton(onClick = { scope.launch { app.database.photoDao().setFavorite(current.id, !current.favorite) } }) {
                 Icon(
                     if (current.favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                     contentDescription = "Favorita",
-                    tint = if (current.favorite) Tone.Accent else Tone.Text,
+                    tint = Tone.Text,
                 )
             }
             IconButton(onClick = { confirmDelete = current }) { Icon(Icons.Outlined.Delete, contentDescription = "Apagar do celular") }
@@ -253,7 +253,7 @@ fun RatingBar(rating: Int, onRate: (Int) -> Unit) {
                 Icon(
                     if (star <= rating) Icons.Filled.Star else Icons.Outlined.StarOutline,
                     contentDescription = null,
-                    tint = if (star <= rating) Tone.Accent else Tone.TextMuted,
+                    tint = if (star <= rating) Tone.Text else Tone.TextMuted,
                 )
             }
         }
@@ -369,7 +369,7 @@ private fun fileSummary(photo: Photo): String {
 @Composable
 private fun Histogram(analysis: Analysis?, rgb: Boolean, modifier: Modifier) {
     val background = Tone.Surface
-    val luma = Tone.TextMuted
+    val luma = Tone.Info
     Canvas(modifier.background(background)) {
         val a = analysis ?: return@Canvas
         val channels = if (rgb) {

@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.core.ptp.EosValues
 import com.example.ui.theme.ReadoutStyle
+import com.example.ui.theme.TileShape
 import com.example.ui.theme.Tone
 
 /** Section title used across screens. */
@@ -114,8 +115,8 @@ fun FormatTag(hasRaw: Boolean, hasJpg: Boolean, modifier: Modifier = Modifier) {
         style = MaterialTheme.typography.labelSmall,
         color = Tone.Text,
         modifier = modifier
-            .clip(MaterialTheme.shapes.extraSmall)
-            .background(Color.Black.copy(alpha = 0.6f))
-            .padding(horizontal = 5.dp, vertical = 2.dp),
+            .clip(TileShape(slant = 0.3f, corner = 0.15f))
+            .background(Color.Black.copy(alpha = 0.65f))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
     )
 }

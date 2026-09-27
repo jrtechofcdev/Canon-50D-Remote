@@ -3,7 +3,6 @@ package com.example.ui.settings
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -70,18 +69,24 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.example.TetherApp
 import com.example.core.camera.ConnectionState
 import com.example.core.data.DownloadMode
 import com.example.core.data.Settings
 import com.example.core.data.SettingKeys
+import com.example.core.data.WatermarkSource
+import androidx.compose.foundation.Image
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import com.example.core.export.WatermarkLayout
 import com.example.core.ptp.EosProp
 import com.example.core.ptp.EosValues
 import com.example.ui.theme.Tone
+import com.example.ui.theme.WordmarkStyle
+import com.example.ui.components.BrandSymbol
+import com.example.BuildConfig
 import kotlinx.coroutines.launch
-import java.io.File
 
 enum class SettingsSection(val route: String, val title: String, val summary: String, val icon: ImageVector) {
     Save("save", "Salvamento", "Formato, pastas RAW e JPG, sessão e nomes", Icons.Outlined.Folder),
@@ -117,6 +122,19 @@ fun SettingsScreen(onOpen: (SettingsSection) -> Unit) {
                 Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = Tone.TextMuted)
             }
         }
+        Spacer(Modifier.height(40.dp))
+        AboutFooter()
+    }
+}
+
+@Composable
+private fun AboutFooter() {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        BrandSymbol(36.dp)
+        Spacer(Modifier.height(10.dp))
+        Text("Jr_Link ${BuildConfig.VERSION_NAME}", style = WordmarkStyle.copy(fontSize = 16.sp), color = Tone.Text)
+        Text("por Jr_Tech_OFC · Nossa Arte, Seu Sucesso", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -166,21 +184,21 @@ private fun SaveSettings(app: TetherApp, s: Settings) {
     val pickJpg = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.jpgFolder, it) } }
     val pickRaw = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.rawFolder, it) } }
 
-    SettingsGroup("O QUE VEM PARA O CELULAR") {
+    SettingsGroup("O que vem para o celular") {
         ChoiceRow("Formato", DownloadMode.entries.map { it to it.label }, s.downloadMode) {
             scope.launch { app.settings.setDownloadMode(it) }
         }
         InfoText("A câmera grava tudo no cartão. Aqui você escolhe o que também é salvo no celular.")
     }
 
-    SettingsGroup("PASTAS") {
+    SettingsGroup("Pastas") {
         FolderRow("Pasta dos JPG", app.store.describeTree(s.jpgFolder), s.downloadMode.jpg,
             onPick = { pickJpg.launch(null) }, onReset = s.jpgFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.jpgFolder, null) } } })
         FolderRow("Pasta dos RAW (CR2)", app.store.describeTree(s.rawFolder), s.downloadMode.raw,
             onPick = { pickRaw.launch(null) }, onReset = s.rawFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.rawFolder, null) } } })
     }
 
-    SettingsGroup("SESSÃO / CLIENTE") {
+    SettingsGroup("Sessão / cliente") {
         var name by remember { mutableStateOf(s.sessionName) }
         OutlinedTextField(
             value = name,
@@ -232,15 +250,15 @@ private fun ReviewSettings(app: TetherApp, s: Settings) {
     val scope = rememberCoroutineScope()
     fun set(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>, v: Boolean) = scope.launch { app.settings.set(key, v) }
 
-    SettingsGroup("FOTO NOVA") {
+    SettingsGroup("Foto nova") {
         ToggleRow("Ir para a foto nova automaticamente", "Com uma foto aberta em tela cheia, desliza para a que acabou de chegar", s.autoSlideToNew) { set(SettingKeys.autoSlideToNew, it) }
         ToggleRow("Só se eu estiver na última foto", "Não interrompe quando você está revendo fotos antigas", s.autoSlideOnlyAtLatest, enabled = s.autoSlideToNew) { set(SettingKeys.autoSlideOnlyAtLatest, it) }
         ToggleRow("Abrir em tela cheia ao receber", "Na tela Sessão, cada foto nova abre direto no visualizador", s.autoOpenViewer) { set(SettingKeys.autoOpenViewer, it) }
     }
-    SettingsGroup("AVALIAÇÃO") {
+    SettingsGroup("Avaliação") {
         ToggleRow("Estrelas (1 a 5)", "Mostra as estrelas no visualizador e o filtro na galeria", s.ratingEnabled) { set(SettingKeys.ratingEnabled, it) }
     }
-    SettingsGroup("EXPOSIÇÃO") {
+    SettingsGroup("Exposição") {
         ToggleRow("Histograma", null, s.histogramEnabled) { set(SettingKeys.histogramEnabled, it) }
         ToggleRow("Histograma RGB", "Desligado: só luminância", s.histogramRgb, enabled = s.histogramEnabled) { set(SettingKeys.histogramRgb, it) }
         ToggleRow("Alerta de estouro", "Áreas estouradas piscam em vermelho ao abrir a foto", s.highlightAlert) { set(SettingKeys.highlightAlert, it) }
@@ -259,17 +277,17 @@ private fun CameraSettings(app: TetherApp, s: Settings) {
     val state by app.camera.state.collectAsState()
     fun set(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>, v: Boolean) = scope.launch { app.settings.set(key, v) }
 
-    SettingsGroup("CONEXÃO") {
+    SettingsGroup("Conexão") {
         ToggleRow("Manter a câmera ligada", "Evita o desligamento automático da 50D durante a sessão", s.keepCameraAwake) { set(SettingKeys.keepCameraAwake, it) }
         ToggleRow("Mostrar bateria da câmera", "No topo da Sessão e aviso quando estiver baixa", s.showBattery) { set(SettingKeys.showBattery, it) }
         if (state is ConnectionState.Connected) {
             OutlinedButton(onClick = app.camera::disconnect, modifier = Modifier.padding(vertical = 8.dp)) { Text("Encerrar conexão") }
         }
     }
-    SettingsGroup("CARTÃO") {
+    SettingsGroup("Cartão") {
         ToggleRow("Navegar no cartão", "Botão na Sessão para ver e baixar fotos que já estão no cartão", s.cardBrowserEnabled) { set(SettingKeys.cardBrowserEnabled, it) }
     }
-    SettingsGroup("PRESETS DE EXPOSIÇÃO") {
+    SettingsGroup("Presets de exposição") {
         ToggleRow("Usar presets", "Salve ISO, Av, Tv, ±EV e WB e aplique com um toque na Sessão", s.presetsEnabled) { set(SettingKeys.presetsEnabled, it) }
         val presets = s.exposurePresets
         if (presets.isEmpty()) InfoText("Nenhum preset salvo. Na Sessão, toque em Presets → Salvar atual.")
@@ -295,7 +313,7 @@ private fun CameraSettings(app: TetherApp, s: Settings) {
             }
         }
     }
-    SettingsGroup("BRACKETING (AEB)") {
+    SettingsGroup("Bracketing (AEB)") {
         ToggleRow("Bracketing pelo app", "Botão na Sessão que faz a sequência variando a exposição", s.aebEnabled) { set(SettingKeys.aebEnabled, it) }
         ChoiceRow("Fotos por sequência", listOf(3 to "3", 5 to "5", 7 to "7"), s.aebShots, enabled = s.aebEnabled) {
             scope.launch { app.settings.set(SettingKeys.aebShots, it) }
@@ -320,12 +338,14 @@ private fun ShareSettings(app: TetherApp, s: Settings) {
     val pickLogo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) scope.launch {
             val path = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { app.export.importLogo(uri) }
-            app.settings.setOrClear(SettingKeys.watermarkPath, path)
-            if (path != null) app.settings.set(SettingKeys.watermarkEnabled, true)
+            if (path != null) {
+                app.settings.setOrClear(SettingKeys.watermarkPath, path)
+                app.settings.set(SettingKeys.watermarkSource, WatermarkSource.Custom.id)
+            }
         }
     }
 
-    SettingsGroup("ENVIO LEVE (WHATSAPP)") {
+    SettingsGroup("Envio leve (WhatsApp)") {
         ToggleRow("Opção \"JPG leve\" ao enviar", "Cópia reduzida, rápida no 4G. O original não muda.", s.lightShareEnabled) { set(SettingKeys.lightShareEnabled, it) }
         ChoiceRow(
             "Tamanho (lado maior)",
@@ -338,30 +358,43 @@ private fun ShareSettings(app: TetherApp, s: Settings) {
         }
     }
 
-    SettingsGroup("MARCA D'ÁGUA") {
-        ToggleRow("Aplicar marca d'água", "Só nas cópias leves enviadas. Os arquivos salvos ficam sem marca.", s.watermarkEnabled, enabled = s.watermarkPath != null) {
+    SettingsGroup("Marca d'água") {
+        ToggleRow("Aplicar marca d'água", "Só nas cópias leves enviadas. Os arquivos salvos ficam sem marca.", s.watermarkEnabled) {
             set(SettingKeys.watermarkEnabled, it)
         }
-        Row(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { pickLogo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
-                Text(if (s.watermarkPath == null) "Escolher logo (PNG)" else "Trocar logo")
+        val source = WatermarkSource.of(s.watermarkSource)
+        ChoiceRow(
+            "Logo",
+            WatermarkSource.entries.map { it.id to it.label },
+            source.id,
+            enabled = s.watermarkEnabled,
+        ) { id ->
+            if (id == WatermarkSource.Custom.id && s.watermarkPath == null) {
+                pickLogo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            } else {
+                scope.launch { app.settings.set(SettingKeys.watermarkSource, id) }
             }
         }
-        if (s.watermarkPath != null) {
-            WatermarkPreview(s)
+        if (source == WatermarkSource.Custom) {
+            OutlinedButton(
+                onClick = { pickLogo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                modifier = Modifier.padding(bottom = 8.dp),
+            ) { Text("Trocar PNG") }
+        }
+        if (s.watermarkEnabled) {
+            WatermarkPreview(app, s)
             Text("Posição", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 12.dp))
             PositionGrid(s.watermarkPosition) { scope.launch { app.settings.set(SettingKeys.watermarkPosition, it) } }
             SliderRow("Tamanho", s.watermarkSizePct, 5..60, format = { "$it%" }) { scope.launch { app.settings.set(SettingKeys.watermarkSizePct, it) } }
             SliderRow("Opacidade", s.watermarkOpacity, 10..100, step = 5, format = { "$it%" }) { scope.launch { app.settings.set(SettingKeys.watermarkOpacity, it) } }
             SliderRow("Margem", s.watermarkMarginPct, 0..15, format = { "$it%" }) { scope.launch { app.settings.set(SettingKeys.watermarkMarginPct, it) } }
-        } else {
-            InfoText("Use um PNG com fundo transparente (ex.: logo Jr_Tech_OFC).")
         }
     }
 
-    SettingsGroup("MODO CLIENTE") {
+    SettingsGroup("Modo cliente") {
         ToggleRow("Mostrar botão Modo cliente", "Tela cheia só com as fotos, para o cliente acompanhar", s.clientModeEnabled) { set(SettingKeys.clientModeEnabled, it) }
         ToggleRow("Mostrar nome e exposição", null, s.clientShowInfo, enabled = s.clientModeEnabled) { set(SettingKeys.clientShowInfo, it) }
+        ToggleRow("Assinatura Jr_Tech_OFC", "Símbolo e nome discretos no canto da tela", s.clientShowBrand, enabled = s.clientModeEnabled) { set(SettingKeys.clientShowBrand, it) }
         ToggleRow("Só favoritas", "Mostra apenas as fotos marcadas com estrela de favorita", s.clientOnlyFavorites, enabled = s.clientModeEnabled) { set(SettingKeys.clientOnlyFavorites, it) }
         ChoiceRow(
             "Passar as fotos",
@@ -388,24 +421,25 @@ private fun ShareSettings(app: TetherApp, s: Settings) {
     }
 }
 
+/** Where the logo lands on a 3:2 frame, with the real logo, size and opacity. */
 @Composable
-private fun WatermarkPreview(s: Settings) {
-    val path = s.watermarkPath ?: return
-    val logoSize = remember(path) {
-        BitmapFactory.Options().apply { inJustDecodeBounds = true }.also { BitmapFactory.decodeFile(path, it) }
-            .let { it.outWidth.coerceAtLeast(1) to it.outHeight.coerceAtLeast(1) }
+private fun WatermarkPreview(app: TetherApp, s: Settings) {
+    val logo by produceState<android.graphics.Bitmap?>(null, s.watermarkSource, s.watermarkPath) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { app.export.loadLogo(s) }
     }
+    val bitmap = logo ?: return
+    val image = remember(bitmap) { bitmap.asImageBitmap() }
     BoxWithConstraints(
-        Modifier.fillMaxWidth().aspectRatio(3f / 2f).clip(MaterialTheme.shapes.small).background(Tone.SurfaceHigh),
+        Modifier.fillMaxWidth().aspectRatio(3f / 2f).clip(MaterialTheme.shapes.small).background(Color(0xFF6B6F66)),
     ) {
         val density = LocalDensity.current
         val wPx = with(density) { maxWidth.roundToPx() }
         val hPx = with(density) { maxHeight.roundToPx() }
-        val r = WatermarkLayout.place(wPx, hPx, logoSize.first, logoSize.second, s.watermarkPosition, s.watermarkSizePct, s.watermarkMarginPct)
-        Text("Prévia", style = MaterialTheme.typography.labelSmall, color = Tone.TextMuted, modifier = Modifier.padding(8.dp))
-        AsyncImage(
-            model = File(path),
-            contentDescription = "Logo",
+        val r = WatermarkLayout.place(wPx, hPx, bitmap.width, bitmap.height, s.watermarkPosition, s.watermarkSizePct, s.watermarkMarginPct)
+        Text("Prévia sobre uma foto", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.padding(8.dp))
+        Image(
+            bitmap = image,
+            contentDescription = "Marca d'água",
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .offset(x = with(density) { r.left.toDp() }, y = with(density) { r.top.toDp() })
@@ -443,7 +477,7 @@ private fun AlertSettings(app: TetherApp, s: Settings) {
     val scope = rememberCoroutineScope()
     fun set(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>, v: Boolean) = scope.launch { app.settings.set(key, v) }
 
-    SettingsGroup("AVISOS") {
+    SettingsGroup("Avisos") {
         ToggleRow("Vibrar a cada foto recebida", "Um toque curto, sem som", s.vibrateOnReceive) { set(SettingKeys.vibrateOnReceive, it) }
         ToggleRow("Alerta se a câmera desconectar", "Vibração forte e notificação", s.alertOnDisconnect) { set(SettingKeys.alertOnDisconnect, it) }
         ToggleRow("Aviso de cartão quase cheio", null, s.cardLowWarning) { set(SettingKeys.cardLowWarning, it) }
@@ -455,11 +489,11 @@ private fun AlertSettings(app: TetherApp, s: Settings) {
             scope.launch { app.settings.set(SettingKeys.phoneLowGb, it) }
         }
     }
-    SettingsGroup("REENVIO AUTOMÁTICO") {
+    SettingsGroup("Reenvio automático") {
         ToggleRow("Baixar fotos pendentes ao reconectar", "Fotos feitas com o cabo solto, ou que falharam, vêm do cartão quando a câmera volta", s.autoResend) { set(SettingKeys.autoResend, it) }
         ToggleRow("Perguntar antes de baixar", null, s.resendAsk, enabled = s.autoResend) { set(SettingKeys.resendAsk, it) }
     }
-    SettingsGroup("FIM DA SESSÃO") {
+    SettingsGroup("Fim da sessão") {
         ToggleRow("Mostrar resumo da sessão", "Ao encerrar: total, espaço usado, favoritas e envio ao Lightroom", s.sessionSummary) { set(SettingKeys.sessionSummary, it) }
     }
 }
@@ -469,7 +503,7 @@ private fun AlertSettings(app: TetherApp, s: Settings) {
 @Composable
 private fun DisplaySettings(app: TetherApp, s: Settings) {
     val scope = rememberCoroutineScope()
-    SettingsGroup("MODO ESCURO TOTAL") {
+    SettingsGroup("Modo escuro total") {
         ToggleRow("Ativar", "Cores ainda mais escuras e brilho reduzido, para igrejas e eventos à noite", s.nightMode) {
             scope.launch { app.settings.set(SettingKeys.nightMode, it) }
         }
@@ -477,7 +511,7 @@ private fun DisplaySettings(app: TetherApp, s: Settings) {
             scope.launch { app.settings.set(SettingKeys.nightBrightness, it) }
         }
     }
-    SettingsGroup("TELA") {
+    SettingsGroup("Tela") {
         ToggleRow("Manter a tela ligada", "Enquanto a câmera estiver conectada", s.keepScreenOn) {
             scope.launch { app.settings.set(SettingKeys.keepScreenOn, it) }
         }
@@ -512,5 +546,5 @@ private fun DiagnosticsSettings(app: TetherApp) {
 
 private fun copyLog(context: Context, lines: List<String>) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText("Log Tether 50D", lines.joinToString("\n")))
+    clipboard.setPrimaryClip(ClipData.newPlainText("Log Jr_Link", lines.joinToString("\n")))
 }

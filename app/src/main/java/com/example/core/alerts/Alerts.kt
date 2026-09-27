@@ -49,8 +49,9 @@ class Alerts(private val context: Context) {
         ) return
         val open = PendingIntent.getActivity(context, 1, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_warning)
+            .setSmallIcon(com.example.R.drawable.ic_stat_symbol)
             .setContentTitle(title)
+            .setColor(0xFF00FCA8.toInt())
             .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)

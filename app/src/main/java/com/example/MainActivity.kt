@@ -51,7 +51,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.activity.compose.LocalActivity
 import com.example.ui.theme.Tone
-import com.example.ui.theme.TetherTheme
+import com.example.ui.theme.JrLinkTheme
 import kotlinx.coroutines.flow.merge
 
 class MainActivity : ComponentActivity() {
@@ -73,7 +73,7 @@ class MainActivity : ComponentActivity() {
                 nightBrightness = if (settings.nightMode) settings.nightBrightness else null,
                 keepScreenOn = settings.keepScreenOn && cameraState is ConnectionState.Connected,
             )
-            TetherTheme(night = settings.nightMode) {
+            JrLinkTheme(night = settings.nightMode) {
                 val nav = rememberNavController()
                 val entry by nav.currentBackStackEntryAsState()
                 val route = entry?.destination?.route ?: Tab.Session.route
@@ -103,7 +103,7 @@ class MainActivity : ComponentActivity() {
                                         icon = { Icon(tab.icon, contentDescription = null) },
                                         label = { Text(tab.label) },
                                         colors = NavigationBarItemDefaults.colors(
-                                            selectedIconColor = Tone.Text,
+                                            selectedIconColor = Tone.Accent,
                                             selectedTextColor = Tone.Text,
                                             indicatorColor = Tone.SurfaceHigh,
                                             unselectedIconColor = Tone.TextMuted,
