@@ -1,0 +1,370 @@
+package com.example.core.camera
+
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.hardware.usb.UsbConstants
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
+import android.os.Build
+import android.util.Log
+import androidx.core.content.ContextCompat
+import androidx.core.content.IntentCompat
+import com.example.core.ptp.DeviceInfo
+import com.example.core.ptp.EosEventParser
+import com.example.core.ptp.EosEventRecord
+import com.example.core.ptp.EosProp
+import com.example.core.ptp.PtpContainer
+import com.example.core.ptp.PtpDataSink
+import com.example.core.ptp.PtpException
+import com.example.core.ptp.PtpOp
+import com.example.core.ptp.PtpResponse
+import com.example.core.ptp.PtpResponseException
+import com.example.core.ptp.PtpSession
+import com.example.core.ptp.UsbPtpTransport
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+sealed interface ConnectionState {
+    data object NoCamera : ConnectionState
+    data object WaitingPermission : ConnectionState
+    data object Connecting : ConnectionState
+    data class Connected(val model: String, val serial: String) : ConnectionState
+    data class Failed(val message: String) : ConnectionState
+}
+
+/** Exposure values as last reported by the camera, keyed by EOS property code. */
+data class CameraStatus(
+    val values: Map<Int, Int> = emptyMap(),
+    val options: Map<Int, List<Int>> = emptyMap(),
+) {
+    fun value(prop: Int): Int? = values[prop]
+    fun options(prop: Int): List<Int> = options[prop].orEmpty()
+    val shotsLeft: Int? get() = values[EosProp.AVAILABLE_SHOTS]
+}
+
+data class IntervalState(val running: Boolean = false, val done: Int = 0, val total: Int = 0, val seconds: Int = 0)
+
+/**
+ * Owns the USB link to the 50D.
+ *
+ * The session is opened in "event mode" only: no UI lock and no live view, so the camera body keeps
+ * working normally. Every frame written to the card (from the camera's own shutter button or from the
+ * app) is announced through GetEvent and handed to [newObjects] for download.
+ */
+class CameraManager(
+    private val context: Context,
+    private val keepCameraAwake: suspend () -> Boolean,
+) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
+
+    private val _state = MutableStateFlow<ConnectionState>(ConnectionState.NoCamera)
+    val state: StateFlow<ConnectionState> = _state.asStateFlow()
+
+    private val _status = MutableStateFlow(CameraStatus())
+    val status: StateFlow<CameraStatus> = _status.asStateFlow()
+
+    private val _newObjects = MutableSharedFlow<EosEventRecord.ObjectAdded>(extraBufferCapacity = 64)
+    val newObjects: SharedFlow<EosEventRecord.ObjectAdded> = _newObjects.asSharedFlow()
+
+    private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val messages: SharedFlow<String> = _messages.asSharedFlow()
+
+    private val _interval = MutableStateFlow(IntervalState())
+    val interval: StateFlow<IntervalState> = _interval.asStateFlow()
+
+    private val _log = MutableStateFlow<List<String>>(emptyList())
+    val log: StateFlow<List<String>> = _log.asStateFlow()
+
+    private var session: PtpSession? = null
+    private var device: UsbDevice? = null
+    private var deviceInfo: DeviceInfo? = null
+    private var sessionJob: Job? = null
+    private var intervalJob: Job? = null
+
+    private val usbReceiver = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) {
+            val dev = IntentCompat.getParcelableExtra(intent, UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+            when (intent.action) {
+                ACTION_USB_PERMISSION -> {
+                    if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false) && dev != null) {
+                        open(dev)
+                    } else {
+                        _state.value = ConnectionState.Failed("Permissão USB negada. Toque em Conectar para tentar de novo.")
+                    }
+                }
+                UsbManager.ACTION_USB_DEVICE_ATTACHED -> findAndConnect()
+                UsbManager.ACTION_USB_DEVICE_DETACHED -> if (dev != null && dev.deviceName == device?.deviceName) {
+                    log("Cabo desconectado")
+                    closeSession()
+                    _state.value = ConnectionState.NoCamera
+                }
+            }
+        }
+    }
+
+    init {
+        val filter = IntentFilter().apply {
+            addAction(ACTION_USB_PERMISSION)
+            addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+            addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
+        }
+        ContextCompat.registerReceiver(context, usbReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+    }
+
+    /** Looks for a Canon still-image device and connects, asking for USB permission if needed. */
+    fun findAndConnect() {
+        if (_state.value is ConnectionState.Connected || _state.value == ConnectionState.Connecting) return
+        val camera = usbManager.deviceList.values
+            .filter { stillImageInterface(it) != null }
+            .sortedByDescending { it.vendorId == CANON_VENDOR_ID }
+            .firstOrNull()
+        if (camera == null) {
+            _state.value = ConnectionState.NoCamera
+            return
+        }
+        if (usbManager.hasPermission(camera)) {
+            open(camera)
+        } else {
+            _state.value = ConnectionState.WaitingPermission
+            val intent = Intent(ACTION_USB_PERMISSION).setPackage(context.packageName)
+            // The system fills in the device and the grant flag, so the intent has to be mutable.
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+            usbManager.requestPermission(camera, PendingIntent.getBroadcast(context, 0, intent, flags))
+        }
+    }
+
+    private fun open(dev: UsbDevice) {
+        if (_state.value is ConnectionState.Connected) return
+        _state.value = ConnectionState.Connecting
+        val iface = stillImageInterface(dev)
+        val endpoints = iface?.let { UsbPtpTransport.endpointsOf(it) }
+        val connection = usbManager.openDevice(dev)
+        if (iface == null || endpoints == null || connection == null) {
+            connection?.close()
+            _state.value = ConnectionState.Failed("Não foi possível abrir a câmera pela USB.")
+            return
+        }
+        if (!connection.claimInterface(iface, true)) {
+            connection.close()
+            _state.value = ConnectionState.Failed("Outro app está usando a câmera. Feche-o e tente de novo.")
+            return
+        }
+        val transport = UsbPtpTransport(connection, iface, endpoints.first, endpoints.second)
+        val ptp = PtpSession(transport, ::log)
+        session = ptp
+        device = dev
+        sessionJob = scope.launch { runSession(ptp) }
+    }
+
+    private suspend fun runSession(ptp: PtpSession) {
+        try {
+            log("Abrindo sessão PTP")
+            ptp.openSession()
+            val info = DeviceInfo.parse(ptp.transactForData(PtpOp.GET_DEVICE_INFO))
+            deviceInfo = info
+            log("Câmera: ${info.manufacturer} ${info.model} (firmware ${info.version})")
+
+            // Remote mode + event mode is what EOS Utility uses for tethering. No UI lock is sent,
+            // so the shutter button, dials and menus on the camera stay usable.
+            if (info.supports(PtpOp.EOS_SET_REMOTE_MODE)) ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, 1)
+            if (info.supports(PtpOp.EOS_SET_EVENT_MODE)) ptp.transact(PtpOp.EOS_SET_EVENT_MODE, 1)
+            runCatching { setPropertyNow(ptp, EosProp.CAPTURE_DESTINATION, EosProp.DESTINATION_CARD) }
+                .onFailure { log("Destino de captura mantido pela câmera: ${it.message}") }
+
+            // The first GetEvent calls describe the current state (and may list files already on the card).
+            // Read them until the queue is empty and only then start treating new objects as new shots.
+            for (i in 0 until 20) {
+                val records = EosEventParser.parse(ptp.transactForData(PtpOp.EOS_GET_EVENT))
+                applyRecords(records, announceObjects = false)
+                if (records.isEmpty()) break
+            }
+
+            _state.value = ConnectionState.Connected(info.model.ifBlank { "Canon EOS" }, info.serial)
+            log("Pronto: captura vinculada ativa")
+            eventLoop(ptp, info)
+        } catch (e: Exception) {
+            if (session === ptp) {
+                log("Erro: ${e.message}")
+                closeSession()
+                _state.value = ConnectionState.Failed(e.message ?: "Falha na comunicação com a câmera")
+            }
+        }
+    }
+
+    private suspend fun eventLoop(ptp: PtpSession, info: DeviceInfo) {
+        var lastKeepAlive = System.currentTimeMillis()
+        while (scope.isActive && session === ptp) {
+            val records = try {
+                EosEventParser.parse(ptp.transactForData(PtpOp.EOS_GET_EVENT))
+            } catch (e: PtpResponseException) {
+                // Busy while the camera writes to the card: just ask again shortly.
+                delay(300)
+                continue
+            }
+            applyRecords(records, announceObjects = true)
+
+            val now = System.currentTimeMillis()
+            if (now - lastKeepAlive > KEEP_ALIVE_MS && info.supports(PtpOp.EOS_KEEP_DEVICE_ON) && keepCameraAwake()) {
+                runCatching { ptp.transact(PtpOp.EOS_KEEP_DEVICE_ON) }
+                lastKeepAlive = now
+            }
+            delay(if (records.isEmpty()) POLL_IDLE_MS else POLL_BUSY_MS)
+        }
+    }
+
+    private fun applyRecords(records: List<EosEventRecord>, announceObjects: Boolean) {
+        for (record in records) when (record) {
+            is EosEventRecord.PropertyChanged ->
+                _status.update { it.copy(values = it.values + (record.prop to record.value)) }
+            is EosEventRecord.AvailableValues ->
+                _status.update { it.copy(options = it.options + (record.prop to record.values)) }
+            is EosEventRecord.ObjectAdded -> if (announceObjects && !record.isFolder) {
+                log("Nova foto: ${record.filename} (${record.size / 1024} KB)")
+                _newObjects.tryEmit(record)
+            }
+        }
+    }
+
+    /** Streams one file from the camera. Runs inside the session lock, so polling pauses meanwhile. */
+    suspend fun download(handle: Int, sink: PtpDataSink) {
+        val ptp = session ?: throw PtpException("Câmera desconectada")
+        ptp.transact(PtpOp.GET_OBJECT, handle, dataIn = sink, timeoutMs = DOWNLOAD_TIMEOUT_MS)
+    }
+
+    fun capture() {
+        val ptp = session ?: return
+        val info = deviceInfo ?: return
+        scope.launch {
+            try {
+                releaseShutter(ptp, info)
+            } catch (e: PtpException) {
+                _messages.tryEmit("Não disparou: ${e.message}")
+            }
+        }
+    }
+
+    private suspend fun releaseShutter(ptp: PtpSession, info: DeviceInfo) {
+        repeat(4) { attempt ->
+            try {
+                if (info.supports(PtpOp.EOS_REMOTE_RELEASE)) {
+                    // 50D path: one command, the camera focuses (if AF) and fires like a full press.
+                    ptp.transact(PtpOp.EOS_REMOTE_RELEASE)
+                } else {
+                    ptp.transact(PtpOp.EOS_REMOTE_RELEASE_ON, 3, 0)
+                    ptp.transact(PtpOp.EOS_REMOTE_RELEASE_OFF, 3)
+                }
+                return
+            } catch (e: PtpResponseException) {
+                if (e.code != PtpResponse.DEVICE_BUSY || attempt == 3) throw e
+                delay(250)
+            }
+        }
+    }
+
+    fun setProperty(prop: Int, value: Int) {
+        val ptp = session ?: return
+        scope.launch {
+            try {
+                setPropertyNow(ptp, prop, value)
+                _status.update { it.copy(values = it.values + (prop to value)) }
+            } catch (e: PtpException) {
+                _messages.tryEmit("A câmera recusou o ajuste. Confira o modo no dial (P/Tv/Av/M).")
+            }
+        }
+    }
+
+    private suspend fun setPropertyNow(ptp: PtpSession, prop: Int, value: Int) {
+        ptp.transact(PtpOp.EOS_SET_DEVICE_PROP_VALUE_EX, dataOut = PtpContainer.eosPropValue(prop, value))
+    }
+
+    fun startInterval(seconds: Int, shots: Int) {
+        intervalJob?.cancel()
+        intervalJob = scope.launch {
+            _interval.value = IntervalState(running = true, done = 0, total = shots, seconds = seconds)
+            for (i in 1..shots) {
+                val ptp = session ?: break
+                val info = deviceInfo ?: break
+                runCatching { releaseShutter(ptp, info) }.onFailure { _messages.tryEmit("Intervalômetro: ${it.message}") }
+                _interval.update { it.copy(done = i) }
+                if (i < shots) delay(seconds * 1000L)
+            }
+            _interval.update { it.copy(running = false) }
+        }
+    }
+
+    fun stopInterval() {
+        intervalJob?.cancel()
+        _interval.update { it.copy(running = false) }
+    }
+
+    /** Ends the session politely so the camera leaves PC mode and goes back to normal. */
+    fun disconnect() {
+        val ptp = session ?: return
+        // Detach first so the event loop stops and its error handler ignores this session.
+        closeSession(closeTransport = false)
+        scope.launch {
+            withTimeoutOrNull(2_000) {
+                runCatching { ptp.transact(PtpOp.EOS_SET_EVENT_MODE, 0, timeoutMs = 1_000) }
+                runCatching { ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, 0, timeoutMs = 1_000) }
+                runCatching { ptp.transact(PtpOp.CLOSE_SESSION, timeoutMs = 1_000) }
+            }
+            ptp.close()
+            _state.value = ConnectionState.NoCamera
+            log("Sessão encerrada")
+        }
+    }
+
+    private fun closeSession(closeTransport: Boolean = true) {
+        stopInterval()
+        val ptp = session
+        session = null
+        device = null
+        deviceInfo = null
+        sessionJob?.cancel()
+        sessionJob = null
+        if (closeTransport) ptp?.close()
+        _status.value = CameraStatus()
+    }
+
+    private fun stillImageInterface(dev: UsbDevice) =
+        (0 until dev.interfaceCount).map { dev.getInterface(it) }
+            .firstOrNull { it.interfaceClass == UsbConstants.USB_CLASS_STILL_IMAGE }
+
+    private fun log(message: String) {
+        Log.d(TAG, message)
+        val line = "${timeFormat.format(Date())}  $message"
+        _log.update { (it + line).takeLast(300) }
+    }
+
+    private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.ROOT)
+
+    companion object {
+        private const val TAG = "CameraManager"
+        private const val ACTION_USB_PERMISSION = "com.jrtechofc.tether50d.USB_PERMISSION"
+        const val CANON_VENDOR_ID = 0x04A9
+        private const val POLL_IDLE_MS = 200L
+        private const val POLL_BUSY_MS = 40L
+        private const val KEEP_ALIVE_MS = 60_000L
+        private const val DOWNLOAD_TIMEOUT_MS = 20_000
+    }
+}

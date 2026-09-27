@@ -1,6 +1,6 @@
 {
-  "name": "Canon 50D Remote",
-  "description": "Aplicativo de tethering, download automático de fotos e controle remoto USB para câmeras Canon EOS 50D.",
+  "name": "Tether 50D",
+  "description": "Captura vinculada USB para a Canon EOS 50D: auto-save de RAW e JPG em pastas escolhidas, preview e envio para o Lightroom.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }
