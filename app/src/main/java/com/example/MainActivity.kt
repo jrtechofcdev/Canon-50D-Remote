@@ -1,6 +1,9 @@
 package com.example
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,121 +11,139 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.CameraAlt
-import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.PhotoLibrary
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.testTag
+import androidx.core.content.ContextCompat
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.core.service.CameraForegroundService
-import com.example.core.ui.camera.CameraScreen
-import com.example.core.ui.gallery.GalleryScreen
-import com.example.core.ui.home.HomeScreen
-import com.example.core.ui.settings.SettingsScreen
-import com.example.ui.theme.MyApplicationTheme
+import androidx.navigation.navArgument
+import com.example.core.camera.ConnectionState
+import com.example.ui.PhotoActions
+import com.example.ui.photos.PhotosScreen
+import com.example.ui.photos.ViewerScreen
+import com.example.ui.session.SessionScreen
+import com.example.ui.settings.SettingsScreen
+import com.example.ui.settings.SettingsSection
+import com.example.ui.settings.SettingsSectionScreen
+import com.example.ui.card.CardScreen
+import com.example.ui.client.ClientModeScreen
+import com.example.core.data.Settings
+import android.view.WindowManager
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.activity.compose.LocalActivity
+import com.example.ui.theme.Tone
+import com.example.ui.theme.JrLinkTheme
+import kotlinx.coroutines.flow.merge
 
 class MainActivity : ComponentActivity() {
+
+    private val app get() = application as TetherApp
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        askNotificationPermissionOnce()
+        app.camera.findAndConnect()
 
-        // Request notification permission dynamically on Android 13+
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 101)
-        }
-
-        // Start Foreground Service to keep USB/tethering alive in background
-        startCameraService()
-
-        val app = application as Canon50DRemoteApplication
-        val cameraManager = app.cameraManager
-        val downloadManager = app.downloadManager
-        val repository = app.photoRepository
-
-        // Attempt automatic USB detection on launch
-        cameraManager.tryConnectUsb()
+        val actions = PhotoActions(this, app.store, app.export)
 
         setContent {
-            MyApplicationTheme {
-                val navController = rememberNavController()
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentRoute = navBackStackEntry?.destination?.route ?: "home"
+            val settings by app.settings.settings.collectAsState(initial = Settings())
+            val cameraState by app.camera.state.collectAsState()
+            WindowPreferences(
+                nightBrightness = if (settings.nightMode) settings.nightBrightness else null,
+                keepScreenOn = settings.keepScreenOn && cameraState is ConnectionState.Connected,
+            )
+            JrLinkTheme(night = settings.nightMode) {
+                val nav = rememberNavController()
+                val entry by nav.currentBackStackEntryAsState()
+                val route = entry?.destination?.route ?: Tab.Session.route
+                val snackbar = remember { SnackbarHostState() }
+
+                LaunchedEffect(Unit) {
+                    merge(app.camera.messages, app.tether.errors).collect { snackbar.showSnackbar(it) }
+                }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
+                    containerColor = Tone.Background,
+                    snackbarHost = { SnackbarHost(snackbar) },
                     bottomBar = {
-                        NavigationBar(
-                            modifier = Modifier.testTag("main_navigation_bar")
-                        ) {
-                            val items = listOf(
-                                NavigationItem("home", "Início", Icons.Filled.Home, Icons.Outlined.Home),
-                                NavigationItem("camera", "Câmera", Icons.Filled.CameraAlt, Icons.Outlined.CameraAlt),
-                                NavigationItem("gallery", "Galeria", Icons.Filled.PhotoLibrary, Icons.Outlined.PhotoLibrary),
-                                NavigationItem("settings", "Ajustes", Icons.Filled.Settings, Icons.Outlined.Settings)
-                            )
-
-                            items.forEach { item ->
-                                val isSelected = currentRoute == item.route
-                                NavigationBarItem(
-                                    selected = isSelected,
-                                    onClick = {
-                                        if (currentRoute != item.route) {
-                                            navController.navigate(item.route) {
-                                                popUpTo(navController.graph.startDestinationId) {
-                                                    saveState = true
-                                                }
+                        if (Tab.entries.any { it.route == route }) {
+                            NavigationBar(containerColor = Tone.Surface) {
+                                Tab.entries.forEach { tab ->
+                                    NavigationBarItem(
+                                        selected = route == tab.route,
+                                        onClick = {
+                                            nav.navigate(tab.route) {
+                                                popUpTo(Tab.Session.route) { saveState = true }
                                                 launchSingleTop = true
                                                 restoreState = true
                                             }
-                                        }
-                                    },
-                                    icon = {
-                                        Icon(
-                                            imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
-                                            contentDescription = item.label
-                                        )
-                                    },
-                                    label = { Text(item.label, style = MaterialTheme.typography.labelSmall) },
-                                    modifier = Modifier.testTag("nav_item_${item.route}")
-                                )
+                                        },
+                                        icon = { Icon(tab.icon, contentDescription = null) },
+                                        label = { Text(tab.label) },
+                                        colors = NavigationBarItemDefaults.colors(
+                                            selectedIconColor = Tone.Accent,
+                                            selectedTextColor = Tone.Text,
+                                            indicatorColor = Tone.SurfaceHigh,
+                                            unselectedIconColor = Tone.TextMuted,
+                                            unselectedTextColor = Tone.TextMuted,
+                                        ),
+                                    )
+                                }
                             }
                         }
-                    }
-                ) { innerPadding ->
-                    NavHost(
-                        navController = navController,
-                        startDestination = "home",
-                        modifier = Modifier.padding(innerPadding)
-                    ) {
-                        composable("home") {
-                            HomeScreen(
-                                cameraManager = cameraManager,
-                                downloadManager = downloadManager,
-                                onNavigateToCamera = { navController.navigate("camera") }
+                    },
+                ) { padding ->
+                    NavHost(nav, startDestination = Tab.Session.route, modifier = Modifier.padding(padding)) {
+                        composable(Tab.Session.route) {
+                            SessionScreen(
+                                app = app,
+                                actions = actions,
+                                onOpenPhoto = { nav.navigate("photo/$it") { launchSingleTop = true } },
+                                onOpenSettings = { nav.navigate("settings/${SettingsSection.Save.route}") },
+                                onOpenCard = { nav.navigate("card") },
+                                onOpenClient = { nav.navigate("client") },
                             )
                         }
-                        composable("camera") {
-                            CameraScreen(cameraManager = cameraManager)
+                        composable("card") { CardScreen(app = app, onBack = { nav.popBackStack() }) }
+                        composable("client") { ClientModeScreen(app = app, onExit = { nav.popBackStack() }) }
+                        composable("settings/{section}") { entry ->
+                            val section = SettingsSection.entries.firstOrNull { it.route == entry.arguments?.getString("section") }
+                                ?: SettingsSection.Save
+                            SettingsSectionScreen(app = app, section = section, onBack = { nav.popBackStack() })
                         }
-                        composable("gallery") {
-                            GalleryScreen(
-                                photoRepository = repository,
-                                cameraManager = cameraManager
+                        composable(Tab.Photos.route) {
+                            PhotosScreen(app = app, onOpenPhoto = { nav.navigate("photo/$it") })
+                        }
+                        composable(Tab.Settings.route) { SettingsScreen(onOpen = { nav.navigate("settings/${it.route}") }) }
+                        composable("photo/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
+                            ViewerScreen(
+                                app = app,
+                                actions = actions,
+                                startId = it.arguments?.getLong("id") ?: 0L,
+                                onBack = { nav.popBackStack() },
                             )
-                        }
-                        composable("settings") {
-                            SettingsScreen(cameraManager = cameraManager)
                         }
                     }
                 }
@@ -132,26 +153,43 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        setIntent(intent)
-        if (intent.action == android.hardware.usb.UsbManager.ACTION_USB_DEVICE_ATTACHED) {
-            val app = application as Canon50DRemoteApplication
-            app.cameraManager.tryConnectUsb()
-        }
+        // Plugging the camera in while the app is open lands here.
+        app.camera.findAndConnect()
     }
 
-    private fun startCameraService() {
-        val serviceIntent = Intent(this, CameraForegroundService::class.java)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
-        } else {
-            startService(serviceIntent)
-        }
+    override fun onResume() {
+        super.onResume()
+        // Only retry silently from "no camera"; after a failure or a denied permission the user taps Conectar,
+        // otherwise the permission dialog would reopen every time the activity resumes.
+        if (app.camera.state.value == ConnectionState.NoCamera) app.camera.findAndConnect()
+    }
+
+    private fun askNotificationPermissionOnce() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
     }
 }
 
-data class NavigationItem(
-    val route: String,
-    val label: String,
-    val selectedIcon: ImageVector,
-    val unselectedIcon: ImageVector
-)
+/** Night-mode brightness and keep-screen-on, applied to this activity's window only. */
+@Composable
+private fun WindowPreferences(nightBrightness: Int?, keepScreenOn: Boolean) {
+    val activity = LocalActivity.current ?: return
+    DisposableEffect(nightBrightness, keepScreenOn) {
+        val window = activity.window
+        window.attributes = window.attributes.apply {
+            screenBrightness = nightBrightness?.let { it.coerceIn(1, 100) / 100f }
+                ?: WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        }
+        if (keepScreenOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { }
+    }
+}
+
+enum class Tab(val route: String, val label: String, val icon: ImageVector) {
+    Session("session", "Sessão", Icons.Outlined.CameraAlt),
+    Photos("photos", "Fotos", Icons.Outlined.PhotoLibrary),
+    Settings("settings", "Ajustes", Icons.Outlined.Tune),
+}

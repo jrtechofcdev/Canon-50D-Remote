@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Match ANY Canon camera (Vendor ID 1193 is 0x04A9) -->
+    <!-- Canon (vendor 0x04A9), still-image/PTP interface. The EOS 50D reports this class. -->
+    <usb-device vendor-id="1193" class="6" />
     <usb-device vendor-id="1193" />
-
-    <!-- Match ANY digital camera using PTP/MTP (Class 6 - Image, Subclass 1, Protocol 1) -->
-    <usb-device class="6" subclass="1" protocol="1" />
-    <usb-device class="6" subclass="1" />
-    <usb-device class="6" />
 </resources>
