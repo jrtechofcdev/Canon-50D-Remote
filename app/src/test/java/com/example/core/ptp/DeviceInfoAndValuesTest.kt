@@ -82,3 +82,18 @@ class ObjectInfoAndBatteryTest {
         org.junit.Assert.assertEquals(false, EosValues.batteryIsLow(4))
     }
 }
+
+class CameraClockTest {
+    @org.junit.Test
+    fun clockIsLocalWallTime() {
+        val brt = java.util.TimeZone.getTimeZone("America/Sao_Paulo")
+        // 2026-09-28 12:00:00 UTC is 09:00:00 in Brasília; the camera stores 09:00 as if it were UTC.
+        val utcNoon = 1_790_596_800_000L
+        org.junit.Assert.assertEquals(1_790_586_000, com.example.core.ptp.EosValues.cameraClock(utcNoon, brt))
+        val packet = com.example.core.ptp.PtpContainer.eosPropValue(com.example.core.ptp.EosProp.CAMERA_TIME, 1_790_586_000)
+        val buf = java.nio.ByteBuffer.wrap(packet).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        org.junit.Assert.assertEquals(12, buf.int)
+        org.junit.Assert.assertEquals(0xD113, buf.int)
+        org.junit.Assert.assertEquals(1_790_586_000, buf.int)
+    }
+}

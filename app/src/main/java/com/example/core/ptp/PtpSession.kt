@@ -73,13 +73,24 @@ class PtpSession(
 
     suspend fun openSession(sessionId: Int = 1) = lock.withLock {
         withContext(Dispatchers.IO) {
-            // The spec requires transaction id 0 for OpenSession; numbering restarts at 1 afterwards.
-            nextTransactionId = 0
-            try {
-                transactBlocking(PtpOp.OPEN_SESSION, intArrayOf(sessionId), null, null, DEFAULT_TIMEOUT_MS)
-            } catch (e: PtpResponseException) {
-                if (e.code != PtpResponse.SESSION_ALREADY_OPEN) throw e
-                log("Sessão já estava aberta, reaproveitando")
+            // A previous attempt (or another app) may have left the camera waiting mid-transaction.
+            // Reset the link first, and once more before a single retry if OpenSession still fails.
+            for (attempt in 1..2) {
+                runCatching { transport.recover() }.onFailure { log("Reset USB falhou: ${it.message}") }
+                isBroken = false
+                // The spec requires transaction id 0 for OpenSession; numbering restarts at 1 afterwards.
+                nextTransactionId = 0
+                try {
+                    transactBlocking(PtpOp.OPEN_SESSION, intArrayOf(sessionId), null, null, DEFAULT_TIMEOUT_MS)
+                    return@withContext
+                } catch (e: PtpResponseException) {
+                    if (e.code != PtpResponse.SESSION_ALREADY_OPEN) throw e
+                    log("Sessão já estava aberta, reaproveitando")
+                    return@withContext
+                } catch (e: PtpException) {
+                    if (attempt == 2) throw e
+                    log("Nova tentativa depois de resetar a USB")
+                }
             }
         }
     }

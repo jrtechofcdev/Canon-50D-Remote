@@ -9,6 +9,7 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
+import com.example.core.storage.ExifCopy
 import com.example.core.data.Settings
 import com.example.core.data.WatermarkSource
 import java.io.File
@@ -57,7 +58,7 @@ class ExportService(private val context: Context) {
 
     private val dir get() = File(context.cacheDir, "export").apply { mkdirs() }
 
-    fun exportLight(sourceUri: String, name: String, settings: Settings): File? = runCatching {
+    fun exportLight(sourceUri: String, name: String, settings: Settings, lat: Double? = null, lon: Double? = null): File? = runCatching {
         val uri = Uri.parse(sourceUri)
         val resolver = context.contentResolver
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -92,6 +93,7 @@ class ExportService(private val context: Context) {
         val out = File(dir, "${name}_leve.jpg")
         out.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, settings.lightShareQuality.coerceIn(50, 100), it) }
         bitmap.recycle()
+        ExifCopy.apply(context, out, sourceUri, if (settings.gpsEnabled) lat else null, lon)
         out
     }.getOrNull()
 

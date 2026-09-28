@@ -2,10 +2,8 @@ package com.example.core.analysis
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import android.net.Uri
-import androidx.exifinterface.media.ExifInterface
+import com.example.core.render.BitmapLoader
 
 /** Histogram bins (64 per channel) plus which pixels are clipped. */
 class Analysis(
@@ -27,7 +25,7 @@ object ImageAnalyzer {
     private const val MASK_COLOR = 0xFFFF3B30.toInt()
 
     fun analyze(context: Context, uri: String, threshold: Int): Analysis? = runCatching {
-        val bitmap = decodeReduced(context, Uri.parse(uri)) ?: return null
+        val bitmap = BitmapLoader.load(context, Uri.parse(uri), TARGET_EDGE) ?: return null
         val pixels = IntArray(bitmap.width * bitmap.height)
         bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
         val result = measure(pixels, threshold)
@@ -71,23 +69,5 @@ object ImageAnalyzer {
             }
         }
         return Measurement(luma, red, green, blue, clipped, count)
-    }
-
-    private fun decodeReduced(context: Context, uri: Uri): Bitmap? {
-        val resolver = context.contentResolver
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-        if (bounds.outWidth <= 0) return null
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= TARGET_EDGE) sample *= 2
-        val decoded = resolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
-        } ?: return null
-        // The viewer shows the photo upright (EXIF orientation), so the mask has to be rotated the same way.
-        val rotation = resolver.openInputStream(uri)?.use { ExifInterface(it).rotationDegrees } ?: 0
-        if (rotation == 0) return decoded
-        val rotated = Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, Matrix().apply { postRotate(rotation.toFloat()) }, true)
-        if (rotated !== decoded) decoded.recycle()
-        return rotated
     }
 }

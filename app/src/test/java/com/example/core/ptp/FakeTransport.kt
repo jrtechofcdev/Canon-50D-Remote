@@ -20,6 +20,16 @@ class FakeTransport(override val readBufferSize: Int = 512) : PtpTransport {
         return chunk.size
     }
 
+    var recoveries = 0
+    /** Reads queued here become available only after the next recover(), like a camera freed by a USB reset. */
+    val afterRecover = ArrayDeque<ByteArray>()
+
+    override fun recover() {
+        recoveries++
+        reads += afterRecover
+        afterRecover.clear()
+    }
+
     override fun close() {}
 
     fun queueResponse(code: Int, tid: Int, vararg params: Int) {

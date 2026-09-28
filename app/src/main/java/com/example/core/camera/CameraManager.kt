@@ -81,6 +81,8 @@ data class IntervalState(val running: Boolean = false, val done: Int = 0, val to
 class CameraManager(
     private val context: Context,
     private val keepCameraAwake: suspend () -> Boolean,
+    private val syncClock: suspend () -> Boolean = { false },
+    private val onClockRefused: suspend () -> Unit = {},
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
@@ -216,6 +218,8 @@ class CameraManager(
                 if (records.isEmpty()) break
             }
 
+            if (syncClock()) setCameraClock(ptp)
+
             _state.value = ConnectionState.Connected(info.model.ifBlank { "Canon EOS" }, info.serial)
             log("Pronto: captura vinculada ativa")
             eventLoop(ptp, info)
@@ -322,6 +326,19 @@ class CameraManager(
                 delay(200)
             }
         }
+    }
+
+    /** Sets the camera clock to the phone's, so two bodies (or the phone's notes) line up in time. */
+    private suspend fun setCameraClock(ptp: PtpSession) {
+        val now = EosValues.cameraClock(System.currentTimeMillis())
+        _status.value.value(EosProp.CAMERA_TIME)?.let { cam -> log("Relógio da câmera diferia ${now - cam} s do celular") }
+        runCatching { setPropertyNow(ptp, EosProp.CAMERA_TIME, now) }
+            .onSuccess { log("Relógio da câmera acertado pelo celular") }
+            .onFailure {
+                log("A câmera recusou o acerto do relógio: ${it.message}")
+                _messages.tryEmit("A 50D não aceitou acertar o relógio pelo cabo. A opção foi desligada.")
+                onClockRefused()
+            }
     }
 
     /** Applies a saved preset, skipping values the current dial mode doesn't let the camera change. */

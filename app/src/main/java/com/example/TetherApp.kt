@@ -5,6 +5,7 @@ import com.example.core.alerts.Alerts
 import com.example.core.camera.CameraManager
 import com.example.core.camera.ConnectionState
 import com.example.core.data.PhotoDatabase
+import com.example.core.data.SettingKeys
 import com.example.core.data.SettingsRepository
 import com.example.core.export.ExportService
 import com.example.core.ptp.EosProp
@@ -12,6 +13,14 @@ import com.example.core.ptp.EosValues
 import com.example.core.service.CameraForegroundService
 import com.example.core.storage.PhotoStore
 import com.example.core.tether.TetherController
+import com.example.core.preset.PresetRepository
+import com.example.core.render.Looks
+import com.example.core.render.PresetEngine
+import com.example.core.notes.VoiceNotes
+import com.example.core.location.LocationTracker
+import com.example.core.backup.SessionBackup
+import com.example.core.analysis.Culler
+import com.example.core.analysis.MlKitFaceAnalyzer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -36,6 +45,20 @@ class TetherApp : Application() {
         private set
     lateinit var alerts: Alerts
         private set
+    lateinit var presets: PresetRepository
+        private set
+    lateinit var engine: PresetEngine
+        private set
+    lateinit var looks: Looks
+        private set
+    lateinit var notes: VoiceNotes
+        private set
+    lateinit var location: LocationTracker
+        private set
+    lateinit var backup: SessionBackup
+        private set
+    lateinit var culler: Culler
+        private set
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -49,12 +72,28 @@ class TetherApp : Application() {
         settings = SettingsRepository(this)
         database = PhotoDatabase.create(this)
         store = PhotoStore(this)
-        camera = CameraManager(this) { settings.current().keepCameraAwake }
-        tether = TetherController(this, camera, settings, store, database.photoDao())
+        camera = CameraManager(
+            this,
+            keepCameraAwake = { settings.current().keepCameraAwake },
+            syncClock = { settings.current().syncCameraClock },
+            onClockRefused = { settings.set(SettingKeys.syncCameraClock, false) },
+        )
+        presets = PresetRepository(this, database.presetDao(), settings)
+        engine = PresetEngine()
+        looks = Looks(this, engine, presets, database.photoDao(), store, settings)
+        location = LocationTracker(this)
+        tether = TetherController(this, camera, settings, store, database.photoDao(), looks, { id -> presets.get(id)?.name }, location::recent)
         export = ExportService(this)
         alerts = Alerts(this)
+        notes = VoiceNotes(this)
+        backup = SessionBackup(this, database.photoDao(), store)
+        culler = Culler(this, database.photoDao(), settings, MlKitFaceAnalyzer())
 
-        appScope.launch(Dispatchers.IO) { export.clearOldExports() }
+        appScope.launch(Dispatchers.IO) {
+            export.clearOldExports()
+            presets.seedIfEmpty()
+            runCatching { presets.syncFolder() }
+        }
 
         appScope.launch {
             camera.state.distinctUntilChangedBy { it::class }.collect { state ->
@@ -65,6 +104,7 @@ class TetherApp : Application() {
                     warnedPhone = false
                     CameraForegroundService.start(this@TetherApp)
                 }
+                if (state is ConnectionState.Connected && settings.current().gpsEnabled) location.start() else location.stop()
             }
         }
 
@@ -77,6 +117,7 @@ class TetherApp : Application() {
         appScope.launch {
             tether.saved.collect {
                 val s = settings.current()
+                if (s.blurAlert || s.eyesCheck || s.cullSuggestions) culler.enqueue(it.id)
                 if (s.vibrateOnReceive) alerts.photoReceived()
                 if (s.phoneLowWarning && !warnedPhone) {
                     val free = withContext(Dispatchers.IO) { alerts.phoneFreeGb() }
@@ -86,6 +127,10 @@ class TetherApp : Application() {
                     }
                 }
             }
+        }
+
+        appScope.launch {
+            culler.warnings.collect { if (settings.current().blurVibrate) alerts.photoProblem() }
         }
 
         appScope.launch {

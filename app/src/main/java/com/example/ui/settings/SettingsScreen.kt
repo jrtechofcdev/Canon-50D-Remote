@@ -33,6 +33,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Folder
@@ -75,6 +76,10 @@ import com.example.core.data.DownloadMode
 import com.example.core.data.Settings
 import com.example.core.data.SettingKeys
 import com.example.core.data.WatermarkSource
+import com.example.core.messages.MessageDefaults
+import com.example.core.messages.MessageKind
+import com.example.ui.photos.template
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.Color
@@ -91,8 +96,10 @@ import kotlinx.coroutines.launch
 enum class SettingsSection(val route: String, val title: String, val summary: String, val icon: ImageVector) {
     Save("save", "Salvamento", "Formato, pastas RAW e JPG, sessão e nomes", Icons.Outlined.Folder),
     Review("review", "Revisão", "Slide automático, estrelas, histograma, estouro", Icons.Outlined.PhotoLibrary),
-    Camera("camera", "Câmera", "Bateria, cartão, presets, bracketing", Icons.Outlined.CameraAlt),
+    Camera("camera", "Câmera", "Bateria, cartão, exposições salvas, bracketing", Icons.Outlined.CameraAlt),
     Share("share", "Envio e cliente", "WhatsApp leve, marca d'água, modo cliente", Icons.Outlined.Send),
+    Presets("presets", "Presets", "Look das fotos novas, cópia editada, pastas", Icons.Outlined.AutoAwesome),
+    Messages("messages", "Mensagens", "Textos prontos para o WhatsApp do cliente", Icons.AutoMirrored.Outlined.Chat),
     Alerts("alerts", "Alertas", "Vibração, desconexão, reenvio, resumo", Icons.Outlined.NotificationsActive),
     Display("display", "Tela", "Modo escuro total, brilho, tela ligada", Icons.Outlined.DarkMode),
     Diagnostics("diagnostics", "Diagnóstico", "Log da conexão USB", Icons.Outlined.BugReport),
@@ -148,6 +155,8 @@ fun SettingsSectionScreen(app: TetherApp, section: SettingsSection, onBack: () -
             SettingsSection.Review -> ReviewSettings(app, settings)
             SettingsSection.Camera -> CameraSettings(app, settings)
             SettingsSection.Share -> ShareSettings(app, settings)
+            SettingsSection.Presets -> PresetSettingsSection(app, settings)
+            SettingsSection.Messages -> MessageSettings(app, settings)
             SettingsSection.Alerts -> AlertSettings(app, settings)
             SettingsSection.Display -> DisplaySettings(app, settings)
             SettingsSection.Diagnostics -> DiagnosticsSettings(app)
@@ -183,6 +192,13 @@ private fun SaveSettings(app: TetherApp, s: Settings) {
     val scope = rememberCoroutineScope()
     val pickJpg = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.jpgFolder, it) } }
     val pickRaw = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.rawFolder, it) } }
+    val pickBackup = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.backupFolder, it) } }
+    val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        if (result.values.any { it }) scope.launch {
+            app.settings.set(SettingKeys.gpsEnabled, true)
+            if (app.camera.state.value is ConnectionState.Connected) app.location.start()
+        }
+    }
 
     SettingsGroup("O que vem para o celular") {
         ChoiceRow("Formato", DownloadMode.entries.map { it to it.label }, s.downloadMode) {
@@ -219,6 +235,51 @@ private fun SaveSettings(app: TetherApp, s: Settings) {
             scope.launch { app.settings.set(SettingKeys.renameWithSession, it) }
         }
     }
+
+    SettingsGroup("Backup") {
+        FolderRow(
+            "Pasta de backup",
+            s.backupFolder?.let { app.store.describeTree(it) } ?: "Nenhuma (escolha o cartão SD ou um pendrive OTG)",
+            true,
+            onPick = { pickBackup.launch(null) },
+            onReset = s.backupFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.backupFolder, null) } } },
+        )
+        ToggleRow("Oferecer backup ao finalizar sessão", "O botão fica em destaque no resumo da sessão", s.backupOffer, enabled = s.backupFolder != null) {
+            scope.launch { app.settings.set(SettingKeys.backupOffer, it) }
+        }
+        InfoText("Copia RAW, JPG, editadas e notas da sessão e confere o tamanho de cada arquivo.")
+    }
+
+    SettingsGroup("Localização") {
+        ToggleRow("GPS nas fotos", "Grava onde a foto foi feita nas cópias editadas e nos JPG leves. Usa o GPS do celular, funciona sem internet", s.gpsEnabled) { on ->
+            if (on && !app.location.hasPermission()) askLocation.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
+            else scope.launch {
+                app.settings.set(SettingKeys.gpsEnabled, on)
+                if (on && app.camera.state.value is ConnectionState.Connected) app.location.start() else if (!on) app.location.stop()
+            }
+        }
+    }
+
+    SettingsGroup("Momentos do evento") {
+        ToggleRow("Usar momentos", "Chip Momento na Sessão: cada foto nova recebe o momento escolhido", s.momentsEnabled) {
+            scope.launch { app.settings.set(SettingKeys.momentsEnabled, it) }
+        }
+        var list by remember { mutableStateOf(s.moments.joinToString("\n")) }
+        OutlinedTextField(
+            value = list,
+            onValueChange = {
+                list = it
+                scope.launch { app.settings.set(SettingKeys.momentList, it.lines().map(String::trim).filter(String::isNotEmpty).joinToString("|")) }
+            },
+            label = { Text("Momentos, um por linha") },
+            enabled = s.momentsEnabled,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            minLines = 3,
+        )
+        ToggleRow("Subpasta por momento", "Ex.: …/JPG/${s.sessionName.ifBlank { "Casamento" }}/02 Cerimônia/", s.momentSubfolder, enabled = s.momentsEnabled) {
+            scope.launch { app.settings.set(SettingKeys.momentSubfolder, it) }
+        }
+    }
 }
 
 @Composable
@@ -243,6 +304,106 @@ private fun FolderRow(title: String, path: String, active: Boolean, onPick: () -
     }
 }
 
+// ---- Mensagens ----------------------------------------------------------------------------------
+
+@Composable
+private fun MessageSettings(app: TetherApp, s: Settings) {
+    val scope = rememberCoroutineScope()
+    InfoText("Campos preenchidos sozinhos: {cliente} (nome da sessão), {quantidade}, {data} e {lista} (nomes das fotos). Use *asteriscos* para negrito no WhatsApp.")
+    listOf(
+        Triple(MessageKind.Preview, SettingKeys.msgPreview, MessageDefaults.PREVIEW),
+        Triple(MessageKind.Delivered, SettingKeys.msgDelivered, MessageDefaults.DELIVERED),
+        Triple(MessageKind.Payment, SettingKeys.msgPayment, MessageDefaults.PAYMENT),
+        Triple(MessageKind.Selection, SettingKeys.msgSelection, MessageDefaults.SELECTION),
+    ).forEach { (kind, key, default) ->
+        SettingsGroup(kind.label) {
+            var text by remember(kind) { mutableStateOf(s.template(kind)) }
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it; scope.launch { app.settings.set(key, it) } },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                minLines = 4,
+            )
+            if (text != default) {
+                TextButton(onClick = { text = default; scope.launch { app.settings.set(key, default) } }) { Text("Voltar ao texto padrão") }
+            }
+        }
+    }
+}
+
+// ---- Presets -----------------------------------------------------------------------------------
+
+@Composable
+private fun PresetSettingsSection(app: TetherApp, s: Settings) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    fun set(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>, v: Boolean) = scope.launch { app.settings.set(key, v) }
+    val presets by app.presets.presets.collectAsState(initial = emptyList())
+    val pickPresets = rememberFolderPicker(app) { uri ->
+        scope.launch {
+            app.settings.setOrClear(SettingKeys.presetsFolder, uri)
+            val added = app.presets.attachFolder()
+            val msg = if (added > 0) "$added preset(s) da pasta importados" else "Presets copiados para a pasta"
+            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+    val pickEdited = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.editedFolder, it) } }
+
+    SettingsGroup("Fotos novas") {
+        val current = presets.firstOrNull { it.id == s.sessionPresetId }
+        ToggleRow(
+            "Aplicar o look da sessão",
+            current?.let { "Preset atual: ${it.name}. Troque na Sessão (Look) ou na aba Presets." }
+                ?: "Nenhum preset escolhido. Escolha na Sessão (Look) ou na aba Presets.",
+            s.applyPresetToNew,
+        ) { set(SettingKeys.applyPresetToNew, it) }
+        if (s.sessionAdjust.isNotBlank()) {
+            InfoText("Uma calibração feita numa foto está sendo levada para as próximas.")
+            TextButton(onClick = { scope.launch { app.settings.set(SettingKeys.sessionAdjust, "") } }) { Text("Voltar ao preset sem a calibração") }
+        }
+        InfoText("O look é como um perfil de cor: a foto aparece processada, mas o JPG e o RAW da câmera não mudam.")
+    }
+
+    SettingsGroup("Cópia editada") {
+        ToggleRow("Salvar cópia editada", "Um JPG com o preset aplicado, ao lado do original", s.saveEditedCopy) { set(SettingKeys.saveEditedCopy, it) }
+        SliderRow("Qualidade do JPG", s.editedQuality, 70..100, enabled = s.saveEditedCopy) {
+            scope.launch { app.settings.set(SettingKeys.editedQuality, it) }
+        }
+        FolderRow("Pasta das editadas", app.store.describeTree(s.editedFolder), s.saveEditedCopy,
+            onPick = { pickEdited.launch(null) }, onReset = s.editedFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.editedFolder, null) } } })
+        InfoText("Só com RAW (sem JPG), a cópia sai do JPEG embutido no CR2, em resolução menor.")
+    }
+
+    SettingsGroup("Pasta de presets") {
+        FolderRow(
+            "Pasta de presets",
+            s.presetsFolder?.let { app.store.describeTree(it) } ?: "Só dentro do app",
+            true,
+            onPick = { pickPresets.launch(null) },
+            onReset = s.presetsFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.presetsFolder, null) } } },
+        )
+        InfoText("Cada preset é salvo nela como .xmp. Arquivos .xmp, .dng e .lrtemplate colocados nela entram no app quando ele abre.")
+    }
+
+    SettingsGroup("Visualizador e modo cliente") {
+        ToggleRow("Presets no visualizador", "Faixa de presets e botão Calibrar embaixo da foto", s.viewerPresets) { set(SettingKeys.viewerPresets, it) }
+        ToggleRow("Presets no modo cliente", "O cliente pode trocar o look da foto", s.clientPresetsEnabled) { set(SettingKeys.clientPresetsEnabled, it) }
+        ToggleRow(
+            "Pedir PIN para calibrar",
+            if (s.clientPin.isEmpty()) "Defina um PIN em Envio e cliente para usar" else "No modo cliente, Calibrar pede o PIN",
+            s.clientCalibratePin,
+            enabled = s.clientPresetsEnabled,
+        ) { set(SettingKeys.clientCalibratePin, it) }
+    }
+
+    SettingsGroup("Limites") {
+        InfoText(
+            "A prévia imita o processamento do Lightroom, sem ser idêntica. O XMP exportado dá o resultado exato no Lightroom. " +
+                "Máscaras, remoção de manchas, correção de lente e perfis de câmera da Adobe não são aplicados.",
+        )
+    }
+}
+
 // ---- Revisão -----------------------------------------------------------------------------------
 
 @Composable
@@ -257,6 +418,20 @@ private fun ReviewSettings(app: TetherApp, s: Settings) {
     }
     SettingsGroup("Avaliação") {
         ToggleRow("Estrelas (1 a 5)", "Mostra as estrelas no visualizador e o filtro na galeria", s.ratingEnabled) { set(SettingKeys.ratingEnabled, it) }
+    }
+    SettingsGroup("Seleção com análise local") {
+        InfoText("Cada foto é analisada no próprio celular, sem internet: nitidez, rostos e olhos, exposição e fotos parecidas.")
+        ToggleRow("Alerta de foto tremida", "Selo \"Tremida\" e aviso quando a foto sai tremida ou fora de foco", s.blurAlert) { set(SettingKeys.blurAlert, it) }
+        SliderRow("Sensibilidade do alerta", s.blurThreshold, 30..70, enabled = s.blurAlert, format = { v -> when { v < 44 -> "baixa ($v)"; v < 57 -> "média ($v)"; else -> "alta ($v)" } }) {
+            scope.launch { app.settings.set(SettingKeys.blurThreshold, it) }
+        }
+        ToggleRow("Olhos fechados", "Detecta rostos e avisa quando alguém piscou", s.eyesCheck) { set(SettingKeys.eyesCheck, it) }
+        ToggleRow("Vibrar no problema", "Dois toques curtos, diferentes do aviso de foto recebida", s.blurVibrate, enabled = s.blurAlert || s.eyesCheck) { set(SettingKeys.blurVibrate, it) }
+        ToggleRow("Sugerir as melhores", "Entre fotos parecidas, marca a melhor como Sugerida", s.cullSuggestions) { set(SettingKeys.cullSuggestions, it) }
+        ToggleRow("Esconder rejeitadas na galeria", "Os arquivos continuam salvos; veja em Seleção rápida → Rejeitadas", s.hideRejected) { set(SettingKeys.hideRejected, it) }
+    }
+    SettingsGroup("Anotações") {
+        ToggleRow("Notas nas fotos", "Texto ou áudio em cada foto, pelo botão de nota no visualizador", s.notesEnabled) { set(SettingKeys.notesEnabled, it) }
     }
     SettingsGroup("Exposição") {
         ToggleRow("Histograma", null, s.histogramEnabled) { set(SettingKeys.histogramEnabled, it) }
@@ -280,6 +455,12 @@ private fun CameraSettings(app: TetherApp, s: Settings) {
     SettingsGroup("Conexão") {
         ToggleRow("Manter a câmera ligada", "Evita o desligamento automático da 50D durante a sessão", s.keepCameraAwake) { set(SettingKeys.keepCameraAwake, it) }
         ToggleRow("Mostrar bateria da câmera", "No topo da Sessão e aviso quando estiver baixa", s.showBattery) { set(SettingKeys.showBattery, it) }
+        ToggleRow(
+            "Acertar o relógio da câmera",
+            "Ao conectar, a 50D fica com a hora do celular. Útil com duas câmeras no mesmo evento. Se a câmera não aceitar, a opção se desliga sozinha",
+            s.syncCameraClock,
+        ) { set(SettingKeys.syncCameraClock, it) }
+        ToggleRow("Calculadora de flash e foco", "Chip \"Flash e foco\" na Sessão", s.toolsEnabled) { set(SettingKeys.toolsEnabled, it) }
         if (state is ConnectionState.Connected) {
             OutlinedButton(onClick = app.camera::disconnect, modifier = Modifier.padding(vertical = 8.dp)) { Text("Encerrar conexão") }
         }
@@ -287,10 +468,10 @@ private fun CameraSettings(app: TetherApp, s: Settings) {
     SettingsGroup("Cartão") {
         ToggleRow("Navegar no cartão", "Botão na Sessão para ver e baixar fotos que já estão no cartão", s.cardBrowserEnabled) { set(SettingKeys.cardBrowserEnabled, it) }
     }
-    SettingsGroup("Presets de exposição") {
-        ToggleRow("Usar presets", "Salve ISO, Av, Tv, ±EV e WB e aplique com um toque na Sessão", s.presetsEnabled) { set(SettingKeys.presetsEnabled, it) }
+    SettingsGroup("Exposições salvas") {
+        ToggleRow("Usar exposições salvas", "Salve ISO, Av, Tv, ±EV e WB e aplique com um toque na Sessão", s.presetsEnabled) { set(SettingKeys.presetsEnabled, it) }
         val presets = s.exposurePresets
-        if (presets.isEmpty()) InfoText("Nenhum preset salvo. Na Sessão, toque em Presets → Salvar atual.")
+        if (presets.isEmpty()) InfoText("Nenhuma exposição salva. Na Sessão, toque em Exposições → Salvar atual.")
         presets.forEachIndexed { i, p ->
             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -393,6 +574,7 @@ private fun ShareSettings(app: TetherApp, s: Settings) {
 
     SettingsGroup("Modo cliente") {
         ToggleRow("Mostrar botão Modo cliente", "Tela cheia só com as fotos, para o cliente acompanhar", s.clientModeEnabled) { set(SettingKeys.clientModeEnabled, it) }
+        ToggleRow("Cliente escolhe as fotos", "Coração em cada foto; a seleção aparece na galeria e no resumo da sessão", s.clientPicksEnabled, enabled = s.clientModeEnabled) { set(SettingKeys.clientPicksEnabled, it) }
         ToggleRow("Mostrar nome e exposição", null, s.clientShowInfo, enabled = s.clientModeEnabled) { set(SettingKeys.clientShowInfo, it) }
         ToggleRow("Assinatura Jr_Tech_OFC", "Símbolo e nome discretos no canto da tela", s.clientShowBrand, enabled = s.clientModeEnabled) { set(SettingKeys.clientShowBrand, it) }
         ToggleRow("Só favoritas", "Mostra apenas as fotos marcadas com estrela de favorita", s.clientOnlyFavorites, enabled = s.clientModeEnabled) { set(SettingKeys.clientOnlyFavorites, it) }

@@ -16,6 +16,7 @@ import kotlinx.coroutines.withContext
 
 enum class ShareSet(val label: String) {
     LIGHT("JPG leve (WhatsApp)"),
+    EDITED("JPG editado (com preset)"),
     JPG("JPG original"),
     RAW("RAW"),
     BOTH("RAW + JPG"),
@@ -30,6 +31,7 @@ class PhotoActions(
 
     fun availableSets(photo: Photo, settings: Settings, includeLight: Boolean = true): List<ShareSet> = buildList {
         if (includeLight && settings.lightShareEnabled && photo.displayUri != null) add(ShareSet.LIGHT)
+        if (photo.editedUri != null) add(ShareSet.EDITED)
         if (photo.jpgUri != null) add(ShareSet.JPG)
         if (photo.rawUri != null) add(ShareSet.RAW)
         if (photo.jpgUri != null && photo.rawUri != null) add(ShareSet.BOTH)
@@ -51,6 +53,23 @@ class PhotoActions(
         }
     }
 
+    /**
+     * Opens WhatsApp (or WhatsApp Business, or the share sheet when neither is installed) with [text],
+     * plus the photos in [set] when given. Text and photos go in one message where the app allows it.
+     */
+    suspend fun sendMessage(text: String, photos: List<Photo>, set: ShareSet?, settings: Settings) {
+        val intent = (if (set != null && photos.isNotEmpty()) sendIntent(photos, set, settings) else null)
+            ?: Intent(Intent.ACTION_SEND).setType("text/plain")
+        intent.putExtra(Intent.EXTRA_TEXT, text)
+        val whatsapp = listOf(WHATSAPP, WHATSAPP_BUSINESS).firstOrNull { installed(it) }
+        if (whatsapp != null) {
+            runCatching { context.startActivity(Intent(intent).setPackage(whatsapp).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); return }
+        }
+        context.startActivity(Intent.createChooser(intent, "Enviar mensagem").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    private fun installed(pkg: String) = runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess
+
     fun openWith(photo: Photo) {
         val (uri, mime) = when {
             photo.jpgUri != null -> photo.jpgUri to JPEG
@@ -67,7 +86,7 @@ class PhotoActions(
         val files: List<Uri> = if (set == ShareSet.LIGHT) {
             withContext(Dispatchers.IO) {
                 photos.mapNotNull { p ->
-                    p.displayUri?.let { export.exportLight(it, p.savedBase, settings) }
+                    p.lookUri?.let { export.exportLight(it, p.savedBase, settings, p.lat, p.lon) }
                         ?.let { FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", it) }
                 }
             }
@@ -75,6 +94,7 @@ class PhotoActions(
             photos.flatMap { p ->
                 when (set) {
                     ShareSet.JPG -> listOfNotNull(p.jpgUri)
+                    ShareSet.EDITED -> listOfNotNull(p.editedUri)
                     ShareSet.RAW -> listOfNotNull(p.rawUri)
                     else -> listOfNotNull(p.jpgUri, p.rawUri)
                 }
@@ -86,7 +106,7 @@ class PhotoActions(
         }
 
         val mime = when (set) {
-            ShareSet.LIGHT, ShareSet.JPG -> JPEG
+            ShareSet.LIGHT, ShareSet.JPG, ShareSet.EDITED -> JPEG
             ShareSet.RAW -> CR2
             ShareSet.BOTH -> "image/*"
         }
@@ -104,6 +124,8 @@ class PhotoActions(
 
     companion object {
         const val LIGHTROOM = "com.adobe.lrmobile"
+        const val WHATSAPP = "com.whatsapp"
+        const val WHATSAPP_BUSINESS = "com.whatsapp.w4b"
         private const val JPEG = "image/jpeg"
         private const val CR2 = "image/x-canon-cr2"
     }

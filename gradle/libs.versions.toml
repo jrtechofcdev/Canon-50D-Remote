@@ -16,6 +16,7 @@ kotlinxCoroutines = "1.10.2"
 junit = "4.13.2"
 robolectric = "4.16.1"
 androidxTestCore = "1.6.1"
+mlkitFace = "16.1.7"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -45,6 +46,8 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidxTestCore" }
+
+mlkit-face-detection = { group = "com.google.mlkit", name = "face-detection", version.ref = "mlkitFace" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

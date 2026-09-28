@@ -122,4 +122,8 @@ object EosValues {
         EosProp.EXPOSURE_COMPENSATION -> listOf(0xF0, 0xF3, 0xF5, 0xF8, 0xFB, 0xFD, 0, 3, 5, 8, 11, 13, 16)
         else -> emptyList()
     }
+
+    /** Phone time as the 50D stores it: local wall-clock seconds, with the zone offset folded in. */
+    fun cameraClock(nowMillis: Long, zone: java.util.TimeZone = java.util.TimeZone.getDefault()): Int =
+        ((nowMillis + zone.getOffset(nowMillis)) / 1000L).toInt()
 }

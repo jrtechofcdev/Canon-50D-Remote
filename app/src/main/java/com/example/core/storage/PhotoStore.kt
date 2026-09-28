@@ -12,7 +12,7 @@ import java.io.File
 import java.io.IOException
 import java.io.OutputStream
 
-enum class FileKind(val folderName: String) { JPG("JPG"), RAW("RAW") }
+enum class FileKind(val folderName: String) { JPG("JPG"), RAW("RAW"), EDITED("Editadas"), SELECTED("Escolhidas") }
 
 // Files are created as octet-stream so the storage provider keeps the camera's name ("IMG_1234.JPG")
 // instead of appending its own extension; the media scanner still types them by extension.
@@ -27,23 +27,29 @@ class PhotoStore(private val context: Context) {
 
     class Target(val uri: Uri, val stream: OutputStream)
 
-    fun create(kind: FileKind, fileName: String, settings: Settings): Target {
+    /**
+     * [moment] adds a "02 Cerimônia" level under the session folder when "subpasta por momento" is on.
+     * Picks ([FileKind.SELECTED]) go to an "Escolhidas" folder inside the JPG folder's session.
+     */
+    fun create(kind: FileKind, fileName: String, settings: Settings, moment: String? = null): Target {
         val treeUri = when (kind) {
-            FileKind.JPG -> settings.jpgFolder
+            FileKind.JPG, FileKind.SELECTED -> settings.jpgFolder
             FileKind.RAW -> settings.rawFolder
+            FileKind.EDITED -> settings.editedFolder
         }
-        val subfolder = settings.sessionName.trim().takeIf { settings.sessionSubfolder && it.isNotEmpty() }
-        return if (treeUri != null) createInTree(Uri.parse(treeUri), subfolder, kind, fileName)
-        else createInAppFolder(kind, subfolder, fileName)
+        val path = subfolders(settings, moment).let { if (kind == FileKind.SELECTED && treeUri != null) it + kind.folderName else it }
+        return if (treeUri != null) createInTree(Uri.parse(treeUri), path, kind, fileName)
+        else createInAppFolder(kind, path, fileName)
     }
 
-    private fun createInTree(treeUri: Uri, subfolder: String?, kind: FileKind, fileName: String): Target {
+    private fun createInTree(treeUri: Uri, path: List<String>, kind: FileKind, fileName: String): Target {
         val root = DocumentFile.fromTreeUri(context, treeUri)
             ?: throw IOException("Pasta ${kind.folderName} indisponível. Escolha de novo em Ajustes.")
         if (!root.canWrite()) throw IOException("Sem permissão na pasta ${kind.folderName}. Escolha de novo em Ajustes.")
-        val dir = subfolder?.let { name ->
-            root.findFile(name)?.takeIf { it.isDirectory } ?: root.createDirectory(name)
-        } ?: root
+        val dir = path.fold(root) { parent, name ->
+            parent.findFile(name)?.takeIf { it.isDirectory } ?: parent.createDirectory(name)
+                ?: throw IOException("Não foi possível criar a pasta $name")
+        }
         val file = dir.createFile(CREATE_MIME, fileName)
             ?: throw IOException("Não foi possível criar $fileName")
         val stream = context.contentResolver.openOutputStream(file.uri)
@@ -51,14 +57,28 @@ class PhotoStore(private val context: Context) {
         return Target(file.uri, stream)
     }
 
-    private fun createInAppFolder(kind: FileKind, subfolder: String?, fileName: String): Target {
+    private fun createInAppFolder(kind: FileKind, path: List<String>, fileName: String): Target {
         val base = File(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES), "Canon50D/${kind.folderName}")
-        val dir = if (subfolder != null) File(base, subfolder) else base
+        val dir = path.fold(base) { parent, name -> File(parent, name) }
         if (!dir.exists() && !dir.mkdirs()) throw IOException("Não foi possível criar ${dir.path}")
         var file = File(dir, fileName)
         var n = 1
         while (file.exists()) file = File(dir, "${fileName.substringBeforeLast('.')}_${n++}.${fileName.substringAfterLast('.')}")
         return Target(Uri.fromFile(file), file.outputStream())
+    }
+
+    /** Copies a saved file to [kind]'s folder (e.g. the client's picks). Returns the new file's URI. */
+    fun copy(sourceUri: String, kind: FileKind, settings: Settings, moment: String? = null): String {
+        val name = displayName(sourceUri).ifBlank { "foto_${System.currentTimeMillis()}" }
+        val target = create(kind, name, settings, moment)
+        target.stream.use { out ->
+            (openInput(sourceUri) ?: throw IOException("Não foi possível ler $name")).use { it.copyTo(out, 256 * 1024) }
+        }
+        return target.uri.toString()
+    }
+
+    fun openInput(uri: String) = Uri.parse(uri).let { parsed ->
+        if (parsed.scheme == "file") File(parsed.path!!).inputStream() else context.contentResolver.openInputStream(parsed)
     }
 
     fun delete(uri: String) {
@@ -103,5 +123,18 @@ class PhotoStore(private val context: Context) {
         val path = docId.substringAfter(':', "")
         val prefix = if (volume == "primary") "Armazenamento interno" else "Cartão SD"
         return if (path.isEmpty()) prefix else "$prefix/$path"
+    }
+
+    companion object {
+        /** Session folder, then the moment folder ("02 Cerimônia", numbered in the order of the list). */
+        fun subfolders(settings: Settings, moment: String?): List<String> = buildList {
+            settings.sessionName.trim().takeIf { settings.sessionSubfolder && it.isNotEmpty() }?.let { add(safe(it)) }
+            if (settings.momentsEnabled && settings.momentSubfolder && !moment.isNullOrBlank()) {
+                val index = settings.moments.indexOf(moment)
+                add(if (index >= 0) "%02d %s".format(index + 1, safe(moment)) else safe(moment))
+            }
+        }
+
+        private fun safe(name: String) = name.replace(Regex("[\\\\/:*?\"<>|]"), "-").trim()
     }
 }

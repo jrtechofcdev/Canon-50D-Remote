@@ -17,6 +17,9 @@ import com.example.ui.settings.SettingsSectionScreen
 import com.example.ui.session.SessionScreen
 import com.example.ui.theme.JrLinkTheme
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -110,7 +113,7 @@ class ScreenshotTest {
     @Test
     fun photos() {
         seedPhotos()
-        rule.setContent { JrLinkTheme { PhotosScreen(app, onOpenPhoto = {}) } }
+        rule.setContent { JrLinkTheme { PhotosScreen(app, PhotoActions(app, app.store, app.export), onOpenPhoto = {}) } }
         rule.mainClock.advanceTimeBy(1_000)
         save("fotos", androidx.compose.ui.test.hasText("RAW+JPG"))
     }
@@ -120,7 +123,7 @@ class ScreenshotTest {
         seedPhotos()
         val actions = PhotoActions(app, app.store, app.export)
         val id = runBlocking { app.database.photoDao().inSession("Geral").last().id }
-        rule.setContent { JrLinkTheme { ViewerScreen(app, actions, id, onBack = {}) } }
+        rule.setContent { JrLinkTheme { ViewerScreen(app, actions, id, onBack = {}, onCalibrate = {}) } }
         rule.mainClock.advanceTimeBy(1_000)
         save("visualizador")
     }
@@ -139,5 +142,133 @@ class ScreenshotTest {
         runCatching { rule.waitUntil(15_000) { rule.onAllNodes(logo).fetchSemanticsNodes().isNotEmpty() } }
         rule.onNode(androidx.compose.ui.test.hasText("Posição")).performScrollTo()
         save("ajustes_envio", logo)
+    }
+
+    /** Seeds the starter pack and gives the newest sample photo a preset, as a session with a look would. */
+    private fun seedLooks(): Long = runBlocking {
+        seedPhotos()
+        app.presets.seedIfEmpty()
+        val preset = app.presets.all().first { it.name.contains("Golden") || it.name.contains("Outdoor") }
+        val photo = app.database.photoDao().inSession("Geral").last()
+        app.database.photoDao().setLook(photo.id, preset.id, null)
+        app.settings.set(com.example.core.data.SettingKeys.sessionPresetId, preset.id)
+        photo.id
+    }
+
+    @Test
+    fun presetsTab() {
+        seedLooks()
+        rule.setContent { JrLinkTheme { com.example.ui.preset.PresetsScreen(app, onEdit = {}) } }
+        save("presets", androidx.compose.ui.test.hasText("Pack Externo"))
+    }
+
+    private fun editor(target: com.example.ui.preset.EditTarget, tab: String?, name: String) {
+        rule.setContent { JrLinkTheme { com.example.ui.preset.EditorScreen(app, target, onDone = {}) } }
+        runCatching { rule.waitUntil(15_000) { rule.onAllNodes(androidx.compose.ui.test.hasText("Luz")).fetchSemanticsNodes().isNotEmpty() } }
+        if (tab != null) rule.onNode(androidx.compose.ui.test.hasText(tab)).performScrollTo().performClick()
+        save(name)
+    }
+
+    @Test
+    fun editorLight() {
+        val id = seedLooks()
+        editor(com.example.ui.preset.EditTarget.PhotoTarget(id), null, "editor_luz")
+    }
+
+    @Test
+    fun editorColor() {
+        val id = seedLooks()
+        editor(com.example.ui.preset.EditTarget.PhotoTarget(id), "Cor", "editor_cor")
+    }
+
+    @Test
+    fun editorCurve() {
+        seedLooks()
+        val preset = runBlocking { app.presets.all().first() }
+        editor(com.example.ui.preset.EditTarget.PresetTarget(preset.id), "Curva", "editor_curva")
+    }
+
+    @Test
+    fun editorGrading() {
+        seedLooks()
+        val preset = runBlocking { app.presets.all().first() }
+        editor(com.example.ui.preset.EditTarget.PresetTarget(preset.id), "Color grading", "editor_grading")
+    }
+
+    @Test
+    fun viewerWithLook() {
+        val id = seedLooks()
+        val actions = PhotoActions(app, app.store, app.export)
+        rule.setContent { JrLinkTheme { ViewerScreen(app, actions, id, onBack = {}, onCalibrate = {}) } }
+        save("visualizador_preset", androidx.compose.ui.test.hasText("Calibrar"))
+    }
+
+    @Test
+    fun clientWithLook() {
+        seedLooks()
+        rule.setContent { JrLinkTheme { com.example.ui.client.ClientModeScreen(app, onExit = {}, onCalibrate = {}) } }
+        save("cliente_preset", androidx.compose.ui.test.hasText("Sem preset"))
+    }
+
+    @Test
+    fun settingsPresets() {
+        seedLooks()
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Presets, onBack = {}) } }
+        save("ajustes_presets", androidx.compose.ui.test.hasText("Salvar cópia editada"))
+    }
+
+    @Test
+    fun galleryBatch() {
+        seedPhotos()
+        runBlocking {
+            val dao = app.database.photoDao()
+            val ids = dao.inSession("Geral").map { it.id }
+            dao.setMoment(ids.take(3), "Cerimônia")
+            dao.setMoment(ids.drop(3), "Recepção")
+            dao.setClientPick(ids[1], true)
+            dao.setNote(ids[2], "mãe da noiva")
+            app.settings.set(com.example.core.data.SettingKeys.momentsEnabled, true)
+        }
+        rule.setContent { JrLinkTheme { PhotosScreen(app, PhotoActions(app, app.store, app.export), onOpenPhoto = {}) } }
+        runCatching { rule.waitUntil(15_000) { rule.onAllNodes(androidx.compose.ui.test.hasContentDescription("IMG_1045")).fetchSemanticsNodes().isNotEmpty() } }
+        listOf("IMG_1045", "IMG_1043").forEach { name ->
+            rule.onNode(androidx.compose.ui.test.hasContentDescription(name)).performTouchInput { longClick() }
+        }
+        save("galeria_lote")
+    }
+
+    @Test
+    fun clientHeart() {
+        seedPhotos()
+        runBlocking { app.database.photoDao().inSession("Geral").last().let { app.database.photoDao().setClientPick(it.id, true) } }
+        rule.setContent { JrLinkTheme { com.example.ui.client.ClientModeScreen(app, onExit = {}, onCalibrate = {}) } }
+        save("cliente_coracao", androidx.compose.ui.test.hasContentDescription("Tirar da seleção"))
+    }
+
+    @Test
+    fun tools() {
+        rule.setContent { JrLinkTheme { com.example.ui.tools.ToolsScreen(onBack = {}) } }
+        save("ferramentas", androidx.compose.ui.test.hasText("Flash direto"))
+    }
+
+    @Test
+    fun settingsMessages() {
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Messages, onBack = {}) } }
+        save("ajustes_mensagens", androidx.compose.ui.test.hasText("Prévia pronta"))
+    }
+
+    @Test
+    fun cull() {
+        seedPhotos()
+        runBlocking {
+            val dao = app.database.photoDao()
+            val list = dao.inSession("Geral")
+            list.forEachIndexed { i, p ->
+                dao.setAnalysis(p.id, 80f - i * 9, i == 4, 2, if (i == 2) 1 else 0, 88f - i * 8, 0L)
+                dao.setBurst(p.id, if (i < 2) list.first().id else null, i == 0)
+            }
+        }
+        rule.setContent { JrLinkTheme { com.example.ui.cull.CullScreen(app, onBack = {}, onOpenPhoto = {}) } }
+        save("selecao_rapida", androidx.compose.ui.test.hasText("Sugerida"))
     }
 }

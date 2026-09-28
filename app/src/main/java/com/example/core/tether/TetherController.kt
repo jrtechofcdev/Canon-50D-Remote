@@ -15,6 +15,7 @@ import com.example.core.ptp.StreamSink
 import com.example.core.storage.Cr2Preview
 import com.example.core.storage.FileKind
 import com.example.core.storage.PhotoStore
+import com.example.core.render.Looks
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -46,6 +47,9 @@ class TetherController(
     private val settingsRepository: SettingsRepository,
     private val store: PhotoStore,
     private val dao: PhotoDao,
+    private val looks: Looks,
+    private val presetName: suspend (Long) -> String?,
+    private val location: () -> Pair<Double, Double>? = { null },
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private class Job(val obj: EosEventRecord.ObjectAdded, val force: Boolean, val attempt: Int = 0)
@@ -163,7 +167,9 @@ class TetherController(
         } else cameraBase
         val fileName = "$savedBase.$extension"
 
-        val target = store.create(kind, fileName, settings)
+        // RAW and JPG of one frame stay in the same moment even if it changed between the two files.
+        val moment = existing?.moment ?: settings.currentMoment.takeIf { settings.momentsEnabled && it.isNotBlank() }
+        val target = store.create(kind, fileName, settings, moment)
         try {
             BufferedOutputStream(target.stream, 256 * 1024).use { out ->
                 camera.download(obj.handle, StreamSink(out) { received, total ->
@@ -177,10 +183,13 @@ class TetherController(
 
         val uri = target.uri.toString()
         val exif = readExif(target.uri)
-        var photo = existing ?: Photo(session = session, baseName = cameraBase, savedBase = savedBase, capturedAt = System.currentTimeMillis())
+        var photo = existing ?: Photo(
+            session = session, baseName = cameraBase, savedBase = savedBase, capturedAt = System.currentTimeMillis(), moment = moment,
+        ).let { p -> if (settings.gpsEnabled) location()?.let { (lat, lon) -> p.copy(lat = lat, lon = lon) } ?: p else p }
         photo = when (kind) {
             FileKind.JPG -> photo.copy(jpgUri = uri, jpgSize = obj.size, jpgCameraName = obj.filename)
             FileKind.RAW -> photo.copy(rawUri = uri, rawSize = obj.size, rawCameraName = obj.filename)
+            FileKind.EDITED, FileKind.SELECTED -> photo // never downloaded from the camera
         }
         photo = photo.copy(
             aperture = exif?.aperture ?: photo.aperture,
@@ -192,9 +201,25 @@ class TetherController(
             photo = photo.copy(previewPath = extractPreview(target.uri, session, savedBase))
         }
 
+        // The session look goes on every new frame; the file itself stays as the camera made it.
+        if (settings.applyPresetToNew && settings.sessionPresetId > 0 && photo.presetId == null) {
+            photo = photo.copy(presetId = settings.sessionPresetId, adjust = settings.sessionAdjust.ifBlank { null })
+        }
+
         val id = if (photo.id == 0L) dao.insert(photo) else photo.id.also { dao.update(photo) }
         _received.update { it + 1 }
         _saved.tryEmit(photo.copy(id = id))
+
+        // Edited copy from the JPG (or from the RAW's embedded preview when no JPG is coming).
+        val copySource = kind == FileKind.JPG || !settings.downloadMode.jpg
+        if (settings.saveEditedCopy && photo.presetId != null && copySource) {
+            scope.launch {
+                runCatching {
+                    val name = photo.presetId?.let { presetName(it) }
+                    looks.writeEditedCopy(photo.copy(id = id), name)
+                }.onFailure { _errors.tryEmit("Não foi possível salvar a cópia editada de ${photo.savedBase}: ${it.message}") }
+            }
+        }
     }
 
     private suspend fun extractPreview(uri: Uri, session: String, base: String): String? = withContext(Dispatchers.IO) {

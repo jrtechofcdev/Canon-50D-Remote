@@ -30,6 +30,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Delete
@@ -82,7 +83,11 @@ import com.example.core.analysis.ImageAnalyzer
 import com.example.core.data.Photo
 import com.example.ui.PhotoActions
 import com.example.ui.ShareSet
+import com.example.core.preset.Preset
+import com.example.ui.preset.LookImage
+import com.example.ui.preset.PresetStrip
 import com.example.ui.theme.Tone
+import androidx.compose.material.icons.outlined.Tune
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -91,8 +96,9 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: () -> Unit) {
+fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: () -> Unit, onCalibrate: (Long) -> Unit) {
     val photos by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
+    val presets by app.presets.presets.collectAsState(initial = emptyList())
     val s by app.settings.settings.collectAsState(initial = null)
     val list = photos ?: return
     val settings = s ?: return
@@ -106,6 +112,7 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
     var confirmDelete by remember { mutableStateOf<Photo?>(null) }
     val zoomed = remember { mutableStateMapOf<Long, Boolean>() }
     var showClipping by remember { mutableStateOf(settings.highlightAlert) }
+    var noteFor by remember { mutableStateOf<Photo?>(null) }
 
     // Slide to a frame that just arrived. New photos are inserted at index 0; the pager keeps the
     // current photo in place by key, so "was on the latest" means we were on index 0 before it.
@@ -142,7 +149,7 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { list[it].id }) { page ->
             val photo = list[page]
             val mask = if (showClipping && photo.id == viewing?.id) analysis?.clippedMask else null
-            PhotoPage(photo, mask) { zoomed[photo.id] = it }
+            PhotoPage(app, photo, presets, mask) { zoomed[photo.id] = it }
         }
 
         val current = list.getOrNull(pager.currentPage) ?: return@Box
@@ -167,6 +174,15 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
                     tint = if (showClipping) Tone.Info else Tone.TextMuted,
                 )
             }
+            if (settings.notesEnabled) {
+                IconButton(onClick = { noteFor = current }) {
+                    Icon(
+                        Icons.AutoMirrored.Outlined.StickyNote2,
+                        contentDescription = "Nota",
+                        tint = if (current.note != null || current.audioNote != null) Tone.Accent else Tone.Text,
+                    )
+                }
+            }
             IconButton(onClick = { scope.launch { app.database.photoDao().setFavorite(current.id, !current.favorite) } }) {
                 Icon(
                     if (current.favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
@@ -181,6 +197,25 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Tone.Background.copy(alpha = 0.85f))
                 .navigationBarsPadding().padding(16.dp),
         ) {
+            com.example.ui.cull.Badges(current, settings, Modifier.padding(bottom = 8.dp))
+            if (settings.viewerPresets && presets.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) {
+                        PresetStrip(presets, current.presetId) { picked ->
+                            scope.launch { app.looks.setLook(current, picked?.id, null) }
+                        }
+                    }
+                    TextButton(onClick = { onCalibrate(current.id) }) {
+                        Icon(Icons.Outlined.Tune, contentDescription = null, tint = Tone.Accent, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Calibrar", color = Tone.Accent)
+                    }
+                }
+                if (current.adjust != null) {
+                    Text("Calibrada só nesta foto", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted,
+                        modifier = Modifier.padding(start = 12.dp, bottom = 4.dp))
+                }
+            }
             if (settings.ratingEnabled) {
                 RatingBar(current.rating) { stars ->
                     scope.launch { app.database.photoDao().setRating(current.id, if (stars == current.rating) 0 else stars) }
@@ -193,7 +228,14 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
                         listOfNotNull(current.shutter, current.aperture, current.iso).joinToString("   ").ifEmpty { "Sem dados EXIF" },
                         style = MaterialTheme.typography.labelLarge,
                     )
-                    Text(fileSummary(current), style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+                    Text(
+                        listOfNotNull(fileSummary(current), current.moment).joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Tone.TextMuted,
+                    )
+                    current.note?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = Tone.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
                 }
                 if (settings.histogramEnabled) {
                     Histogram(analysis, settings.histogramRgb, Modifier.width(128.dp).height(52.dp))
@@ -221,6 +263,8 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
         }
     }
 
+    noteFor?.let { photo -> NoteSheet(app, photo, onDismiss = { noteFor = null }) }
+
     confirmDelete?.let { photo ->
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
@@ -230,11 +274,7 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = null
-                    scope.launch(Dispatchers.IO) {
-                        listOfNotNull(photo.jpgUri, photo.rawUri).forEach(app.store::delete)
-                        photo.previewPath?.let { java.io.File(it).delete() }
-                        app.database.photoDao().delete(photo.id)
-                    }
+                    scope.launch(Dispatchers.IO) { deletePhoto(app, photo) }
                 }) { Text("Apagar", color = Tone.Error) }
             },
             dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Cancelar") } },
@@ -308,7 +348,7 @@ private fun SetMenuButton(
 /** One page of the pager: zoomable photo with the blinking highlight mask on top (same transform). */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun PhotoPage(photo: Photo, mask: android.graphics.Bitmap?, onZoomChanged: (Boolean) -> Unit) {
+private fun PhotoPage(app: TetherApp, photo: Photo, presets: List<Preset>, mask: android.graphics.Bitmap?, onZoomChanged: (Boolean) -> Unit) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     val state = rememberTransformableState { zoom, pan, _ ->
@@ -340,12 +380,7 @@ private fun PhotoPage(photo: Photo, mask: android.graphics.Bitmap?, onZoomChange
                 translationY = offset.y
             },
     ) {
-        AsyncImage(
-            model = photo.displayUri,
-            contentDescription = photo.savedBase,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize(),
-        )
+        LookImage(app, photo, presets, Modifier.fillMaxSize())
         if (mask != null) {
             val image = remember(mask) { mask.asImageBitmap() }
             Image(
