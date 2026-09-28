@@ -66,7 +66,7 @@ class CameraForegroundService : LifecycleService() {
 
     private fun notification(text: String) = NotificationCompat.Builder(this, CHANNEL_ID)
         .setSmallIcon(com.example.R.drawable.ic_stat_symbol)
-        .setContentTitle("Jr_Link · captura vinculada")
+        .setContentTitle("JR C50D Sync · captura vinculada")
         .setColor(0xFF00FCA8.toInt())
         .setContentText(text)
         .setOngoing(true)

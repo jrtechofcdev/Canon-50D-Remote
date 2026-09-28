@@ -1,10 +1,11 @@
-# DESIGN.md: Jr_Link
+# DESIGN.md: JR C50D Sync
 
 App de captura vinculada da **Jr_Tech_OFC** ("Nossa Arte, Seu Sucesso").
 Direção tirada do kit da marca enviado pelo José Renato (`branding/`).
 
 ## Nome
-**Jr_Link**. Segue o padrão do nome da marca (`Jr_` + palavra com underline) e diz o que o app faz: liga a câmera ao celular.
+**JR C50D Sync** (até a 2.7, Jr_Link). JR é a marca, C50D a Canon 50D e Sync a captura vinculada.
+Ícone: uma câmera no degradê menta → ciano, com o visor em bloco inclinado como os do símbolo e a lente formada por duas setas de sincronia (`branding/icon.py`).
 Subtítulo: "Captura vinculada · Canon 50D".
 
 ## Identidade
@@ -32,7 +33,7 @@ Regra: no máximo **um** elemento menta por área da tela. O degradê só aparec
 ## Tipografia
 - **Exo 2**, a fonte do logo, em toda a interface: 600 em títulos, 500 em rótulos e botões, 400 no texto.
 - Números de exposição com algarismos tabulares, como no LCD da câmera.
-- Letras espaçadas só no nome "Jr_Link", do jeito do logo. Rótulos de seção ficam em caixa normal.
+- Letras espaçadas só no nome "JR C50D Sync", do jeito do logo. Rótulos de seção ficam em caixa normal.
 
 ## Formas e movimento
 - Raio 8dp em cartões e campos, 4dp nas miniaturas, círculo só no disparador.

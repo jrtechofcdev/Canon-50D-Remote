@@ -32,5 +32,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Jr_Link-apk
+          name: JR_C50D_Sync-apk
           path: app/build/outputs/apk/debug/app-debug.apk

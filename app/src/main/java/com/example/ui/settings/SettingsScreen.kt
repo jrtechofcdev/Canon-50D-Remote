@@ -139,7 +139,7 @@ private fun AboutFooter() {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         BrandSymbol(36.dp)
         Spacer(Modifier.height(10.dp))
-        Text("Jr_Link ${BuildConfig.VERSION_NAME}", style = WordmarkStyle.copy(fontSize = 16.sp), color = Tone.Text)
+        Text("JR C50D Sync ${BuildConfig.VERSION_NAME}", style = WordmarkStyle.copy(fontSize = 16.sp), color = Tone.Text)
         Text("por Jr_Tech_OFC · Nossa Arte, Seu Sucesso", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
         Spacer(Modifier.height(24.dp))
     }
@@ -730,5 +730,5 @@ private fun DiagnosticsSettings(app: TetherApp) {
 
 private fun copyLog(context: Context, lines: List<String>) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText("Log Jr_Link", lines.joinToString("\n")))
+    clipboard.setPrimaryClip(ClipData.newPlainText("Log JR C50D Sync", lines.joinToString("\n")))
 }

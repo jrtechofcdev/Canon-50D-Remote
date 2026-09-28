@@ -151,7 +151,7 @@ val ReadoutStyle = TextStyle(
     fontFeatureSettings = "tnum",
 )
 
-/** "Jr_Link" set like the logo's wordmark: Exo 2 with open tracking. */
+/** The app name set like the logo's wordmark: Exo 2 with open tracking. */
 val WordmarkStyle = TextStyle(
     fontFamily = Exo2,
     fontSize = 22.sp,

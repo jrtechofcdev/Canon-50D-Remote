@@ -42,7 +42,7 @@ fun BrandMark(modifier: Modifier = Modifier, subtitle: String? = null) {
         BrandSymbol(28.dp)
         Spacer(Modifier.width(10.dp))
         Column {
-            Text("Jr_Link", style = WordmarkStyle, color = Tone.Text)
+            Text("JR C50D Sync", style = WordmarkStyle, color = Tone.Text)
             subtitle?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Tone.TextMuted) }
         }
     }

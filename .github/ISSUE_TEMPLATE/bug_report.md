@@ -16,7 +16,7 @@ labels: bug
 **Aparelho**
 - Celular:
 - Versão do Android:
-- Versão do Jr_Link (Ajustes, no rodapé):
+- Versão do JR C50D Sync (Ajustes, no rodapé):
 - Formato na câmera (RAW, JPG, RAW + JPG):
 
 **Log**

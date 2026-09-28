@@ -286,7 +286,7 @@ private fun sourceLabel(source: String) = when (source) {
     "dng" -> "Importado de DNG"
     "xmp" -> "Importado de XMP"
     "lrtemplate" -> "Importado de LRTemplate"
-    "jr_link" -> "Pack Jr_Link"
+    "jr_link" -> "Pack JR C50D Sync"
     else -> "Criado no app"
 }
 

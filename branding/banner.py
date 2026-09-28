@@ -1,4 +1,4 @@
-"""Repository banner: symbol + "Jr_Link" wordmark + tagline on brand graphite.
+"""Repository banner: app icon + "JR C50D Sync" wordmark + tagline on brand graphite.
 
 Run from the repository root:  python3 branding/banner.py
 """
@@ -21,8 +21,8 @@ for x in range(W):
     c = tuple(int(MINT[i] + (CYAN[i] - MINT[i]) * t) for i in range(3)) + (255,)
     rule.line([(x, H - 6), (x, H)], fill=c)
 
-sym = symbol(250)
-word = text('Jr_Link', 150, TEXT, tracking=0.06)
+sym = Image.open('branding/icone_jr_c50d_sync.png').convert('RGBA').resize((250, 250), Image.LANCZOS)
+word = text('JR C50D Sync', 120, TEXT, tracking=0.04)
 tag = text('Captura vinculada USB para a Canon EOS 50D', 44, MUTED, tracking=0.02)
 brand = text('por Jr_Tech_OFC · Nossa Arte, Seu Sucesso', 36, CYAN + (255,), tracking=0.03)
 

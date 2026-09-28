@@ -1,6 +1,6 @@
 ---
 name: Sugerir função
-about: Uma ideia para o Jr_Link ficar melhor no trabalho
+about: Uma ideia para o JR C50D Sync ficar melhor no trabalho
 labels: enhancement
 ---
 

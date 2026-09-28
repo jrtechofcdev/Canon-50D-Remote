@@ -1,6 +1,30 @@
 # Novidades
 
-Versões do **Jr_Link**. A mais recente fica no topo.
+Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
+
+## [3.0] · 2026-09-28
+
+Novo nome, **JR C50D Sync** (JR da marca, C50D da Canon 50D, Sync da captura vinculada), e ícone novo: uma câmera nas cores da marca com a lente formada por setas de sincronia.
+
+- **Live view profissional:** a imagem da 50D no celular como monitor externo.
+  - Preset em tempo real, como um perfil de cor.
+  - Guias de enquadramento: terços, áurea, centro, 1:1, Instagram 4:5 e Stories 9:16.
+  - Zebra de estouro, focus peaking e histograma RGB.
+  - Toque para focar, zoom da câmera 5× e 10×, lupa com pinça, foco fino e prévia de profundidade de campo.
+  - ISO, Tv, Av, ±EV e WB, e disparo.
+  - Tela sempre ligada, paisagem e monitor limpo.
+- **Recorte no estilo Lightroom:**
+  - Proporções prontas para Instagram (1:1, 4:5, 1,91:1), Stories/Reels/Status 9:16, Facebook, foto de perfil, YouTube e impressão (10×15, 13×18, 15×21, 20×25, 20×30, A4, 3×4).
+  - Recorte livre, com moldura de alças e arraste para enquadrar.
+  - Endireitar pela régua, com **Auto** (detecta o horizonte) ou traçando o horizonte com o dedo.
+  - Girar 90° e espelhar.
+  - Vale para a tela, a cópia editada e o envio, no tamanho de cada rede. O original não muda.
+  - Recorte rápido em lote na galeria.
+- **WhatsApp direto para o cliente:**
+  - Na galeria, no visualizador e no modo cliente, digite o número e a conversa abre com a foto pronta (preset, recorte e marca d'água) já anexada.
+  - Os números usados ficam em Recentes.
+- **Modo cliente com zoom:** pinça e duplo toque. Com zoom, a foto não troca sozinha, e segurar a tela para sair não dispara durante a pinça. O cliente também pode receber a foto no WhatsApp dele.
+- Nas versões anteriores, as fotos, os ajustes e os presets continuam; o app instala por cima.
 
 ## [2.7] · 2026-09-28
 
