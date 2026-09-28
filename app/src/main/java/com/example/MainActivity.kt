@@ -2,6 +2,14 @@ package com.example
 
 import android.Manifest
 import android.content.Intent
+import android.content.res.Configuration
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
+import androidx.compose.ui.platform.LocalConfiguration
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -52,6 +60,7 @@ import com.example.ui.cull.CullScreen
 import com.example.ui.crop.CropScreen
 import com.example.ui.live.LiveViewScreen
 import com.example.ui.components.CaptureFab
+import com.example.ui.components.ScreenTurn
 import androidx.compose.material.icons.outlined.Swipe
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -86,12 +95,25 @@ class MainActivity : ComponentActivity() {
                 nightBrightness = if (settings.nightMode) settings.nightBrightness else null,
                 keepScreenOn = settings.keepScreenOn && cameraState is ConnectionState.Connected,
             )
+            // The rotation chosen in the radial menu applies to every screen.
+            LaunchedEffect(settings.screenOrientation) {
+                requestedOrientation = ScreenTurn.of(settings.screenOrientation).orientation
+            }
             JrLinkTheme(night = settings.nightMode) {
                 val nav = rememberNavController()
                 val entry by nav.currentBackStackEntryAsState()
                 val route = entry?.destination?.route ?: Tab.Session.route
                 val snackbar = remember { SnackbarHostState() }
                 var gallerySelecting by remember { mutableStateOf(false) }
+                val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+                val onTab = Tab.entries.any { it.route == route }
+                val goTo = { tab: Tab ->
+                    nav.navigate(tab.route) {
+                        popUpTo(Tab.Session.route) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
                 val openSession = {
                     nav.navigate(Tab.Session.route) {
                         popUpTo(Tab.Session.route) { saveState = true }
@@ -132,18 +154,12 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     bottomBar = {
-                        if (Tab.entries.any { it.route == route }) {
+                        if (!landscape && onTab) {
                             NavigationBar(containerColor = Tone.Surface) {
                                 Tab.entries.forEach { tab ->
                                     NavigationBarItem(
                                         selected = route == tab.route,
-                                        onClick = {
-                                            nav.navigate(tab.route) {
-                                                popUpTo(Tab.Session.route) { saveState = true }
-                                                launchSingleTop = true
-                                                restoreState = true
-                                            }
-                                        },
+                                        onClick = { goTo(tab) },
                                         icon = { Icon(tab.icon, contentDescription = null) },
                                         label = { Text(tab.label) },
                                         colors = NavigationBarItemDefaults.colors(
@@ -159,7 +175,30 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                 ) { padding ->
-                    NavHost(nav, startDestination = Tab.Session.route, modifier = Modifier.padding(padding)) {
+                  Row(Modifier.fillMaxSize().padding(padding)) {
+                    // Lying down, the tabs move to a rail on the side so the screen keeps its height.
+                    if (landscape && onTab) {
+                        NavigationRail(containerColor = Tone.Surface, modifier = Modifier.fillMaxHeight()) {
+                            Spacer(Modifier.weight(1f))
+                            Tab.entries.forEach { tab ->
+                                NavigationRailItem(
+                                    selected = route == tab.route,
+                                    onClick = { goTo(tab) },
+                                    icon = { Icon(tab.icon, contentDescription = null) },
+                                    label = { Text(tab.label) },
+                                    colors = NavigationRailItemDefaults.colors(
+                                        selectedIconColor = Tone.Accent,
+                                        selectedTextColor = Tone.Text,
+                                        indicatorColor = Tone.SurfaceHigh,
+                                        unselectedIconColor = Tone.TextMuted,
+                                        unselectedTextColor = Tone.TextMuted,
+                                    ),
+                                )
+                            }
+                            Spacer(Modifier.weight(1f))
+                        }
+                    }
+                    NavHost(nav, startDestination = Tab.Session.route, modifier = Modifier.weight(1f).fillMaxHeight()) {
                         composable(Tab.Session.route) {
                             SessionScreen(
                                 app = app,
@@ -223,6 +262,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
+                  }
                 }
             }
         }

@@ -16,6 +16,8 @@ import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.CenterFocusStrong
 import androidx.compose.material.icons.outlined.Flip
 import androidx.compose.material.icons.outlined.TouchApp
+import androidx.compose.material.icons.outlined.CenterFocusWeak
+import androidx.compose.material.icons.outlined.VolumeOff
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -89,7 +91,28 @@ fun LiveOptionsSheet(app: TetherApp, s: Settings, presets: List<Preset>, onDismi
                 }
             }
             Toggle(Icons.Outlined.BarChart, "Histograma", s.liveHistogram) { set(SettingKeys.liveHistogram, it) }
-            Toggle(Icons.Outlined.TouchApp, "Toque para focar", s.liveTapToFocus) { set(SettingKeys.liveTapToFocus, it) }
+            Toggle(Icons.Outlined.TouchApp, "Toque escolhe o ponto de foco", s.liveTapToFocus) { set(SettingKeys.liveTapToFocus, it) }
+            if (s.liveTapToFocus) Toggle(Icons.Outlined.CenterFocusWeak, "Toque também foca (AF)", s.liveTapAf) { set(SettingKeys.liveTapAf, it) }
+
+            Label("Silêncio e foco")
+            Toggle(Icons.Outlined.VolumeOff, "AF silencioso (Modo Live)", s.liveSilentAf) { set(SettingKeys.liveSilentAf, it) }
+            Text(
+                "O barulho vem do espelho: no Modo rápido ele desce a cada foco. O app pede o Modo Live (foco pelo sensor, sem espelho). " +
+                    "Se a 50D não aceitar pelo cabo, escolha na câmera: Menu → Live View → Modo AF: Modo Live, e Disparo silencioso: Modo 1.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Tone.TextMuted,
+            )
+            Toggle(Icons.Outlined.CenterFocusStrong, "Focar antes de disparar", s.shutterFocusFirst) { set(SettingKeys.shutterFocusFirst, it) }
+            Label("Esperar o foco antes de desistir")
+            ChipLine {
+                listOf(3, 5, 8, 12).forEach { v -> SheetChip("$v s", s.shutterWait == v) { set(SettingKeys.shutterWait, v) } }
+            }
+            Label("Fluidez (quadros por segundo)")
+            ChipLine {
+                listOf(10 to "10 · economiza", 15 to "15", 20 to "20", 30 to "30 · máximo").forEach { (v, l) ->
+                    SheetChip(l, s.liveFps == v) { set(SettingKeys.liveFps, v) }
+                }
+            }
             Toggle(Icons.Outlined.Flip, "Espelhar a imagem", s.liveMirror) { set(SettingKeys.liveMirror, it) }
             Toggle(Icons.Outlined.CameraAlt, "Mostrar também na tela da câmera", s.liveOnCamera) { set(SettingKeys.liveOnCamera, it) }
             Text(

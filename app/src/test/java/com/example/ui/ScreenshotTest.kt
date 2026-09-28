@@ -289,6 +289,17 @@ class ScreenshotTest {
         }
         rule.setContent { JrLinkTheme { com.example.ui.cull.CullScreen(app, onBack = {}, onOpenPhoto = {}) } }
         save("selecao_rapida", androidx.compose.ui.test.hasText("Sugerida"))
+        // Finger held part-way down: the card follows it and the "MARCAR" stamp locks in.
+        rule.onNode(androidx.compose.ui.test.hasContentDescription("IMG_1040")).performTouchInput {
+            down(center)
+            repeat(10) { moveBy(androidx.compose.ui.geometry.Offset(0f, 40f)) }
+        }
+        rule.mainClock.advanceTimeBy(100)
+        rule.waitForIdle()
+        val view = rule.activity.window.decorView
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bitmap))
+        File("build/screens/culling_arrastando.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
     @Test
@@ -305,7 +316,13 @@ class ScreenshotTest {
     }
 
     @Test
-    fun liveView() {
+    fun liveView() = live("live_view")
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun liveViewLandscape() = live("live_view_deitado")
+
+    private fun live(name: String) {
         runBlocking {
             app.presets.seedIfEmpty()
             val preset = app.presets.all().first { it.name.contains("Golden") }
@@ -326,6 +343,6 @@ class ScreenshotTest {
         val jpeg = java.io.ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.JPEG, 85, it) }.toByteArray()
         val frames = kotlinx.coroutines.flow.flow { while (true) { emit(jpeg); kotlinx.coroutines.delay(200) } }
         rule.setContent { JrLinkTheme { com.example.ui.live.LiveViewScreen(app, onBack = {}, frames = frames) } }
-        save("live_view", androidx.compose.ui.test.hasContentDescription("Imagem ao vivo"))
+        save(name, androidx.compose.ui.test.hasContentDescription("Imagem ao vivo"))
     }
 }

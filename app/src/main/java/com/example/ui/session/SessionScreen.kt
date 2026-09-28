@@ -38,6 +38,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import com.example.core.camera.ShutterState
+import com.example.ui.live.ShutterButton
+import com.example.ui.components.RotateButton
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -93,6 +96,7 @@ fun SessionScreen(
     onOpenProfiles: () -> Unit = {},
 ) {
     val state by app.camera.state.collectAsState()
+    val shutter by app.camera.shutter.collectAsState()
     val activeProfile by app.settings.activeProfile.collectAsState(initial = "")
     var showProfiles by remember { mutableStateOf(false) }
     val status by app.camera.status.collectAsState()
@@ -135,7 +139,10 @@ fun SessionScreen(
         }
         val controls: @Composable (Modifier) -> Unit = { mod ->
             Column(mod) {
-                BrandMark(subtitle = "Captura vinculada · Canon 50D")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    BrandMark(Modifier.weight(1f), subtitle = "Captura vinculada · Canon 50D")
+                    RotateButton(app, settings.screenOrientation)
+                }
                 Spacer(Modifier.height(20.dp))
                 ConnectionHeader(state, received, status, settings.showBattery, onConnect = app.camera::findAndConnect)
                 FolderNotice(settings, onOpenSettings)
@@ -147,7 +154,8 @@ fun SessionScreen(
                     connected = connected,
                     interval = interval,
                     latest = photos.firstOrNull(),
-                    onShoot = app.camera::capture,
+                    shutter = shutter,
+                    onShoot = { app.camera.capture(settings.shutterWait) },
                     onInterval = { if (interval.running) app.camera.stopInterval() else showInterval = true },
                     onOpenLatest = onOpenPhoto,
                 )
@@ -354,30 +362,45 @@ private fun ShutterRow(
     connected: Boolean,
     interval: IntervalState,
     latest: Photo?,
+    shutter: ShutterState,
     onShoot: () -> Unit,
     onInterval: () -> Unit,
     onOpenLatest: (Long) -> Unit,
 ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-            OutlinedButton(onClick = onInterval, enabled = connected) {
-                Icon(Icons.Outlined.Timer, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(if (interval.running) "${interval.done}/${interval.total}" else "Intervalo", maxLines = 1)
+            Column(
+                Modifier.clip(MaterialTheme.shapes.small).clickable(enabled = connected, onClick = onInterval).padding(6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    Modifier.size(52.dp).clip(CircleShape).background(if (interval.running) Tone.Accent else Tone.Surface).border(1.dp, Tone.Line, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Outlined.Timer,
+                        contentDescription = null,
+                        tint = if (interval.running) Tone.OnAccent else if (connected) Tone.Text else Tone.TextMuted,
+                    )
+                }
+                Text(
+                    if (interval.running) "${interval.done}/${interval.total}" else "Intervalo",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (connected) Tone.TextMuted else Tone.Line,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
             }
         }
-        Box(
-            Modifier
-                .size(76.dp)
-                .clip(CircleShape)
-                .border(2.dp, if (connected) Tone.Accent else Tone.Line, CircleShape)
-                .padding(7.dp)
-                .clip(CircleShape)
-                // The logo's gradient lives on the one control that matters most.
-                .then(if (connected) Modifier.background(BrandGradient) else Modifier.background(Tone.SurfaceHigh))
-                .clickable(enabled = connected, onClick = onShoot)
-                .semantics { contentDescription = "Disparar" },
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            ShutterButton(shutter, connected, 80.dp, Modifier.semantics { contentDescription = "Disparar" }, onShoot)
+            val hint = when (shutter) {
+                is ShutterState.Focusing -> "Focando…"
+                ShutterState.Fired -> "Disparou"
+                is ShutterState.Failed -> "Não disparou"
+                ShutterState.Idle -> null
+            }
+            Text(hint ?: " ", style = MaterialTheme.typography.labelSmall, color = if (shutter is ShutterState.Failed) Tone.Error else Tone.TextMuted)
+        }
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
             Box(
                 Modifier

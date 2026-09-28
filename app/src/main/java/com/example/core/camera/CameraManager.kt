@@ -130,6 +130,12 @@ class CameraManager(
     val liveFrames: SharedFlow<ByteArray> = _liveFrames.asSharedFlow()
     private var liveJob: Job? = null
     @Volatile private var liveZoom = 1
+    /** Set while the shutter works, so live view stops asking for frames and the camera can focus and fire. */
+    @Volatile private var liveHold = false
+    @Volatile private var liveFrameMs = 50L
+
+    private val _shutter = MutableStateFlow<ShutterState>(ShutterState.Idle)
+    val shutter: StateFlow<ShutterState> = _shutter.asStateFlow()
 
     private var session: PtpSession? = null
     private var device: UsbDevice? = null
@@ -293,35 +299,45 @@ class CameraManager(
         ptp.transact(PtpOp.GET_OBJECT, handle, dataIn = sink, timeoutMs = DOWNLOAD_TIMEOUT_MS)
     }
 
-    fun capture() {
+    /**
+     * Fires from the app. The camera gets up to [waitSeconds] to focus: while it answers "not focused"
+     * or "busy" the app asks again. With [focusFirst] and live view on, AF runs first and the shot
+     * follows once it settles. Live view pauses meanwhile so the camera isn't interrupted.
+     */
+    fun capture(waitSeconds: Int = 5, focusFirst: Boolean = false) {
         val ptp = session ?: return
         val info = deviceInfo ?: return
+        if (_shutter.value is ShutterState.Focusing) return
         scope.launch {
+            _shutter.value = ShutterState.Focusing(0)
+            val inLive = liveJob?.isActive == true
+            liveHold = true
             try {
-                releaseShutter(ptp, info)
+                if (focusFirst && inLive) {
+                    runCatching { ptp.transact(PtpOp.EOS_DO_AF) }
+                    delay(AF_SETTLE_MS)
+                }
+                ShutterRelease.fire(ptp, info.supports(PtpOp.EOS_REMOTE_RELEASE), waitSeconds.coerceIn(1, 15) * 1000L) {
+                    _shutter.value = ShutterState.Focusing(it)
+                }
+                _shutter.value = ShutterState.Fired
+                log("Disparo feito")
             } catch (e: PtpException) {
+                _shutter.value = ShutterState.Failed(e.message ?: "A câmera não disparou")
                 _messages.tryEmit("Não disparou: ${e.message}")
+                log("Disparo falhou: ${e.message}")
+            } finally {
+                // In live view the mirror cycles after the shot; give it a moment before asking for frames.
+                if (inLive) delay(LIVE_AFTER_SHOT_MS)
+                liveHold = false
             }
+            delay(1_200)
+            if (_shutter.value !is ShutterState.Focusing) _shutter.value = ShutterState.Idle
         }
     }
 
-    private suspend fun releaseShutter(ptp: PtpSession, info: DeviceInfo) {
-        repeat(4) { attempt ->
-            try {
-                if (info.supports(PtpOp.EOS_REMOTE_RELEASE)) {
-                    // 50D path: one command, the camera focuses (if AF) and fires like a full press.
-                    ptp.transact(PtpOp.EOS_REMOTE_RELEASE)
-                } else {
-                    ptp.transact(PtpOp.EOS_REMOTE_RELEASE_ON, 3, 0)
-                    ptp.transact(PtpOp.EOS_REMOTE_RELEASE_OFF, 3)
-                }
-                return
-            } catch (e: PtpResponseException) {
-                if (e.code != PtpResponse.DEVICE_BUSY || attempt == 3) throw e
-                delay(250)
-            }
-        }
-    }
+    private suspend fun releaseShutter(ptp: PtpSession, info: DeviceInfo) =
+        ShutterRelease.fire(ptp, info.supports(PtpOp.EOS_REMOTE_RELEASE), 5_000)
 
     fun setProperty(prop: Int, value: Int) {
         val ptp = session ?: return
@@ -365,10 +381,11 @@ class CameraManager(
      * The event loop keeps running alongside (the session lock takes turns), so settings changed on
      * the camera still show up and new photos still download.
      */
-    fun startLiveView(alsoOnCamera: Boolean = false) {
+    fun startLiveView(alsoOnCamera: Boolean = false, silentAf: Boolean = true, fps: Int = 20) {
         val ptp = session ?: return
         if (liveJob?.isActive == true) return
-        liveJob = scope.launch { runLiveView(ptp, alsoOnCamera) }
+        liveFrameMs = 1000L / fps.coerceIn(5, 30)
+        liveJob = scope.launch { runLiveView(ptp, alsoOnCamera, silentAf) }
     }
 
     fun stopLiveView() {
@@ -384,8 +401,18 @@ class CameraManager(
         }
     }
 
-    private suspend fun runLiveView(ptp: PtpSession, alsoOnCamera: Boolean) {
+    private suspend fun runLiveView(ptp: PtpSession, alsoOnCamera: Boolean, silentAf: Boolean) {
         _live.value = LiveState.Starting
+        if (silentAf) {
+            // "Modo Live" (contrast AF on the sensor) focuses without dropping the mirror; "Modo rápido"
+            // drops it for every AF, which is the clack-clack. Not every firmware takes it over USB.
+            runCatching { setPropertyNow(ptp, EosProp.LV_AF_SYSTEM, EosProp.LV_AF_LIVE) }
+                .onSuccess { log("AF do live view: Modo Live (silencioso)") }
+                .onFailure {
+                    log("A câmera não aceitou trocar o AF do live view: ${it.message}")
+                    _messages.tryEmit("Para focar sem o barulho do espelho, na 50D escolha Menu → Live View → Modo AF: Modo Live.")
+                }
+        }
         val output = if (alsoOnCamera) EosProp.EVF_PHONE or EosProp.EVF_CAMERA else EosProp.EVF_PHONE
         try {
             setPropertyNow(ptp, EosProp.EVF_OUTPUT_DEVICE, output)
@@ -399,6 +426,12 @@ class CameraManager(
         var windowFrames = 0
         var fps = 0f
         while (scope.isActive && session === ptp && liveJob?.isActive == true) {
+            if (liveHold) {
+                // The shutter has the camera: no frames, and the pause doesn't count as silence.
+                delay(50)
+                lastFrame = System.currentTimeMillis()
+                continue
+            }
             val started = System.currentTimeMillis()
             val data = try {
                 ptp.transactForData(PtpOp.EOS_GET_VIEWFINDER_DATA, LIVE_VIEW_PARAM, timeoutMs = LIVE_TIMEOUT_MS)
@@ -422,9 +455,9 @@ class CameraManager(
                 windowStart = lastFrame
             }
             _live.value = LiveState.Running(fps, liveZoom)
-            // Leave the cable some room for events and downloads (about 25 frames a second at most).
+            // Leave the cable some room for events and downloads, and the phone some rest.
             val spent = lastFrame - started
-            if (spent < MIN_FRAME_MS) delay(MIN_FRAME_MS - spent)
+            if (spent < liveFrameMs) delay(liveFrameMs - spent)
         }
     }
 
@@ -640,7 +673,8 @@ class CameraManager(
         private const val LIVE_VIEW_PARAM = 0x00100000
         private const val LIVE_TIMEOUT_MS = 3_000
         private const val LIVE_GIVE_UP_MS = 6_000L
-        private const val MIN_FRAME_MS = 40L
+        private const val AF_SETTLE_MS = 700L
+        private const val LIVE_AFTER_SHOT_MS = 600L
         /** Zoom position coordinates use the sensor's pixel grid (50D: 4752 × 3168). */
         private const val SENSOR_W = 4752
         private const val SENSOR_H = 3168

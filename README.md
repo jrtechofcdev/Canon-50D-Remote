@@ -41,7 +41,7 @@ Sem Wi-Fi, sem FTP, sem internet. Só a USB, só a 50D.
     <td align="center"><img src="docs/images/tela-cliente-escolha.png" width="200" alt="Cliente escolhe fotos"><br><sub><b>Seleção</b><br>o cliente marca as fotos</sub></td>
     <td align="center"><img src="docs/images/tela-galeria-lote.png" width="200" alt="Galeria em lote"><br><sub><b>Lote</b><br>preset, envio e mensagem de uma vez</sub></td>
     <td align="center"><img src="docs/images/tela-flash-foco.png" width="200" alt="Flash e foco"><br><sub><b>Flash e foco</b><br>Yongnuo e profundidade de campo</sub></td>
-    <td align="center"><img src="docs/images/tela-selecao-rapida.png" width="200" alt="Seleção rápida"><br><sub><b>Culling</b><br>tremidas, olhos fechados, sugeridas</sub></td>
+    <td align="center"><img src="docs/images/tela-culling-arrastar.png" width="200" alt="Culling arrastando"><br><sub><b>Culling</b><br>arraste para marcar ou rejeitar</sub></td>
   </tr>
   <tr>
     <td align="center"><img src="docs/images/tela-live-view.png" width="200" alt="Live view"><br><sub><b>Live view</b><br>monitor com preset ao vivo</sub></td>
@@ -108,8 +108,12 @@ O disparador do app funciona como apertar o botão até o fim: com AF ligado, a 
 1. Na 50D, ative uma vez: **Menu → Configurações de Live View → Disparo com Live View: Ativar**. Deixe o dial em P, Tv, Av ou M.
 2. Com a câmera conectada, toque em **Live view** na Sessão.
 3. No botão de camadas escolha o **preset em tempo real** (nenhum, o look da sessão ou qualquer preset), a guia (terços, Instagram 4:5, Stories 9:16…), zebra, peaking e histograma.
-4. Toque na imagem para focar ali. **5×/10×** amplia pela câmera e a pinça é uma lupa no celular. **◀ ▶** mexe o foco (lente na chave AF). Segure **DOF** para ver a profundidade de campo.
-5. O ícone de girar deixa a tela em paisagem, e o olho esconde os controles para usar o celular como monitor limpo.
+4. Toque na imagem para escolher o ponto de foco e use o botão **AF** para focar. **5×/10×** amplia pela câmera e a pinça é uma lupa no celular. Os ícones de montanha (longe) e flor (perto) e as setas mexem o foco com a lente na chave AF. Segure o botão de profundidade para ver a profundidade de campo.
+5. O ícone de girar abre o menu das posições (em pé, deitado para cada lado, de cabeça para baixo ou automático) e vale para o app todo. O ícone de tela cheia deixa só a imagem, com o disparador.
+
+**Menos barulho:** o app pede o AF **Modo Live**, que foca pelo sensor sem descer o espelho. Se a 50D não aceitar pelo cabo, escolha na câmera: Menu → Live View → **Modo AF: Modo Live** e **Disparo silencioso: Modo 1**.
+
+**Disparo:** se a câmera ainda está focando, o app insiste até disparar (até 5 s, ajustável nas opções do monitor). O botão mostra *Focando…*, *Disparou* ou *Não disparou* com o motivo.
 
 Live view gasta mais bateria da câmera. Com a imagem só no celular, a tela da 50D fica apagada; dá para manter nas duas em "Mostrar também na tela da câmera".
 

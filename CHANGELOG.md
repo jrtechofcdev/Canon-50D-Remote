@@ -2,6 +2,40 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [3.2] · 2026-09-28
+
+- **Girar a tela do app todo:** o botão de girar (Sessão, visualizador e live view) abre um menu em círculo com as posições em pé, deitado para a esquerda, deitado para a direita e de cabeça para baixo, e Auto no meio. A escolha vale para todas as telas e fica guardada.
+  - Deitado, as abas passam para uma barra lateral e as telas se reorganizam para usar a altura toda.
+  - Girar não reinicia mais o app nem o live view.
+- **Live view mais leve e com mais imagem:**
+  - Tela cheia, sem as barras do Android.
+  - Em pé, os controles ficam embaixo da imagem. Deitado, ficam nas laterais: exposição à esquerda, zoom, disparador e foco à direita.
+  - Menos travadas: a imagem não cria um bitmap novo a cada quadro, a zebra e o peaking são calculados a cada dois quadros e o histograma a cada quatro, e só a imagem é redesenhada a cada quadro.
+  - Fluidez ajustável (10 a 30 quadros por segundo).
+  - Foco manual com ícones: montanha (longe), setas e flor (perto), AF no meio e profundidade de campo segurando.
+- **Menos barulho de espelho:**
+  - O app pede à 50D o AF **Modo Live** (foco pelo sensor, sem descer o espelho).
+  - O toque na imagem só escolhe o ponto de foco. O AF fica no botão, ou no toque se você ligar.
+  - Nas opções do monitor aparece a dica: Modo AF Live e Disparo silencioso Modo 1.
+- **Disparador que espera o foco:**
+  - Quando a 50D responde "não consegui focar" ou "ocupada", o app pergunta de novo até disparar. Por padrão espera até 5 s; dá para escolher 3, 5, 8 ou 12 s.
+  - Antes, essa resposta era tratada como disparo feito e a foto se perdia.
+  - O botão mostra *Focando…*, *Disparou* ou *Não disparou*, com o motivo (sem foco, cartão cheio).
+  - No live view, a imagem pausa durante o disparo.
+- **Sessão organizada por ícones:** as ferramentas ficam em três grupos (Câmera, Sessão, Cliente e extras). Cada uma tem ícone, nome e, quando faz sentido, o valor atual (look, momento, perfil).
+- **Visualizador:**
+  - Um toque esconde tudo e deixa só a foto. Dois toques ampliam no ponto tocado.
+  - Segurar mostra o **antes** (sem preset e sem recorte); soltar volta ao depois.
+  - Ações em ícones: Lightroom, WhatsApp, Enviar, Recortar, Nota e Abrir com.
+  - Presets e Calibrar alinhados na mesma faixa.
+  - Deitado, o painel vai para a lateral.
+- **Culling com arrastar de verdade:**
+  - O cartão segue o dedo e inclina.
+  - Para cima aparece o carimbo vermelho **REJEITAR**; para baixo, o verde **MARCAR**.
+  - Quando o gesto passa do ponto, o carimbo trava com uma vibração. Ao soltar (ou dar um peteleco), o cartão sai da tela.
+  - Corrigido: rejeitar pulava uma foto.
+  - A última escolha tem **Desfazer**.
+
 ## [3.1] · 2026-09-28
 
 - **WhatsApp que abre a conversa certa:** o envio agora é em dois toques.

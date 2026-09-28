@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.SettingsSuggest
+import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material.icons.outlined.Crop
@@ -801,6 +802,15 @@ private fun DisplaySettings(app: TetherApp, s: Settings) {
         SliderRow("Brilho da tela", s.nightBrightness, 1..100, enabled = s.nightMode, format = { "$it%" }) {
             scope.launch { app.settings.set(SettingKeys.nightBrightness, it) }
         }
+    }
+    SettingsGroup("Posição da tela", Icons.Outlined.ScreenRotation) {
+        ChoiceRow(
+            "O app todo fica",
+            com.example.ui.components.ScreenTurn.entries.map { it.id to it.label },
+            com.example.ui.components.ScreenTurn.of(s.screenOrientation).id,
+            icon = Icons.Outlined.ScreenRotation,
+        ) { scope.launch { app.settings.set(SettingKeys.screenOrientation, it) } }
+        InfoText("Também pelo botão de girar na Sessão, no visualizador e no live view, que abre um menu com as quatro posições.")
     }
     SettingsGroup("Tela", Icons.Outlined.Smartphone) {
         ToggleRow(Icons.Outlined.LightMode, "Manter a tela ligada", "Enquanto a câmera estiver conectada", s.keepScreenOn) {

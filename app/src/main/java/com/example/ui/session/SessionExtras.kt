@@ -16,6 +16,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Calculate
+import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.outlined.Exposure
@@ -45,16 +58,12 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.example.TetherApp
 import com.example.core.camera.BracketState
 import com.example.core.camera.CameraStatus
 import com.example.core.data.ExposurePreset
-import androidx.compose.material.icons.outlined.AutoAwesome
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -71,9 +80,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import androidx.compose.material.icons.outlined.Calculate
-import androidx.compose.material.icons.outlined.Videocam
-import androidx.compose.material.icons.outlined.Flag
 import com.example.core.data.Photo
 import com.example.core.data.Settings
 import com.example.core.ptp.EosProp
@@ -105,8 +111,14 @@ fun PendingBanner(count: Int, onDownload: () -> Unit, onDismiss: () -> Unit) {
     }
 }
 
-/** Secondary tools. Each chip appears only when its feature is switched on in Ajustes. */
-@OptIn(ExperimentalLayoutApi::class)
+/** One tool: an icon in a tile with its name under it, and what it is set to (in mint) when that matters. */
+private data class ToolItem(val icon: ImageVector, val label: String, val value: String? = null, val enabled: Boolean = true, val onClick: () -> Unit)
+
+/**
+ * The Session's tools in three groups, so each one is found by where it lives, not by reading a
+ * row of words: the camera, this job, and the client. A tile appears only when its feature is on
+ * in Ajustes; camera tiles fade out while the 50D is not connected.
+ */
 @Composable
 fun ToolsRow(
     settings: Settings,
@@ -127,35 +139,77 @@ fun ToolsRow(
     profile: String = "",
     onProfile: () -> Unit = {},
 ) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Tool(profile.ifBlank { null }?.let { "Perfil: $it" } ?: "Perfil", Icons.Outlined.SettingsSuggest, true, onProfile)
-        if (settings.liveViewEnabled) Tool("Live view", Icons.Outlined.Videocam, connected, onLive)
-        Tool(sessionLook?.let { "Look: $it" } ?: "Look: nenhum", Icons.Outlined.AutoAwesome, true, onLook)
-        if (settings.momentsEnabled) {
-            Tool(settings.currentMoment.ifBlank { null }?.let { "Momento: $it" } ?: "Momento", Icons.Outlined.Flag, true, onMoment)
-        }
-        if (settings.presetsEnabled) Tool("Exposições", Icons.Outlined.Tune, connected, onPresets)
-        if (settings.aebEnabled) {
-            val label = bracket?.let { "AEB ${it.shot}/${it.total}" } ?: "AEB ${settings.aebShots}×"
-            Tool(label, Icons.Outlined.Exposure, connected && bracket == null, onBracket)
-        }
-        if (settings.cardBrowserEnabled) Tool("Cartão", Icons.Outlined.SdCard, connected, onCard)
-        if (settings.clientModeEnabled) Tool("Modo cliente", Icons.Outlined.Slideshow, true, onClient)
-        Tool(if (settings.nightMode) "Modo normal" else "Modo noite", Icons.Outlined.Bedtime, true, onNight)
-        if (settings.toolsEnabled) Tool("Flash e foco", Icons.Outlined.Calculate, true, onTools)
-        if (settings.sessionSummary && hasSessionPhotos) Tool("Finalizar sessão", Icons.Outlined.Summarize, true, onSummary)
+    val camera = buildList {
+        if (settings.liveViewEnabled) add(ToolItem(Icons.Outlined.Videocam, "Live view", enabled = connected, onClick = onLive))
+        if (settings.presetsEnabled) add(ToolItem(Icons.Outlined.Tune, "Exposições", enabled = connected, onClick = onPresets))
+        if (settings.aebEnabled) add(ToolItem(Icons.Outlined.Exposure, "Bracketing", bracket?.let { "${it.shot}/${it.total}" } ?: "${settings.aebShots}×", connected && bracket == null, onBracket))
+        if (settings.cardBrowserEnabled) add(ToolItem(Icons.Outlined.SdCard, "Cartão", enabled = connected, onClick = onCard))
+    }
+    val session = buildList {
+        add(ToolItem(Icons.Outlined.AutoAwesome, "Look", sessionLook ?: "nenhum", onClick = onLook))
+        if (settings.momentsEnabled) add(ToolItem(Icons.Outlined.Flag, "Momento", settings.currentMoment.ifBlank { null }, onClick = onMoment))
+        add(ToolItem(Icons.Outlined.SettingsSuggest, "Perfil", profile.ifBlank { null }, onClick = onProfile))
+        if (settings.sessionSummary && hasSessionPhotos) add(ToolItem(Icons.Outlined.Summarize, "Finalizar", onClick = onSummary))
+    }
+    val extras = buildList {
+        if (settings.clientModeEnabled) add(ToolItem(Icons.Outlined.Slideshow, "Modo cliente", onClick = onClient))
+        if (settings.toolsEnabled) add(ToolItem(Icons.Outlined.Calculate, "Flash e foco", onClick = onTools))
+        add(ToolItem(Icons.Outlined.Bedtime, if (settings.nightMode) "Modo normal" else "Modo noite", onClick = onNight))
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        ToolGroup(Icons.Outlined.CameraAlt, "Câmera", camera)
+        ToolGroup(Icons.Outlined.Folder, "Sessão", session)
+        ToolGroup(Icons.Outlined.Person, "Cliente e extras", extras)
     }
 }
 
 @Composable
-private fun Tool(label: String, icon: ImageVector, enabled: Boolean, onClick: () -> Unit) {
-    AssistChip(
-        onClick = onClick,
-        enabled = enabled,
-        label = { Text(label) },
-        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
-        colors = AssistChipDefaults.assistChipColors(labelColor = Tone.Text, leadingIconContentColor = Tone.TextMuted),
-    )
+private fun ToolGroup(icon: ImageVector, title: String, items: List<ToolItem>) {
+    if (items.isEmpty()) return
+    Column(
+        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(Tone.Surface).padding(horizontal = 8.dp, vertical = 10.dp),
+    ) {
+        Row(Modifier.padding(start = 6.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = Tone.Accent, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(title.uppercase(), style = MaterialTheme.typography.labelSmall, color = Tone.TextMuted)
+        }
+        // Four per row, always the same width, so the grid lines up from group to group.
+        items.chunked(4).forEach { row ->
+            Row(Modifier.fillMaxWidth()) {
+                row.forEach { item -> ToolTile(item, Modifier.weight(1f)) }
+                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ToolTile(item: ToolItem, modifier: Modifier) {
+    val alpha = if (item.enabled) 1f else 0.38f
+    Column(
+        modifier.clip(MaterialTheme.shapes.small).clickable(enabled = item.enabled, onClick = item.onClick).padding(vertical = 6.dp, horizontal = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier.size(48.dp).clip(MaterialTheme.shapes.medium).background(Tone.SurfaceHigh),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(item.icon, contentDescription = null, tint = Tone.Text.copy(alpha = alpha), modifier = Modifier.size(24.dp))
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            item.label,
+            style = MaterialTheme.typography.labelMedium,
+            color = Tone.Text.copy(alpha = alpha),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
+        item.value?.let {
+            Text(it, style = MaterialTheme.typography.labelSmall, color = Tone.Accent, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

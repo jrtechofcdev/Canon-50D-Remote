@@ -77,6 +77,11 @@ object EosProp {
     const val EVF_CAMERA = 1
     const val EVF_PHONE = 2
 
+    /** Live view AF system (gphoto2's LvAfSystem): 0 Quick mode (mirror drops), 1 Live mode (silent), 2 face. */
+    const val LV_AF_SYSTEM = 0xD1BA
+    const val LV_AF_QUICK = 0
+    const val LV_AF_LIVE = 1
+
     /** Camera clock, seconds since 1970 in the camera's local time (no time zone on the 50D). */
     const val CAMERA_TIME = 0xD113
 
