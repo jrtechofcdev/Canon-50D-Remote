@@ -16,6 +16,7 @@ import com.example.ui.settings.SettingsSection
 import com.example.ui.settings.SettingsSectionScreen
 import com.example.ui.session.SessionScreen
 import com.example.ui.theme.JrLinkTheme
+import androidx.compose.ui.test.performScrollTo
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,8 +38,13 @@ class ScreenshotTest {
 
     private val app get() = ApplicationProvider.getApplicationContext<TetherApp>()
 
-    private fun save(name: String) {
-        rule.waitForIdle()
+    private fun save(name: String, readyWhen: androidx.compose.ui.test.SemanticsMatcher? = null) {
+        if (readyWhen != null) {
+            runCatching { rule.waitUntil(15_000) { rule.onAllNodes(readyWhen).fetchSemanticsNodes().isNotEmpty() } }
+        }
+        // Room, Coil and the histogram work on background threads. waitUntil keeps the clock and loopers
+        // moving while it polls, so let it run out before drawing.
+        runCatching { rule.waitUntil(8_000) { false } }
         val view = rule.activity.window.decorView
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         view.draw(Canvas(bitmap))
@@ -48,28 +54,46 @@ class ScreenshotTest {
 
     @Test
     fun session() {
+        seedPhotos()
         val actions = PhotoActions(app, app.store, app.export)
         rule.setContent { JrLinkTheme { SessionScreen(app, actions, {}, {}, {}, {}) } }
-        save("sessao")
+        save("sessao", androidx.compose.ui.test.hasText("Finalizar sessão"))
     }
 
     @Test
     fun sessionNight() {
+        seedPhotos()
         val actions = PhotoActions(app, app.store, app.export)
         rule.setContent { JrLinkTheme(night = true) { SessionScreen(app, actions, {}, {}, {}, {}) } }
-        save("sessao_noite")
+        save("sessao_noite", androidx.compose.ui.test.hasText("Finalizar sessão"))
     }
 
     /** A few synthetic frames (gradients with a bright patch) so the gallery and viewer have content. */
     private fun seedPhotos() = runBlocking {
         val dao = app.database.photoDao()
         if (dao.inSession("Geral").isNotEmpty()) return@runBlocking
-        val colors = listOf(0xFF3A5A40.toInt(), 0xFF6B4E3D.toInt(), 0xFF2E4A62.toInt(), 0xFF7A6A52.toInt(), 0xFF4B3F5E.toInt(), 0xFF5E6B3A.toInt())
-        colors.forEachIndexed { i, c ->
+        // Warm/cool defocused-light scenes (bokeh), so the screens look like a real event gallery.
+        val palettes = listOf(
+            intArrayOf(0xFF1B1410.toInt(), 0xFFFFB45A.toInt()), intArrayOf(0xFF0E1622.toInt(), 0xFF7FC4FF.toInt()),
+            intArrayOf(0xFF1E1016.toInt(), 0xFFFF7A8A.toInt()), intArrayOf(0xFF101A14.toInt(), 0xFFB8F29A.toInt()),
+            intArrayOf(0xFF1A1420.toInt(), 0xFFE0A6FF.toInt()), intArrayOf(0xFF1C1810.toInt(), 0xFFFFE08A.toInt()),
+        )
+        palettes.forEachIndexed { i, (dark, light) ->
             val bmp = Bitmap.createBitmap(900, 600, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bmp)
-            canvas.drawColor(c)
-            canvas.drawCircle(600f, 220f, 120f, Paint().apply { color = android.graphics.Color.WHITE })
+            canvas.drawColor(dark)
+            val rnd = java.util.Random(i * 31L + 7)
+            repeat(26) {
+                val x = rnd.nextFloat() * 900f
+                val y = rnd.nextFloat() * 600f
+                val r = 30f + rnd.nextFloat() * 90f
+                val alpha = 40 + rnd.nextInt(120)
+                val c = (alpha shl 24) or (light and 0x00FFFFFF)
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    shader = android.graphics.RadialGradient(x, y, r, intArrayOf(c, c, c and 0x00FFFFFF), floatArrayOf(0f, 0.8f, 1f), android.graphics.Shader.TileMode.CLAMP)
+                }
+                canvas.drawCircle(x, y, r, paint)
+            }
             val file = File(app.cacheDir, "sample_$i.jpg")
             file.outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
             dao.insert(
@@ -88,7 +112,7 @@ class ScreenshotTest {
         seedPhotos()
         rule.setContent { JrLinkTheme { PhotosScreen(app, onOpenPhoto = {}) } }
         rule.mainClock.advanceTimeBy(1_000)
-        save("fotos")
+        save("fotos", androidx.compose.ui.test.hasText("RAW+JPG"))
     }
 
     @Test
@@ -111,6 +135,9 @@ class ScreenshotTest {
     fun settingsShare() {
         rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Share, onBack = {}) } }
         rule.mainClock.advanceTimeBy(2_000)
-        save("ajustes_envio")
+        val logo = androidx.compose.ui.test.hasContentDescription("Marca d'água")
+        runCatching { rule.waitUntil(15_000) { rule.onAllNodes(logo).fetchSemanticsNodes().isNotEmpty() } }
+        rule.onNode(androidx.compose.ui.test.hasText("Posição")).performScrollTo()
+        save("ajustes_envio", logo)
     }
 }

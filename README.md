@@ -1,134 +1,148 @@
-# Jr_Link
+<p align="center">
+  <img src="docs/images/banner.png" alt="Jr_Link: captura vinculada USB para a Canon EOS 50D, por Jr_Tech_OFC" width="100%">
+</p>
 
-**Jr_Link**, da Jr_Tech_OFC: captura vinculada via USB para a **Canon EOS 50D** no Android.
+<p align="center">
+  <a href="https://github.com/jrtechofcdev/Canon-50D-Remote/releases/latest"><img alt="Versão" src="https://img.shields.io/github/v/release/jrtechofcdev/Canon-50D-Remote?label=vers%C3%A3o&color=00FCA8&labelColor=292929"></a>
+  <img alt="Android 7 ou mais novo" src="https://img.shields.io/badge/Android-7%2B-1CDAFF?labelColor=292929&logo=android&logoColor=white">
+  <img alt="Canon EOS 50D" src="https://img.shields.io/badge/c%C3%A2mera-Canon%20EOS%2050D-00FCA8?labelColor=292929">
+  <img alt="Kotlin e Jetpack Compose" src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-1CDAFF?labelColor=292929&logo=kotlin&logoColor=white">
+  <a href="https://github.com/jrtechofcdev/Canon-50D-Remote/actions/workflows/build.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/jrtechofcdev/Canon-50D-Remote/build.yml?branch=main&label=build&labelColor=292929"></a>
+</p>
 
-*Nossa Arte, Seu Sucesso.*
-
-Com a câmera ligada ao celular por um cabo USB OTG:
-
-- **Você fotografa normalmente pela câmera** (botão, dials e menus continuam funcionando).
-- Cada foto é gravada no cartão CF, que serve de backup, **e uma cópia chega sozinha no celular**.
-- O app salva **RAW (CR2)** e/ou **JPG** em **pastas escolhidas por você**, que podem ser pastas diferentes para cada formato.
-- A tela **Sessão** mostra a última foto, a fila de download, a exposição atual (Tv, Av, ISO, ±EV, WB) e um disparador remoto.
-- No visualizador você tem zoom para conferir o foco, histograma, **Enviar** (WhatsApp, Drive…) e **Lightroom**. Para quadros com RAW + JPG, dá para escolher mandar só o JPG, só o RAW ou os dois.
-
-### Novidades da versão 2.2: identidade Jr_Tech_OFC
-
-- Nome **Jr_Link**, ícone com o símbolo da marca (vetor redesenhado a partir do kit, nítido em qualquer tamanho), tela de abertura, notificações e rodapé "Sobre".
-- Cores da marca: menta `#00FCA8` na ação principal, ciano `#1CDAFF` em progresso e informação, grafite `#292929` nas superfícies.
-- Fonte **Exo 2**, a mesma do logo, em todo o app.
-- O bloco inclinado do símbolo aparece no indicador de conexão e nas etiquetas RAW/JPG.
-- Marca d'água já vem com os seus logos: horizontal branco (padrão), horizontal nas cores, logo completo, só o símbolo, ou o seu PNG.
-- Modo cliente com assinatura Jr_Tech_OFC discreta no canto (dá para desligar).
-
-Arquivos da marca e scripts que geram ícones e marcas d'água: pasta `branding/`.
-
-### Novidades da versão 2.1
-
-Todas podem ser ligadas, desligadas ou ajustadas em **Ajustes**, que agora é dividido por categoria:
-
-| Categoria | O que tem |
-|---|---|
-| **Salvamento** | Formato (JPG, RAW ou os dois), pasta de cada formato, subpasta e renomeação por sessão |
-| **Revisão** | Ir sozinho para a foto nova (com opção "só se eu estiver na última"), abrir em tela cheia ao receber, estrelas de 1 a 5, histograma RGB, alerta de estouro piscando (com limite ajustável) |
-| **Câmera** | Manter a câmera ligada, bateria da 50D, navegar no cartão e baixar só as escolhidas, presets de exposição, bracketing (AEB) de 3, 5 ou 7 fotos |
-| **Envio e cliente** | "JPG leve" para WhatsApp (1080 a 2048 px, qualidade ajustável), marca d'água com o seu logo (posição, tamanho, opacidade, margem), modo cliente em tela cheia com PIN opcional |
-| **Alertas** | Vibrar a cada foto, alerta forte se o cabo soltar, cartão e memória quase cheios, reenvio automático das fotos pendentes, resumo ao finalizar a sessão |
-| **Tela** | Modo escuro total com brilho próprio, tela sempre ligada durante a sessão |
-| **Diagnóstico** | Log da conexão USB com botão de copiar |
-
-O app não tem Wi-Fi, FTP nem Live View. Ele usa só a USB, só com a 50D.
+<p align="center">
+  <a href="https://github.com/jrtechofcdev/Canon-50D-Remote/releases/latest"><b>Baixar o APK (última versão)</b></a>
+  &nbsp;·&nbsp;
+  <a href="release/">APK direto no repositório</a>
+  &nbsp;·&nbsp;
+  <a href="CHANGELOG.md">Novidades</a>
+</p>
 
 ---
 
-## 1. Como usar
+Você fotografa pela **Canon EOS 50D** como sempre, com botão, dials e menus funcionando. Cada foto vai para o cartão CF e **uma cópia chega sozinha no celular** pelo cabo USB OTG, salva em RAW, JPG ou nos dois, cada formato na pasta que você escolher.
 
-1. Na 50D, no menu de configuração (ícone de ferramenta amarela), deixe **Desligamento automático** em **Desativado** para sessões longas. O app também mantém a câmera acordada enquanto está conectado.
-2. Ligue a câmera e conecte o cabo **USB OTG** no celular.
-3. O Android pergunta se deve abrir o **Jr_Link**. Marque **"Usar por padrão"** para ele abrir e liberar a USB sozinho nas próximas vezes.
-4. Na primeira vez, vá em **Ajustes** e toque em **Escolher pasta** para os JPG e para os RAW.
-5. Fotografe. As fotos aparecem na aba **Sessão** e ficam na aba **Fotos**.
+Sem Wi-Fi, sem FTP, sem Live View. Só a USB, só a 50D.
 
-*Dica:* o disparador do app funciona como apertar o botão até o fim. Com AF ligado, a câmera foca antes. Se não achar foco, ela não dispara. Com a lente em MF ou usando AF no botão traseiro (AF-ON), o disparo é imediato.
+<table>
+  <tr>
+    <td align="center"><img src="docs/images/tela-sessao.png" width="200" alt="Tela Sessão"><br><sub><b>Sessão</b><br>última foto, exposição, disparador</sub></td>
+    <td align="center"><img src="docs/images/tela-fotos.png" width="200" alt="Galeria"><br><sub><b>Fotos</b><br>RAW/JPG, favoritas, estrelas</sub></td>
+    <td align="center"><img src="docs/images/tela-visualizador.png" width="200" alt="Visualizador"><br><sub><b>Visualizador</b><br>zoom, histograma, Lightroom</sub></td>
+    <td align="center"><img src="docs/images/tela-marca-dagua.png" width="200" alt="Marca d'água"><br><sub><b>Envio</b><br>JPG leve e marca d'água</sub></td>
+  </tr>
+</table>
 
-### Onde as fotos ficam
+<sub>Telas renderizadas a partir do código, com fotos de exemplo.</sub>
 
-| Ajuste | Resultado |
+## O que ele faz
+
+| | |
 |---|---|
-| Pasta escolhida | `…/sua pasta/` (ou `…/sua pasta/Nome da sessão/` com a subpasta ligada) |
-| Sem pasta escolhida | `Android/data/com.jrtechofc.tether50d/files/Pictures/Canon50D/JPG` e `/RAW` (apagada se desinstalar o app) |
+| **Captura vinculada** | Fotos feitas pelo botão da câmera ou pelo disparador do app chegam sozinhas no celular. A câmera nunca fica travada. |
+| **Auto-save** | Só JPG, só RAW ou RAW + JPG. Pasta própria para cada formato (inclusive cartão SD), subpasta por sessão, renomeação com o nome do cliente. |
+| **Revisão** | Slide automático para a foto nova, zoom para conferir foco, histograma RGB, alerta de estouro piscando, estrelas de 1 a 5 e favoritas. |
+| **Controle da câmera** | ISO, abertura, velocidade, ±EV e balanço de branco lidos da própria 50D. Presets de exposição, bracketing (AEB) e intervalômetro. |
+| **Cartão** | Navegar pelas fotos que já estão no CF e baixar só as escolhidas. Reenvio automático do que foi feito com o cabo solto. |
+| **Envio** | Lightroom com um toque, "JPG leve" para WhatsApp e marca d'água Jr_Tech_OFC aplicada só na cópia enviada. |
+| **Cliente** | Modo cliente em tela cheia, com PIN para sair e resumo ao fim da sessão. |
+| **Campo** | Vibração a cada foto, alerta se o cabo soltar, aviso de cartão e memória cheios, modo escuro total para igreja e evento noturno. |
 
----
+Cada função tem um liga/desliga em **Ajustes**.
 
-## 2. Como gerar o APK
+## Instalar
 
-Requisitos: **Android Studio** recente (2025 ou mais novo) **ou** JDK 17+ com o Android SDK instalado.
+1. Baixe o APK na [página de versões](https://github.com/jrtechofcdev/Canon-50D-Remote/releases/latest) ou na pasta [`release/`](release/).
+2. Abra o arquivo no celular e permita **instalar apps desconhecidos** quando o Android pedir.
+3. Atualizações instalam por cima e mantêm suas fotos e ajustes.
 
-**Pelo Android Studio:** *File → Open* na pasta do projeto, espere o Gradle sincronizar e use *Build → Build APK(s)*.
+## Usar com a 50D
 
-**Pelo terminal:**
+1. Na câmera, deixe **Desligamento automático** em **Desativado** (menu de configuração, ícone amarelo).
+2. Ligue a 50D e conecte o cabo **USB OTG** no celular.
+3. O Android pergunta se deve abrir o **Jr_Link**. Marque **Usar por padrão** para ele abrir e liberar a USB sozinho das próximas vezes.
+4. Na primeira vez, vá em **Ajustes → Salvamento** e escolha as pastas dos JPG e dos RAW.
+5. Fotografe.
+
+O disparador do app funciona como apertar o botão até o fim: com AF ligado, a câmera foca antes e, sem foco, não dispara. Em MF ou com AF-ON o disparo é imediato.
+
+<details>
+<summary><b>Se algo der errado</b></summary>
+
+| Sintoma | O que fazer |
+|---|---|
+| "Câmera não conectada" | Confira se a 50D está ligada e se o cabo é OTG. Toque em **Conectar**. |
+| "Permissão USB negada" | Toque em **Conectar** e depois em **Permitir**. |
+| "Outro app está usando a câmera" | Feche outros apps de câmera ou USB e tente de novo. |
+| Foto não chega | Confira se o formato em Ajustes inclui o que a câmera grava (câmera em RAW e app em "Só JPG" não baixa nada). |
+| Não dispara pelo app | AF sem foco. Use MF ou AF-ON. |
+| Qualquer outro erro | **Ajustes → Diagnóstico → Copiar log** e abra um [relato de problema](https://github.com/jrtechofcdev/Canon-50D-Remote/issues/new/choose) com o log. |
+
+Ao tocar em **Encerrar conexão**, a câmera sai do modo PC e volta ao normal.
+</details>
+
+## Gerar o APK
+
+Precisa de **JDK 17** e do **Android SDK** (ou do Android Studio recente, que já traz os dois).
 
 ```bash
 ./gradlew :app:assembleDebug          # Windows: gradlew.bat :app:assembleDebug
 ```
 
-O APK sai em `app/build/outputs/apk/debug/app-debug.apk`. Passe para o celular e instale (permita "instalar apps desconhecidos").
-
-Testes automáticos do protocolo:
+O APK sai em `app/build/outputs/apk/debug/app-debug.apk`.
 
 ```bash
-./gradlew :app:testDebugUnitTest
+./gradlew :app:testDebugUnitTest      # testes do protocolo PTP, bracketing, marca d'água, migração do banco
 ```
 
----
+Para publicar uma versão nova: suba o `versionName` em `app/build.gradle.kts`, anote as mudanças no `CHANGELOG.md` e crie a tag (`git tag v2.3 && git push origin v2.3`). O GitHub Actions compila, testa e publica o APK na página de versões.
 
-## 3. Estrutura do código
+<details>
+<summary><b>Estrutura do código</b></summary>
 
 ```
 app/src/main/java/com/example/
-├── TetherApp.kt                 cria as peças do app (câmera, banco, configurações)
-├── MainActivity.kt              navegação entre Sessão / Fotos / Ajustes
+├── TetherApp.kt                   cria as peças do app (câmera, banco, configurações)
+├── MainActivity.kt                navegação: Sessão, Fotos, Ajustes
 ├── core/
-│   ├── ptp/                     protocolo PTP da Canon (pacotes, sessão USB, eventos, tabelas de valores)
-│   ├── camera/CameraManager.kt  conecta na 50D, lê eventos, dispara, muda ISO/Av/Tv…
-│   ├── tether/TetherController.kt  auto-save: baixa cada foto nova e grava na pasta certa
-│   ├── storage/                 gravação nas pastas escolhidas + preview extraído do CR2
-│   ├── data/                    banco de fotos (Room), configurações e presets (DataStore)
-│   ├── analysis/                histograma e máscara de estouro
-│   ├── export/                  cópia leve para WhatsApp + marca d'água
-│   ├── alerts/                  vibração e notificações de alerta
-│   └── service/                 notificação que mantém a conexão com a tela apagada
-└── ui/                          telas em Jetpack Compose
+│   ├── ptp/                       protocolo PTP da Canon: pacotes, sessão USB, eventos, valores
+│   ├── camera/CameraManager.kt    conexão com a 50D, eventos, disparo, ISO/Av/Tv, AEB, cartão
+│   ├── tether/TetherController.kt auto-save: baixa cada foto nova e grava na pasta certa
+│   ├── storage/                   pastas escolhidas + preview extraído do CR2
+│   ├── data/                      banco de fotos (Room), configurações e presets (DataStore)
+│   ├── analysis/                  histograma e máscara de estouro
+│   ├── export/                    JPG leve e marca d'água
+│   ├── alerts/                    vibração e notificações de alerta
+│   └── service/                   mantém a conexão com a tela apagada
+└── ui/                            telas em Jetpack Compose
 ```
+</details>
 
----
-
-## 4. Como personalizar
+<details>
+<summary><b>Onde personalizar</b></summary>
 
 | Quero mudar… | Onde |
 |---|---|
-| Cores da marca e do tema | `ui/theme/Theme.kt` → `Brand` e `DayPalette` |
+| Cores da marca e do tema | `ui/theme/Theme.kt` → `Brand`, `DayPalette`, `NightPalette` |
 | Nome do app | `app/src/main/res/values/strings.xml` |
+| Padrões das opções | `core/data/AppSettings.kt` → `Settings` |
 | Logos da marca d'água | `app/src/main/assets/watermarks/` (gerados por `branding/render.py`) |
-| Ícone do app | `branding/symbol.py` → gera `res/drawable/ic_launcher_foreground.xml` |
-| Textos das telas | arquivos em `ui/session`, `ui/photos`, `ui/settings` |
-| Formato padrão (RAW+JPG) | `core/data/AppSettings.kt` → `Settings.downloadMode` |
-| Padrão do nome renomeado (`Sessão_0001`) | `core/tether/TetherController.kt` → `savedBase` |
-| Padrões de todas as opções (ligado/desligado) | `core/data/AppSettings.kt` → `Settings` |
-| Cores do modo escuro total | `ui/theme/Theme.kt` → `NightPalette` |
-| Velocidade da leitura de eventos | `core/camera/CameraManager.kt` → `POLL_IDLE_MS` |
+| Ícone do app | `branding/symbol.py` |
+| Banner deste README | `branding/banner.py` |
+| Textos das telas | `ui/session`, `ui/photos`, `ui/settings` |
+</details>
 
----
+## Documentação
 
-## 5. Se algo der errado
+- [`CHANGELOG.md`](CHANGELOG.md): o que mudou em cada versão.
+- [`docs/AUDITORIA.md`](docs/AUDITORIA.md): por que a versão 1.0 travava a câmera e como a 2.0 resolveu.
+- [`DESIGN.md`](DESIGN.md) e [`branding/`](branding/): identidade visual, cores, fonte e símbolo.
 
-| Sintoma | O que fazer |
-|---|---|
-| "Câmera não conectada" | Confira se a câmera está ligada, se o cabo é OTG e se a chave da 50D não está em OFF. Toque em **Conectar**. |
-| "Permissão USB negada" | Toque em **Conectar** e depois em **Permitir**. |
-| "Outro app está usando a câmera" | Feche outros apps de câmera/USB e tente de novo. |
-| Foto não chega | Veja se o formato em **Ajustes** inclui o tipo que a câmera grava (ex.: câmera em RAW e app em "Só JPG"). |
-| Não dispara pelo app | AF sem foco. Use MF ou AF-ON, ou mire num ponto com contraste. |
-| Qualquer outro erro | **Ajustes → Diagnóstico → Copiar log** e envie o log para análise. |
+## Créditos
 
-Ao tocar em **Encerrar conexão**, o app avisa a câmera, que sai do modo PC e volta ao normal.
+**Jr_Link** é um app da **Jr_Tech_OFC** ([@jose_renato_a](https://instagram.com/jose_renato_a)).
+Uso exclusivo. Marca, logo e nome Jr_Tech_OFC: todos os direitos reservados.
+
+Fonte [Exo 2](https://github.com/googlefonts/Exo-2.0) (SIL Open Font License). Protocolo PTP da Canon com base na documentação do [libgphoto2](https://github.com/gphoto/libgphoto2).
+
+<p align="center"><img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp" width="48" alt=""><br><sub>Nossa Arte, Seu Sucesso</sub></p>

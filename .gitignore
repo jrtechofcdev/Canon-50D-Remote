@@ -16,3 +16,9 @@
 local.properties
 .env
 debug.keystore
+
+# Build and tool output
+app/build/
+branding/__pycache__/
+*.apk
+!release/*.apk
