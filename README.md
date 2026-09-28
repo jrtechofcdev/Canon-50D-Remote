@@ -95,7 +95,7 @@ O APK sai em `app/build/outputs/apk/debug/app-debug.apk`.
 ./gradlew :app:testDebugUnitTest      # testes do protocolo PTP, bracketing, marca d'água, migração do banco
 ```
 
-Para publicar uma versão nova: suba o `versionName` em `app/build.gradle.kts`, anote as mudanças no `CHANGELOG.md` e crie a tag (`git tag v2.3 && git push origin v2.3`). O GitHub Actions compila, testa e publica o APK na página de versões.
+Para publicar uma versão nova: suba o `versionName` em `app/build.gradle.kts` e anote as mudanças no `CHANGELOG.md`. Quando isso chega na `main`, o GitHub Actions compila, testa, cria a tag `vX.Y` e publica o APK na página de versões.
 
 <details>
 <summary><b>Estrutura do código</b></summary>

@@ -9,7 +9,7 @@ auto-save em `core/tether` + `core/storage`, telas em `ui/`.
 - Capturas de tela das telas: `gradle :app:testDebugUnitTest --tests com.example.ui.ScreenshotTest` → `app/build/screens/`
 - APK: `gradle :app:assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk` (assinado com `app/signing/jrlink-debug.keystore`, mantém atualização por cima)
 - Capturas para o README: rodar cada teste do `ScreenshotTest` separadamente (juntos no mesmo processo alguns não carregam), redimensionar para 540 px em `docs/images/`.
-- Nova versão: `versionName` em `app/build.gradle.kts` + seção no `CHANGELOG.md` + APK em `release/` + tag `vX.Y` (o workflow `release` publica a Release).
+- Nova versão: `versionName` em `app/build.gradle.kts` + seção no `CHANGELOG.md` + APK em `release/`. Ao chegar na `main`, o workflow `release` cria a tag `vX.Y` e publica a Release (só se ela ainda não existir).
 
 <!-- antislop:start -->
 ## antislop
