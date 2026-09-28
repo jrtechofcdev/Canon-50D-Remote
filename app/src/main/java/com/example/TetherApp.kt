@@ -19,6 +19,8 @@ import com.example.core.render.PresetEngine
 import com.example.core.notes.VoiceNotes
 import com.example.core.location.LocationTracker
 import com.example.core.backup.SessionBackup
+import com.example.core.analysis.Culler
+import com.example.core.analysis.MlKitFaceAnalyzer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -55,6 +57,8 @@ class TetherApp : Application() {
         private set
     lateinit var backup: SessionBackup
         private set
+    lateinit var culler: Culler
+        private set
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -83,6 +87,7 @@ class TetherApp : Application() {
         alerts = Alerts(this)
         notes = VoiceNotes(this)
         backup = SessionBackup(this, database.photoDao(), store)
+        culler = Culler(this, database.photoDao(), settings, MlKitFaceAnalyzer())
 
         appScope.launch(Dispatchers.IO) {
             export.clearOldExports()
@@ -112,6 +117,7 @@ class TetherApp : Application() {
         appScope.launch {
             tether.saved.collect {
                 val s = settings.current()
+                if (s.blurAlert || s.eyesCheck || s.cullSuggestions) culler.enqueue(it.id)
                 if (s.vibrateOnReceive) alerts.photoReceived()
                 if (s.phoneLowWarning && !warnedPhone) {
                     val free = withContext(Dispatchers.IO) { alerts.phoneFreeGb() }
@@ -121,6 +127,10 @@ class TetherApp : Application() {
                     }
                 }
             }
+        }
+
+        appScope.launch {
+            culler.warnings.collect { if (settings.current().blurVibrate) alerts.photoProblem() }
         }
 
         appScope.launch {

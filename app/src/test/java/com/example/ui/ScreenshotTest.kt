@@ -256,4 +256,19 @@ class ScreenshotTest {
         rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Messages, onBack = {}) } }
         save("ajustes_mensagens", androidx.compose.ui.test.hasText("Prévia pronta"))
     }
+
+    @Test
+    fun cull() {
+        seedPhotos()
+        runBlocking {
+            val dao = app.database.photoDao()
+            val list = dao.inSession("Geral")
+            list.forEachIndexed { i, p ->
+                dao.setAnalysis(p.id, 80f - i * 9, i == 4, 2, if (i == 2) 1 else 0, 88f - i * 8, 0L)
+                dao.setBurst(p.id, if (i < 2) list.first().id else null, i == 0)
+            }
+        }
+        rule.setContent { JrLinkTheme { com.example.ui.cull.CullScreen(app, onBack = {}, onOpenPhoto = {}) } }
+        save("selecao_rapida", androidx.compose.ui.test.hasText("Sugerida"))
+    }
 }

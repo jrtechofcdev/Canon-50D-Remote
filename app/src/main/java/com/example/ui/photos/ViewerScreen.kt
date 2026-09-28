@@ -197,6 +197,7 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Tone.Background.copy(alpha = 0.85f))
                 .navigationBarsPadding().padding(16.dp),
         ) {
+            com.example.ui.cull.Badges(current, settings, Modifier.padding(bottom = 8.dp))
             if (settings.viewerPresets && presets.isNotEmpty()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) {

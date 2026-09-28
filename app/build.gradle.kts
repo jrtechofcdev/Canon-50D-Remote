@@ -12,9 +12,14 @@ android {
     applicationId = "com.jrtechofc.tether50d"
     minSdk = 24
     targetSdk = 36
-    versionCode = 7
-    versionName = "2.5"
+    versionCode = 8
+    versionName = "2.6"
+    // Phones only (the face model ships native code for each CPU type; x86 is emulators).
+    ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
   }
+
+  // Compressed native code keeps the APK small to download and send; it is unpacked once at install.
+  packaging { jniLibs { useLegacyPackaging = true } }
 
   signingConfigs {
     // Debug builds, local and on GitHub Actions, share this key so every APK installs over the previous one.
@@ -76,6 +81,8 @@ dependencies {
   implementation(libs.androidx.room.runtime)
   implementation(libs.coil.compose)
   implementation(libs.kotlinx.coroutines.android)
+  // Bundled face model: works offline, no Google Play services needed.
+  implementation(libs.mlkit.face.detection)
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.robolectric)

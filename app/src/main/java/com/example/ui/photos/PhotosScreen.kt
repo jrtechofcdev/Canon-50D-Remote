@@ -29,6 +29,9 @@ import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.BlurOn
+import androidx.compose.material.icons.outlined.Swipe
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -93,7 +96,7 @@ private data class BatchProgress(val label: String, val done: Int, val total: In
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun PhotosScreen(app: TetherApp, actions: PhotoActions, onOpenPhoto: (Long) -> Unit) {
+fun PhotosScreen(app: TetherApp, actions: PhotoActions, onOpenPhoto: (Long) -> Unit, onCull: () -> Unit = {}) {
     val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = emptyList())
     val settings by app.settings.settings.collectAsState(initial = Settings())
     val presets by app.presets.presets.collectAsState(initial = emptyList())
@@ -102,6 +105,7 @@ fun PhotosScreen(app: TetherApp, actions: PhotoActions, onOpenPhoto: (Long) -> U
     var minStars by rememberSaveable { mutableIntStateOf(0) }
     var moment by rememberSaveable { mutableStateOf<String?>(null) }
     val photos = all.filtered(filter, if (settings.ratingEnabled) minStars else 0, moment, settings)
+        .filter { !settings.hideRejected || !it.rejected }
 
     val selected = remember { mutableStateListOf<Long>() }
     val selecting = selected.isNotEmpty()
@@ -133,6 +137,11 @@ fun PhotosScreen(app: TetherApp, actions: PhotoActions, onOpenPhoto: (Long) -> U
                 Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                androidx.compose.material3.AssistChip(
+                    onClick = onCull,
+                    label = { Text("Seleção rápida") },
+                    leadingIcon = { Icon(Icons.Outlined.Swipe, contentDescription = null, modifier = Modifier.size(18.dp), tint = Tone.Accent) },
+                )
                 PhotoFilter.entries.filter { it != PhotoFilter.ClientPicks || settings.clientPicksEnabled }.forEach {
                     GalleryChip(it.label, filter == it) { filter = it }
                 }
@@ -200,6 +209,9 @@ fun PhotosScreen(app: TetherApp, actions: PhotoActions, onOpenPhoto: (Long) -> U
                     )
                     FormatTag(photo.rawUri != null, photo.jpgUri != null, Modifier.align(Alignment.BottomStart).padding(4.dp))
                     Row(Modifier.align(Alignment.TopEnd).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        if (photo.blurry) TileIcon(Icons.Outlined.BlurOn, "Tremida", Tone.Error)
+                        if (settings.eyesCheck && photo.eyesClosed > 0) TileIcon(Icons.Outlined.VisibilityOff, "Olhos fechados", Tone.Error)
+                        if (settings.cullSuggestions && photo.suggested) TileIcon(Icons.Outlined.AutoAwesome, "Sugerida", Tone.Accent)
                         if (photo.note != null || photo.audioNote != null) TileIcon(Icons.AutoMirrored.Outlined.StickyNote2, "Tem nota", Tone.Text)
                         if (photo.clientPick && settings.clientPicksEnabled) TileIcon(Icons.Filled.Favorite, "Escolhida pelo cliente", Tone.Accent)
                         else if (photo.favorite) TileIcon(Icons.Filled.Favorite, "Favorita", Tone.Text)

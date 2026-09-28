@@ -42,6 +42,9 @@ class Alerts(private val context: Context) {
     /** One short tick: a photo arrived. */
     fun photoReceived() = vibrate(longArrayOf(0, 35))
 
+    /** Two short pulses, different from "photo received", for a shaken frame or closed eyes. */
+    fun photoProblem() = vibrate(longArrayOf(0, 60, 90, 60))
+
     fun warn(title: String, text: String) {
         vibrate(longArrayOf(0, 400, 150, 400, 150, 400))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&

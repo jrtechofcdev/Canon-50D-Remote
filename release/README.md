@@ -2,7 +2,7 @@
 
 | Arquivo | Versão | Android |
 |---|---|---|
-| [`Jr_Link-v2.5.apk`](Jr_Link-v2.5.apk) | 2.5 | 7.0 ou mais novo |
+| [`Jr_Link-v2.6.apk`](Jr_Link-v2.6.apk) | 2.6 | 7.0 ou mais novo |
 
 Para instalar: baixe o arquivo no celular, abra e permita **instalar apps desconhecidos**.
 Atualizações instalam por cima da versão anterior e mantêm fotos e ajustes.

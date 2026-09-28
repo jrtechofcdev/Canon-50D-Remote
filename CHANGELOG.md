@@ -2,6 +2,17 @@
 
 Versões do **Jr_Link**. A mais recente fica no topo.
 
+## [2.6] · 2026-09-28
+
+Seleção com análise local, gratuita e sem internet. Nenhuma foto sai do celular.
+
+- **Alerta de foto tremida:** cada foto recebida é analisada (nitidez no rosto, ou no ponto mais nítido). Se saiu tremida ou fora de foco, o celular dá dois toques curtos e a foto ganha o selo **Tremida**. Sensibilidade ajustável.
+- **Olhos fechados:** detecção de rostos com o Google ML Kit embutido no app (funciona offline). Avisa quando alguém piscou: "olhos fechados (2 de 5)".
+- **Fotos parecidas e sugestões:** fotos da mesma pose são agrupadas, e a melhor de cada grupo (nitidez, olhos abertos, exposição) ganha o selo **Sugerida**.
+- **Seleção rápida:** arrastar para cima rejeita, para baixo marca, estrelas de 1 a 5, comparar duas fotos lado a lado com zoom junto, filtros (não avaliadas, sugeridas, tremidas, olhos fechados, rejeitadas) e **Aceitar sugestões** com desfazer.
+- Rejeitar nunca apaga arquivo; a galeria pode esconder as rejeitadas.
+- O APK passou de 20 para 32 MB por causa do modelo de rostos (só as versões para celular ARM entram no APK).
+
 ## [2.5] · 2026-09-28
 
 Ferramentas do dia a dia. Tudo funciona sem internet, e cada função tem liga/desliga em Ajustes.

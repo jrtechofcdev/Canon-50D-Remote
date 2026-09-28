@@ -119,7 +119,7 @@ data class Settings(
     val toolsEnabled: Boolean = true,
     val blurAlert: Boolean = true,
     /** Sharpness below this (0-100 scale) marks a frame as shaken or out of focus. */
-    val blurThreshold: Int = 35,
+    val blurThreshold: Int = 50,
     val blurVibrate: Boolean = true,
     val eyesCheck: Boolean = true,
     val cullSuggestions: Boolean = true,

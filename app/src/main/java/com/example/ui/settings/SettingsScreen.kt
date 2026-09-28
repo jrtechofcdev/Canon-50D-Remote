@@ -419,6 +419,17 @@ private fun ReviewSettings(app: TetherApp, s: Settings) {
     SettingsGroup("Avaliação") {
         ToggleRow("Estrelas (1 a 5)", "Mostra as estrelas no visualizador e o filtro na galeria", s.ratingEnabled) { set(SettingKeys.ratingEnabled, it) }
     }
+    SettingsGroup("Seleção com análise local") {
+        InfoText("Cada foto é analisada no próprio celular, sem internet: nitidez, rostos e olhos, exposição e fotos parecidas.")
+        ToggleRow("Alerta de foto tremida", "Selo \"Tremida\" e aviso quando a foto sai tremida ou fora de foco", s.blurAlert) { set(SettingKeys.blurAlert, it) }
+        SliderRow("Sensibilidade do alerta", s.blurThreshold, 30..70, enabled = s.blurAlert, format = { v -> when { v < 44 -> "baixa ($v)"; v < 57 -> "média ($v)"; else -> "alta ($v)" } }) {
+            scope.launch { app.settings.set(SettingKeys.blurThreshold, it) }
+        }
+        ToggleRow("Olhos fechados", "Detecta rostos e avisa quando alguém piscou", s.eyesCheck) { set(SettingKeys.eyesCheck, it) }
+        ToggleRow("Vibrar no problema", "Dois toques curtos, diferentes do aviso de foto recebida", s.blurVibrate, enabled = s.blurAlert || s.eyesCheck) { set(SettingKeys.blurVibrate, it) }
+        ToggleRow("Sugerir as melhores", "Entre fotos parecidas, marca a melhor como Sugerida", s.cullSuggestions) { set(SettingKeys.cullSuggestions, it) }
+        ToggleRow("Esconder rejeitadas na galeria", "Os arquivos continuam salvos; veja em Seleção rápida → Rejeitadas", s.hideRejected) { set(SettingKeys.hideRejected, it) }
+    }
     SettingsGroup("Anotações") {
         ToggleRow("Notas nas fotos", "Texto ou áudio em cada foto, pelo botão de nota no visualizador", s.notesEnabled) { set(SettingKeys.notesEnabled, it) }
     }

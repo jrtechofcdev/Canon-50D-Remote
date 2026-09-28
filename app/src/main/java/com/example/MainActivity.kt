@@ -48,6 +48,7 @@ import com.example.ui.preset.EditTarget
 import com.example.ui.preset.EditorScreen
 import com.example.ui.preset.PresetsScreen
 import com.example.ui.tools.ToolsScreen
+import com.example.ui.cull.CullScreen
 import androidx.compose.material.icons.outlined.AutoAwesome
 import com.example.core.data.Settings
 import android.view.WindowManager
@@ -57,6 +58,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.activity.compose.LocalActivity
 import com.example.ui.theme.Tone
 import com.example.ui.theme.JrLinkTheme
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 
 class MainActivity : ComponentActivity() {
@@ -85,7 +87,14 @@ class MainActivity : ComponentActivity() {
                 val snackbar = remember { SnackbarHostState() }
 
                 LaunchedEffect(Unit) {
-                    merge(app.camera.messages, app.tether.errors).collect { snackbar.showSnackbar(it) }
+                    val cullMessages = app.culler.warnings.map { w ->
+                        val problems = listOfNotNull(
+                            "tremida ou fora de foco".takeIf { w.blurry },
+                            "olhos fechados (${w.eyesClosed} de ${w.faces})".takeIf { w.eyesClosed > 0 },
+                        )
+                        "${w.photo.savedBase}: ${problems.joinToString(", ")}"
+                    }
+                    merge(app.camera.messages, app.tether.errors, cullMessages).collect { snackbar.showSnackbar(it) }
                 }
 
                 Scaffold(
@@ -132,6 +141,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenTools = { nav.navigate("tools") },
                             )
                         }
+                        composable("cull") { CullScreen(app, onBack = { nav.popBackStack() }, onOpenPhoto = { nav.navigate("photo/$it") }) }
                         composable("tools") { ToolsScreen(onBack = { nav.popBackStack() }) }
                         composable("card") { CardScreen(app = app, onBack = { nav.popBackStack() }) }
                         composable("client") {
@@ -143,7 +153,7 @@ class MainActivity : ComponentActivity() {
                             SettingsSectionScreen(app = app, section = section, onBack = { nav.popBackStack() })
                         }
                         composable(Tab.Photos.route) {
-                            PhotosScreen(app = app, actions = actions, onOpenPhoto = { nav.navigate("photo/$it") })
+                            PhotosScreen(app = app, actions = actions, onOpenPhoto = { nav.navigate("photo/$it") }, onCull = { nav.navigate("cull") })
                         }
                         composable(Tab.Presets.route) {
                             PresetsScreen(app = app, onEdit = { nav.navigate("editor/preset/$it") })

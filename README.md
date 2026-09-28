@@ -41,7 +41,7 @@ Sem Wi-Fi, sem FTP, sem Live View. Só a USB, só a 50D.
     <td align="center"><img src="docs/images/tela-cliente-escolha.png" width="200" alt="Cliente escolhe fotos"><br><sub><b>Seleção</b><br>o cliente marca as fotos</sub></td>
     <td align="center"><img src="docs/images/tela-galeria-lote.png" width="200" alt="Galeria em lote"><br><sub><b>Lote</b><br>preset, envio e mensagem de uma vez</sub></td>
     <td align="center"><img src="docs/images/tela-flash-foco.png" width="200" alt="Flash e foco"><br><sub><b>Flash e foco</b><br>Yongnuo e profundidade de campo</sub></td>
-    <td></td>
+    <td align="center"><img src="docs/images/tela-selecao-rapida.png" width="200" alt="Seleção rápida"><br><sub><b>Seleção rápida</b><br>tremidas, olhos fechados, sugeridas</sub></td>
   </tr>
 </table>
 
@@ -61,6 +61,7 @@ Sem Wi-Fi, sem FTP, sem Live View. Só a USB, só a 50D.
 | **Cliente** | Modo cliente em tela cheia, com PIN para sair e resumo ao fim da sessão. O cliente escolhe o preset da foto; o botão Calibrar (com PIN) abre os ajustes daquela foto. |
 | **Entrega** | O cliente marca as fotos no modo cliente; a lista vai para o filtro do Lightroom ou para a pasta Escolhidas. Galeria em lote e mensagens prontas no WhatsApp. |
 | **Evento** | Momentos (Cerimônia, Festa…) com subpasta, notas de texto e voz por foto, backup da sessão para cartão SD ou pendrive. |
+| **Seleção com análise local** | Avisa na hora se a foto saiu tremida ou se alguém piscou, agrupa fotos parecidas e sugere a melhor. Tela de seleção rápida com gestos. Roda no celular, sem internet (Google ML Kit embutido). |
 | **Ferramentas** | Calculadora de flash Yongnuo e de profundidade de campo, GPS nas cópias e acerto do relógio da câmera. Tudo offline. |
 | **Campo** | Vibração a cada foto, alerta se o cabo soltar, aviso de cartão e memória cheios, modo escuro total para igreja e evento noturno. |
 
@@ -89,6 +90,8 @@ O disparador do app funciona como apertar o botão até o fim: com AF ligado, a 
 3. No menu **⋮** do preset, **Usar na sessão**. Cada foto nova já chega com ele. Na Sessão, o chip **Look** troca o preset rápido.
 4. No visualizador, a faixa embaixo da foto troca o preset e **Calibrar** ajusta só aquela foto. No menu do editor ficam **Aplicar às próximas fotos** e **Salvar como preset**.
 5. Em **Ajustes → Presets**, escolha a **pasta de presets** (cada um é salvo lá em `.xmp`, pronto para o Lightroom) e a **pasta das editadas**.
+
+**Análise local:** os limites de "tremida" vêm de testes com imagens de exemplo. Se o alerta avisar demais ou de menos nas suas fotos, ajuste a sensibilidade em **Ajustes → Revisão**.
 
 **Limites:** o processamento da Adobe é fechado, então a prévia do Jr_Link é uma aproximação. O `.xmp` exportado dá o resultado exato no Lightroom. Máscaras, remoção de manchas, correção de lente e perfis de câmera da Adobe não são aplicados; o corte também não, porque não faz parte de um preset.
 
@@ -139,7 +142,7 @@ app/src/main/java/com/example/
 │   ├── data/                      banco de fotos (Room), configurações e presets (DataStore)
 │   ├── preset/                    presets: leitura de DNG/XMP/LRTemplate, XMP para exportar, pack inicial
 │   ├── render/                    processamento dos presets (OpenGL na GPU, com versão na CPU de reserva)
-│   ├── analysis/                  histograma e máscara de estouro
+│   ├── analysis/                  histograma, estouro e a seleção local (nitidez, rostos, nota)
 │   ├── messages/                  modelos de mensagem do WhatsApp
 │   ├── tools/                     contas de flash e profundidade de campo
 │   ├── backup/  location/  notes/ backup da sessão, GPS e notas de voz
