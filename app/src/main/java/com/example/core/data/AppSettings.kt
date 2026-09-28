@@ -144,6 +144,18 @@ data class Settings(
     val whatsDefaultSet: String = "LIGHT",
     /** Gallery thumbnail size in dp. */
     val galleryThumb: Int = 112,
+    /** Whole-app screen orientation: one of [ScreenTurn] ids. */
+    val screenOrientation: String = "auto",
+    /** Live view: a tap also runs AF. Off, a tap only moves the focus point and AF waits for the AF button. */
+    val liveTapAf: Boolean = false,
+    /** Live view: ask the 50D for its silent contrast AF ("Modo Live") instead of Quick mode (mirror flips). */
+    val liveSilentAf: Boolean = true,
+    /** Live view frames per second cap, to leave the cable free and keep the phone cool. */
+    val liveFps: Int = 20,
+    /** How long the shutter keeps trying while the camera focuses, in seconds. */
+    val shutterWait: Int = 5,
+    /** Focus first (AF) and only then fire, from the app's shutter. */
+    val shutterFocusFirst: Boolean = true,
 
     // Live view
     val liveViewEnabled: Boolean = true,
@@ -287,6 +299,12 @@ object SettingKeys {
     val msgWhatsApp = stringPreferencesKey("msg_whatsapp")
     val whatsDefaultSet = stringPreferencesKey("whats_default_set")
     val galleryThumb = intPreferencesKey("gallery_thumb")
+    val screenOrientation = stringPreferencesKey("screen_orientation")
+    val liveTapAf = booleanPreferencesKey("live_tap_af")
+    val liveSilentAf = booleanPreferencesKey("live_silent_af")
+    val liveFps = intPreferencesKey("live_fps")
+    val shutterWait = intPreferencesKey("shutter_wait")
+    val shutterFocusFirst = booleanPreferencesKey("shutter_focus_first")
     val liveViewEnabled = booleanPreferencesKey("live_view_enabled")
     val liveOnCamera = booleanPreferencesKey("live_on_camera")
     val liveGrid = stringPreferencesKey("live_grid")
@@ -456,6 +474,12 @@ class SettingsRepository(private val context: Context) {
             msgWhatsApp = this[k.msgWhatsApp] ?: d.msgWhatsApp,
             whatsDefaultSet = this[k.whatsDefaultSet] ?: d.whatsDefaultSet,
             galleryThumb = this[k.galleryThumb] ?: d.galleryThumb,
+            screenOrientation = this[k.screenOrientation] ?: d.screenOrientation,
+            liveTapAf = this[k.liveTapAf] ?: d.liveTapAf,
+            liveSilentAf = this[k.liveSilentAf] ?: d.liveSilentAf,
+            liveFps = this[k.liveFps] ?: d.liveFps,
+            shutterWait = this[k.shutterWait] ?: d.shutterWait,
+            shutterFocusFirst = this[k.shutterFocusFirst] ?: d.shutterFocusFirst,
             liveViewEnabled = this[k.liveViewEnabled] ?: d.liveViewEnabled,
             liveOnCamera = this[k.liveOnCamera] ?: d.liveOnCamera,
             liveGrid = this[k.liveGrid] ?: d.liveGrid,

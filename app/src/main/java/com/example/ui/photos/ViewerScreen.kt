@@ -88,6 +88,23 @@ import com.example.core.preset.Preset
 import com.example.ui.preset.LookImage
 import com.example.ui.preset.PresetPicker
 import com.example.ui.theme.Tone
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.example.ui.components.RotateButton
 import androidx.compose.material.icons.outlined.Tune
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -154,123 +171,130 @@ fun ViewerScreen(
         rememberAnalysis(viewing?.displayUri, settings.highlightThreshold)
     } else null
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    // One tap hides everything but the photo; another brings it back.
+    var chrome by remember { mutableStateOf(true) }
+
+    BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
+        val landscape = maxWidth > maxHeight
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { list[it].id }) { page ->
             val photo = list[page]
             val mask = if (showClipping && photo.id == viewing?.id && photo.crop == null) analysis?.clippedMask else null
-            PhotoPage(app, photo, presets, mask) { zoomed[photo.id] = it }
+            PhotoPage(app, photo, presets, mask, onTap = { chrome = !chrome }) { zoomed[photo.id] = it }
         }
 
-        val current = list.getOrNull(pager.currentPage) ?: return@Box
+        val current = list.getOrNull(pager.currentPage) ?: return@BoxWithConstraints
 
-        Row(
-            Modifier.fillMaxWidth().background(Tone.Background.copy(alpha = 0.75f)).statusBarsPadding().padding(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar") }
-            Column(Modifier.weight(1f)) {
-                Text(current.savedBase, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    SimpleDateFormat("dd/MM HH:mm:ss", Locale.getDefault()).format(Date(current.capturedAt)) + " · " + current.session,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Tone.TextMuted,
-                )
-            }
-            IconButton(onClick = { onCrop(current.id) }) {
-                Icon(Icons.Outlined.Crop, contentDescription = "Recortar", tint = if (current.crop != null) Tone.Accent else Tone.Text)
-            }
-            IconButton(onClick = { showClipping = !showClipping }) {
-                Icon(
-                    Icons.Outlined.WbSunny,
-                    contentDescription = if (showClipping) "Esconder alerta de estouro" else "Mostrar alerta de estouro",
-                    tint = if (showClipping) Tone.Info else Tone.TextMuted,
-                )
-            }
-            if (settings.notesEnabled) {
-                IconButton(onClick = { noteFor = current }) {
-                    Icon(
-                        Icons.AutoMirrored.Outlined.StickyNote2,
-                        contentDescription = "Nota",
-                        tint = if (current.note != null || current.audioNote != null) Tone.Accent else Tone.Text,
-                    )
-                }
-            }
-            IconButton(onClick = { scope.launch { app.database.photoDao().setFavorite(current.id, !current.favorite) } }) {
-                Icon(
-                    if (current.favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                    contentDescription = "Favorita",
-                    tint = Tone.Text,
-                )
-            }
-            IconButton(onClick = { confirmDelete = current }) { Icon(Icons.Outlined.Delete, contentDescription = "Apagar do celular") }
-        }
-
-        Column(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Tone.Background.copy(alpha = 0.85f))
-                .navigationBarsPadding().padding(16.dp),
-        ) {
-            com.example.ui.cull.Badges(current, settings, Modifier.padding(bottom = 8.dp))
-            if (settings.viewerPresets && presets.isNotEmpty()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1f)) {
-                        PresetPicker(app, presets, current.presetId, current.displayUri, onPick = { picked ->
-                            scope.launch { app.looks.setLook(current, picked?.id, null) }
-                        })
-                    }
-                    TextButton(onClick = { onCalibrate(current.id) }) {
-                        Icon(Icons.Outlined.Tune, contentDescription = null, tint = Tone.Accent, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Calibrar", color = Tone.Accent)
-                    }
-                }
-                if (current.adjust != null) {
-                    Text("Calibrada só nesta foto", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted,
-                        modifier = Modifier.padding(start = 12.dp, bottom = 4.dp))
-                }
-            }
-            if (settings.ratingEnabled) {
-                RatingBar(current.rating) { stars ->
-                    scope.launch { app.database.photoDao().setRating(current.id, if (stars == current.rating) 0 else stars) }
-                }
-                Spacer(Modifier.height(8.dp))
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        AnimatedVisibility(chrome, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopCenter)) {
+            Row(
+                Modifier.fillMaxWidth().background(Tone.Background.copy(alpha = 0.75f)).statusBarsPadding().padding(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar") }
                 Column(Modifier.weight(1f)) {
+                    Text(current.savedBase, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        listOfNotNull(current.shutter, current.aperture, current.iso).joinToString("   ").ifEmpty { "Sem dados EXIF" },
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                    Text(
-                        listOfNotNull(fileSummary(current), current.moment).joinToString(" · "),
+                        SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(current.capturedAt)) + " · " + current.session,
                         style = MaterialTheme.typography.bodySmall,
                         color = Tone.TextMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    current.note?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = Tone.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                RotateButton(app, settings.screenOrientation)
+                IconButton(onClick = { showClipping = !showClipping }) {
+                    Icon(
+                        Icons.Outlined.WbSunny,
+                        contentDescription = if (showClipping) "Esconder alerta de estouro" else "Mostrar alerta de estouro",
+                        tint = if (showClipping) Tone.Info else Tone.TextMuted,
+                    )
+                }
+                IconButton(onClick = { scope.launch { app.database.photoDao().setFavorite(current.id, !current.favorite) } }) {
+                    Icon(
+                        if (current.favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = "Favorita",
+                        tint = if (current.favorite) Tone.Accent else Tone.Text,
+                    )
+                }
+                IconButton(onClick = { confirmDelete = current }) { Icon(Icons.Outlined.Delete, contentDescription = "Apagar do celular") }
+            }
+        }
+
+        val panel: @Composable (Modifier) -> Unit = { m ->
+            Column(m.background(Tone.Background.copy(alpha = 0.88f)).padding(vertical = 10.dp)) {
+                // Info: badges, exposure, file and histogram.
+                Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        com.example.ui.cull.Badges(current, settings, Modifier.padding(bottom = 4.dp))
+                        Text(
+                            listOfNotNull(current.shutter, current.aperture, current.iso).joinToString("   ").ifEmpty { "Sem dados EXIF" },
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                        Text(
+                            listOfNotNull(fileSummary(current), current.moment).joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Tone.TextMuted,
+                        )
+                        current.note?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = Tone.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    if (settings.histogramEnabled) {
+                        Histogram(analysis, settings.histogramRgb, Modifier.width(120.dp).height(48.dp).clip(MaterialTheme.shapes.extraSmall))
                     }
                 }
-                if (settings.histogramEnabled) {
-                    Histogram(analysis, settings.histogramRgb, Modifier.width(128.dp).height(52.dp))
+                if (settings.ratingEnabled) {
+                    Box(Modifier.padding(horizontal = 8.dp)) {
+                        RatingBar(current.rating) { stars ->
+                            scope.launch { app.database.photoDao().setRating(current.id, if (stars == current.rating) 0 else stars) }
+                        }
+                    }
+                }
+                if (settings.viewerPresets && presets.isNotEmpty()) {
+                    // Presets and Calibrar on one line, same tile size, so nothing sits out of step.
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        PresetPicker(
+                            app, presets, current.presetId, current.displayUri,
+                            onPick = { picked -> scope.launch { app.looks.setLook(current, picked?.id, null) } },
+                            modifier = Modifier.weight(1f),
+                        )
+                        ActionTile(Icons.Outlined.Tune, if (current.adjust != null) "Calibrada" else "Calibrar", accent = true, box = 64.dp, modifier = Modifier.padding(end = 4.dp)) {
+                            onCalibrate(current.id)
+                        }
+                    }
+                }
+                HorizontalDivider(color = Tone.Line, modifier = Modifier.padding(vertical = 6.dp))
+                // What to do with the photo, as icons with their names.
+                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    SetMenuTile(
+                        label = "Lightroom",
+                        sets = actions.availableSets(current, settings, includeLight = false),
+                        icon = { LightroomMark() },
+                    ) { scope.launch { actions.openInLightroom(listOf(current), it, settings) } }
+                    ActionTile(Icons.AutoMirrored.Outlined.Send, "WhatsApp", accent = true) { whatsFor = current }
+                    SetMenuTile(
+                        label = "Enviar",
+                        sets = actions.availableSets(current, settings),
+                        icon = { Icon(Icons.Outlined.Share, contentDescription = null, tint = Tone.Text) },
+                    ) { scope.launch { actions.share(listOf(current), it, settings) } }
+                    ActionTile(Icons.Outlined.Crop, "Recortar", selected = current.crop != null) { onCrop(current.id) }
+                    if (settings.notesEnabled) {
+                        ActionTile(Icons.AutoMirrored.Outlined.StickyNote2, "Nota", selected = current.note != null || current.audioNote != null) { noteFor = current }
+                    }
+                    ActionTile(Icons.AutoMirrored.Outlined.OpenInNew, "Abrir com") { actions.openWith(current) }
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SetMenuButton(
-                    label = "Lightroom",
-                    primary = true,
-                    sets = actions.availableSets(current, settings, includeLight = false),
-                    modifier = Modifier.weight(1f),
-                ) { scope.launch { actions.openInLightroom(listOf(current), it, settings) } }
-                OutlinedButton(onClick = { whatsFor = current }, modifier = Modifier.weight(1f)) { Text("WhatsApp", maxLines = 1) }
-                SetMenuButton(
-                    label = "Enviar",
-                    primary = false,
-                    sets = actions.availableSets(current, settings),
-                    modifier = Modifier.weight(1f),
-                ) { scope.launch { actions.share(listOf(current), it, settings) } }
-                OutlinedButton(onClick = { actions.openWith(current) }) {
-                    Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = "Abrir com")
-                }
+        }
+        AnimatedVisibility(
+            chrome,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = if (landscape) Modifier.align(Alignment.CenterEnd) else Modifier.align(Alignment.BottomCenter),
+        ) {
+            if (landscape) {
+                // Lying down the panel moves to the side, so the photo keeps the full height.
+                panel(Modifier.width(360.dp).fillMaxHeight().verticalScroll(rememberScrollState()).navigationBarsPadding())
+            } else {
+                panel(Modifier.fillMaxWidth().navigationBarsPadding())
             }
         }
     }
@@ -322,31 +346,50 @@ private fun rememberAnalysis(uri: String?, threshold: Int): Analysis? {
     return analysis
 }
 
-/** A button that asks which files to send when there is more than one option. */
+/** An icon with its name under it: the viewer's actions, readable at a glance. */
 @Composable
-private fun SetMenuButton(
+private fun ActionTile(
+    icon: ImageVector,
     label: String,
-    primary: Boolean,
-    sets: List<ShareSet>,
     modifier: Modifier = Modifier,
-    icon: (@Composable () -> Unit)? = null,
-    onPick: (ShareSet) -> Unit,
+    accent: Boolean = false,
+    selected: Boolean = false,
+    enabled: Boolean = true,
+    box: androidx.compose.ui.unit.Dp = 44.dp,
+    onClick: () -> Unit,
 ) {
+    ActionTileBase(label, modifier, enabled, onClick, box) {
+        Icon(icon, contentDescription = null, tint = if (accent || selected) Tone.Accent else Tone.Text)
+    }
+}
+
+@Composable
+private fun ActionTileBase(label: String, modifier: Modifier, enabled: Boolean, onClick: () -> Unit, box: androidx.compose.ui.unit.Dp = 44.dp, icon: @Composable () -> Unit) {
+    Column(
+        modifier.clip(MaterialTheme.shapes.small).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 4.dp, vertical = 4.dp)
+            .alpha(if (enabled) 1f else 0.4f),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.size(box).clip(MaterialTheme.shapes.medium).background(Tone.SurfaceHigh), contentAlignment = Alignment.Center) { icon() }
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Tone.TextMuted, maxLines = 1, modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
+/** The "Lr" square photographers know from the app, drawn in the app's own colours. */
+@Composable
+private fun LightroomMark() {
+    Box(
+        Modifier.size(24.dp).clip(MaterialTheme.shapes.extraSmall).border(1.5.dp, Tone.Info, MaterialTheme.shapes.extraSmall),
+        contentAlignment = Alignment.Center,
+    ) { Text("Lr", style = MaterialTheme.typography.labelMedium, color = Tone.Info) }
+}
+
+/** An action tile that asks which files to use when there is more than one option. */
+@Composable
+private fun SetMenuTile(label: String, sets: List<ShareSet>, icon: @Composable () -> Unit, onPick: (ShareSet) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    Box(modifier) {
-        val onClick = { if (sets.size == 1) onPick(sets.first()) else open = true }
-        val content: @Composable () -> Unit = {
-            icon?.let { it(); Spacer(Modifier.width(8.dp)) }
-            Text(label)
-        }
-        if (primary) {
-            Button(
-                onClick = onClick, enabled = sets.isNotEmpty(), modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
-            ) { content() }
-        } else {
-            OutlinedButton(onClick = onClick, enabled = sets.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { content() }
-        }
+    Box {
+        ActionTileBase(label, Modifier, sets.isNotEmpty(), { if (sets.size == 1) onPick(sets.first()) else open = true }, icon = icon)
         DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = Tone.SurfaceHigh) {
             sets.forEach { set ->
                 DropdownMenuItem(text = { Text(set.label) }, onClick = {
@@ -358,12 +401,24 @@ private fun SetMenuButton(
     }
 }
 
-/** One page of the pager: zoomable photo with the blinking highlight mask on top (same transform). */
+/**
+ * One page of the pager: zoomable photo with the blinking highlight mask on top (same transform).
+ * Tap shows or hides the controls, double tap zooms 3× to check focus, and holding a finger shows
+ * the photo before the look and the crop (let go to see it after).
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun PhotoPage(app: TetherApp, photo: Photo, presets: List<Preset>, mask: android.graphics.Bitmap?, onZoomChanged: (Boolean) -> Unit) {
+private fun PhotoPage(
+    app: TetherApp,
+    photo: Photo,
+    presets: List<Preset>,
+    mask: android.graphics.Bitmap?,
+    onTap: () -> Unit,
+    onZoomChanged: (Boolean) -> Unit,
+) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var before by remember { mutableStateOf(false) }
     val state = rememberTransformableState { zoom, pan, _ ->
         scale = (scale * zoom).coerceIn(1f, 8f)
         offset = if (scale == 1f) Offset.Zero else offset + pan
@@ -373,34 +428,63 @@ private fun PhotoPage(app: TetherApp, photo: Photo, presets: List<Preset>, mask:
         initialValue = 0f, targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(450), RepeatMode.Reverse), label = "blinkAlpha",
     )
+    val edited = photo.presetId != null || photo.adjust != null || photo.crop != null
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                // Double tap toggles a 3× zoom to check focus.
-                detectTapGestures(onDoubleTap = {
-                    if (scale > 1f) { scale = 1f; offset = Offset.Zero } else scale = 3f
-                    onZoomChanged(scale > 1f)
-                })
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(photo.id, edited) {
+                    detectTapGestures(
+                        onTap = { onTap() },
+                        onDoubleTap = { tap ->
+                            if (scale > 1f) {
+                                scale = 1f
+                                offset = Offset.Zero
+                            } else {
+                                // Zoom into the spot that was tapped.
+                                scale = 3f
+                                offset = (Offset(size.width / 2f, size.height / 2f) - tap) * 2f
+                            }
+                            onZoomChanged(scale > 1f)
+                        },
+                        onLongPress = { if (edited) before = true },
+                        onPress = {
+                            tryAwaitRelease()
+                            before = false
+                        },
+                    )
+                }
+                // Only take gestures while zoomed, so swiping between photos keeps working at fit size.
+                .transformable(state, lockRotationOnZoomPan = true, canPan = { scale > 1f })
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    translationX = offset.x
+                    translationY = offset.y
+                },
+        ) {
+            if (before) {
+                coil.compose.AsyncImage(model = photo.displayUri, contentDescription = "Antes", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+            } else {
+                LookImage(app, photo, presets, Modifier.fillMaxSize())
             }
-            // Only take gestures while zoomed, so swiping between photos keeps working at fit size.
-            .transformable(state, lockRotationOnZoomPan = true, canPan = { scale > 1f })
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                translationX = offset.x
-                translationY = offset.y
-            },
-    ) {
-        LookImage(app, photo, presets, Modifier.fillMaxSize())
-        if (mask != null) {
-            val image = remember(mask) { mask.asImageBitmap() }
-            Image(
-                bitmap = image,
-                contentDescription = "Áreas estouradas",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = blink },
+            if (mask != null && !before) {
+                val image = remember(mask) { mask.asImageBitmap() }
+                Image(
+                    bitmap = image,
+                    contentDescription = "Áreas estouradas",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = blink },
+                )
+            }
+        }
+        if (before) {
+            Text(
+                "Antes",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+                modifier = Modifier.align(Alignment.Center).clip(CircleShape).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 16.dp, vertical = 6.dp),
             )
         }
     }

@@ -111,7 +111,7 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
     var whatsFor by remember { mutableStateOf<Photo?>(null) }
     val pager = rememberPagerState { photos.size }
 
-    ImmersiveMode()
+    com.example.ui.components.ImmersiveMode()
     // Back does nothing here, so a client can't leave by accident.
     BackHandler { }
 
@@ -349,16 +349,4 @@ private fun PinDialog(expected: String, title: String, action: String, onOk: () 
         confirmButton = { TextButton(onClick = { if (pin == expected) onOk() else wrong = true }) { Text(action) } },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancelar") } },
     )
-}
-
-/** Hides status and navigation bars while the client mode is on screen. */
-@Composable
-private fun ImmersiveMode() {
-    val activity = LocalActivity.current ?: return
-    DisposableEffect(Unit) {
-        val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
-        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        controller.hide(WindowInsetsCompat.Type.systemBars())
-        onDispose { controller.show(WindowInsetsCompat.Type.systemBars()) }
-    }
 }

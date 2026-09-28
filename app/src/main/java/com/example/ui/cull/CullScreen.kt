@@ -58,6 +58,18 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.example.TetherApp
 import com.example.core.data.Photo
 import com.example.core.data.Settings
@@ -107,9 +119,27 @@ fun CullScreen(app: TetherApp, onBack: (() -> Unit)?, onOpenPhoto: (Long) -> Uni
     val current = photos.getOrNull(pager.currentPage.coerceAtMost(photos.lastIndex))
     val dao = app.database.photoDao()
 
+    var last by remember { mutableStateOf<LastCull?>(null) }
+
     fun next() = scope.launch { if (pager.currentPage < photos.lastIndex) pager.animateScrollToPage(pager.currentPage + 1) }
-    fun reject(p: Photo) = scope.launch { dao.setRejected(listOf(p.id), !p.rejected); if (filter != CullFilter.Rejected) next() }
-    fun keep(p: Photo) = scope.launch { dao.setFavorite(listOf(p.id), !p.favorite); if (!p.favorite) next() }
+
+    /**
+     * Applies a choice and moves on. When the choice takes the photo out of the current filter the
+     * list itself slides the next one in, so the pager must not advance too (that skipped a photo).
+     */
+    fun apply(p: Photo, rejected: Boolean, favorite: Boolean, label: String) = scope.launch {
+        last = LastCull(p, label)
+        dao.setRejected(listOf(p.id), rejected)
+        dao.setFavorite(listOf(p.id), favorite)
+        val after = p.copy(rejected = rejected, favorite = favorite)
+        val stays = listOf(after).cullFiltered(filter).isNotEmpty()
+        if (stays) next()
+    }
+    fun reject(p: Photo) = apply(p, rejected = !p.rejected, favorite = p.favorite && p.rejected, label = if (p.rejected) "voltou" else "rejeitada")
+    fun keep(p: Photo) = apply(p, rejected = false, favorite = !p.favorite, label = if (p.favorite) "desmarcada" else "marcada")
+    // A swipe always sets (never toggles): up is out, down is in.
+    fun swipeOut(p: Photo) = apply(p, rejected = true, favorite = false, label = "rejeitada")
+    fun swipeIn(p: Photo) = apply(p, rejected = false, favorite = true, label = "marcada")
 
     LaunchedEffect(Unit) { app.culler.analyzeMissing(settings.sessionKey) }
 
@@ -167,7 +197,7 @@ fun CullScreen(app: TetherApp, onBack: (() -> Unit)?, onOpenPhoto: (Long) -> Uni
             } else {
                 HorizontalPager(state = pager, key = { photos[it].id }, modifier = Modifier.fillMaxSize()) { page ->
                     val p = photos[page]
-                    SwipeCard(p, onUp = { reject(p) }, onDown = { keep(p) })
+                    SwipeCard(p, onUp = { swipeOut(p) }, onDown = { swipeIn(p) })
                 }
             }
             current?.let { Badges(it, settings, Modifier.align(Alignment.TopStart).padding(12.dp)) }
@@ -192,14 +222,24 @@ fun CullScreen(app: TetherApp, onBack: (() -> Unit)?, onOpenPhoto: (Long) -> Uni
                         Icon(if (p.favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, contentDescription = "Favoritar", tint = if (p.favorite) Tone.Accent else Tone.Text)
                     }
                 }
-                Text(
-                    "↑ rejeita  ·  ↓ marca  ·  nenhum arquivo é apagado",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Tone.TextMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                )
+                last?.let { l ->
+                    // The last choice, with undo: a swipe is quick, so a slip is easy to take back.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("${l.before.savedBase} ${l.label}", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted, modifier = Modifier.weight(1f), maxLines = 1)
+                        TextButton(onClick = {
+                            scope.launch {
+                                dao.setRejected(listOf(l.before.id), l.before.rejected)
+                                dao.setFavorite(listOf(l.before.id), l.before.favorite)
+                                last = null
+                            }
+                        }) { Text("Desfazer") }
+                    }
+                } ?: Row(Modifier.align(Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = null, tint = Tone.Error, modifier = Modifier.size(16.dp))
+                    Text(" rejeita   ", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+                    Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, tint = Tone.Accent, modifier = Modifier.size(16.dp))
+                    Text(" marca   ·   nada é apagado", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+                }
                 undo?.let { snap ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Sugestões aplicadas.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
@@ -244,50 +284,140 @@ fun CullScreen(app: TetherApp, onBack: (() -> Unit)?, onOpenPhoto: (Long) -> Uni
     }
 }
 
-/** The photo; a vertical fling past a third of the height rejects (up) or keeps (down). */
+private data class LastCull(val before: Photo, val label: String)
+
+/**
+ * The photo as a card that follows the finger. Up throws it out (red stamp), down keeps it (mint
+ * heart). The stamp grows with the drag and locks in, with a buzz, once far enough; letting go there,
+ * or flicking, sends the card off the screen. Short of that it springs back.
+ */
 @Composable
 private fun SwipeCard(photo: Photo, onUp: () -> Unit, onDown: () -> Unit) {
-    val offset = remember(photo.id) { Animatable(0f) }
+    val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
-    Box(
-        Modifier
-            .fillMaxSize()
-            .pointerInput(photo.id) {
-                detectVerticalDragGestures(
-                    onDragEnd = {
-                        val limit = size.height / 5f
-                        val v = offset.value
-                        when {
-                            v < -limit -> onUp()
-                            v > limit -> onDown()
-                        }
-                        scope.launch { offset.animateTo(0f) }
-                    },
-                    onDragCancel = { scope.launch { offset.animateTo(0f) } },
-                    onVerticalDrag = { _, dy -> scope.launch { offset.snapTo(offset.value + dy) } },
+    var dragY by remember(photo.id) { mutableFloatStateOf(0f) }
+    var armed by remember(photo.id) { mutableIntStateOf(0) }
+    val red = Tone.Error
+    val mint = Tone.Accent
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val h = constraints.maxHeight.toFloat().coerceAtLeast(1f)
+        val limit = h * 0.16f
+        val progress = (abs(dragY) / limit).coerceIn(0f, 1f)
+        val up = dragY < 0
+
+        // Edge glow on the side the card is heading to.
+        if (dragY != 0f) {
+            val glow = (if (up) red else mint).copy(alpha = 0.35f * progress)
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(
+                        if (up) listOf(glow, Color.Transparent, Color.Transparent) else listOf(Color.Transparent, Color.Transparent, glow),
+                    ),
+                ),
+            )
+        }
+
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+                .pointerInput(photo.id) {
+                    val tracker = VelocityTracker()
+                    detectVerticalDragGestures(
+                        onDragStart = { tracker.resetTracking() },
+                        onVerticalDrag = { change, dy ->
+                            change.consume()
+                            tracker.addPosition(change.uptimeMillis, change.position)
+                            dragY += dy
+                            val now = when {
+                                dragY < -limit -> -1
+                                dragY > limit -> 1
+                                else -> 0
+                            }
+                            if (now != armed) {
+                                armed = now
+                                if (now != 0) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                        },
+                        onDragEnd = {
+                            val velocity = tracker.calculateVelocity().y
+                            val dir = when {
+                                dragY < -limit || (velocity < -FLING && dragY < 0) -> -1
+                                dragY > limit || (velocity > FLING && dragY > 0) -> 1
+                                else -> 0
+                            }
+                            scope.launch {
+                                if (dir != 0) {
+                                    animate(dragY, dir * h * 1.2f, animationSpec = tween(220)) { v, _ -> dragY = v }
+                                    if (dir < 0) onUp() else onDown()
+                                    // The card stays out of sight until the list moves on.
+                                    kotlinx.coroutines.delay(250)
+                                    dragY = 0f
+                                } else {
+                                    animate(dragY, 0f, animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f)) { v, _ -> dragY = v }
+                                }
+                                armed = 0
+                            }
+                        },
+                        onDragCancel = {
+                            scope.launch { animate(dragY, 0f, animationSpec = spring(dampingRatio = 0.55f)) { v, _ -> dragY = v } }
+                            armed = 0
+                        },
+                    )
+                }
+                .graphicsLayer {
+                    translationY = dragY
+                    rotationZ = dragY / h * 10f
+                    val shrink = 1f - 0.07f * progress
+                    scaleX = shrink
+                    scaleY = shrink
+                }
+                .clip(MaterialTheme.shapes.large)
+                .background(Color(0xFF0C0C0C)),
+        ) {
+            AsyncImage(model = photo.displayUri, contentDescription = photo.savedBase, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+        }
+
+        if (progress > 0.05f) {
+            val color = if (up) red else mint
+            val locked = armed != 0
+            // The stamp: an outlined label that fills in once the choice is locked.
+            Row(
+                Modifier
+                    .align(if (up) Alignment.BottomCenter else Alignment.TopCenter)
+                    .padding(vertical = 48.dp)
+                    .graphicsLayer {
+                        val grow = 0.7f + 0.35f * progress
+                        scaleX = grow
+                        scaleY = grow
+                        alpha = progress
+                        rotationZ = if (up) -10f else 10f
+                    }
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(if (locked) color else Color.Black.copy(alpha = 0.55f))
+                    .border(3.dp, color, MaterialTheme.shapes.medium)
+                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    if (up) Icons.Outlined.Close else Icons.Filled.Favorite,
+                    contentDescription = null,
+                    tint = if (locked) Color.Black else color,
+                    modifier = Modifier.size(28.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    if (up) "REJEITAR" else "MARCAR",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = if (locked) Color.Black else color,
                 )
             }
-            .graphicsLayer {
-                translationY = offset.value
-                alpha = 1f - (abs(offset.value) / (size.height.coerceAtLeast(1f))).coerceIn(0f, 0.6f)
-            },
-    ) {
-        AsyncImage(model = photo.displayUri, contentDescription = photo.savedBase, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
-        val hint = when {
-            offset.value < -40 -> "Rejeitar" to Tone.Error
-            offset.value > 40 -> "Marcar" to Tone.Accent
-            else -> null
-        }
-        hint?.let { (label, color) ->
-            Text(
-                label,
-                style = MaterialTheme.typography.titleLarge,
-                color = color,
-                modifier = Modifier.align(Alignment.Center).clip(MaterialTheme.shapes.small).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 16.dp, vertical = 8.dp),
-            )
         }
     }
 }
+
+private const val FLING = 1800f
 
 /** Two frames, one above the other, zoomed and panned together to compare focus. */
 @Composable

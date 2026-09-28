@@ -40,4 +40,8 @@ class MainScreenshotTest {
         rule.onNode(hasText("Culling")).performClick()
         save("app_culling")
     }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun sessionLyingDown() = save("app_sessao_deitado")
 }
