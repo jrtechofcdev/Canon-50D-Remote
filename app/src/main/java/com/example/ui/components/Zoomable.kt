@@ -30,6 +30,8 @@ fun Zoomable(
     modifier: Modifier = Modifier,
     key: Any? = null,
     onZoomChanged: (Boolean) -> Unit = {},
+    /** Single tap, with the point as a fraction (0…1) of the unzoomed content, e.g. to focus there. */
+    onTap: ((x: Float, y: Float) -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     var scale by remember(key) { mutableFloatStateOf(1f) }
@@ -55,7 +57,14 @@ fun Zoomable(
             .fillMaxSize()
             .onSizeChanged { size = it }
             .pointerInput(key) {
-                detectTapGestures(onDoubleTap = { tap ->
+                detectTapGestures(onTap = onTap?.let { handler ->
+                    { tap ->
+                        // Undo the zoom so the point matches the picture, not the screen.
+                        val center = Offset(size.width / 2f, size.height / 2f)
+                        val p = (tap - center - offset) / scale + center
+                        handler(p.x / size.width.coerceAtLeast(1), p.y / size.height.coerceAtLeast(1))
+                    }
+                }, onDoubleTap = { tap ->
                     if (scale > 1f) {
                         scale = 1f
                         offset = Offset.Zero

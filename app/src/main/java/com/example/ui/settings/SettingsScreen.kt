@@ -460,6 +460,7 @@ private fun CameraSettings(app: TetherApp, s: Settings) {
             "Ao conectar, a 50D fica com a hora do celular. Útil com duas câmeras no mesmo evento. Se a câmera não aceitar, a opção se desliga sozinha",
             s.syncCameraClock,
         ) { set(SettingKeys.syncCameraClock, it) }
+        ToggleRow("Live view", "Chip Live view na Sessão: a imagem da câmera no celular, como monitor externo", s.liveViewEnabled) { set(SettingKeys.liveViewEnabled, it) }
         ToggleRow("Calculadora de flash e foco", "Chip \"Flash e foco\" na Sessão", s.toolsEnabled) { set(SettingKeys.toolsEnabled, it) }
         if (state is ConnectionState.Connected) {
             OutlinedButton(onClick = app.camera::disconnect, modifier = Modifier.padding(vertical = 8.dp)) { Text("Encerrar conexão") }

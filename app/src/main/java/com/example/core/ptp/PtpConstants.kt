@@ -21,6 +21,14 @@ object PtpOp {
     const val EOS_GET_EVENT = 0x9116
     const val EOS_TRANSFER_COMPLETE = 0x9117
     const val EOS_KEEP_DEVICE_ON = 0x911D
+    // Live view (names as in libgphoto2's ptp.h).
+    const val EOS_GET_VIEWFINDER_DATA = 0x9153
+    const val EOS_DO_AF = 0x9154
+    const val EOS_DRIVE_LENS = 0x9155
+    const val EOS_DOF_PREVIEW = 0x9156
+    const val EOS_ZOOM = 0x9158
+    const val EOS_ZOOM_POSITION = 0x9159
+    const val EOS_AF_CANCEL = 0x9160
     const val EOS_REMOTE_RELEASE_ON = 0x9128
     const val EOS_REMOTE_RELEASE_OFF = 0x9129
 }
@@ -32,6 +40,8 @@ object PtpResponse {
     const val OPERATION_NOT_SUPPORTED = 0x2005
     const val DEVICE_BUSY = 0x2019
     const val SESSION_ALREADY_OPEN = 0x201E
+    /** Canon "not ready": no live view frame yet, or AF could not lock. */
+    const val NOT_READY = 0xA102
 
     fun name(code: Int): String = when (code) {
         OK -> "OK"
@@ -40,7 +50,7 @@ object PtpResponse {
         OPERATION_NOT_SUPPORTED -> "Operação não suportada"
         DEVICE_BUSY -> "Câmera ocupada"
         SESSION_ALREADY_OPEN -> "Sessão já aberta"
-        0xA102 -> "Câmera não conseguiu disparar (foco?)"
+        NOT_READY -> "Câmera não pronta (foco? live view desligado?)"
         else -> "0x%04X".format(code)
     }
 }
@@ -61,6 +71,12 @@ object EosProp {
     const val AVAILABLE_SHOTS = 0xD11B
     const val CAPTURE_DESTINATION = 0xD11C
     const val BATTERY_POWER = 0xD111
+    /** Where live view goes: bit 1 = camera screen, bit 2 = computer (here, the phone). */
+    const val EVF_OUTPUT_DEVICE = 0xD1B0
+    const val EVF_OFF = 0
+    const val EVF_CAMERA = 1
+    const val EVF_PHONE = 2
+
     /** Camera clock, seconds since 1970 in the camera's local time (no time zone on the 50D). */
     const val CAMERA_TIME = 0xD113
 

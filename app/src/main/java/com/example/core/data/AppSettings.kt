@@ -129,6 +129,22 @@ data class Settings(
     /** WhatsApp button in client mode: the client types their own number and gets the photo. */
     val clientWhatsApp: Boolean = true,
 
+    // Live view
+    val liveViewEnabled: Boolean = true,
+    /** Keep the picture on the camera's screen too (uses more battery). */
+    val liveOnCamera: Boolean = false,
+    val liveGrid: String = "thirds",
+    val liveZebra: Boolean = true,
+    val liveZebraLevel: Int = 250,
+    val livePeaking: Boolean = false,
+    val livePeakingColor: String = "mint",
+    val livePeakingSensitivity: Int = 2,
+    val liveHistogram: Boolean = true,
+    /** Look on the live picture: -1 none, 0 the session's look, else a preset id. */
+    val livePresetId: Long = 0L,
+    val liveTapToFocus: Boolean = true,
+    val liveMirror: Boolean = false,
+
     // Tela
     val nightMode: Boolean = false,
     val nightBrightness: Int = 15,
@@ -244,6 +260,18 @@ object SettingKeys {
     val hideRejected = booleanPreferencesKey("hide_rejected")
     val recentContacts = stringPreferencesKey("recent_contacts")
     val clientWhatsApp = booleanPreferencesKey("client_whatsapp")
+    val liveViewEnabled = booleanPreferencesKey("live_view_enabled")
+    val liveOnCamera = booleanPreferencesKey("live_on_camera")
+    val liveGrid = stringPreferencesKey("live_grid")
+    val liveZebra = booleanPreferencesKey("live_zebra")
+    val liveZebraLevel = intPreferencesKey("live_zebra_level")
+    val livePeaking = booleanPreferencesKey("live_peaking")
+    val livePeakingColor = stringPreferencesKey("live_peaking_color")
+    val livePeakingSensitivity = intPreferencesKey("live_peaking_sensitivity")
+    val liveHistogram = booleanPreferencesKey("live_histogram")
+    val livePresetId = longPreferencesKey("live_preset_id")
+    val liveTapToFocus = booleanPreferencesKey("live_tap_focus")
+    val liveMirror = booleanPreferencesKey("live_mirror")
 
     val nightMode = booleanPreferencesKey("night_mode")
     val nightBrightness = intPreferencesKey("night_brightness")
@@ -358,6 +386,18 @@ class SettingsRepository(private val context: Context) {
             hideRejected = this[k.hideRejected] ?: d.hideRejected,
             recentContacts = this[k.recentContacts] ?: d.recentContacts,
             clientWhatsApp = this[k.clientWhatsApp] ?: d.clientWhatsApp,
+            liveViewEnabled = this[k.liveViewEnabled] ?: d.liveViewEnabled,
+            liveOnCamera = this[k.liveOnCamera] ?: d.liveOnCamera,
+            liveGrid = this[k.liveGrid] ?: d.liveGrid,
+            liveZebra = this[k.liveZebra] ?: d.liveZebra,
+            liveZebraLevel = this[k.liveZebraLevel] ?: d.liveZebraLevel,
+            livePeaking = this[k.livePeaking] ?: d.livePeaking,
+            livePeakingColor = this[k.livePeakingColor] ?: d.livePeakingColor,
+            livePeakingSensitivity = this[k.livePeakingSensitivity] ?: d.livePeakingSensitivity,
+            liveHistogram = this[k.liveHistogram] ?: d.liveHistogram,
+            livePresetId = this[k.livePresetId] ?: d.livePresetId,
+            liveTapToFocus = this[k.liveTapToFocus] ?: d.liveTapToFocus,
+            liveMirror = this[k.liveMirror] ?: d.liveMirror,
 
             nightMode = this[k.nightMode] ?: d.nightMode,
             nightBrightness = this[k.nightBrightness] ?: d.nightBrightness,

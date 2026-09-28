@@ -89,6 +89,7 @@ fun SessionScreen(
     onOpenCard: () -> Unit,
     onOpenClient: () -> Unit,
     onOpenTools: () -> Unit = {},
+    onOpenLive: () -> Unit = {},
 ) {
     val state by app.camera.state.collectAsState()
     val status by app.camera.status.collectAsState()
@@ -163,6 +164,7 @@ fun SessionScreen(
                     onLook = { showLooks = true },
                     onMoment = { showMoments = true },
                     onTools = onOpenTools,
+                    onLive = onOpenLive,
                 )
             }
         }

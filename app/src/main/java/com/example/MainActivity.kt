@@ -50,6 +50,7 @@ import com.example.ui.preset.PresetsScreen
 import com.example.ui.tools.ToolsScreen
 import com.example.ui.cull.CullScreen
 import com.example.ui.crop.CropScreen
+import com.example.ui.live.LiveViewScreen
 import com.example.ui.components.CaptureFab
 import androidx.compose.material.icons.outlined.Swipe
 import androidx.compose.runtime.mutableStateOf
@@ -168,9 +169,11 @@ class MainActivity : ComponentActivity() {
                                 onOpenCard = { nav.navigate("card") },
                                 onOpenClient = { nav.navigate("client") },
                                 onOpenTools = { nav.navigate("tools") },
+                                onOpenLive = { nav.navigate("live") },
                             )
                         }
                         composable(Tab.Cull.route) { CullScreen(app, onBack = null, onOpenPhoto = { nav.navigate("photo/$it") }) }
+                        composable("live") { LiveViewScreen(app, onBack = { nav.popBackStack() }) }
                         composable("tools") { ToolsScreen(onBack = { nav.popBackStack() }) }
                         composable("card") { CardScreen(app = app, onBack = { nav.popBackStack() }) }
                         composable("client") {

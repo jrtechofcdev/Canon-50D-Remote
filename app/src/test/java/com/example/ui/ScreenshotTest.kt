@@ -284,4 +284,29 @@ class ScreenshotTest {
         rule.setContent { JrLinkTheme { com.example.ui.crop.CropScreen(app, id, onDone = {}) } }
         save("recorte", androidx.compose.ui.test.hasText("Instagram retrato"))
     }
+
+    @Test
+    fun liveView() {
+        runBlocking {
+            app.presets.seedIfEmpty()
+            val preset = app.presets.all().first { it.name.contains("Golden") }
+            app.settings.set(com.example.core.data.SettingKeys.livePresetId, preset.id)
+            app.settings.set(com.example.core.data.SettingKeys.livePeaking, true)
+            app.settings.set(com.example.core.data.SettingKeys.liveGrid, "ig45")
+        }
+        // A live-view sized frame: soft background, a sharp subject in the middle and a blown sky.
+        val bmp = Bitmap.createBitmap(1024, 680, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        canvas.drawColor(0xFF3A4A5C.toInt())
+        canvas.drawRect(0f, 0f, 1024f, 160f, Paint().apply { color = 0xFFFFFFFF.toInt() })
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        for (i in 0 until 40) {
+            p.color = if (i % 2 == 0) 0xFF202020.toInt() else 0xFFE8D0B0.toInt()
+            canvas.drawRect(420f + (i % 8) * 24, 300f + (i / 8) * 40, 444f + (i % 8) * 24, 340f + (i / 8) * 40, p)
+        }
+        val jpeg = java.io.ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.JPEG, 85, it) }.toByteArray()
+        val frames = kotlinx.coroutines.flow.flow { while (true) { emit(jpeg); kotlinx.coroutines.delay(200) } }
+        rule.setContent { JrLinkTheme { com.example.ui.live.LiveViewScreen(app, onBack = {}, frames = frames) } }
+        save("live_view", androidx.compose.ui.test.hasContentDescription("Imagem ao vivo"))
+    }
 }
