@@ -147,7 +147,7 @@ fun PresetsScreen(app: TetherApp, onEdit: (Long) -> Unit) {
             return@Column
         }
 
-        LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp)) {
+        LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp)) {
             presets.groupBy { it.group }.forEach { (group, list) ->
                 item(key = "g:$group") { SectionLabel(group, Modifier.padding(top = 16.dp)) }
                 items(list, key = { it.id }) { preset ->

@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -86,7 +88,7 @@ private data class Snapshot(val favorite: Map<Long, Boolean>, val rejected: Map<
  * frames side by side with a shared zoom, and accept the local analysis' suggestions in one go.
  */
 @Composable
-fun CullScreen(app: TetherApp, onBack: () -> Unit, onOpenPhoto: (Long) -> Unit) {
+fun CullScreen(app: TetherApp, onBack: (() -> Unit)?, onOpenPhoto: (Long) -> Unit) {
     val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
     val settings by app.settings.settings.collectAsState(initial = Settings())
     val pending by app.culler.pending.collectAsState()
@@ -113,9 +115,13 @@ fun CullScreen(app: TetherApp, onBack: () -> Unit, onOpenPhoto: (Long) -> Unit) 
 
     Column(Modifier.fillMaxSize().background(Color.Black)) {
         Row(Modifier.fillMaxWidth().background(Tone.Background).statusBarsPadding().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar") }
+            if (onBack != null) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar") }
+            } else {
+                Spacer(Modifier.width(12.dp))
+            }
             Column(Modifier.weight(1f)) {
-                Text("Seleção rápida", style = MaterialTheme.typography.titleMedium)
+                Text("Culling", style = MaterialTheme.typography.titleMedium)
                 Text(
                     if (photos.isEmpty()) "Nenhuma foto neste filtro"
                     else "${pager.currentPage + 1} de ${photos.size}" + if (pending > 0) " · analisando $pending…" else "",
@@ -148,7 +154,10 @@ fun CullScreen(app: TetherApp, onBack: () -> Unit, onOpenPhoto: (Long) -> Unit) 
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (photos.isEmpty()) {
                 Text(
-                    "Nada aqui. Troque o filtro ou fotografe mais.",
+                    if (session.isEmpty()) {
+                        "Cada foto que chega é analisada aqui no celular, sem internet: tremidas, olhos fechados e a melhor de cada pose. " +
+                            "Depois é só arrastar para cima para rejeitar e para baixo para marcar."
+                    } else "Nenhuma foto neste filtro.",
                     color = Tone.TextMuted,
                     modifier = Modifier.align(Alignment.Center).padding(32.dp),
                 )
@@ -165,7 +174,11 @@ fun CullScreen(app: TetherApp, onBack: () -> Unit, onOpenPhoto: (Long) -> Unit) 
         }
 
         current?.let { p ->
-            Column(Modifier.fillMaxWidth().background(Tone.Background).navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Column(
+                Modifier.fillMaxWidth().background(Tone.Background)
+                    .then(if (onBack != null) Modifier.navigationBarsPadding() else Modifier)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { reject(p) }) {
                         Icon(Icons.Outlined.Close, contentDescription = if (p.rejected) "Desfazer rejeição" else "Rejeitar", tint = if (p.rejected) Tone.Error else Tone.Text)

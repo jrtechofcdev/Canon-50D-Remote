@@ -41,7 +41,7 @@ Sem Wi-Fi, sem FTP, sem Live View. Só a USB, só a 50D.
     <td align="center"><img src="docs/images/tela-cliente-escolha.png" width="200" alt="Cliente escolhe fotos"><br><sub><b>Seleção</b><br>o cliente marca as fotos</sub></td>
     <td align="center"><img src="docs/images/tela-galeria-lote.png" width="200" alt="Galeria em lote"><br><sub><b>Lote</b><br>preset, envio e mensagem de uma vez</sub></td>
     <td align="center"><img src="docs/images/tela-flash-foco.png" width="200" alt="Flash e foco"><br><sub><b>Flash e foco</b><br>Yongnuo e profundidade de campo</sub></td>
-    <td align="center"><img src="docs/images/tela-selecao-rapida.png" width="200" alt="Seleção rápida"><br><sub><b>Seleção rápida</b><br>tremidas, olhos fechados, sugeridas</sub></td>
+    <td align="center"><img src="docs/images/tela-selecao-rapida.png" width="200" alt="Seleção rápida"><br><sub><b>Culling</b><br>tremidas, olhos fechados, sugeridas</sub></td>
   </tr>
 </table>
 
@@ -61,7 +61,7 @@ Sem Wi-Fi, sem FTP, sem Live View. Só a USB, só a 50D.
 | **Cliente** | Modo cliente em tela cheia, com PIN para sair e resumo ao fim da sessão. O cliente escolhe o preset da foto; o botão Calibrar (com PIN) abre os ajustes daquela foto. |
 | **Entrega** | O cliente marca as fotos no modo cliente; a lista vai para o filtro do Lightroom ou para a pasta Escolhidas. Galeria em lote e mensagens prontas no WhatsApp. |
 | **Evento** | Momentos (Cerimônia, Festa…) com subpasta, notas de texto e voz por foto, backup da sessão para cartão SD ou pendrive. |
-| **Seleção com análise local** | Avisa na hora se a foto saiu tremida ou se alguém piscou, agrupa fotos parecidas e sugere a melhor. Tela de seleção rápida com gestos. Roda no celular, sem internet (Google ML Kit embutido). |
+| **Seleção com análise local** | Avisa na hora se a foto saiu tremida ou se alguém piscou, agrupa fotos parecidas e sugere a melhor. Aba **Culling** com gestos. Roda no celular, sem internet (Google ML Kit embutido). |
 | **Ferramentas** | Calculadora de flash Yongnuo e de profundidade de campo, GPS nas cópias e acerto do relógio da câmera. Tudo offline. |
 | **Campo** | Vibração a cada foto, alerta se o cabo soltar, aviso de cartão e memória cheios, modo escuro total para igreja e evento noturno. |
 
@@ -77,7 +77,7 @@ Cada função tem um liga/desliga em **Ajustes**.
 
 1. Na câmera, deixe **Desligamento automático** em **Desativado** (menu de configuração, ícone amarelo).
 2. Ligue a 50D e conecte o cabo **USB OTG** no celular.
-3. O Android pergunta se deve abrir o **Jr_Link**. Marque **Usar por padrão** para ele abrir e liberar a USB sozinho das próximas vezes.
+3. O Android pergunta se deve abrir o **Jr_Link**. Se o app já estiver aberto, toque em **Iniciar captura** (botão verde no canto). Marque **Usar por padrão** para ele abrir e liberar a USB sozinho das próximas vezes.
 4. Na primeira vez, vá em **Ajustes → Salvamento** e escolha as pastas dos JPG e dos RAW.
 5. Fotografe.
 
@@ -133,7 +133,7 @@ Para publicar uma versão nova: suba o `versionName` em `app/build.gradle.kts` e
 ```
 app/src/main/java/com/example/
 ├── TetherApp.kt                   cria as peças do app (câmera, banco, configurações)
-├── MainActivity.kt                navegação: Sessão, Fotos, Presets, Ajustes
+├── MainActivity.kt                navegação: Sessão, Fotos, Culling, Presets, Ajustes + botão Iniciar captura
 ├── core/
 │   ├── ptp/                       protocolo PTP da Canon: pacotes, sessão USB, eventos, valores
 │   ├── camera/CameraManager.kt    conexão com a 50D, eventos, disparo, ISO/Av/Tv, AEB, cartão

@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BlurOn
-import androidx.compose.material.icons.outlined.Swipe
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
@@ -51,6 +50,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -96,7 +96,12 @@ private data class BatchProgress(val label: String, val done: Int, val total: In
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun PhotosScreen(app: TetherApp, actions: PhotoActions, onOpenPhoto: (Long) -> Unit, onCull: () -> Unit = {}) {
+fun PhotosScreen(
+    app: TetherApp,
+    actions: PhotoActions,
+    onOpenPhoto: (Long) -> Unit,
+    onSelectingChange: (Boolean) -> Unit = {},
+) {
     val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = emptyList())
     val settings by app.settings.settings.collectAsState(initial = Settings())
     val presets by app.presets.presets.collectAsState(initial = emptyList())
@@ -109,6 +114,7 @@ fun PhotosScreen(app: TetherApp, actions: PhotoActions, onOpenPhoto: (Long) -> U
 
     val selected = remember { mutableStateListOf<Long>() }
     val selecting = selected.isNotEmpty()
+    LaunchedEffect(selecting) { onSelectingChange(selecting) }
     val selection = photos.filter { it.id in selected }
     var progress by remember { mutableStateOf<BatchProgress?>(null) }
     var sheet by remember { mutableStateOf<String?>(null) }
@@ -137,11 +143,6 @@ fun PhotosScreen(app: TetherApp, actions: PhotoActions, onOpenPhoto: (Long) -> U
                 Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                androidx.compose.material3.AssistChip(
-                    onClick = onCull,
-                    label = { Text("Seleção rápida") },
-                    leadingIcon = { Icon(Icons.Outlined.Swipe, contentDescription = null, modifier = Modifier.size(18.dp), tint = Tone.Accent) },
-                )
                 PhotoFilter.entries.filter { it != PhotoFilter.ClientPicks || settings.clientPicksEnabled }.forEach {
                     GalleryChip(it.label, filter == it) { filter = it }
                 }
@@ -177,7 +178,8 @@ fun PhotosScreen(app: TetherApp, actions: PhotoActions, onOpenPhoto: (Long) -> U
 
         LazyVerticalGrid(
             columns = GridCells.Adaptive(112.dp),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+            // Room under the last row for the capture button.
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = if (selecting) 16.dp else 88.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.weight(1f),

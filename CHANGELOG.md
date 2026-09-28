@@ -2,6 +2,11 @@
 
 Versões do **Jr_Link**. A mais recente fica no topo.
 
+## [2.7] · 2026-09-28
+
+- **Aba Culling** na barra de baixo, entre Fotos e Presets. A seleção com análise local (tremidas, olhos fechados, sugeridas) antes ficava escondida em um chip dentro de Fotos.
+- **Botão "Iniciar captura"** flutuante em todas as abas: conecta a 50D e abre a Sessão. Enquanto conecta, mostra o andamento; depois de conectada, vira um botão de câmera que volta para a captura.
+
 ## [2.6] · 2026-09-28
 
 Seleção com análise local, gratuita e sem internet. Nenhuma foto sai do celular.

@@ -49,6 +49,10 @@ import com.example.ui.preset.EditorScreen
 import com.example.ui.preset.PresetsScreen
 import com.example.ui.tools.ToolsScreen
 import com.example.ui.cull.CullScreen
+import com.example.ui.components.CaptureFab
+import androidx.compose.material.icons.outlined.Swipe
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.material.icons.outlined.AutoAwesome
 import com.example.core.data.Settings
 import android.view.WindowManager
@@ -85,6 +89,18 @@ class MainActivity : ComponentActivity() {
                 val entry by nav.currentBackStackEntryAsState()
                 val route = entry?.destination?.route ?: Tab.Session.route
                 val snackbar = remember { SnackbarHostState() }
+                var gallerySelecting by remember { mutableStateOf(false) }
+                val openSession = {
+                    nav.navigate(Tab.Session.route) {
+                        popUpTo(Tab.Session.route) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+                // On every tab except Culling (its own buttons sit there) and the Session once it is capturing.
+                val showFab = Tab.entries.any { it.route == route } && route != Tab.Cull.route &&
+                    !(route == Tab.Session.route && cameraState is ConnectionState.Connected) &&
+                    !(route == Tab.Photos.route && gallerySelecting)
 
                 LaunchedEffect(Unit) {
                     val cullMessages = app.culler.warnings.map { w ->
@@ -101,6 +117,18 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     containerColor = Tone.Background,
                     snackbarHost = { SnackbarHost(snackbar) },
+                    floatingActionButton = {
+                        if (showFab) {
+                            CaptureFab(
+                                state = cameraState,
+                                onStart = {
+                                    app.camera.findAndConnect()
+                                    openSession()
+                                },
+                                onOpenSession = openSession,
+                            )
+                        }
+                    },
                     bottomBar = {
                         if (Tab.entries.any { it.route == route }) {
                             NavigationBar(containerColor = Tone.Surface) {
@@ -141,7 +169,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenTools = { nav.navigate("tools") },
                             )
                         }
-                        composable("cull") { CullScreen(app, onBack = { nav.popBackStack() }, onOpenPhoto = { nav.navigate("photo/$it") }) }
+                        composable(Tab.Cull.route) { CullScreen(app, onBack = null, onOpenPhoto = { nav.navigate("photo/$it") }) }
                         composable("tools") { ToolsScreen(onBack = { nav.popBackStack() }) }
                         composable("card") { CardScreen(app = app, onBack = { nav.popBackStack() }) }
                         composable("client") {
@@ -153,7 +181,12 @@ class MainActivity : ComponentActivity() {
                             SettingsSectionScreen(app = app, section = section, onBack = { nav.popBackStack() })
                         }
                         composable(Tab.Photos.route) {
-                            PhotosScreen(app = app, actions = actions, onOpenPhoto = { nav.navigate("photo/$it") }, onCull = { nav.navigate("cull") })
+                            PhotosScreen(
+                                app = app,
+                                actions = actions,
+                                onOpenPhoto = { nav.navigate("photo/$it") },
+                                onSelectingChange = { gallerySelecting = it },
+                            )
                         }
                         composable(Tab.Presets.route) {
                             PresetsScreen(app = app, onEdit = { nav.navigate("editor/preset/$it") })
@@ -220,6 +253,7 @@ private fun WindowPreferences(nightBrightness: Int?, keepScreenOn: Boolean) {
 enum class Tab(val route: String, val label: String, val icon: ImageVector) {
     Session("session", "Sessão", Icons.Outlined.CameraAlt),
     Photos("photos", "Fotos", Icons.Outlined.PhotoLibrary),
+    Cull("cull", "Culling", Icons.Outlined.Swipe),
     Presets("presets", "Presets", Icons.Outlined.AutoAwesome),
     Settings("settings", "Ajustes", Icons.Outlined.Tune),
 }

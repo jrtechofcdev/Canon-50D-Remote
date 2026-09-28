@@ -161,7 +161,7 @@ fun SettingsSectionScreen(app: TetherApp, section: SettingsSection, onBack: () -
             SettingsSection.Display -> DisplaySettings(app, settings)
             SettingsSection.Diagnostics -> DiagnosticsSettings(app)
         }
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(88.dp))
     }
 }
 
@@ -428,7 +428,7 @@ private fun ReviewSettings(app: TetherApp, s: Settings) {
         ToggleRow("Olhos fechados", "Detecta rostos e avisa quando alguém piscou", s.eyesCheck) { set(SettingKeys.eyesCheck, it) }
         ToggleRow("Vibrar no problema", "Dois toques curtos, diferentes do aviso de foto recebida", s.blurVibrate, enabled = s.blurAlert || s.eyesCheck) { set(SettingKeys.blurVibrate, it) }
         ToggleRow("Sugerir as melhores", "Entre fotos parecidas, marca a melhor como Sugerida", s.cullSuggestions) { set(SettingKeys.cullSuggestions, it) }
-        ToggleRow("Esconder rejeitadas na galeria", "Os arquivos continuam salvos; veja em Seleção rápida → Rejeitadas", s.hideRejected) { set(SettingKeys.hideRejected, it) }
+        ToggleRow("Esconder rejeitadas na galeria", "Os arquivos continuam salvos; veja na aba Culling → Rejeitadas", s.hideRejected) { set(SettingKeys.hideRejected, it) }
     }
     SettingsGroup("Anotações") {
         ToggleRow("Notas nas fotos", "Texto ou áudio em cada foto, pelo botão de nota no visualizador", s.notesEnabled) { set(SettingKeys.notesEnabled, it) }
