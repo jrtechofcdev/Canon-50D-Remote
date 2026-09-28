@@ -64,6 +64,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import com.example.core.data.Photo
 import com.example.core.preset.Preset
 import com.example.ui.preset.LookImage
+import com.example.ui.components.Zoomable
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.input.pointer.PointerEventPass
 import com.example.ui.preset.PresetStrip
 
 /**
@@ -99,15 +102,20 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
             .background(Color.Black)
             .pointerInput(Unit) {
                 awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
-                    // Lifting the finger or swiping (the pager takes the drag) both end the wait early;
-                    // only a 3 s hold runs into the timeout.
-                    var ended = false
-                    withTimeoutOrNull(3_000) {
-                        waitForUpOrCancellation()
-                        ended = true
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    // Exit needs one finger held still for 3 s. A second finger (pinch to zoom), a drag
+                    // (swipe or pan) or lifting the finger all cancel it.
+                    var still = true
+                    val lifted = withTimeoutOrNull(3_000) {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            if (event.changes.size > 1 ||
+                                event.changes.any { (it.position - down.position).getDistance() > viewConfiguration.touchSlop }
+                            ) still = false
+                            if (event.changes.none { it.pressed }) break
+                        }
                     }
-                    if (!ended) requestExit()
+                    if (lifted == null && still) requestExit()
                 }
             },
     ) {
@@ -167,11 +175,14 @@ private fun ClientPager(
     infoAbove: Boolean,
 ) {
     val scope = rememberCoroutineScope()
+    // While the client looks closely at a photo, nothing moves it away.
+    var zoomed by remember { mutableStateOf(false) }
+    val isZoomed by rememberUpdatedState(zoomed)
     // New photo: jump to it (the list is newest first).
     LaunchedEffect(Unit) {
         app.tether.saved.collect {
             delay(300)
-            pager.animateScrollToPage(0)
+            if (!isZoomed) pager.animateScrollToPage(0)
         }
     }
     // Optional slideshow through the session.
@@ -179,13 +190,20 @@ private fun ClientPager(
         if (settings.clientSlideSeconds <= 0 || entries.size < 2) return@LaunchedEffect
         while (true) {
             delay(settings.clientSlideSeconds * 1000L)
-            pager.animateScrollToPage((pager.currentPage + 1) % entries.size)
+            if (!isZoomed) pager.animateScrollToPage((pager.currentPage + 1) % entries.size)
         }
     }
-    HorizontalPager(state = pager, key = { entries[it].id }, modifier = Modifier.fillMaxSize()) { page ->
+    HorizontalPager(
+        state = pager,
+        key = { entries[it].id },
+        userScrollEnabled = !zoomed,
+        modifier = Modifier.fillMaxSize(),
+    ) { page ->
         val photo = entries[page]
         Box(Modifier.fillMaxSize()) {
-            LookImage(app, photo, presets, Modifier.fillMaxSize())
+            Zoomable(key = photo.id, onZoomChanged = { zoomed = it }) {
+                LookImage(app, photo, presets, Modifier.fillMaxSize())
+            }
             if (settings.clientPicksEnabled) {
                 // The client's own pick; the photographer sees it in the gallery and the session summary.
                 IconButton(
