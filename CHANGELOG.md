@@ -2,6 +2,14 @@
 
 Versões do **Jr_Link**. A mais recente fica no topo.
 
+## [2.3] · 2026-09-28
+
+Correção da conexão.
+
+- Corrigido "Sem resposta da câmera" ao conectar: o app pedia leituras USB de 256 KB, que muitos celulares recusam. Agora usa blocos de 16 KB, aceitos por qualquer aparelho.
+- Antes de abrir a sessão, o app reseta a USB da câmera e descarta respostas presas de tentativas anteriores. Se a primeira tentativa falhar, tenta de novo sozinho.
+- O log de Diagnóstico agora diz se a falha foi timeout da câmera ou recusa do USB do celular.
+
 ## [2.2] · 2026-09-27
 
 Identidade Jr_Tech_OFC.
@@ -38,6 +46,7 @@ Reescrita da captura vinculada. Detalhes em [`docs/AUDITORIA.md`](docs/AUDITORIA
 - Removidos simulador, Live View e bibliotecas sem uso.
 - Corrigido o fechamento do app ao pedir permissão USB no Android 14 e o erro ao compartilhar.
 
+[2.3]: https://github.com/jrtechofcdev/Canon-50D-Remote/releases/tag/v2.3
 [2.2]: https://github.com/jrtechofcdev/Canon-50D-Remote/releases/tag/v2.2
 [2.1]: https://github.com/jrtechofcdev/Canon-50D-Remote/compare/de5f5ce...95221c3
 [2.0]: https://github.com/jrtechofcdev/Canon-50D-Remote/commit/de5f5ce

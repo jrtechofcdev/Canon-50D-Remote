@@ -110,4 +110,39 @@ class PtpSessionTest {
             assertTrue(s.isBroken)
         }
     }
+
+    @Test
+    fun openSessionResetsUsbAndRetriesWhenTheFirstAttemptGetsNoReply() = runTest {
+        val t = FakeTransport()
+        // First attempt: nothing to read (the camera was stuck). After the reset it answers.
+        t.afterRecover += FakeTransport.container(PtpContainer.TYPE_RESPONSE, PtpResponse.OK, 0, ByteArray(0))
+        // recover() runs before the first attempt too, so hold the reply back one more reset.
+        val held = t.afterRecover.toList(); t.afterRecover.clear()
+        var calls = 0
+        val wrapper = object : PtpTransport by t {
+            override fun recover() {
+                calls++
+                if (calls == 2) t.reads += held
+            }
+        }
+        val session = PtpSession(wrapper)
+        session.openSession()
+
+        assertEquals(2, calls)
+        assertFalse(session.isBroken)
+        t.queueResponse(PtpResponse.OK, 1)
+        session.transact(PtpOp.EOS_SET_REMOTE_MODE, 1)
+    }
+
+    @Test
+    fun openSessionGivesUpAfterTheRetry() = runTest {
+        val t = FakeTransport()
+        val s = PtpSession(t)
+        try {
+            s.openSession()
+            fail("expected failure")
+        } catch (e: PtpException) {
+            assertEquals(2, t.recoveries)
+        }
+    }
 }
