@@ -76,6 +76,10 @@ import com.example.core.data.DownloadMode
 import com.example.core.data.Settings
 import com.example.core.data.SettingKeys
 import com.example.core.data.WatermarkSource
+import com.example.core.messages.MessageDefaults
+import com.example.core.messages.MessageKind
+import com.example.ui.photos.template
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.Color
@@ -95,6 +99,7 @@ enum class SettingsSection(val route: String, val title: String, val summary: St
     Camera("camera", "Câmera", "Bateria, cartão, exposições salvas, bracketing", Icons.Outlined.CameraAlt),
     Share("share", "Envio e cliente", "WhatsApp leve, marca d'água, modo cliente", Icons.Outlined.Send),
     Presets("presets", "Presets", "Look das fotos novas, cópia editada, pastas", Icons.Outlined.AutoAwesome),
+    Messages("messages", "Mensagens", "Textos prontos para o WhatsApp do cliente", Icons.AutoMirrored.Outlined.Chat),
     Alerts("alerts", "Alertas", "Vibração, desconexão, reenvio, resumo", Icons.Outlined.NotificationsActive),
     Display("display", "Tela", "Modo escuro total, brilho, tela ligada", Icons.Outlined.DarkMode),
     Diagnostics("diagnostics", "Diagnóstico", "Log da conexão USB", Icons.Outlined.BugReport),
@@ -151,6 +156,7 @@ fun SettingsSectionScreen(app: TetherApp, section: SettingsSection, onBack: () -
             SettingsSection.Camera -> CameraSettings(app, settings)
             SettingsSection.Share -> ShareSettings(app, settings)
             SettingsSection.Presets -> PresetSettingsSection(app, settings)
+            SettingsSection.Messages -> MessageSettings(app, settings)
             SettingsSection.Alerts -> AlertSettings(app, settings)
             SettingsSection.Display -> DisplaySettings(app, settings)
             SettingsSection.Diagnostics -> DiagnosticsSettings(app)
@@ -263,6 +269,33 @@ private fun FolderRow(title: String, path: String, active: Boolean, onPick: () -
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onPick) { Text("Escolher pasta") }
             onReset?.let { TextButton(onClick = it) { Text("Usar padrão") } }
+        }
+    }
+}
+
+// ---- Mensagens ----------------------------------------------------------------------------------
+
+@Composable
+private fun MessageSettings(app: TetherApp, s: Settings) {
+    val scope = rememberCoroutineScope()
+    InfoText("Campos preenchidos sozinhos: {cliente} (nome da sessão), {quantidade}, {data} e {lista} (nomes das fotos). Use *asteriscos* para negrito no WhatsApp.")
+    listOf(
+        Triple(MessageKind.Preview, SettingKeys.msgPreview, MessageDefaults.PREVIEW),
+        Triple(MessageKind.Delivered, SettingKeys.msgDelivered, MessageDefaults.DELIVERED),
+        Triple(MessageKind.Payment, SettingKeys.msgPayment, MessageDefaults.PAYMENT),
+        Triple(MessageKind.Selection, SettingKeys.msgSelection, MessageDefaults.SELECTION),
+    ).forEach { (kind, key, default) ->
+        SettingsGroup(kind.label) {
+            var text by remember(kind) { mutableStateOf(s.template(kind)) }
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it; scope.launch { app.settings.set(key, it) } },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                minLines = 4,
+            )
+            if (text != default) {
+                TextButton(onClick = { text = default; scope.launch { app.settings.set(key, default) } }) { Text("Voltar ao texto padrão") }
+            }
         }
     }
 }

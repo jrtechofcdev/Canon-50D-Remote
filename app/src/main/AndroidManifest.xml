@@ -16,6 +16,8 @@
 
     <queries>
         <package android:name="com.adobe.lrmobile" />
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
         <intent>
             <action android:name="android.intent.action.SEND" />
             <data android:mimeType="image/*" />

@@ -111,7 +111,7 @@ class ScreenshotTest {
     @Test
     fun photos() {
         seedPhotos()
-        rule.setContent { JrLinkTheme { PhotosScreen(app, onOpenPhoto = {}) } }
+        rule.setContent { JrLinkTheme { PhotosScreen(app, PhotoActions(app, app.store, app.export), onOpenPhoto = {}) } }
         rule.mainClock.advanceTimeBy(1_000)
         save("fotos", androidx.compose.ui.test.hasText("RAW+JPG"))
     }

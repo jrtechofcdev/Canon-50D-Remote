@@ -273,12 +273,7 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = null
-                    scope.launch(Dispatchers.IO) {
-                        listOfNotNull(photo.jpgUri, photo.rawUri, photo.editedUri).forEach(app.store::delete)
-                        photo.previewPath?.let { java.io.File(it).delete() }
-                        photo.audioNote?.let { java.io.File(it).delete() }
-                        app.database.photoDao().delete(photo.id)
-                    }
+                    scope.launch(Dispatchers.IO) { deletePhoto(app, photo) }
                 }) { Text("Apagar", color = Tone.Error) }
             },
             dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Cancelar") } },

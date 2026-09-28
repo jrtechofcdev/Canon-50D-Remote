@@ -140,7 +140,7 @@ class MainActivity : ComponentActivity() {
                             SettingsSectionScreen(app = app, section = section, onBack = { nav.popBackStack() })
                         }
                         composable(Tab.Photos.route) {
-                            PhotosScreen(app = app, onOpenPhoto = { nav.navigate("photo/$it") })
+                            PhotosScreen(app = app, actions = actions, onOpenPhoto = { nav.navigate("photo/$it") })
                         }
                         composable(Tab.Presets.route) {
                             PresetsScreen(app = app, onEdit = { nav.navigate("editor/preset/$it") })

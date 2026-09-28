@@ -53,6 +53,23 @@ class PhotoActions(
         }
     }
 
+    /**
+     * Opens WhatsApp (or WhatsApp Business, or the share sheet when neither is installed) with [text],
+     * plus the photos in [set] when given. Text and photos go in one message where the app allows it.
+     */
+    suspend fun sendMessage(text: String, photos: List<Photo>, set: ShareSet?, settings: Settings) {
+        val intent = (if (set != null && photos.isNotEmpty()) sendIntent(photos, set, settings) else null)
+            ?: Intent(Intent.ACTION_SEND).setType("text/plain")
+        intent.putExtra(Intent.EXTRA_TEXT, text)
+        val whatsapp = listOf(WHATSAPP, WHATSAPP_BUSINESS).firstOrNull { installed(it) }
+        if (whatsapp != null) {
+            runCatching { context.startActivity(Intent(intent).setPackage(whatsapp).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); return }
+        }
+        context.startActivity(Intent.createChooser(intent, "Enviar mensagem").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    private fun installed(pkg: String) = runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess
+
     fun openWith(photo: Photo) {
         val (uri, mime) = when {
             photo.jpgUri != null -> photo.jpgUri to JPEG
@@ -107,6 +124,8 @@ class PhotoActions(
 
     companion object {
         const val LIGHTROOM = "com.adobe.lrmobile"
+        const val WHATSAPP = "com.whatsapp"
+        const val WHATSAPP_BUSINESS = "com.whatsapp.w4b"
         private const val JPEG = "image/jpeg"
         private const val CR2 = "image/x-canon-cr2"
     }
