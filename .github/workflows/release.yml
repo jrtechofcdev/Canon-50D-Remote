@@ -1,0 +1,53 @@
+name: release
+
+# Push a tag like v2.3 to publish that version's APK on the Releases page.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # The default package list includes the retired "tools" package, so name the ones the build needs.
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-36 build-tools;36.0.0
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
+
+      - name: Build APK
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Name the APK and extract release notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cp app/build/outputs/apk/debug/app-debug.apk "Jr_Link-v${VERSION}.apk"
+          # Section of CHANGELOG.md between "## [VERSION]" and the next "## [".
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { on=1; next }
+            on && /^## \[/ { exit }
+            on && /^\[[0-9.]+\]:/ { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          printf '\n---\nInstale o APK no celular e permita "instalar apps desconhecidos". Atualiza por cima da versão anterior.\n' >> notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Jr_Link ${{ github.ref_name }}
+          body_path: notes.md
+          files: Jr_Link-v*.apk

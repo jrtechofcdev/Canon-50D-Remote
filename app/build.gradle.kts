@@ -17,6 +17,14 @@ android {
   }
 
   signingConfigs {
+    // Debug builds, local and on GitHub Actions, share this key so every APK installs over the previous one.
+    // It is a standard debug key (password "android"), not a Play Store key.
+    getByName("debug") {
+      storeFile = file("signing/jrlink-debug.keystore")
+      storePassword = "android"
+      keyAlias = "androiddebugkey"
+      keyPassword = "android"
+    }
     // Release is signed only when KEYSTORE_PATH points to an existing keystore.
     // Without it, `assembleRelease` produces an unsigned APK and `assembleDebug` keeps working.
     val keystorePath = System.getenv("KEYSTORE_PATH")
