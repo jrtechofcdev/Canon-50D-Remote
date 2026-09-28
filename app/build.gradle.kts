@@ -15,7 +15,8 @@ android {
     versionCode = 8
     versionName = "2.6"
     // Phones only (the face model ships native code for each CPU type; x86 is emulators).
-    ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+    // "-Pabis=arm64-v8a" builds a smaller APK for modern phones only.
+    ndk { abiFilters += ((project.findProperty("abis") as String?) ?: "arm64-v8a,armeabi-v7a").split(",") }
   }
 
   // Compressed native code keeps the APK small to download and send; it is unpacked once at install.
