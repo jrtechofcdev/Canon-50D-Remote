@@ -55,6 +55,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.rememberCoroutineScope
@@ -163,6 +166,7 @@ private fun ClientPager(
     settings: Settings,
     infoAbove: Boolean,
 ) {
+    val scope = rememberCoroutineScope()
     // New photo: jump to it (the list is newest first).
     LaunchedEffect(Unit) {
         app.tether.saved.collect {
@@ -182,6 +186,20 @@ private fun ClientPager(
         val photo = entries[page]
         Box(Modifier.fillMaxSize()) {
             LookImage(app, photo, presets, Modifier.fillMaxSize())
+            if (settings.clientPicksEnabled) {
+                // The client's own pick; the photographer sees it in the gallery and the session summary.
+                IconButton(
+                    onClick = { scope.launch { app.database.photoDao().setClientPick(photo.id, !photo.clientPick) } },
+                    modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp).size(56.dp),
+                ) {
+                    Icon(
+                        if (photo.clientPick) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = if (photo.clientPick) "Tirar da seleção" else "Escolher esta foto",
+                        tint = if (photo.clientPick) Tone.Accent else Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(30.dp),
+                    )
+                }
+            }
             if (settings.clientShowInfo) {
                 Text(
                     listOfNotNull(photo.savedBase, photo.shutter, photo.aperture, photo.iso).joinToString("   "),

@@ -67,6 +67,16 @@ class PhotoStore(private val context: Context) {
         return Target(Uri.fromFile(file), file.outputStream())
     }
 
+    /** Copies a saved file to [kind]'s folder (e.g. the client's picks). Returns the new file's URI. */
+    fun copy(sourceUri: String, kind: FileKind, settings: Settings, moment: String? = null): String {
+        val name = displayName(sourceUri).ifBlank { "foto_${System.currentTimeMillis()}" }
+        val target = create(kind, name, settings, moment)
+        target.stream.use { out ->
+            (openInput(sourceUri) ?: throw IOException("Não foi possível ler $name")).use { it.copyTo(out, 256 * 1024) }
+        }
+        return target.uri.toString()
+    }
+
     fun openInput(uri: String) = Uri.parse(uri).let { parsed ->
         if (parsed.scheme == "file") File(parsed.path!!).inputStream() else context.contentResolver.openInputStream(parsed)
     }

@@ -54,6 +54,19 @@ import com.example.core.camera.BracketState
 import com.example.core.camera.CameraStatus
 import com.example.core.data.ExposurePreset
 import androidx.compose.material.icons.outlined.AutoAwesome
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalContext
+import com.example.core.messages.MessageKind
+import com.example.core.messages.MessageTemplates
+import com.example.core.storage.FileKind
+import com.example.ui.photos.MessageSheet
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.outlined.Calculate
 import androidx.compose.material.icons.outlined.Flag
 import com.example.core.data.Photo
@@ -227,20 +240,63 @@ fun SessionSummaryDialog(app: TetherApp, actions: PhotoActions, settings: Settin
     val rated = list.filter { it.rating >= 3 }
     val bytes = list.sumOf { it.jpgSize + it.rawSize }
     val minutes = if (list.size > 1) (list.last().capturedAt - list.first().capturedAt) / 60_000 else 0
+    val picks = list.filter { it.clientPick }
+    val context = LocalContext.current
+    var message by remember { mutableStateOf<Pair<MessageKind, List<Photo>>?>(null) }
+    var copying by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Tone.Surface,
         title = { Text("Sessão ${settings.sessionKey}") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 SummaryLine("Fotos recebidas", list.size.toString())
                 SummaryLine("RAW / JPG", "${list.count { it.rawUri != null }} / ${list.count { it.jpgUri != null }}")
                 SummaryLine("Espaço usado", "%.1f GB".format(bytes / 1_073_741_824.0))
                 SummaryLine("Duração", if (minutes >= 60) "${minutes / 60} h ${minutes % 60} min" else "$minutes min")
                 SummaryLine("Favoritas", favorites.size.toString())
                 if (settings.ratingEnabled) SummaryLine("3 estrelas ou mais", rated.size.toString())
+                if (settings.clientPicksEnabled) SummaryLine("Escolhidas pelo cliente", picks.size.toString())
                 Spacer(Modifier.height(8.dp))
+                if (settings.clientPicksEnabled && picks.isNotEmpty()) {
+                    Text("Seleção do cliente", style = MaterialTheme.typography.labelMedium, color = Tone.TextMuted)
+                    OutlinedButton(
+                        onClick = {
+                            val text = MessageTemplates.lightroomFilter(picks.map { it.savedBase })
+                            (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
+                                .setPrimaryClip(ClipData.newPlainText("Seleção do cliente", text))
+                            Toast.makeText(context, "Lista copiada. No Lightroom Classic: Filtro de texto → Contém qualquer.", Toast.LENGTH_LONG).show()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Copiar lista para o Lightroom") }
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                var done = 0
+                                withContext(Dispatchers.IO) {
+                                    picks.forEach { p ->
+                                        listOfNotNull(p.jpgUri, p.rawUri, p.editedUri).forEach { uri ->
+                                            copying = "Copiando ${++done}…"
+                                            runCatching { app.store.copy(uri, FileKind.SELECTED, settings) }
+                                        }
+                                    }
+                                }
+                                copying = null
+                                Toast.makeText(context, "$done arquivo(s) na pasta Escolhidas", Toast.LENGTH_LONG).show()
+                            }
+                        },
+                        enabled = copying == null,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(copying ?: "Copiar escolhidas para a pasta") }
+                    OutlinedButton(onClick = { message = MessageKind.Selection to picks }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Mandar a seleção no WhatsApp")
+                    }
+                    Spacer(Modifier.height(4.dp))
+                }
+                OutlinedButton(onClick = { message = MessageKind.Preview to list }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Mensagem para o cliente")
+                }
                 val sendSet = if (settings.downloadMode.raw) ShareSet.RAW else ShareSet.JPG
                 OutlinedButton(
                     onClick = { scope.launch { actions.openInLightroom(favorites, sendSet, settings) } },
@@ -264,6 +320,10 @@ fun SessionSummaryDialog(app: TetherApp, actions: PhotoActions, settings: Settin
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Continuar fotografando") } },
     )
+
+    message?.let { (kind, photos) ->
+        MessageSheet(actions, settings, photos, initial = kind, onDismiss = { message = null })
+    }
 }
 
 @Composable
