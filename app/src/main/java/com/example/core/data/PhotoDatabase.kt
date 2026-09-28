@@ -44,9 +44,18 @@ data class Photo(
     /** File names on the camera card (e.g. IMG_1234.CR2), used to find frames still missing after a reconnect. */
     val rawCameraName: String? = null,
     val jpgCameraName: String? = null,
+    /** Preset applied to this photo (null = none). */
+    val presetId: Long? = null,
+    /** Per-photo calibration: the full settings used for this photo when they differ from the preset. */
+    val adjust: String? = null,
+    /** JPG copy with the preset applied, in the "editadas" folder. */
+    val editedUri: String? = null,
 ) {
     /** What the viewer shows: the JPG when there is one, else the preview pulled out of the RAW. */
     val displayUri: String? get() = jpgUri ?: previewPath?.let { "file://$it" }
+
+    /** What to show in lists and send to others: the edited copy when there is one. */
+    val lookUri: String? get() = editedUri ?: displayUri
 }
 
 @Dao
@@ -81,18 +90,75 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE session = :session ORDER BY capturedAt ASC")
     suspend fun inSession(session: String): List<Photo>
 
+    @Query("UPDATE photos SET presetId = :presetId, adjust = :adjust WHERE id = :id")
+    suspend fun setLook(id: Long, presetId: Long?, adjust: String?)
+
+    @Query("UPDATE photos SET editedUri = :uri WHERE id = :id")
+    suspend fun setEdited(id: Long, uri: String?)
+
+    @Query("SELECT * FROM photos WHERE id = :id")
+    suspend fun get(id: Long): Photo?
+
+    @Query("SELECT * FROM photos WHERE jpgUri IS NOT NULL OR previewPath IS NOT NULL ORDER BY capturedAt DESC LIMIT 1")
+    suspend fun latestWithImage(): Photo?
+
+    suspend fun latestDisplayUri(): String? = latestWithImage()?.displayUri
+
     @Query("SELECT rawCameraName FROM photos WHERE rawCameraName IS NOT NULL UNION SELECT jpgCameraName FROM photos WHERE jpgCameraName IS NOT NULL")
     suspend fun knownCameraNames(): List<String>
 }
 
-@Database(entities = [Photo::class], version = 3, exportSchema = false)
+@Entity(tableName = "presets")
+data class PresetEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    @ColumnInfo(name = "grp") val group: String,
+    /** [com.example.core.preset.PresetSettings.encode] text. */
+    val settings: String,
+    val source: String,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
+@Dao
+interface PresetDao {
+    @Query("SELECT * FROM presets ORDER BY grp, name COLLATE NOCASE")
+    fun observeAll(): Flow<List<PresetEntity>>
+
+    @Query("SELECT * FROM presets ORDER BY grp, name COLLATE NOCASE")
+    suspend fun all(): List<PresetEntity>
+
+    @Query("SELECT * FROM presets WHERE id = :id")
+    suspend fun get(id: Long): PresetEntity?
+
+    @Query("SELECT * FROM presets WHERE id = :id")
+    fun observe(id: Long): Flow<PresetEntity?>
+
+    @Query("SELECT COUNT(*) FROM presets")
+    suspend fun count(): Int
+
+    @Insert
+    suspend fun insert(preset: PresetEntity): Long
+
+    @Update
+    suspend fun update(preset: PresetEntity)
+
+    @Query("DELETE FROM presets WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    @Query("UPDATE photos SET presetId = NULL WHERE presetId = :id")
+    suspend fun detachFromPhotos(id: Long)
+}
+
+@Database(entities = [Photo::class, PresetEntity::class], version = 4, exportSchema = false)
 abstract class PhotoDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
+    abstract fun presetDao(): PresetDao
 
     companion object {
         fun create(context: Context): PhotoDatabase =
             Room.databaseBuilder(context, PhotoDatabase::class.java, "tether50d.db")
-                .addMigrations(MIGRATION_2_3)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                 // Version 1 only ever held simulator entries, so dropping it loses nothing real.
                 .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1)
                 .build()
@@ -103,6 +169,20 @@ abstract class PhotoDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE photos ADD COLUMN rating INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE photos ADD COLUMN rawCameraName TEXT")
                 db.execSQL("ALTER TABLE photos ADD COLUMN jpgCameraName TEXT")
+            }
+        }
+
+        /** Presets table, plus the look (preset and calibration) and edited copy of each photo. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE photos ADD COLUMN presetId INTEGER")
+                db.execSQL("ALTER TABLE photos ADD COLUMN adjust TEXT")
+                db.execSQL("ALTER TABLE photos ADD COLUMN editedUri TEXT")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `presets` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`name` TEXT NOT NULL, `grp` TEXT NOT NULL, `settings` TEXT NOT NULL, `source` TEXT NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL)",
+                )
             }
         }
     }

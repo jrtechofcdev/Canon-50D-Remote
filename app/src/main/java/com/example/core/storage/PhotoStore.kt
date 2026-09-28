@@ -12,7 +12,7 @@ import java.io.File
 import java.io.IOException
 import java.io.OutputStream
 
-enum class FileKind(val folderName: String) { JPG("JPG"), RAW("RAW") }
+enum class FileKind(val folderName: String) { JPG("JPG"), RAW("RAW"), EDITED("Editadas") }
 
 // Files are created as octet-stream so the storage provider keeps the camera's name ("IMG_1234.JPG")
 // instead of appending its own extension; the media scanner still types them by extension.
@@ -31,6 +31,7 @@ class PhotoStore(private val context: Context) {
         val treeUri = when (kind) {
             FileKind.JPG -> settings.jpgFolder
             FileKind.RAW -> settings.rawFolder
+            FileKind.EDITED -> settings.editedFolder
         }
         val subfolder = settings.sessionName.trim().takeIf { settings.sessionSubfolder && it.isNotEmpty() }
         return if (treeUri != null) createInTree(Uri.parse(treeUri), subfolder, kind, fileName)

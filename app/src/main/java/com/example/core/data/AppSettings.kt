@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -81,6 +82,19 @@ data class Settings(
     val clientSlideSeconds: Int = 0,
     val clientOnlyFavorites: Boolean = false,
     val clientPin: String = "",
+
+    // Presets
+    val presetsFolder: String? = null,
+    val editedFolder: String? = null,
+    /** Preset applied to new photos; -1 = none. */
+    val sessionPresetId: Long = -1,
+    val applyPresetToNew: Boolean = true,
+    /** A calibration carried to the next photos ("Aplicar às próximas"); empty = use the preset as is. */
+    val sessionAdjust: String = "",
+    val saveEditedCopy: Boolean = true,
+    val editedQuality: Int = 92,
+    val clientPresetsEnabled: Boolean = true,
+    val clientCalibratePin: Boolean = true,
 
     // Tela
     val nightMode: Boolean = false,
@@ -162,6 +176,16 @@ object SettingKeys {
     val clientOnlyFavorites = booleanPreferencesKey("client_only_favorites")
     val clientPin = stringPreferencesKey("client_pin")
 
+    val presetsFolder = stringPreferencesKey("presets_folder")
+    val editedFolder = stringPreferencesKey("edited_folder")
+    val sessionPresetId = longPreferencesKey("session_preset_id")
+    val applyPresetToNew = booleanPreferencesKey("apply_preset_to_new")
+    val sessionAdjust = stringPreferencesKey("session_adjust")
+    val saveEditedCopy = booleanPreferencesKey("save_edited_copy")
+    val editedQuality = intPreferencesKey("edited_quality")
+    val clientPresetsEnabled = booleanPreferencesKey("client_presets_enabled")
+    val clientCalibratePin = booleanPreferencesKey("client_calibrate_pin")
+
     val nightMode = booleanPreferencesKey("night_mode")
     val nightBrightness = intPreferencesKey("night_brightness")
     val keepScreenOn = booleanPreferencesKey("keep_screen_on")
@@ -241,6 +265,16 @@ class SettingsRepository(private val context: Context) {
             clientSlideSeconds = this[k.clientSlideSeconds] ?: d.clientSlideSeconds,
             clientOnlyFavorites = this[k.clientOnlyFavorites] ?: d.clientOnlyFavorites,
             clientPin = this[k.clientPin] ?: d.clientPin,
+
+            presetsFolder = this[k.presetsFolder],
+            editedFolder = this[k.editedFolder],
+            sessionPresetId = this[k.sessionPresetId] ?: d.sessionPresetId,
+            applyPresetToNew = this[k.applyPresetToNew] ?: d.applyPresetToNew,
+            sessionAdjust = this[k.sessionAdjust] ?: d.sessionAdjust,
+            saveEditedCopy = this[k.saveEditedCopy] ?: d.saveEditedCopy,
+            editedQuality = this[k.editedQuality] ?: d.editedQuality,
+            clientPresetsEnabled = this[k.clientPresetsEnabled] ?: d.clientPresetsEnabled,
+            clientCalibratePin = this[k.clientCalibratePin] ?: d.clientCalibratePin,
 
             nightMode = this[k.nightMode] ?: d.nightMode,
             nightBrightness = this[k.nightBrightness] ?: d.nightBrightness,

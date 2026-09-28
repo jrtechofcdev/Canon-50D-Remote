@@ -12,6 +12,9 @@ import com.example.core.ptp.EosValues
 import com.example.core.service.CameraForegroundService
 import com.example.core.storage.PhotoStore
 import com.example.core.tether.TetherController
+import com.example.core.preset.PresetRepository
+import com.example.core.render.Looks
+import com.example.core.render.PresetEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -36,6 +39,12 @@ class TetherApp : Application() {
         private set
     lateinit var alerts: Alerts
         private set
+    lateinit var presets: PresetRepository
+        private set
+    lateinit var engine: PresetEngine
+        private set
+    lateinit var looks: Looks
+        private set
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -50,11 +59,18 @@ class TetherApp : Application() {
         database = PhotoDatabase.create(this)
         store = PhotoStore(this)
         camera = CameraManager(this) { settings.current().keepCameraAwake }
-        tether = TetherController(this, camera, settings, store, database.photoDao())
+        presets = PresetRepository(this, database.presetDao(), settings)
+        engine = PresetEngine()
+        looks = Looks(this, engine, presets, database.photoDao(), store, settings)
+        tether = TetherController(this, camera, settings, store, database.photoDao(), looks) { id -> presets.get(id)?.name }
         export = ExportService(this)
         alerts = Alerts(this)
 
-        appScope.launch(Dispatchers.IO) { export.clearOldExports() }
+        appScope.launch(Dispatchers.IO) {
+            export.clearOldExports()
+            presets.seedIfEmpty()
+            runCatching { presets.syncFolder() }
+        }
 
         appScope.launch {
             camera.state.distinctUntilChangedBy { it::class }.collect { state ->
