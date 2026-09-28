@@ -55,6 +55,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Crop
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.foundation.layout.size
@@ -77,7 +78,7 @@ import com.example.ui.preset.PresetStrip
  * Exit: hold a finger on the screen for 3 s (plus the PIN when one is set).
  */
 @Composable
-fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> Unit) {
+fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> Unit, onCrop: (Long) -> Unit = {}) {
     val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
     val presets by app.presets.presets.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
@@ -96,9 +97,11 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
     BackHandler { }
 
     val requestExit = { if (settings.clientPin.isEmpty()) onExit() else askPin = true }
-    val requestCalibrate = { id: Long ->
-        if (settings.clientCalibratePin && settings.clientPin.isNotEmpty()) calibrateAsk = id else onCalibrate(id)
-    }
+    // Calibrar and Recortar are the photographer's: both ask for the PIN when one is set.
+    var cropAsk by remember { mutableStateOf<Long?>(null) }
+    val guarded = settings.clientCalibratePin && settings.clientPin.isNotEmpty()
+    val requestCalibrate = { id: Long -> if (guarded) calibrateAsk = id else onCalibrate(id) }
+    val requestCrop = { id: Long -> if (guarded) cropAsk = id else onCrop(id) }
 
     Box(
         Modifier
@@ -134,7 +137,7 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
             ClientPager(app, pager, photos, presets, settings, infoAbove = showStrip || settings.clientWhatsApp)
             val current = photos.getOrNull(pager.currentPage)
             val showWhatsApp = settings.clientWhatsApp
-            if ((showStrip || showWhatsApp) && current != null) {
+            if (current != null) {
                 // Discreet bar: the client picks the look and can get the photo on WhatsApp; Calibrar is for the photographer.
                 Row(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.55f))
@@ -150,6 +153,9 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
                         IconButton(onClick = { whatsFor = current }) {
                             Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = "Receber no WhatsApp", tint = Tone.Accent)
                         }
+                    }
+                    IconButton(onClick = { requestCrop(current.id) }) {
+                        Icon(Icons.Outlined.Crop, contentDescription = "Recortar", tint = Color(0xFFBDBDBD))
                     }
                     if (showStrip) {
                         IconButton(onClick = { requestCalibrate(current.id) }) {
@@ -176,6 +182,9 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
     }
     whatsFor?.let { photo ->
         WhatsAppSheet(app, remember { PhotoActions(app, app.store, app.export, app.looks) }, settings, listOf(photo), forClient = true, onDismiss = { whatsFor = null })
+    }
+    cropAsk?.let { id ->
+        PinDialog(settings.clientPin, "PIN para recortar", "Recortar", onOk = { cropAsk = null; onCrop(id) }, onCancel = { cropAsk = null })
     }
     calibrateAsk?.let { id ->
         PinDialog(settings.clientPin, "PIN para calibrar", "Calibrar", onOk = { calibrateAsk = null; onCalibrate(id) }, onCancel = { calibrateAsk = null })

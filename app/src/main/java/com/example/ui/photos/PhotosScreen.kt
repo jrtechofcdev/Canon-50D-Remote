@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BlurOn
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Crop
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Flag
@@ -76,6 +77,7 @@ import com.example.ui.PhotoActions
 import com.example.ui.ShareSet
 import com.example.ui.components.FormatTag
 import com.example.ui.session.MomentSheet
+import com.example.ui.crop.QuickCropSheet
 import com.example.ui.theme.Tone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -102,6 +104,7 @@ fun PhotosScreen(
     actions: PhotoActions,
     onOpenPhoto: (Long) -> Unit,
     onSelectingChange: (Boolean) -> Unit = {},
+    onCrop: (Long) -> Unit = {},
 ) {
     val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = emptyList())
     val settings by app.settings.settings.collectAsState(initial = Settings())
@@ -250,6 +253,7 @@ fun PhotosScreen(
                 onMoment = { sheet = "moment" },
                 onMessage = { sheet = "message" },
                 onWhatsApp = { sheet = "whatsapp" },
+                onCrop = { sheet = "crop" },
                 onDelete = { sheet = "delete" },
                 onShare = { set -> scope.launch { actions.share(selection, set, settings) } },
                 onLightroom = { set -> scope.launch { actions.openInLightroom(selection, set, settings) } },
@@ -267,6 +271,14 @@ fun PhotosScreen(
             scope.launch { app.database.photoDao().setMoment(selection.map { it.id }, m.ifEmpty { null }); selected.clear() }
         }, onDismiss = { sheet = null })
         "message" -> MessageSheet(actions, settings, selection, onDismiss = { sheet = null })
+        "crop" -> QuickCropSheet(
+            count = selection.size,
+            onDismiss = { sheet = null },
+            onOpenFull = selection.singleOrNull()?.let { p -> { sheet = null; selected.clear(); onCrop(p.id) } },
+        ) { ratio ->
+            sheet = null
+            runBatch(if (ratio == null) "Removendo recorte" else "Recortando ${ratio.label}", selection) { app.looks.quickCrop(it, ratio) }
+        }
         "whatsapp" -> WhatsAppSheet(app, actions, settings, selection, onDismiss = { sheet = null; selected.clear() })
         "delete" -> AlertDialog(
             onDismissRequest = { sheet = null },
@@ -322,6 +334,7 @@ private fun BatchBar(
     onMoment: () -> Unit,
     onMessage: () -> Unit,
     onWhatsApp: () -> Unit,
+    onCrop: () -> Unit,
     onDelete: () -> Unit,
     onShare: (ShareSet) -> Unit,
     onLightroom: (ShareSet) -> Unit,
@@ -335,6 +348,7 @@ private fun BatchBar(
     ) {
         BarAction(Icons.AutoMirrored.Outlined.Send, "WhatsApp", onWhatsApp)
         BarAction(Icons.Outlined.AutoAwesome, "Preset", onPreset)
+        BarAction(Icons.Outlined.Crop, "Recorte", onCrop)
         BarMenu(Icons.Outlined.Share, "Enviar", sets, onShare)
         BarMenu(Icons.Outlined.PhotoLibrary, "Lightroom", lrSets, onLightroom)
         BarAction(Icons.AutoMirrored.Outlined.Chat, "Mensagem", onMessage)

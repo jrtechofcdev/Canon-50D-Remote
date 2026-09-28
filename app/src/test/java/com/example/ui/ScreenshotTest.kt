@@ -271,4 +271,17 @@ class ScreenshotTest {
         rule.setContent { JrLinkTheme { com.example.ui.cull.CullScreen(app, onBack = {}, onOpenPhoto = {}) } }
         save("selecao_rapida", androidx.compose.ui.test.hasText("Sugerida"))
     }
+
+    @Test
+    fun crop() {
+        seedPhotos()
+        val id = runBlocking {
+            val p = app.database.photoDao().inSession("Geral").last()
+            val spec = com.example.core.render.CropRatio.IG_PORTRAIT.centred(900f, 600f).copy(angle = -4f)
+            app.database.photoDao().setCrop(listOf(p.id), com.example.core.render.CropGeometry.fitAfterRotation(spec, 900f, 600f).encode())
+            p.id
+        }
+        rule.setContent { JrLinkTheme { com.example.ui.crop.CropScreen(app, id, onDone = {}) } }
+        save("recorte", androidx.compose.ui.test.hasText("Instagram retrato"))
+    }
 }

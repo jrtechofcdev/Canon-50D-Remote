@@ -36,15 +36,21 @@ fun LookImage(
     maxEdge: Int = Looks.PREVIEW_EDGE,
 ) {
     val look = remember(photo.adjust, photo.presetId, presets) { lookSettings(photo, presets) }
+    val crop = photo.crop
     val source = photo.displayUri
-    val rendered by produceState<Bitmap?>(null, source, look, maxEdge) {
-        value = if (source != null && look != null) runCatching { app.looks.render(source, look, maxEdge) }.getOrNull() else null
+    val rendered by produceState<Bitmap?>(null, source, look, crop, maxEdge) {
+        value = if (source != null && (look != null || crop != null)) {
+            runCatching { app.looks.renderPhoto(photo, look, maxEdge) }.getOrNull()
+        } else null
     }
     Box(modifier) {
-        AsyncImage(model = source, contentDescription = photo.savedBase, contentScale = contentScale, modifier = Modifier.fillMaxSize())
+        // A cropped photo waits for its render: the uncropped file underneath would show the wrong framing.
+        if (crop == null) {
+            AsyncImage(model = source, contentDescription = photo.savedBase, contentScale = contentScale, modifier = Modifier.fillMaxSize())
+        }
         val bmp = rendered
-        if (look != null && bmp != null) {
-            Image(bmp.asImageBitmap(), contentDescription = null, contentScale = contentScale, modifier = Modifier.fillMaxSize())
+        if ((look != null || crop != null) && bmp != null) {
+            Image(bmp.asImageBitmap(), contentDescription = photo.savedBase, contentScale = contentScale, modifier = Modifier.fillMaxSize())
         }
     }
 }

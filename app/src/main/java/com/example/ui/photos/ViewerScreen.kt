@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Crop
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Share
@@ -96,7 +97,14 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: () -> Unit, onCalibrate: (Long) -> Unit) {
+fun ViewerScreen(
+    app: TetherApp,
+    actions: PhotoActions,
+    startId: Long,
+    onBack: () -> Unit,
+    onCalibrate: (Long) -> Unit,
+    onCrop: (Long) -> Unit = {},
+) {
     val photos by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
     val presets by app.presets.presets.collectAsState(initial = emptyList())
     val s by app.settings.settings.collectAsState(initial = null)
@@ -149,7 +157,7 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { list[it].id }) { page ->
             val photo = list[page]
-            val mask = if (showClipping && photo.id == viewing?.id) analysis?.clippedMask else null
+            val mask = if (showClipping && photo.id == viewing?.id && photo.crop == null) analysis?.clippedMask else null
             PhotoPage(app, photo, presets, mask) { zoomed[photo.id] = it }
         }
 
@@ -167,6 +175,9 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
                     style = MaterialTheme.typography.bodySmall,
                     color = Tone.TextMuted,
                 )
+            }
+            IconButton(onClick = { onCrop(current.id) }) {
+                Icon(Icons.Outlined.Crop, contentDescription = "Recortar", tint = if (current.crop != null) Tone.Accent else Tone.Text)
             }
             IconButton(onClick = { showClipping = !showClipping }) {
                 Icon(

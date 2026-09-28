@@ -49,6 +49,7 @@ import com.example.ui.preset.EditorScreen
 import com.example.ui.preset.PresetsScreen
 import com.example.ui.tools.ToolsScreen
 import com.example.ui.cull.CullScreen
+import com.example.ui.crop.CropScreen
 import com.example.ui.components.CaptureFab
 import androidx.compose.material.icons.outlined.Swipe
 import androidx.compose.runtime.mutableStateOf
@@ -173,7 +174,12 @@ class MainActivity : ComponentActivity() {
                         composable("tools") { ToolsScreen(onBack = { nav.popBackStack() }) }
                         composable("card") { CardScreen(app = app, onBack = { nav.popBackStack() }) }
                         composable("client") {
-                            ClientModeScreen(app = app, onExit = { nav.popBackStack() }, onCalibrate = { id -> nav.navigate("editor/photo/$id") })
+                            ClientModeScreen(
+                                app = app,
+                                onExit = { nav.popBackStack() },
+                                onCalibrate = { id -> nav.navigate("editor/photo/$id") },
+                                onCrop = { id -> nav.navigate("editor/crop/$id") },
+                            )
                         }
                         composable("settings/{section}") { entry ->
                             val section = SettingsSection.entries.firstOrNull { it.route == entry.arguments?.getString("section") }
@@ -186,6 +192,7 @@ class MainActivity : ComponentActivity() {
                                 actions = actions,
                                 onOpenPhoto = { nav.navigate("photo/$it") },
                                 onSelectingChange = { gallerySelecting = it },
+                                onCrop = { id -> nav.navigate("editor/crop/$id") },
                             )
                         }
                         composable(Tab.Presets.route) {
@@ -197,6 +204,9 @@ class MainActivity : ComponentActivity() {
                         composable("editor/photo/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
                             EditorScreen(app, EditTarget.PhotoTarget(it.arguments?.getLong("id") ?: 0L), onDone = { nav.popBackStack() })
                         }
+                        composable("editor/crop/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
+                            CropScreen(app, it.arguments?.getLong("id") ?: 0L, onDone = { nav.popBackStack() })
+                        }
                         composable(Tab.Settings.route) { SettingsScreen(onOpen = { nav.navigate("settings/${it.route}") }) }
                         composable("photo/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
                             ViewerScreen(
@@ -205,6 +215,7 @@ class MainActivity : ComponentActivity() {
                                 startId = it.arguments?.getLong("id") ?: 0L,
                                 onBack = { nav.popBackStack() },
                                 onCalibrate = { id -> nav.navigate("editor/photo/$id") },
+                                onCrop = { id -> nav.navigate("editor/crop/$id") },
                             )
                         }
                     }

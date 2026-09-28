@@ -72,6 +72,8 @@ data class Photo(
     @ColumnInfo(defaultValue = "0") val rejected: Boolean = false,
     /** 64-bit perceptual hash, used to find near-identical frames. */
     val dHash: Long? = null,
+    /** Crop and straighten ([com.example.core.render.CropSpec] text); null = the whole frame. */
+    val crop: String? = null,
 ) {
     /** What the viewer shows: the JPG when there is one, else the preview pulled out of the RAW. */
     val displayUri: String? get() = jpgUri ?: previewPath?.let { "file://$it" }
@@ -120,6 +122,9 @@ interface PhotoDao {
 
     @Query("SELECT * FROM photos WHERE id = :id")
     suspend fun get(id: Long): Photo?
+
+    @Query("UPDATE photos SET crop = :crop WHERE id IN (:ids)")
+    suspend fun setCrop(ids: List<Long>, crop: String?)
 
     @Query("UPDATE photos SET clientPick = :pick WHERE id = :id")
     suspend fun setClientPick(id: Long, pick: Boolean)
@@ -202,7 +207,7 @@ interface PresetDao {
     suspend fun detachFromPhotos(id: Long)
 }
 
-@Database(entities = [Photo::class, PresetEntity::class], version = 5, exportSchema = false)
+@Database(entities = [Photo::class, PresetEntity::class], version = 6, exportSchema = false)
 abstract class PhotoDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
     abstract fun presetDao(): PresetDao
@@ -211,7 +216,7 @@ abstract class PhotoDatabase : RoomDatabase() {
         /** [name] is only changed by tests, which must not share the file the app itself opens. */
         fun create(context: Context, name: String = "tether50d.db"): PhotoDatabase =
             Room.databaseBuilder(context, PhotoDatabase::class.java, name)
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 // Version 1 only ever held simulator entries, so dropping it loses nothing real.
                 .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1)
                 .build()
@@ -222,6 +227,13 @@ abstract class PhotoDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE photos ADD COLUMN rating INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE photos ADD COLUMN rawCameraName TEXT")
                 db.execSQL("ALTER TABLE photos ADD COLUMN jpgCameraName TEXT")
+            }
+        }
+
+        /** Crop and straighten per photo. */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE photos ADD COLUMN crop TEXT")
             }
         }
 
