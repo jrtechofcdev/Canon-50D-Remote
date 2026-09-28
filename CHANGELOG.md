@@ -2,6 +2,21 @@
 
 Versões do **Jr_Link**. A mais recente fica no topo.
 
+## [2.4] · 2026-09-28
+
+Presets do Lightroom dentro do app.
+
+- Nova aba **Presets**: importa presets em **DNG, XMP, LRTemplate** ou **ZIP**, cria do zero, duplica, apaga e exporta em XMP.
+- **Editor** com os painéis do Lightroom: Luz, Cor (balanço de branco, mistura de 8 cores, P&B), Efeitos (textura, claridade, desembaçar, vinheta, granulação), Detalhe, Curva (paramétrica e por pontos RGB/R/G/B), Color grading (3 rodas + global) e Calibração. Desfazer/refazer, segurar para ver o antes e alerta de recorte.
+- **Look da sessão:** o preset escolhido é aplicado em cada foto nova, como um perfil de cor. O JPG e o RAW da câmera não mudam.
+- **Cópia editada:** um JPG com o preset é salvo na pasta das editadas (liga/desliga e qualidade em Ajustes). Pode ser enviado pelo botão Enviar.
+- **Calibrar:** ajusta só a foto aberta, com **Aplicar às próximas fotos** e **Salvar como preset**.
+- **Modo cliente:** a foto aparece com o preset e o cliente pode trocar. Calibrar pede o PIN, se houver.
+- **Pack Externo** com 11 presets para começar (Outdoor, Golden Hour, Flash Event, Clean B&W e outros).
+- **Pasta de presets:** cada preset vira um `.xmp` na pasta escolhida; arquivos colocados nela entram no app.
+- Na Sessão, os "presets" da câmera passaram a se chamar **Exposições**, para não confundir.
+- A prévia é uma aproximação do Lightroom; o XMP exportado dá o resultado exato lá.
+
 ## [2.3] · 2026-09-28
 
 Correção da conexão.
