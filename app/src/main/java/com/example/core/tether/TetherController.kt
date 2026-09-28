@@ -16,6 +16,7 @@ import com.example.core.storage.Cr2Preview
 import com.example.core.storage.FileKind
 import com.example.core.storage.PhotoStore
 import com.example.core.render.Looks
+import com.example.core.log.AppLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -51,7 +52,7 @@ class TetherController(
     private val presetName: suspend (Long) -> String?,
     private val location: () -> Pair<Double, Double>? = { null },
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + AppLog.handler("DOWNLOAD"))
     private class Job(val obj: EosEventRecord.ObjectAdded, val force: Boolean, val attempt: Int = 0)
 
     private val queue = Channel<Job>(Channel.UNLIMITED)
@@ -84,8 +85,11 @@ class TetherController(
             for (job in queue) {
                 try {
                     process(job.obj, job.force)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Download failed", e)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    // Throwable, not Exception: an OutOfMemoryError here used to end this loop (and the app).
+                    AppLog.e("DOWNLOAD", "Falha ao salvar ${job.obj.filename} (tentativa ${job.attempt + 1}) · ${AppLog.memory()}", e)
                     if (job.attempt < MAX_RETRIES && camera.state.value is ConnectionState.Connected) {
                         // Usually a busy camera or a brief USB hiccup: try again after the queue drains a bit.
                         delay(1_000L * (job.attempt + 1))
@@ -170,10 +174,19 @@ class TetherController(
         // RAW and JPG of one frame stay in the same moment even if it changed between the two files.
         val moment = existing?.moment ?: settings.currentMoment.takeIf { settings.momentsEnabled && it.isNotBlank() }
         val target = store.create(kind, fileName, settings, moment)
+        val started = System.currentTimeMillis()
+        AppLog.i("DOWNLOAD", "Baixando ${obj.filename} (${obj.size / 1024} KB) como $fileName")
         try {
             BufferedOutputStream(target.stream, 256 * 1024).use { out ->
+                var lastPercent = -1
                 camera.download(obj.handle, StreamSink(out) { received, total ->
-                    _transfer.value = Transfer(fileName, received, if (total > 0) total else obj.size, queued.get() - 1)
+                    // Progress changes only once per percent: every USB chunk used to redraw the screen and the notification.
+                    val size = if (total > 0) total else obj.size
+                    val percent = if (size > 0) (received * 100 / size).toInt() else 0
+                    if (percent != lastPercent) {
+                        lastPercent = percent
+                        _transfer.value = Transfer(fileName, received, size, queued.get() - 1)
+                    }
                 })
             }
         } catch (e: Exception) {
@@ -182,6 +195,7 @@ class TetherController(
         }
 
         val uri = target.uri.toString()
+        AppLog.i("DOWNLOAD", "$fileName salvo em ${System.currentTimeMillis() - started} ms")
         val exif = readExif(target.uri)
         var photo = existing ?: Photo(
             session = session, baseName = cameraBase, savedBase = savedBase, capturedAt = System.currentTimeMillis(), moment = moment,
@@ -217,7 +231,10 @@ class TetherController(
                 runCatching {
                     val name = photo.presetId?.let { presetName(it) }
                     looks.writeEditedCopy(photo.copy(id = id), name)
-                }.onFailure { _errors.tryEmit("Não foi possível salvar a cópia editada de ${photo.savedBase}: ${it.message}") }
+                }.onFailure {
+                    AppLog.e("EDITADA", "Cópia editada de ${photo.savedBase} falhou · ${AppLog.memory()}", it)
+                    _errors.tryEmit("Não foi possível salvar a cópia editada de ${photo.savedBase}: ${it.message}")
+                }
             }
         }
     }

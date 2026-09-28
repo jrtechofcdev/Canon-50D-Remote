@@ -43,6 +43,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.core.camera.ConnectionState
+import com.example.core.log.AppLog
 import com.example.ui.PhotoActions
 import com.example.ui.photos.PhotosScreen
 import com.example.ui.photos.ViewerScreen
@@ -103,6 +104,7 @@ class MainActivity : ComponentActivity() {
                 val nav = rememberNavController()
                 val entry by nav.currentBackStackEntryAsState()
                 val route = entry?.destination?.route ?: Tab.Session.route
+                LaunchedEffect(route) { AppLog.i("TELA", route) }
                 val snackbar = remember { SnackbarHostState() }
                 var gallerySelecting by remember { mutableStateOf(false) }
                 val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -134,7 +136,10 @@ class MainActivity : ComponentActivity() {
                         )
                         "${w.photo.savedBase}: ${problems.joinToString(", ")}"
                     }
-                    merge(app.camera.messages, app.tether.errors, cullMessages).collect { snackbar.showSnackbar(it) }
+                    merge(app.camera.messages, app.tether.errors, cullMessages).collect {
+                        AppLog.i("AVISO", it)
+                        snackbar.showSnackbar(it)
+                    }
                 }
 
                 Scaffold(
@@ -274,8 +279,19 @@ class MainActivity : ComponentActivity() {
         app.camera.findAndConnect()
     }
 
+    override fun onPause() {
+        super.onPause()
+        AppLog.i("APP", "Em segundo plano · ${AppLog.memory()}")
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        AppLog.i("APP", "Tela girou: ${if (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE) "deitada" else "em pé"}")
+    }
+
     override fun onResume() {
         super.onResume()
+        AppLog.i("APP", "Em primeiro plano · ${AppLog.memory()}")
         // Only retry silently from "no camera"; after a failure or a denied permission the user taps Conectar,
         // otherwise the permission dialog would reopen every time the activity resumes.
         if (app.camera.state.value == ConnectionState.NoCamera) app.camera.findAndConnect()

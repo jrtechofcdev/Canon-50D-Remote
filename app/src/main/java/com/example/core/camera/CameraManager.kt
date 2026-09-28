@@ -13,6 +13,7 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import com.example.core.data.ExposurePreset
+import com.example.core.log.AppLog
 import com.example.core.ptp.DeviceInfo
 import com.example.core.ptp.EosValues
 import com.example.core.ptp.ObjectInfo
@@ -94,7 +95,7 @@ class CameraManager(
     private val syncClock: suspend () -> Boolean = { false },
     private val onClockRefused: suspend () -> Unit = {},
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + AppLog.handler("CAMERA"))
     private val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
 
     private val _state = MutableStateFlow<ConnectionState>(ConnectionState.NoCamera)
@@ -325,7 +326,7 @@ class CameraManager(
             } catch (e: PtpException) {
                 _shutter.value = ShutterState.Failed(e.message ?: "A câmera não disparou")
                 _messages.tryEmit("Não disparou: ${e.message}")
-                log("Disparo falhou: ${e.message}")
+                AppLog.e("DISPARO", "Disparo falhou: ${e.message}")
             } finally {
                 // In live view the mirror cycles after the shot; give it a moment before asking for frames.
                 if (inLive) delay(LIVE_AFTER_SHOT_MS)
@@ -656,7 +657,7 @@ class CameraManager(
             .firstOrNull { it.interfaceClass == UsbConstants.USB_CLASS_STILL_IMAGE }
 
     private fun log(message: String) {
-        Log.d(TAG, message)
+        AppLog.i("USB", message)
         val line = "${timeFormat.format(Date())}  $message"
         _log.update { (it + line).takeLast(300) }
     }

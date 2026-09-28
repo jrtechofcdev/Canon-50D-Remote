@@ -13,6 +13,7 @@ import com.example.core.storage.ExifCopy
 import com.example.core.storage.FileKind
 import com.example.core.storage.PhotoStore
 import kotlinx.coroutines.Dispatchers
+import com.example.core.log.AppLog
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -32,6 +33,13 @@ class Looks(
     // Rendered previews, keyed by photo, settings and size. ~12 MB each at most; 6 of them fit a 4 GB phone well.
     private val cache = object : LruCache<String, Bitmap>(6) {}
     private val copyLock = Mutex()
+
+    /** Drops the cached renders (Android asked for memory back); they are rebuilt when shown again. */
+    fun trim() {
+        cache.evictAll()
+        baseCache.evictAll()
+        thumbs.evictAll()
+    }
 
     /** The settings that apply to [photo], or null when it has no look. */
     suspend fun settingsFor(photo: Photo): PresetSettings? {
@@ -102,7 +110,10 @@ class Looks(
         val crop = cropOf(photo)
         if (s == null && crop == null) return@withLock null
         val source = photo.displayUri ?: return@withLock null
-        val rendered = withContext(Dispatchers.IO) { finished(source, s, crop, 0) } ?: return@withLock null
+        val started = System.currentTimeMillis()
+        val edge = fullSizeEdge()
+        val rendered = withContext(Dispatchers.IO) { finished(source, s, crop, edge) } ?: return@withLock null
+        AppLog.i("EDITADA", "${photo.savedBase}: ${rendered.width}×${rendered.height} em ${System.currentTimeMillis() - started} ms · ${AppLog.memory()}")
         val suffix = presetName?.let { "_" + it.replace(Regex("[\\\\/:*?\"<>|]"), "-").replace(' ', '-') }
             ?: if (s == null) "_recorte" else "_editada"
         val uri = withContext(Dispatchers.IO) {
@@ -179,6 +190,27 @@ class Looks(
         }
     }
 
+    /**
+     * Long edge for a "full size" render that fits the memory free right now: the whole frame when
+     * there is room (0), smaller when the phone is short, so a second photo never runs it out.
+     */
+    private fun fullSizeEdge(): Int {
+        val rt = Runtime.getRuntime()
+        val free = rt.maxMemory() - (rt.totalMemory() - rt.freeMemory())
+        // A 15 MP frame needs about 60 MB per copy and the pipeline holds three at once.
+        val edge = when {
+            free > 420L * MB -> 0
+            free > 260L * MB -> 4096
+            free > 160L * MB -> 3200
+            else -> 2400
+        }
+        if (edge != 0) {
+            trim()
+            AppLog.w("MEM", "Pouca memória livre (${free / MB} MB): cópia editada com ${edge}px · ${AppLog.memory()}")
+        }
+        return edge
+    }
+
     /** Full pipeline on the file: decode, crop (at the preset's pixel size), then the look. */
     private suspend fun finished(source: String, look: PresetSettings?, crop: CropSpec?, maxEdge: Int): Bitmap? {
         val full = BitmapLoader.load(context, Uri.parse(source), maxEdge) ?: return null
@@ -192,5 +224,6 @@ class Looks(
         const val PREVIEW_EDGE = 2048
         const val EDITOR_EDGE = 1440
         const val THUMB_EDGE = 320
+        private const val MB = 1024L * 1024L
     }
 }

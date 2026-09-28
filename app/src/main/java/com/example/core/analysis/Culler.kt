@@ -6,6 +6,7 @@ import com.example.core.data.Photo
 import com.example.core.data.PhotoDao
 import com.example.core.data.SettingsRepository
 import com.example.core.render.BitmapLoader
+import com.example.core.log.AppLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,7 +35,7 @@ class Culler(
     private val settings: SettingsRepository,
     private val faces: FaceAnalyzer,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + AppLog.handler("CULLING"))
     private val queue = Channel<Long>(Channel.UNLIMITED)
 
     private val _warnings = MutableSharedFlow<CullWarning>(extraBufferCapacity = 8)
@@ -48,6 +49,7 @@ class Culler(
         scope.launch {
             for (id in queue) {
                 runCatching { dao.get(id)?.let { analyze(it, alert = true) } }
+                    .onFailure { AppLog.e("CULLING", "Análise da foto $id falhou · ${AppLog.memory()}", it) }
                 _pending.update { (it - 1).coerceAtLeast(0) }
             }
         }

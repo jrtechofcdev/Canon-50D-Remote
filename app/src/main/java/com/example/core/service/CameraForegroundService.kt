@@ -17,6 +17,8 @@ import com.example.MainActivity
 import com.example.TetherApp
 import com.example.core.camera.ConnectionState
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
 
 /**
@@ -39,18 +41,20 @@ class CameraForegroundService : LifecycleService() {
 
         val app = application as TetherApp
         lifecycleScope.launch {
+            // The notification text changes in 20 % steps and at most twice a second: updating it for every
+            // USB chunk flooded Android (it rate-limits notifications) and kept the main thread busy.
             combine(app.camera.state, app.tether.receivedThisSession, app.tether.transfer) { state, count, transfer ->
-                Triple(state, count, transfer)
-            }.collect { (state, count, transfer) ->
                 when (state) {
                     is ConnectionState.Connected -> {
-                        val text = transfer?.let { "Recebendo ${it.fileName} · ${(it.progress * 100).toInt()}%" }
+                        val text = transfer?.let { "Recebendo ${it.fileName} · ${(it.progress * 5).toInt() * 20}%" }
                             ?: "$count ${if (count == 1) "foto recebida" else "fotos recebidas"}"
-                        update("${state.model} · $text")
+                        "${state.model} · $text"
                     }
-                    ConnectionState.Connecting, ConnectionState.WaitingPermission -> update("Conectando à câmera…")
-                    else -> stopSelf()
+                    ConnectionState.Connecting, ConnectionState.WaitingPermission -> "Conectando à câmera…"
+                    else -> null
                 }
+            }.distinctUntilChanged().sample(500).collect { text ->
+                if (text == null) stopSelf() else update(text)
             }
         }
     }
@@ -61,7 +65,8 @@ class CameraForegroundService : LifecycleService() {
     }
 
     private fun update(text: String) {
-        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text))
+        runCatching { getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text)) }
+            .onFailure { com.example.core.log.AppLog.e("SERVICO", "Notificação não atualizada", it) }
     }
 
     private fun notification(text: String) = NotificationCompat.Builder(this, CHANNEL_ID)

@@ -2,6 +2,23 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [3.3] · 2026-09-28
+
+- **Correções do fechamento depois de várias fotos:**
+  - *Processamento pela CPU:* quando o processamento de preset pela GPU falha, o app passa para a CPU. Nesse caminho, uma foto de 15 MP em tamanho cheio ocupava mais de 300 MB, e a segunda foto esgotava a memória. Agora esse caminho trabalha com no máximo 2560 px. Pela GPU nada muda.
+  - *Cópia editada:* o tamanho da cópia editada se ajusta à memória livre no momento. Com pouca memória, os previews guardados são liberados antes.
+  - *Memória do app:* o app pede ao Android mais memória para imagens (`largeHeap`) e libera o cache quando o sistema pede.
+  - *Notificação e barra de progresso:* antes eram atualizadas a cada pedaço baixado (centenas de vezes por segundo), o que podia travar a tela até o Android fechar o app. Agora mudam a cada 1 % na tela e a cada 20 % na notificação.
+  - *Erros em segundo plano:* downloads, análise, câmera e avisos não derrubam mais o app. O erro vai para o log e o app continua. A fila de downloads também não para mais por falta de memória.
+- **Log do app salvo no celular** (Ajustes → Diagnóstico):
+  - Um arquivo por dia, guardado por 10 dias, que não se perde ao fechar o app nem ao reiniciar o celular.
+  - Registra conexão USB, cada download com tempo e tamanho, a memória a cada foto, as telas abertas, os avisos, os disparos e os erros com o detalhe técnico.
+  - Se o app fechar por erro, o erro é gravado antes de ele sair.
+  - Na próxima abertura, o app lê do Android por que a execução anterior terminou (erro, erro nativo de gráficos, travamento, falta de memória, fechado pelo sistema) e avisa no topo do Diagnóstico.
+  - **Liga/desliga:** desligado, grava só erros e fechamentos inesperados, para o máximo de desempenho.
+  - **Pasta dos logs:** escolha onde salvar (Downloads, cartão SD, pendrive). O arquivo é copiado para lá a cada 15 s.
+  - **Compartilhar:** junta os últimos 3 dias em um arquivo e abre o menu de envio (WhatsApp, Drive, e-mail). Também dá para copiar e apagar os logs, e ver os registros recentes com o filtro "Só erros".
+
 ## [3.2] · 2026-09-28
 
 - **Girar a tela do app todo:** o botão de girar (Sessão, visualizador e live view) abre um menu em círculo com as posições em pé, deitado para a esquerda, deitado para a direita e de cabeça para baixo, e Auto no meio. A escolha vale para todas as telas e fica guardada.

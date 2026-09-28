@@ -5,6 +5,7 @@ import com.example.core.alerts.Alerts
 import com.example.core.camera.CameraManager
 import com.example.core.camera.ConnectionState
 import com.example.core.data.AppBackup
+import com.example.core.log.AppLog
 import com.example.core.data.PhotoDatabase
 import com.example.core.data.SettingKeys
 import com.example.core.data.SettingsRepository
@@ -63,7 +64,8 @@ class TetherApp : Application() {
     lateinit var appBackup: AppBackup
         private set
 
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    // A failure in one of these collectors is written to the log instead of closing the app.
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main + AppLog.handler("APP"))
 
     // Each warning fires once per connection, not on every event.
     private var warnedCard = false
@@ -72,6 +74,8 @@ class TetherApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // First, so everything after it (and any crash) is written down.
+        AppLog.init(this)
         settings = SettingsRepository(this)
         database = PhotoDatabase.create(this)
         store = PhotoStore(this)
@@ -92,6 +96,10 @@ class TetherApp : Application() {
         backup = SessionBackup(this, database.photoDao(), store)
         culler = Culler(this, database.photoDao(), settings, MlKitFaceAnalyzer())
         appBackup = AppBackup(settings, presets)
+
+        appScope.launch {
+            settings.settings.distinctUntilChangedBy { it.logEnabled to it.logFolder }.collect { AppLog.configure(it.logEnabled, it.logFolder) }
+        }
 
         appScope.launch(Dispatchers.IO) {
             export.clearOldExports()
@@ -120,6 +128,7 @@ class TetherApp : Application() {
 
         appScope.launch {
             tether.saved.collect {
+                AppLog.i("FOTO", "${it.savedBase} salva · ${AppLog.memory()}")
                 val s = settings.current()
                 if (s.blurAlert || s.eyesCheck || s.cullSuggestions) culler.enqueue(it.id)
                 if (s.vibrateOnReceive) alerts.photoReceived()
@@ -152,5 +161,20 @@ class TetherApp : Application() {
                 }
             }
         }
+    }
+
+    /** Android asks for memory back: drop the preview caches (they are rebuilt when needed). */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_RUNNING_LOW) {
+            AppLog.w("MEM", "Android pediu memória (nível $level) · ${AppLog.memory()}")
+            if (::looks.isInitialized) looks.trim()
+        }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        AppLog.w("MEM", "Memória baixa · ${AppLog.memory()}")
+        if (::looks.isInitialized) looks.trim()
     }
 }

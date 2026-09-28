@@ -270,6 +270,15 @@ class ScreenshotTest {
     }
 
     @Test
+    fun settingsDiagnostics() {
+        com.example.core.log.AppLog.i("USB", "Câmera: Canon EOS 50D (firmware 1.0.9)")
+        com.example.core.log.AppLog.i("DOWNLOAD", "IMG_1045.JPG salvo em 812 ms")
+        com.example.core.log.AppLog.e("EDITADA", "Cópia editada de IMG_1046 falhou · memória 240/256 MB")
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Diagnostics, onBack = {}) } }
+        save("ajustes_diagnostico", androidx.compose.ui.test.hasText("Salvar log completo"))
+    }
+
+    @Test
     fun settingsReview() {
         rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Review, onBack = {}) } }
         save("ajustes_revisao", androidx.compose.ui.test.hasText("Tamanho das miniaturas"))

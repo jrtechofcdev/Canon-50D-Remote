@@ -127,6 +127,14 @@ Live view gasta mais bateria da câmera. Com a imagem só no celular, a tela da 
 
   O WhatsApp só pula a tela "Enviar para" quando a conversa já existe; por isso a mensagem vai antes. Os números usados ficam em Recentes (no modo cliente eles não aparecem).
 
+### Log do app
+
+O app escreve um diário em arquivo no celular (um por dia, os últimos 10 dias): conexão, downloads, memória, telas, avisos e erros. Se ele fechar sozinho, o erro fica gravado, e na próxima abertura **Ajustes → Diagnóstico** mostra como ele fechou.
+
+- **Salvar log completo:** desligado, só erros e fechamentos são gravados, para o máximo de desempenho.
+- **Pasta dos logs:** escolha uma pasta (Downloads, cartão SD) e o arquivo é copiado para lá a cada 15 s.
+- **Compartilhar:** junta os últimos dias em um arquivo para mandar pelo WhatsApp, Drive ou e-mail.
+
 ### Perfis e backup
 
 - **Ajustes → Perfis e backup** tem sets prontos (Casamento / igreja, Ensaio externo, Evento / festa, Estúdio / produto). Deixe o app do seu jeito e salve como perfil. Na Sessão, o chip **Perfil** troca tudo em um toque.
@@ -147,7 +155,8 @@ Live view gasta mais bateria da câmera. Com a imagem só no celular, a tela da 
 | WhatsApp abre "Enviar para" | Use o botão **1 · Abrir conversa** primeiro e mande a mensagem; depois o **2 · Enviar fotos** vai direto para o cliente. |
 | WhatsApp abre sem a foto | Atualize o WhatsApp. Sem ele instalado, o app abre o link wa.me do número só com o texto. |
 | Preset não importa | O arquivo precisa ter ajustes do Lightroom dentro. DNG de preset sim; DNG de foto comum sem ajustes, não. |
-| Qualquer outro erro | **Ajustes → Diagnóstico → Copiar log** e abra um [relato de problema](https://github.com/jrtechofcdev/Canon-50D-Remote/issues/new/choose) com o log. |
+| App fechou sozinho | Abra de novo e vá em **Ajustes → Diagnóstico**: o aviso no topo diz como ele fechou. Toque em **Compartilhar** e mande o arquivo de log. |
+| Qualquer outro erro | **Ajustes → Diagnóstico → Compartilhar** e abra um [relato de problema](https://github.com/jrtechofcdev/Canon-50D-Remote/issues/new/choose) com o arquivo de log. |
 
 Ao tocar em **Encerrar conexão**, a câmera sai do modo PC e volta ao normal.
 </details>

@@ -153,6 +153,15 @@ import com.example.ui.theme.Tone
 import com.example.ui.theme.WordmarkStyle
 import com.example.ui.components.BrandSymbol
 import com.example.BuildConfig
+import com.example.core.log.AppLog
+import androidx.compose.material.icons.outlined.ReportProblem
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilterChip
 import kotlinx.coroutines.launch
 
 enum class SettingsSection(val route: String, val title: String, val summary: String, val icon: ImageVector) {
@@ -165,7 +174,7 @@ enum class SettingsSection(val route: String, val title: String, val summary: St
     Messages("messages", "Mensagens", "Textos prontos para o WhatsApp do cliente", Icons.AutoMirrored.Outlined.Chat),
     Alerts("alerts", "Alertas", "Vibração, desconexão, reenvio, resumo", Icons.Outlined.NotificationsActive),
     Display("display", "Tela", "Modo escuro total, brilho, tela ligada", Icons.Outlined.DarkMode),
-    Diagnostics("diagnostics", "Diagnóstico", "Log da conexão USB", Icons.Outlined.BugReport),
+    Diagnostics("diagnostics", "Diagnóstico", "Log do app salvo no celular, pasta e envio", Icons.Outlined.BugReport),
 }
 
 /** Category list. Each category opens its own page so no page gets too long to scan. */
@@ -223,7 +232,7 @@ fun SettingsSectionScreen(app: TetherApp, section: SettingsSection, onBack: () -
             SettingsSection.Messages -> MessageSettings(app, settings)
             SettingsSection.Alerts -> AlertSettings(app, settings)
             SettingsSection.Display -> DisplaySettings(app, settings)
-            SettingsSection.Diagnostics -> DiagnosticsSettings(app)
+            SettingsSection.Diagnostics -> DiagnosticsSettings(app, settings)
         }
         Spacer(Modifier.height(88.dp))
     }
@@ -822,13 +831,79 @@ private fun DisplaySettings(app: TetherApp, s: Settings) {
 // ---- Diagnóstico -------------------------------------------------------------------------------
 
 @Composable
-private fun DiagnosticsSettings(app: TetherApp) {
-    val log by app.camera.log.collectAsState()
+private fun DiagnosticsSettings(app: TetherApp, s: Settings) {
     val context = LocalContext.current
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp)) {
-        Text("Últimos eventos da conexão", style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted, modifier = Modifier.weight(1f))
-        TextButton(onClick = { copyLog(context, log) }) { Text("Copiar log") }
+    val scope = rememberCoroutineScope()
+    val recent by AppLog.recent.collectAsState()
+    val lastExit by AppLog.lastExit.collectAsState()
+    var onlyErrors by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
+    val pickFolder = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.logFolder, it) } }
+    val today = remember(recent.size) { AppLog.todayFile() }
+
+    lastExit?.let { exit ->
+        Spacer(Modifier.height(12.dp))
+        Row(
+            Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(Tone.Error.copy(alpha = 0.12f)).padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.ReportProblem, contentDescription = null, tint = Tone.Error)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text("Da última vez o app fechou sozinho", style = MaterialTheme.typography.bodyLarge)
+                Text(exit, style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+                Text("Está registrado no log. Toque em Compartilhar e mande o arquivo.", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+            }
+        }
     }
+
+    SettingsGroup("Log do app", Icons.Outlined.Description) {
+        ToggleRow(
+            Icons.Outlined.EditNote,
+            "Salvar log completo",
+            "Conexão, downloads, memória a cada foto, telas e avisos, num arquivo por dia. Desligado: só erros e fechamentos inesperados, para ter o máximo de desempenho",
+            s.logEnabled,
+        ) { scope.launch { app.settings.set(SettingKeys.logEnabled, it) } }
+        FolderRow(
+            "Pasta dos logs",
+            s.logFolder?.let { app.store.describeTree(it) } ?: "Só dentro do app (use Compartilhar para mandar)",
+            true,
+            onPick = { pickFolder.launch(null) },
+            onReset = s.logFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.logFolder, null) } } },
+        )
+        InfoText(
+            "Hoje: ${today.name}" + (if (today.exists()) " · ${today.length() / 1024} KB" else "") +
+                ". Os últimos 10 dias ficam guardados e o arquivo é copiado para a pasta a cada 15 s.",
+        )
+        Row(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { scope.launch { shareLog(context) } },
+                colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Compartilhar", maxLines = 1)
+            }
+            OutlinedButton(onClick = { copyLog(context, recent) }) {
+                Icon(Icons.Outlined.ContentCopy, contentDescription = "Copiar", modifier = Modifier.size(18.dp))
+            }
+            OutlinedButton(onClick = { confirmClear = true }) {
+                Icon(Icons.Outlined.Delete, contentDescription = "Apagar logs", modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 16.dp)) {
+        Text("Últimos registros", style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted, modifier = Modifier.weight(1f))
+        FilterChip(
+            selected = onlyErrors,
+            onClick = { onlyErrors = !onlyErrors },
+            label = { Text("Só erros") },
+            leadingIcon = { Icon(Icons.Outlined.ErrorOutline, contentDescription = null, modifier = Modifier.size(16.dp)) },
+        )
+    }
+    val shown = recent.filter { !onlyErrors || it.contains(" E/") }.takeLast(150)
     Column(
         Modifier
             .fillMaxWidth()
@@ -838,11 +913,34 @@ private fun DiagnosticsSettings(app: TetherApp) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        if (log.isEmpty()) Text("Sem eventos ainda.", color = Tone.TextMuted, style = MaterialTheme.typography.bodySmall)
-        log.takeLast(80).forEach {
-            Text(it, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = Tone.TextMuted)
+        if (shown.isEmpty()) Text("Sem registros ainda.", color = Tone.TextMuted, style = MaterialTheme.typography.bodySmall)
+        shown.forEach {
+            Text(it, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = if (it.contains(" E/")) Tone.Error else Tone.TextMuted)
         }
     }
+
+    if (confirmClear) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            containerColor = Tone.Surface,
+            title = { Text("Apagar os logs?") },
+            text = { Text("Os arquivos de log guardados no app são apagados. Cópias na pasta escolhida continuam lá.") },
+            confirmButton = { TextButton(onClick = { AppLog.clear(); confirmClear = false }) { Text("Apagar", color = Tone.Error) } },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancelar") } },
+        )
+    }
+}
+
+/** Joins the last days of log into one file and opens the share sheet (WhatsApp, Drive, e-mail…). */
+private suspend fun shareLog(context: Context) {
+    val file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { AppLog.bundle() }
+    val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND)
+        .setType("text/plain")
+        .putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        .putExtra(android.content.Intent.EXTRA_SUBJECT, "Log do JR C50D Sync")
+        .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    context.startActivity(android.content.Intent.createChooser(send, "Enviar log"))
 }
 
 private fun copyLog(context: Context, lines: List<String>) {

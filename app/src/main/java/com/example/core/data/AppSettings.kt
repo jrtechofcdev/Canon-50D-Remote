@@ -156,6 +156,10 @@ data class Settings(
     val shutterWait: Int = 5,
     /** Focus first (AF) and only then fire, from the app's shutter. */
     val shutterFocusFirst: Boolean = true,
+    /** Full diary in a file on the phone; off keeps only errors and crashes. */
+    val logEnabled: Boolean = true,
+    /** SAF folder the log file is copied to; null = only inside the app (share from Diagnóstico). */
+    val logFolder: String? = null,
 
     // Live view
     val liveViewEnabled: Boolean = true,
@@ -305,6 +309,8 @@ object SettingKeys {
     val liveFps = intPreferencesKey("live_fps")
     val shutterWait = intPreferencesKey("shutter_wait")
     val shutterFocusFirst = booleanPreferencesKey("shutter_focus_first")
+    val logEnabled = booleanPreferencesKey("log_enabled")
+    val logFolder = stringPreferencesKey("log_folder")
     val liveViewEnabled = booleanPreferencesKey("live_view_enabled")
     val liveOnCamera = booleanPreferencesKey("live_on_camera")
     val liveGrid = stringPreferencesKey("live_grid")
@@ -480,6 +486,8 @@ class SettingsRepository(private val context: Context) {
             liveFps = this[k.liveFps] ?: d.liveFps,
             shutterWait = this[k.shutterWait] ?: d.shutterWait,
             shutterFocusFirst = this[k.shutterFocusFirst] ?: d.shutterFocusFirst,
+            logEnabled = this[k.logEnabled] ?: d.logEnabled,
+            logFolder = this[k.logFolder],
             liveViewEnabled = this[k.liveViewEnabled] ?: d.liveViewEnabled,
             liveOnCamera = this[k.liveOnCamera] ?: d.liveOnCamera,
             liveGrid = this[k.liveGrid] ?: d.liveGrid,

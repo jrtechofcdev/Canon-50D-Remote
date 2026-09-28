@@ -53,14 +53,14 @@ object SettingsProfiles {
         SettingKeys.jpgFolder, SettingKeys.rawFolder, SettingKeys.presetsFolder, SettingKeys.editedFolder,
         SettingKeys.backupFolder, SettingKeys.watermarkPath, SettingKeys.sessionName, SettingKeys.currentMoment,
         SettingKeys.recentContacts, SettingKeys.clientPin, SettingKeys.sessionAdjust, SettingKeys.presetCategories,
-        SettingKeys.sessionPresetId, SettingKeys.livePresetId, SettingKeys.presets, PROFILES, ACTIVE,
+        SettingKeys.sessionPresetId, SettingKeys.livePresetId, SettingKeys.presets, SettingKeys.logFolder, PROFILES, ACTIVE,
     ).map { it.name }.toSet()
 
     /** Left out of a backup file: folder permissions and preset ids don't carry over to another phone. */
     val deviceOnly: Set<String> = setOf(
         SettingKeys.jpgFolder, SettingKeys.rawFolder, SettingKeys.presetsFolder, SettingKeys.editedFolder,
         SettingKeys.backupFolder, SettingKeys.watermarkPath, SettingKeys.sessionPresetId, SettingKeys.livePresetId,
-        PROFILES, ACTIVE,
+        SettingKeys.logFolder, PROFILES, ACTIVE,
     ).map { it.name }.toSet()
 
     private class Builder {
