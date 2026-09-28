@@ -33,6 +33,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Folder
@@ -91,8 +92,9 @@ import kotlinx.coroutines.launch
 enum class SettingsSection(val route: String, val title: String, val summary: String, val icon: ImageVector) {
     Save("save", "Salvamento", "Formato, pastas RAW e JPG, sessão e nomes", Icons.Outlined.Folder),
     Review("review", "Revisão", "Slide automático, estrelas, histograma, estouro", Icons.Outlined.PhotoLibrary),
-    Camera("camera", "Câmera", "Bateria, cartão, presets, bracketing", Icons.Outlined.CameraAlt),
+    Camera("camera", "Câmera", "Bateria, cartão, exposições salvas, bracketing", Icons.Outlined.CameraAlt),
     Share("share", "Envio e cliente", "WhatsApp leve, marca d'água, modo cliente", Icons.Outlined.Send),
+    Presets("presets", "Presets", "Look das fotos novas, cópia editada, pastas", Icons.Outlined.AutoAwesome),
     Alerts("alerts", "Alertas", "Vibração, desconexão, reenvio, resumo", Icons.Outlined.NotificationsActive),
     Display("display", "Tela", "Modo escuro total, brilho, tela ligada", Icons.Outlined.DarkMode),
     Diagnostics("diagnostics", "Diagnóstico", "Log da conexão USB", Icons.Outlined.BugReport),
@@ -148,6 +150,7 @@ fun SettingsSectionScreen(app: TetherApp, section: SettingsSection, onBack: () -
             SettingsSection.Review -> ReviewSettings(app, settings)
             SettingsSection.Camera -> CameraSettings(app, settings)
             SettingsSection.Share -> ShareSettings(app, settings)
+            SettingsSection.Presets -> PresetSettingsSection(app, settings)
             SettingsSection.Alerts -> AlertSettings(app, settings)
             SettingsSection.Display -> DisplaySettings(app, settings)
             SettingsSection.Diagnostics -> DiagnosticsSettings(app)
@@ -243,6 +246,79 @@ private fun FolderRow(title: String, path: String, active: Boolean, onPick: () -
     }
 }
 
+// ---- Presets -----------------------------------------------------------------------------------
+
+@Composable
+private fun PresetSettingsSection(app: TetherApp, s: Settings) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    fun set(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>, v: Boolean) = scope.launch { app.settings.set(key, v) }
+    val presets by app.presets.presets.collectAsState(initial = emptyList())
+    val pickPresets = rememberFolderPicker(app) { uri ->
+        scope.launch {
+            app.settings.setOrClear(SettingKeys.presetsFolder, uri)
+            val added = app.presets.attachFolder()
+            val msg = if (added > 0) "$added preset(s) da pasta importados" else "Presets copiados para a pasta"
+            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+    val pickEdited = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.editedFolder, it) } }
+
+    SettingsGroup("Fotos novas") {
+        val current = presets.firstOrNull { it.id == s.sessionPresetId }
+        ToggleRow(
+            "Aplicar o look da sessão",
+            current?.let { "Preset atual: ${it.name}. Troque na Sessão (Look) ou na aba Presets." }
+                ?: "Nenhum preset escolhido. Escolha na Sessão (Look) ou na aba Presets.",
+            s.applyPresetToNew,
+        ) { set(SettingKeys.applyPresetToNew, it) }
+        if (s.sessionAdjust.isNotBlank()) {
+            InfoText("Uma calibração feita numa foto está sendo levada para as próximas.")
+            TextButton(onClick = { scope.launch { app.settings.set(SettingKeys.sessionAdjust, "") } }) { Text("Voltar ao preset sem a calibração") }
+        }
+        InfoText("O look é como um perfil de cor: a foto aparece processada, mas o JPG e o RAW da câmera não mudam.")
+    }
+
+    SettingsGroup("Cópia editada") {
+        ToggleRow("Salvar cópia editada", "Um JPG com o preset aplicado, ao lado do original", s.saveEditedCopy) { set(SettingKeys.saveEditedCopy, it) }
+        SliderRow("Qualidade do JPG", s.editedQuality, 70..100, enabled = s.saveEditedCopy) {
+            scope.launch { app.settings.set(SettingKeys.editedQuality, it) }
+        }
+        FolderRow("Pasta das editadas", app.store.describeTree(s.editedFolder), s.saveEditedCopy,
+            onPick = { pickEdited.launch(null) }, onReset = s.editedFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.editedFolder, null) } } })
+        InfoText("Só com RAW (sem JPG), a cópia sai do JPEG embutido no CR2, em resolução menor.")
+    }
+
+    SettingsGroup("Pasta de presets") {
+        FolderRow(
+            "Pasta de presets",
+            s.presetsFolder?.let { app.store.describeTree(it) } ?: "Só dentro do app",
+            true,
+            onPick = { pickPresets.launch(null) },
+            onReset = s.presetsFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.presetsFolder, null) } } },
+        )
+        InfoText("Cada preset é salvo nela como .xmp. Arquivos .xmp, .dng e .lrtemplate colocados nela entram no app quando ele abre.")
+    }
+
+    SettingsGroup("Visualizador e modo cliente") {
+        ToggleRow("Presets no visualizador", "Faixa de presets e botão Calibrar embaixo da foto", s.viewerPresets) { set(SettingKeys.viewerPresets, it) }
+        ToggleRow("Presets no modo cliente", "O cliente pode trocar o look da foto", s.clientPresetsEnabled) { set(SettingKeys.clientPresetsEnabled, it) }
+        ToggleRow(
+            "Pedir PIN para calibrar",
+            if (s.clientPin.isEmpty()) "Defina um PIN em Envio e cliente para usar" else "No modo cliente, Calibrar pede o PIN",
+            s.clientCalibratePin,
+            enabled = s.clientPresetsEnabled,
+        ) { set(SettingKeys.clientCalibratePin, it) }
+    }
+
+    SettingsGroup("Limites") {
+        InfoText(
+            "A prévia imita o processamento do Lightroom, sem ser idêntica. O XMP exportado dá o resultado exato no Lightroom. " +
+                "Máscaras, remoção de manchas, correção de lente e perfis de câmera da Adobe não são aplicados.",
+        )
+    }
+}
+
 // ---- Revisão -----------------------------------------------------------------------------------
 
 @Composable
@@ -287,10 +363,10 @@ private fun CameraSettings(app: TetherApp, s: Settings) {
     SettingsGroup("Cartão") {
         ToggleRow("Navegar no cartão", "Botão na Sessão para ver e baixar fotos que já estão no cartão", s.cardBrowserEnabled) { set(SettingKeys.cardBrowserEnabled, it) }
     }
-    SettingsGroup("Presets de exposição") {
-        ToggleRow("Usar presets", "Salve ISO, Av, Tv, ±EV e WB e aplique com um toque na Sessão", s.presetsEnabled) { set(SettingKeys.presetsEnabled, it) }
+    SettingsGroup("Exposições salvas") {
+        ToggleRow("Usar exposições salvas", "Salve ISO, Av, Tv, ±EV e WB e aplique com um toque na Sessão", s.presetsEnabled) { set(SettingKeys.presetsEnabled, it) }
         val presets = s.exposurePresets
-        if (presets.isEmpty()) InfoText("Nenhum preset salvo. Na Sessão, toque em Presets → Salvar atual.")
+        if (presets.isEmpty()) InfoText("Nenhuma exposição salva. Na Sessão, toque em Exposições → Salvar atual.")
         presets.forEachIndexed { i, p ->
             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

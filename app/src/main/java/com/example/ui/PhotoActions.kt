@@ -16,6 +16,7 @@ import kotlinx.coroutines.withContext
 
 enum class ShareSet(val label: String) {
     LIGHT("JPG leve (WhatsApp)"),
+    EDITED("JPG editado (com preset)"),
     JPG("JPG original"),
     RAW("RAW"),
     BOTH("RAW + JPG"),
@@ -30,6 +31,7 @@ class PhotoActions(
 
     fun availableSets(photo: Photo, settings: Settings, includeLight: Boolean = true): List<ShareSet> = buildList {
         if (includeLight && settings.lightShareEnabled && photo.displayUri != null) add(ShareSet.LIGHT)
+        if (photo.editedUri != null) add(ShareSet.EDITED)
         if (photo.jpgUri != null) add(ShareSet.JPG)
         if (photo.rawUri != null) add(ShareSet.RAW)
         if (photo.jpgUri != null && photo.rawUri != null) add(ShareSet.BOTH)
@@ -67,7 +69,7 @@ class PhotoActions(
         val files: List<Uri> = if (set == ShareSet.LIGHT) {
             withContext(Dispatchers.IO) {
                 photos.mapNotNull { p ->
-                    p.displayUri?.let { export.exportLight(it, p.savedBase, settings) }
+                    p.lookUri?.let { export.exportLight(it, p.savedBase, settings) }
                         ?.let { FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", it) }
                 }
             }
@@ -75,6 +77,7 @@ class PhotoActions(
             photos.flatMap { p ->
                 when (set) {
                     ShareSet.JPG -> listOfNotNull(p.jpgUri)
+                    ShareSet.EDITED -> listOfNotNull(p.editedUri)
                     ShareSet.RAW -> listOfNotNull(p.rawUri)
                     else -> listOfNotNull(p.jpgUri, p.rawUri)
                 }
@@ -86,7 +89,7 @@ class PhotoActions(
         }
 
         val mime = when (set) {
-            ShareSet.LIGHT, ShareSet.JPG -> JPEG
+            ShareSet.LIGHT, ShareSet.JPG, ShareSet.EDITED -> JPEG
             ShareSet.RAW -> CR2
             ShareSet.BOTH -> "image/*"
         }

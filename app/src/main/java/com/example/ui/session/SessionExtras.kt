@@ -53,6 +53,7 @@ import com.example.TetherApp
 import com.example.core.camera.BracketState
 import com.example.core.camera.CameraStatus
 import com.example.core.data.ExposurePreset
+import androidx.compose.material.icons.outlined.AutoAwesome
 import com.example.core.data.Photo
 import com.example.core.data.Settings
 import com.example.core.ptp.EosProp
@@ -98,9 +99,12 @@ fun ToolsRow(
     onClient: () -> Unit,
     onNight: () -> Unit,
     onSummary: () -> Unit,
+    sessionLook: String?,
+    onLook: () -> Unit,
 ) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        if (settings.presetsEnabled) Tool("Presets", Icons.Outlined.Tune, connected, onPresets)
+        Tool(sessionLook?.let { "Look: $it" } ?: "Look: nenhum", Icons.Outlined.AutoAwesome, true, onLook)
+        if (settings.presetsEnabled) Tool("Exposições", Icons.Outlined.Tune, connected, onPresets)
         if (settings.aebEnabled) {
             val label = bracket?.let { "AEB ${it.shot}/${it.total}" } ?: "AEB ${settings.aebShots}×"
             Tool(label, Icons.Outlined.Exposure, connected && bracket == null, onBracket)
@@ -137,10 +141,10 @@ fun PresetsSheet(
     var name by remember { mutableStateOf("") }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Tone.Surface) {
         Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding().padding(bottom = 16.dp)) {
-            Text("Presets de exposição", style = MaterialTheme.typography.titleMedium)
+            Text("Exposições salvas", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             if (presets.isEmpty()) {
-                Text("Nenhum preset ainda. Ajuste a câmera e salve a combinação atual.", color = Tone.TextMuted, style = MaterialTheme.typography.bodySmall)
+                Text("Nenhuma exposição salva. Ajuste a câmera e salve a combinação atual.", color = Tone.TextMuted, style = MaterialTheme.typography.bodySmall)
             }
             presets.forEach { p ->
                 Row(
@@ -164,7 +168,7 @@ fun PresetsSheet(
             if (naming) {
                 OutlinedTextField(
                     value = name, onValueChange = { name = it.take(30) },
-                    label = { Text("Nome do preset") }, placeholder = { Text("Ex.: Igreja interna") },
+                    label = { Text("Nome") }, placeholder = { Text("Ex.: Igreja interna") },
                     singleLine = true, modifier = Modifier.fillMaxWidth(),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
@@ -180,7 +184,7 @@ fun PresetsSheet(
                     TextButton(onClick = { naming = false }) { Text("Cancelar") }
                 }
             } else {
-                OutlinedButton(onClick = { naming = true }, enabled = connected) { Text("Salvar ajuste atual como preset") }
+                OutlinedButton(onClick = { naming = true }, enabled = connected) { Text("Salvar ajuste atual") }
             }
         }
     }

@@ -69,6 +69,8 @@ import com.example.ui.components.ValuePickerSheet
 import com.example.core.data.SettingKeys
 import com.example.ui.PhotoActions
 import com.example.ui.theme.Tone
+import com.example.ui.preset.LookImage
+import com.example.ui.preset.SessionLookSheet
 import com.example.ui.theme.BrandGradient
 import com.example.ui.components.BrandMark
 import com.example.ui.components.BrandSymbol
@@ -94,6 +96,8 @@ fun SessionScreen(
     val received by app.tether.receivedThisSession.collectAsState()
     val settings by app.settings.settings.collectAsState(initial = Settings())
     val photos by remember { app.database.photoDao().observeAll() }.collectAsState(initial = emptyList())
+    val looks by app.presets.presets.collectAsState(initial = emptyList())
+    var showLooks by remember { mutableStateOf(false) }
     val connected = state is ConnectionState.Connected
     val scope = rememberCoroutineScope()
 
@@ -114,7 +118,9 @@ fun SessionScreen(
         val wide = maxWidth >= 720.dp
         val preview: @Composable (Modifier) -> Unit = { mod ->
             Column(mod) {
-                LatestPhoto(photos.firstOrNull(), transfer, onOpenPhoto)
+                LatestPhoto(photos.firstOrNull(), transfer, onOpenPhoto) { photo, mod ->
+                    LookImage(app, photo, looks, mod)
+                }
                 if (photos.size > 1) {
                     Spacer(Modifier.height(12.dp))
                     RecentStrip(photos.drop(1).take(20), onOpenPhoto)
@@ -151,6 +157,8 @@ fun SessionScreen(
                     onClient = onOpenClient,
                     onNight = { scope.launch { app.settings.set(SettingKeys.nightMode, !settings.nightMode) } },
                     onSummary = { showSummary = true },
+                    sessionLook = looks.firstOrNull { it.id == settings.sessionPresetId && settings.applyPresetToNew }?.name,
+                    onLook = { showLooks = true },
                 )
             }
         }
@@ -196,6 +204,10 @@ fun SessionScreen(
             onSave = { preset -> scope.launch { app.settings.savePresets(settings.exposurePresets + preset) } },
             onDismiss = { showPresets = false },
         )
+    }
+
+    if (showLooks) {
+        SessionLookSheet(app = app, presets = looks, settings = settings, onDismiss = { showLooks = false })
     }
 
     if (showSummary) {
@@ -350,7 +362,7 @@ private fun ShutterRow(
                     .border(1.dp, Tone.Line, MaterialTheme.shapes.small)
                     .clickable(enabled = latest != null) { latest?.let { onOpenLatest(it.id) } },
             ) {
-                latest?.displayUri?.let {
+                latest?.lookUri?.let {
                     AsyncImage(model = it, contentDescription = "Última foto", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 }
             }
@@ -359,7 +371,12 @@ private fun ShutterRow(
 }
 
 @Composable
-private fun LatestPhoto(photo: Photo?, transfer: Transfer?, onOpen: (Long) -> Unit) {
+private fun LatestPhoto(
+    photo: Photo?,
+    transfer: Transfer?,
+    onOpen: (Long) -> Unit,
+    image: @Composable (Photo, Modifier) -> Unit,
+) {
     SectionLabel("Última foto")
     Box(
         Modifier
@@ -369,9 +386,9 @@ private fun LatestPhoto(photo: Photo?, transfer: Transfer?, onOpen: (Long) -> Un
             .background(Tone.Surface)
             .clickable(enabled = photo != null) { photo?.let { onOpen(it.id) } },
     ) {
-        Crossfade(targetState = photo?.displayUri, label = "latest") { uri ->
-            if (uri != null) {
-                AsyncImage(model = uri, contentDescription = photo?.savedBase, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+        Crossfade(targetState = photo?.takeIf { it.displayUri != null }, label = "latest") { shown ->
+            if (shown != null) {
+                image(shown, Modifier.fillMaxSize())
             } else {
                 Column(
                     Modifier.fillMaxSize().padding(24.dp),
@@ -426,7 +443,7 @@ private fun RecentStrip(photos: List<Photo>, onOpen: (Long) -> Unit) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         items(photos, key = { it.id }) { photo ->
             AsyncImage(
-                model = photo.displayUri,
+                model = photo.lookUri,
                 contentDescription = photo.savedBase,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

@@ -44,6 +44,10 @@ import com.example.ui.settings.SettingsSection
 import com.example.ui.settings.SettingsSectionScreen
 import com.example.ui.card.CardScreen
 import com.example.ui.client.ClientModeScreen
+import com.example.ui.preset.EditTarget
+import com.example.ui.preset.EditorScreen
+import com.example.ui.preset.PresetsScreen
+import androidx.compose.material.icons.outlined.AutoAwesome
 import com.example.core.data.Settings
 import android.view.WindowManager
 import androidx.compose.runtime.Composable
@@ -127,7 +131,9 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("card") { CardScreen(app = app, onBack = { nav.popBackStack() }) }
-                        composable("client") { ClientModeScreen(app = app, onExit = { nav.popBackStack() }) }
+                        composable("client") {
+                            ClientModeScreen(app = app, onExit = { nav.popBackStack() }, onCalibrate = { id -> nav.navigate("editor/photo/$id") })
+                        }
                         composable("settings/{section}") { entry ->
                             val section = SettingsSection.entries.firstOrNull { it.route == entry.arguments?.getString("section") }
                                 ?: SettingsSection.Save
@@ -136,6 +142,15 @@ class MainActivity : ComponentActivity() {
                         composable(Tab.Photos.route) {
                             PhotosScreen(app = app, onOpenPhoto = { nav.navigate("photo/$it") })
                         }
+                        composable(Tab.Presets.route) {
+                            PresetsScreen(app = app, onEdit = { nav.navigate("editor/preset/$it") })
+                        }
+                        composable("editor/preset/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
+                            EditorScreen(app, EditTarget.PresetTarget(it.arguments?.getLong("id") ?: 0L), onDone = { nav.popBackStack() })
+                        }
+                        composable("editor/photo/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
+                            EditorScreen(app, EditTarget.PhotoTarget(it.arguments?.getLong("id") ?: 0L), onDone = { nav.popBackStack() })
+                        }
                         composable(Tab.Settings.route) { SettingsScreen(onOpen = { nav.navigate("settings/${it.route}") }) }
                         composable("photo/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
                             ViewerScreen(
@@ -143,6 +158,7 @@ class MainActivity : ComponentActivity() {
                                 actions = actions,
                                 startId = it.arguments?.getLong("id") ?: 0L,
                                 onBack = { nav.popBackStack() },
+                                onCalibrate = { id -> nav.navigate("editor/photo/$id") },
                             )
                         }
                     }
@@ -191,5 +207,6 @@ private fun WindowPreferences(nightBrightness: Int?, keepScreenOn: Boolean) {
 enum class Tab(val route: String, val label: String, val icon: ImageVector) {
     Session("session", "Sessão", Icons.Outlined.CameraAlt),
     Photos("photos", "Fotos", Icons.Outlined.PhotoLibrary),
+    Presets("presets", "Presets", Icons.Outlined.AutoAwesome),
     Settings("settings", "Ajustes", Icons.Outlined.Tune),
 }

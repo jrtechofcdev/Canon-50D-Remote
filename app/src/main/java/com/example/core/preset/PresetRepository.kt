@@ -85,6 +85,13 @@ class PresetRepository(
         added
     }
 
+    /** After a presets folder is picked: copies every preset into it and imports the ones already there. */
+    suspend fun attachFolder(): Int = withContext(Dispatchers.IO) {
+        val imported = syncFolder()
+        dao.all().forEach { runCatching { writeToFolder(it.toPreset()) } }
+        imported
+    }
+
     /** An .xmp in the app cache, ready to share (Lightroom, WhatsApp, e-mail). */
     suspend fun exportFile(preset: Preset): File = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "export").apply { mkdirs() }

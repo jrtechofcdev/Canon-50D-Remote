@@ -56,6 +56,7 @@ import kotlin.math.sin
  * One adjustment. Dragging updates live ([onChange]); lifting the finger commits ([onCommit], which the
  * editor uses for undo). Double tap on the label resets to the default, like Lightroom.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun AdjustSlider(spec: SliderSpec, value: Float, onChange: (Float) -> Unit, onCommit: () -> Unit) {
     val changed = kotlin.math.abs(value - spec.default) > 1e-4f
@@ -73,30 +74,31 @@ fun AdjustSlider(spec: SliderSpec, value: Float, onChange: (Float) -> Unit, onCo
                 color = if (changed) Tone.Accent else Tone.TextMuted,
             )
         }
-        Box(contentAlignment = Alignment.Center) {
-            if (spec.track != Track.Plain) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp)
-                        .height(4.dp)
-                        .clip(CircleShape)
-                        .background(trackBrush(spec.track)),
-                )
-            }
-            Slider(
-                value = value.coerceIn(spec.min, spec.max),
-                onValueChange = { v -> onChange(if (spec.decimals == 0) v.roundToInt().toFloat() else v) },
-                onValueChangeFinished = onCommit,
-                valueRange = spec.min..spec.max,
-                colors = SliderDefaults.colors(
-                    thumbColor = Tone.Text,
-                    activeTrackColor = if (spec.track == Track.Plain) Tone.TextMuted else Color.Transparent,
-                    inactiveTrackColor = if (spec.track == Track.Plain) Tone.SurfaceHigh else Color.Transparent,
-                ),
-                modifier = Modifier.height(32.dp).semantics { contentDescription = spec.label },
-            )
-        }
+        val line = Tone.Line
+        val fill = Tone.Accent
+        val knob = Tone.Text
+        Slider(
+            value = value.coerceIn(spec.min, spec.max),
+            onValueChange = { v -> onChange(if (spec.decimals == 0) v.roundToInt().toFloat() else v) },
+            onValueChangeFinished = onCommit,
+            valueRange = spec.min..spec.max,
+            thumb = { Box(Modifier.size(16.dp).clip(CircleShape).background(knob)) },
+            // Thin track; plain sliders fill from the default outwards so the change reads at a glance.
+            track = { state ->
+                Canvas(Modifier.fillMaxWidth().height(16.dp)) {
+                    val y = size.height / 2f
+                    val span = state.valueRange.endInclusive - state.valueRange.start
+                    fun x(v: Float) = (v - state.valueRange.start) / span * size.width
+                    if (spec.track == Track.Plain) {
+                        drawLine(line, Offset(0f, y), Offset(size.width, y), strokeWidth = 2.dp.toPx())
+                        drawLine(fill, Offset(x(spec.default), y), Offset(x(state.value), y), strokeWidth = 2.dp.toPx())
+                    } else {
+                        drawLine(trackBrush(spec.track), Offset(0f, y), Offset(size.width, y), strokeWidth = 3.dp.toPx())
+                    }
+                }
+            },
+            modifier = Modifier.height(32.dp).semantics { contentDescription = spec.label },
+        )
     }
 }
 

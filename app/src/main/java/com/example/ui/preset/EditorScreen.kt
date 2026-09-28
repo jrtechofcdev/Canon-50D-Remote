@@ -171,7 +171,7 @@ fun EditorScreen(app: TetherApp, target: EditTarget, onDone: () -> Unit) {
                     },
                     style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
-                Text("Toque e segure na foto para ver o original", style = MaterialTheme.typography.labelSmall, color = Tone.TextMuted)
+                Text("Segure a foto: antes", style = MaterialTheme.typography.labelSmall, color = Tone.TextMuted)
             }
             IconButton(onClick = { showClipping = !showClipping }) {
                 Icon(Icons.Outlined.WbSunny, contentDescription = "Mostrar estouro", tint = if (showClipping) Tone.Info else Tone.TextMuted)
@@ -298,13 +298,7 @@ private suspend fun applyToPhoto(app: TetherApp, photo: Photo?, presetId: Long?,
     val ph = photo ?: return
     val presetSettings = presetId?.let { app.presets.get(it)?.settings }
     val adjust = if (presetSettings == settings) null else settings.encode()
-    app.database.photoDao().setLook(ph.id, presetId, adjust)
-    val cfg = app.settings.current()
-    if (cfg.saveEditedCopy && (presetId != null || adjust != null)) {
-        val updated = ph.copy(presetId = presetId, adjust = adjust)
-        val name = presetId?.let { app.presets.get(it)?.name }
-        runCatching { app.looks.writeEditedCopy(updated, name) }
-    }
+    runCatching { app.looks.setLook(ph, presetId, adjust) }
 }
 
 private fun clippingMask(bmp: Bitmap): Bitmap? {
@@ -317,7 +311,7 @@ private fun clippingMask(bmp: Bitmap): Bitmap? {
 }
 
 @Composable
-private fun PresetStrip(presets: List<Preset>, selected: Long?, onPick: (Preset?) -> Unit) {
+fun PresetStrip(presets: List<Preset>, selected: Long?, onPick: (Preset?) -> Unit) {
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),

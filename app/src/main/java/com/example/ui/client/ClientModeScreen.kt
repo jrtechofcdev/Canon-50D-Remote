@@ -50,26 +50,45 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.rememberCoroutineScope
+import com.example.core.data.Photo
+import com.example.core.preset.Preset
+import com.example.ui.preset.LookImage
+import com.example.ui.preset.PresetStrip
 
 /**
  * Full-screen photos for the client to follow along. No bars, no settings, no delete.
  * Exit: hold a finger on the screen for 3 s (plus the PIN when one is set).
  */
 @Composable
-fun ClientModeScreen(app: TetherApp, onExit: () -> Unit) {
+fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> Unit) {
     val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
+    val presets by app.presets.presets.collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
     val s by app.settings.settings.collectAsState(initial = null)
     val settings = s ?: return
     val photos = (all ?: return).filter {
         it.session == settings.sessionKey && (!settings.clientOnlyFavorites || it.favorite) && it.displayUri != null
     }
     var askPin by remember { mutableStateOf(false) }
+    var calibrateAsk by remember { mutableStateOf<Long?>(null) }
+    val pager = rememberPagerState { photos.size }
 
     ImmersiveMode()
     // Back does nothing here, so a client can't leave by accident.
     BackHandler { }
 
     val requestExit = { if (settings.clientPin.isEmpty()) onExit() else askPin = true }
+    val requestCalibrate = { id: Long ->
+        if (settings.clientCalibratePin && settings.clientPin.isNotEmpty()) calibrateAsk = id else onCalibrate(id)
+    }
 
     Box(
         Modifier
@@ -96,7 +115,24 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit) {
                 modifier = Modifier.align(Alignment.Center).padding(32.dp),
             )
         } else {
-            ClientPager(app, photos.map { it.id to it }, settings)
+            val showStrip = settings.clientPresetsEnabled && presets.isNotEmpty()
+            ClientPager(app, pager, photos, presets, settings, infoAbove = showStrip)
+            val current = photos.getOrNull(pager.currentPage)
+            if (showStrip && current != null) {
+                // Discreet strip: the client picks the look; Calibrar is for the photographer.
+                Row(
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.55f))
+                        .navigationBarsPadding().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.weight(1f)) {
+                        PresetStrip(presets, current.presetId) { picked -> scope.launch { app.looks.setLook(current, picked?.id, null) } }
+                    }
+                    IconButton(onClick = { requestCalibrate(current.id) }) {
+                        Icon(Icons.Outlined.Tune, contentDescription = "Calibrar", tint = Color(0xFFBDBDBD))
+                    }
+                }
+            }
         }
         if (settings.clientShowBrand) {
             Row(
@@ -111,13 +147,22 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit) {
     }
 
     if (askPin) {
-        PinDialog(expected = settings.clientPin, onOk = { askPin = false; onExit() }, onCancel = { askPin = false })
+        PinDialog(settings.clientPin, "PIN para sair", "Sair", onOk = { askPin = false; onExit() }, onCancel = { askPin = false })
+    }
+    calibrateAsk?.let { id ->
+        PinDialog(settings.clientPin, "PIN para calibrar", "Calibrar", onOk = { calibrateAsk = null; onCalibrate(id) }, onCancel = { calibrateAsk = null })
     }
 }
 
 @Composable
-private fun ClientPager(app: TetherApp, entries: List<Pair<Long, com.example.core.data.Photo>>, settings: Settings) {
-    val pager = rememberPagerState { entries.size }
+private fun ClientPager(
+    app: TetherApp,
+    pager: PagerState,
+    entries: List<Photo>,
+    presets: List<Preset>,
+    settings: Settings,
+    infoAbove: Boolean,
+) {
     // New photo: jump to it (the list is newest first).
     LaunchedEffect(Unit) {
         app.tether.saved.collect {
@@ -133,16 +178,17 @@ private fun ClientPager(app: TetherApp, entries: List<Pair<Long, com.example.cor
             pager.animateScrollToPage((pager.currentPage + 1) % entries.size)
         }
     }
-    HorizontalPager(state = pager, key = { entries[it].first }, modifier = Modifier.fillMaxSize()) { page ->
-        val photo = entries[page].second
+    HorizontalPager(state = pager, key = { entries[it].id }, modifier = Modifier.fillMaxSize()) { page ->
+        val photo = entries[page]
         Box(Modifier.fillMaxSize()) {
-            AsyncImage(model = photo.displayUri, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+            LookImage(app, photo, presets, Modifier.fillMaxSize())
             if (settings.clientShowInfo) {
                 Text(
                     listOfNotNull(photo.savedBase, photo.shutter, photo.aperture, photo.iso).joinToString("   "),
                     style = MaterialTheme.typography.labelMedium,
                     color = Color(0xFFBDBDBD),
-                    modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp),
+                    modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
+                        .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = if (infoAbove) 64.dp else 12.dp),
                 )
             }
         }
@@ -150,13 +196,13 @@ private fun ClientPager(app: TetherApp, entries: List<Pair<Long, com.example.cor
 }
 
 @Composable
-private fun PinDialog(expected: String, onOk: () -> Unit, onCancel: () -> Unit) {
+private fun PinDialog(expected: String, title: String, action: String, onOk: () -> Unit, onCancel: () -> Unit) {
     var pin by remember { mutableStateOf("") }
     var wrong by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onCancel,
         containerColor = Tone.Surface,
-        title = { Text("PIN para sair") },
+        title = { Text(title) },
         text = {
             OutlinedTextField(
                 value = pin,
@@ -168,7 +214,7 @@ private fun PinDialog(expected: String, onOk: () -> Unit, onCancel: () -> Unit) 
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
             )
         },
-        confirmButton = { TextButton(onClick = { if (pin == expected) onOk() else wrong = true }) { Text("Sair") } },
+        confirmButton = { TextButton(onClick = { if (pin == expected) onOk() else wrong = true }) { Text(action) } },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancelar") } },
     )
 }

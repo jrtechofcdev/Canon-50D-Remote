@@ -82,7 +82,11 @@ import com.example.core.analysis.ImageAnalyzer
 import com.example.core.data.Photo
 import com.example.ui.PhotoActions
 import com.example.ui.ShareSet
+import com.example.core.preset.Preset
+import com.example.ui.preset.LookImage
+import com.example.ui.preset.PresetStrip
 import com.example.ui.theme.Tone
+import androidx.compose.material.icons.outlined.Tune
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -91,8 +95,9 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: () -> Unit) {
+fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: () -> Unit, onCalibrate: (Long) -> Unit) {
     val photos by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
+    val presets by app.presets.presets.collectAsState(initial = emptyList())
     val s by app.settings.settings.collectAsState(initial = null)
     val list = photos ?: return
     val settings = s ?: return
@@ -142,7 +147,7 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { list[it].id }) { page ->
             val photo = list[page]
             val mask = if (showClipping && photo.id == viewing?.id) analysis?.clippedMask else null
-            PhotoPage(photo, mask) { zoomed[photo.id] = it }
+            PhotoPage(app, photo, presets, mask) { zoomed[photo.id] = it }
         }
 
         val current = list.getOrNull(pager.currentPage) ?: return@Box
@@ -181,6 +186,24 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Tone.Background.copy(alpha = 0.85f))
                 .navigationBarsPadding().padding(16.dp),
         ) {
+            if (settings.viewerPresets && presets.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) {
+                        PresetStrip(presets, current.presetId) { picked ->
+                            scope.launch { app.looks.setLook(current, picked?.id, null) }
+                        }
+                    }
+                    TextButton(onClick = { onCalibrate(current.id) }) {
+                        Icon(Icons.Outlined.Tune, contentDescription = null, tint = Tone.Accent, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Calibrar", color = Tone.Accent)
+                    }
+                }
+                if (current.adjust != null) {
+                    Text("Calibrada só nesta foto", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted,
+                        modifier = Modifier.padding(start = 12.dp, bottom = 4.dp))
+                }
+            }
             if (settings.ratingEnabled) {
                 RatingBar(current.rating) { stars ->
                     scope.launch { app.database.photoDao().setRating(current.id, if (stars == current.rating) 0 else stars) }
@@ -231,7 +254,7 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
                 TextButton(onClick = {
                     confirmDelete = null
                     scope.launch(Dispatchers.IO) {
-                        listOfNotNull(photo.jpgUri, photo.rawUri).forEach(app.store::delete)
+                        listOfNotNull(photo.jpgUri, photo.rawUri, photo.editedUri).forEach(app.store::delete)
                         photo.previewPath?.let { java.io.File(it).delete() }
                         app.database.photoDao().delete(photo.id)
                     }
@@ -308,7 +331,7 @@ private fun SetMenuButton(
 /** One page of the pager: zoomable photo with the blinking highlight mask on top (same transform). */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun PhotoPage(photo: Photo, mask: android.graphics.Bitmap?, onZoomChanged: (Boolean) -> Unit) {
+private fun PhotoPage(app: TetherApp, photo: Photo, presets: List<Preset>, mask: android.graphics.Bitmap?, onZoomChanged: (Boolean) -> Unit) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     val state = rememberTransformableState { zoom, pan, _ ->
@@ -340,12 +363,7 @@ private fun PhotoPage(photo: Photo, mask: android.graphics.Bitmap?, onZoomChange
                 translationY = offset.y
             },
     ) {
-        AsyncImage(
-            model = photo.displayUri,
-            contentDescription = photo.savedBase,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize(),
-        )
+        LookImage(app, photo, presets, Modifier.fillMaxSize())
         if (mask != null) {
             val image = remember(mask) { mask.asImageBitmap() }
             Image(

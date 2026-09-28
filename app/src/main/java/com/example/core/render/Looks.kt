@@ -58,6 +58,19 @@ class Looks(
 
     private val baseCache = LruCache<String, Bitmap>(3)
 
+    // Small renders for lists (preset tab, strips): ~270 KB each, capped by bytes so they never push out the previews.
+    private val thumbs = object : LruCache<String, Bitmap>(12 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: Bitmap) = value.byteCount
+    }
+
+    /** [sourceUri] with [s] applied, long edge [THUMB_EDGE]. */
+    suspend fun thumb(sourceUri: String, s: PresetSettings): Bitmap? {
+        val key = "$sourceUri|${s.encode().hashCode()}"
+        thumbs.get(key)?.let { return it }
+        val base = base(sourceUri, THUMB_EDGE) ?: return null
+        return engine.render(base, RenderParams.from(s)).also { thumbs.put(key, it) }
+    }
+
     /** The decoded photo before any look, cached so dragging a slider does not decode the file again. */
     suspend fun base(sourceUri: String, maxEdge: Int): Bitmap? = withContext(Dispatchers.IO) {
         val key = "$sourceUri|$maxEdge"
@@ -85,6 +98,21 @@ class Looks(
         rendered.recycle()
         photos.setEdited(photo.id, uri)
         uri
+    }
+
+    /**
+     * Gives [photo] a look (a preset, optionally with its own calibration in [adjust]) or removes it (both null).
+     * Rewrites the edited copy when that is on; a copy left from the previous look is removed so it never lies.
+     */
+    suspend fun setLook(photo: Photo, presetId: Long?, adjust: String?) {
+        photos.setLook(photo.id, presetId, adjust)
+        val updated = photo.copy(presetId = presetId, adjust = adjust)
+        if (settings.current().saveEditedCopy && (presetId != null || adjust != null)) {
+            writeEditedCopy(updated, presetId?.let { presets.get(it)?.name })
+        } else if (photo.editedUri != null) {
+            withContext(Dispatchers.IO) { store.delete(photo.editedUri) }
+            photos.setEdited(photo.id, null)
+        }
     }
 
     companion object {

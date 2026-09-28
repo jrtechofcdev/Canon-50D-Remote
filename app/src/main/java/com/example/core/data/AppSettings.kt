@@ -95,6 +95,8 @@ data class Settings(
     val editedQuality: Int = 92,
     val clientPresetsEnabled: Boolean = true,
     val clientCalibratePin: Boolean = true,
+    /** Preset strip and Calibrar button in the photo viewer. */
+    val viewerPresets: Boolean = true,
 
     // Tela
     val nightMode: Boolean = false,
@@ -185,6 +187,7 @@ object SettingKeys {
     val editedQuality = intPreferencesKey("edited_quality")
     val clientPresetsEnabled = booleanPreferencesKey("client_presets_enabled")
     val clientCalibratePin = booleanPreferencesKey("client_calibrate_pin")
+    val viewerPresets = booleanPreferencesKey("viewer_presets")
 
     val nightMode = booleanPreferencesKey("night_mode")
     val nightBrightness = intPreferencesKey("night_brightness")
@@ -275,6 +278,7 @@ class SettingsRepository(private val context: Context) {
             editedQuality = this[k.editedQuality] ?: d.editedQuality,
             clientPresetsEnabled = this[k.clientPresetsEnabled] ?: d.clientPresetsEnabled,
             clientCalibratePin = this[k.clientCalibratePin] ?: d.clientCalibratePin,
+            viewerPresets = this[k.viewerPresets] ?: d.viewerPresets,
 
             nightMode = this[k.nightMode] ?: d.nightMode,
             nightBrightness = this[k.nightBrightness] ?: d.nightBrightness,

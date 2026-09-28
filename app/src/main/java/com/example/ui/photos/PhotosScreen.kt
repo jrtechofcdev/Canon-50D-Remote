@@ -121,7 +121,7 @@ fun PhotosScreen(app: TetherApp, onOpenPhoto: (Long) -> Unit) {
                         .clickable { onOpenPhoto(photo.id) },
                 ) {
                     AsyncImage(
-                        model = photo.displayUri,
+                        model = photo.lookUri,
                         contentDescription = photo.savedBase,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
