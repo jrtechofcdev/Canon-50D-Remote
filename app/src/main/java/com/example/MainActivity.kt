@@ -47,6 +47,7 @@ import com.example.ui.client.ClientModeScreen
 import com.example.ui.preset.EditTarget
 import com.example.ui.preset.EditorScreen
 import com.example.ui.preset.PresetsScreen
+import com.example.ui.tools.ToolsScreen
 import androidx.compose.material.icons.outlined.AutoAwesome
 import com.example.core.data.Settings
 import android.view.WindowManager
@@ -128,8 +129,10 @@ class MainActivity : ComponentActivity() {
                                 onOpenSettings = { nav.navigate("settings/${SettingsSection.Save.route}") },
                                 onOpenCard = { nav.navigate("card") },
                                 onOpenClient = { nav.navigate("client") },
+                                onOpenTools = { nav.navigate("tools") },
                             )
                         }
+                        composable("tools") { ToolsScreen(onBack = { nav.popBackStack() }) }
                         composable("card") { CardScreen(app = app, onBack = { nav.popBackStack() }) }
                         composable("client") {
                             ClientModeScreen(app = app, onExit = { nav.popBackStack() }, onCalibrate = { id -> nav.navigate("editor/photo/$id") })

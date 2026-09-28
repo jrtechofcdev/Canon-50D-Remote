@@ -65,6 +65,9 @@ import com.example.core.messages.MessageKind
 import com.example.core.messages.MessageTemplates
 import com.example.core.storage.FileKind
 import com.example.ui.photos.MessageSheet
+import com.example.core.backup.BackupState
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.outlined.Calculate
@@ -297,6 +300,7 @@ fun SessionSummaryDialog(app: TetherApp, actions: PhotoActions, settings: Settin
                 OutlinedButton(onClick = { message = MessageKind.Preview to list }, modifier = Modifier.fillMaxWidth()) {
                     Text("Mensagem para o cliente")
                 }
+                BackupPanel(app, settings)
                 val sendSet = if (settings.downloadMode.raw) ShareSet.RAW else ShareSet.JPG
                 OutlinedButton(
                     onClick = { scope.launch { actions.openInLightroom(favorites, sendSet, settings) } },
@@ -323,6 +327,56 @@ fun SessionSummaryDialog(app: TetherApp, actions: PhotoActions, settings: Settin
 
     message?.let { (kind, photos) ->
         MessageSheet(actions, settings, photos, initial = kind, onDismiss = { message = null })
+    }
+}
+
+/** Copy of the session to the backup folder, with the result of the size check. */
+@Composable
+private fun BackupPanel(app: TetherApp, settings: Settings) {
+    val state by app.backup.state.collectAsState()
+    Spacer(Modifier.height(4.dp))
+    Text("Backup", style = MaterialTheme.typography.labelMedium, color = Tone.TextMuted)
+    val folder = settings.backupFolder
+    if (folder == null) {
+        Text("Escolha a pasta de backup em Ajustes → Salvamento (cartão SD ou pendrive OTG).", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+        return
+    }
+    when (val s = state) {
+        is BackupState.Running -> {
+            Text("Copiando ${s.done + 1} de ${s.total}…", style = MaterialTheme.typography.bodySmall)
+            LinearProgressIndicator(
+                progress = { if (s.total == 0) 0f else (s.done + 1f) / s.total },
+                modifier = Modifier.fillMaxWidth(),
+                color = Tone.Info,
+                trackColor = Tone.SurfaceHigh,
+            )
+            Text("Deixe o app aberto até terminar.", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+        }
+        is BackupState.Finished -> {
+            val ok = s.failed.isEmpty()
+            Text(
+                if (ok) "${s.verified} de ${s.total} arquivos copiados e conferidos." else "${s.verified} de ${s.total} conferidos. Faltaram:",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (ok) Tone.Accent else Tone.Error,
+            )
+            s.failed.take(5).forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, color = Tone.Error) }
+            if (!ok) {
+                OutlinedButton(onClick = { app.backup.start(settings.sessionKey, folder) }, modifier = Modifier.fillMaxWidth()) { Text("Tentar de novo o que faltou") }
+            }
+        }
+        BackupState.Idle -> {
+            val prominent = settings.backupOffer
+            if (prominent) {
+                Button(
+                    onClick = { app.backup.start(settings.sessionKey, folder) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Tone.SurfaceHigh, contentColor = Tone.Text),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Fazer backup da sessão") }
+            } else {
+                OutlinedButton(onClick = { app.backup.start(settings.sessionKey, folder) }, modifier = Modifier.fillMaxWidth()) { Text("Fazer backup da sessão") }
+            }
+            Text(app.store.describeTree(folder), style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+        }
     }
 }
 

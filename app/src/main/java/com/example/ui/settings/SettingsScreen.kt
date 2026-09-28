@@ -192,6 +192,13 @@ private fun SaveSettings(app: TetherApp, s: Settings) {
     val scope = rememberCoroutineScope()
     val pickJpg = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.jpgFolder, it) } }
     val pickRaw = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.rawFolder, it) } }
+    val pickBackup = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.backupFolder, it) } }
+    val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        if (result.values.any { it }) scope.launch {
+            app.settings.set(SettingKeys.gpsEnabled, true)
+            if (app.camera.state.value is ConnectionState.Connected) app.location.start()
+        }
+    }
 
     SettingsGroup("O que vem para o celular") {
         ChoiceRow("Formato", DownloadMode.entries.map { it to it.label }, s.downloadMode) {
@@ -226,6 +233,30 @@ private fun SaveSettings(app: TetherApp, s: Settings) {
         }
         ToggleRow("Renomear arquivos com o nome da sessão", "Ex.: ${example}_0001.JPG em vez de IMG_1234.JPG", s.renameWithSession) {
             scope.launch { app.settings.set(SettingKeys.renameWithSession, it) }
+        }
+    }
+
+    SettingsGroup("Backup") {
+        FolderRow(
+            "Pasta de backup",
+            s.backupFolder?.let { app.store.describeTree(it) } ?: "Nenhuma (escolha o cartão SD ou um pendrive OTG)",
+            true,
+            onPick = { pickBackup.launch(null) },
+            onReset = s.backupFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.backupFolder, null) } } },
+        )
+        ToggleRow("Oferecer backup ao finalizar sessão", "O botão fica em destaque no resumo da sessão", s.backupOffer, enabled = s.backupFolder != null) {
+            scope.launch { app.settings.set(SettingKeys.backupOffer, it) }
+        }
+        InfoText("Copia RAW, JPG, editadas e notas da sessão e confere o tamanho de cada arquivo.")
+    }
+
+    SettingsGroup("Localização") {
+        ToggleRow("GPS nas fotos", "Grava onde a foto foi feita nas cópias editadas e nos JPG leves. Usa o GPS do celular, funciona sem internet", s.gpsEnabled) { on ->
+            if (on && !app.location.hasPermission()) askLocation.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
+            else scope.launch {
+                app.settings.set(SettingKeys.gpsEnabled, on)
+                if (on && app.camera.state.value is ConnectionState.Connected) app.location.start() else if (!on) app.location.stop()
+            }
         }
     }
 
@@ -413,6 +444,12 @@ private fun CameraSettings(app: TetherApp, s: Settings) {
     SettingsGroup("Conexão") {
         ToggleRow("Manter a câmera ligada", "Evita o desligamento automático da 50D durante a sessão", s.keepCameraAwake) { set(SettingKeys.keepCameraAwake, it) }
         ToggleRow("Mostrar bateria da câmera", "No topo da Sessão e aviso quando estiver baixa", s.showBattery) { set(SettingKeys.showBattery, it) }
+        ToggleRow(
+            "Acertar o relógio da câmera",
+            "Ao conectar, a 50D fica com a hora do celular. Útil com duas câmeras no mesmo evento. Se a câmera não aceitar, a opção se desliga sozinha",
+            s.syncCameraClock,
+        ) { set(SettingKeys.syncCameraClock, it) }
+        ToggleRow("Calculadora de flash e foco", "Chip \"Flash e foco\" na Sessão", s.toolsEnabled) { set(SettingKeys.toolsEnabled, it) }
         if (state is ConnectionState.Connected) {
             OutlinedButton(onClick = app.camera::disconnect, modifier = Modifier.padding(vertical = 8.dp)) { Text("Encerrar conexão") }
         }
@@ -526,6 +563,7 @@ private fun ShareSettings(app: TetherApp, s: Settings) {
 
     SettingsGroup("Modo cliente") {
         ToggleRow("Mostrar botão Modo cliente", "Tela cheia só com as fotos, para o cliente acompanhar", s.clientModeEnabled) { set(SettingKeys.clientModeEnabled, it) }
+        ToggleRow("Cliente escolhe as fotos", "Coração em cada foto; a seleção aparece na galeria e no resumo da sessão", s.clientPicksEnabled, enabled = s.clientModeEnabled) { set(SettingKeys.clientPicksEnabled, it) }
         ToggleRow("Mostrar nome e exposição", null, s.clientShowInfo, enabled = s.clientModeEnabled) { set(SettingKeys.clientShowInfo, it) }
         ToggleRow("Assinatura Jr_Tech_OFC", "Símbolo e nome discretos no canto da tela", s.clientShowBrand, enabled = s.clientModeEnabled) { set(SettingKeys.clientShowBrand, it) }
         ToggleRow("Só favoritas", "Mostra apenas as fotos marcadas com estrela de favorita", s.clientOnlyFavorites, enabled = s.clientModeEnabled) { set(SettingKeys.clientOnlyFavorites, it) }

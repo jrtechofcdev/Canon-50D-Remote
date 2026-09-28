@@ -18,6 +18,8 @@ import com.example.ui.session.SessionScreen
 import com.example.ui.theme.JrLinkTheme
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -213,5 +215,45 @@ class ScreenshotTest {
         seedLooks()
         rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Presets, onBack = {}) } }
         save("ajustes_presets", androidx.compose.ui.test.hasText("Salvar cópia editada"))
+    }
+
+    @Test
+    fun galleryBatch() {
+        seedPhotos()
+        runBlocking {
+            val dao = app.database.photoDao()
+            val ids = dao.inSession("Geral").map { it.id }
+            dao.setMoment(ids.take(3), "Cerimônia")
+            dao.setMoment(ids.drop(3), "Recepção")
+            dao.setClientPick(ids[1], true)
+            dao.setNote(ids[2], "mãe da noiva")
+            app.settings.set(com.example.core.data.SettingKeys.momentsEnabled, true)
+        }
+        rule.setContent { JrLinkTheme { PhotosScreen(app, PhotoActions(app, app.store, app.export), onOpenPhoto = {}) } }
+        runCatching { rule.waitUntil(15_000) { rule.onAllNodes(androidx.compose.ui.test.hasContentDescription("IMG_1045")).fetchSemanticsNodes().isNotEmpty() } }
+        listOf("IMG_1045", "IMG_1043").forEach { name ->
+            rule.onNode(androidx.compose.ui.test.hasContentDescription(name)).performTouchInput { longClick() }
+        }
+        save("galeria_lote")
+    }
+
+    @Test
+    fun clientHeart() {
+        seedPhotos()
+        runBlocking { app.database.photoDao().inSession("Geral").last().let { app.database.photoDao().setClientPick(it.id, true) } }
+        rule.setContent { JrLinkTheme { com.example.ui.client.ClientModeScreen(app, onExit = {}, onCalibrate = {}) } }
+        save("cliente_coracao", androidx.compose.ui.test.hasContentDescription("Tirar da seleção"))
+    }
+
+    @Test
+    fun tools() {
+        rule.setContent { JrLinkTheme { com.example.ui.tools.ToolsScreen(onBack = {}) } }
+        save("ferramentas", androidx.compose.ui.test.hasText("Flash direto"))
+    }
+
+    @Test
+    fun settingsMessages() {
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Messages, onBack = {}) } }
+        save("ajustes_mensagens", androidx.compose.ui.test.hasText("Prévia pronta"))
     }
 }

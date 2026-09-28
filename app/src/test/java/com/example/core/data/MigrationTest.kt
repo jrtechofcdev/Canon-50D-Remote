@@ -13,11 +13,17 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class MigrationTest {
+    private val DB = "migration_test.db"
+
+    private fun freshFile(context: Context) = context.getDatabasePath(DB).apply {
+        parentFile?.mkdirs()
+        listOf("", "-wal", "-shm", "-journal").forEach { java.io.File(path + it).delete() }
+    }
 
     @Test
     fun version2PhotosSurviveTheUpgrade() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val file = context.getDatabasePath("tether50d.db").apply { parentFile?.mkdirs(); delete() }
+        val file = freshFile(context)
 
         // Exactly what Room 2.7 created for schema version 2.
         SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
@@ -27,7 +33,7 @@ class MigrationTest {
             db.version = 2
         }
 
-        val room = PhotoDatabase.create(context)
+        val room = PhotoDatabase.create(context, DB)
         val photos = runBlocking { room.photoDao().inSession("Casamento") }
         room.close()
 
@@ -40,7 +46,7 @@ class MigrationTest {
     @Test
     fun version3PhotosSurviveAndPresetsWork() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val file = context.getDatabasePath("tether50d.db").apply { parentFile?.mkdirs(); delete() }
+        val file = freshFile(context)
 
         // Version 3 (Jr_Link 2.1 to 2.3): version 2 plus stars and camera file names.
         SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
@@ -50,7 +56,7 @@ class MigrationTest {
             db.version = 3
         }
 
-        val room = PhotoDatabase.create(context)
+        val room = PhotoDatabase.create(context, DB)
         runBlocking {
             val photo = room.photoDao().inSession("Igreja").single()
             assertEquals(4, photo.rating)
@@ -69,7 +75,7 @@ class MigrationTest {
     @Test
     fun version4LooksSurviveAndNewColumnsStartEmpty() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val file = context.getDatabasePath("tether50d.db").apply { parentFile?.mkdirs(); delete() }
+        val file = freshFile(context)
 
         // Version 4 (Jr_Link 2.4): version 3 plus the look columns and the presets table.
         SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
@@ -81,7 +87,7 @@ class MigrationTest {
             db.version = 4
         }
 
-        val room = PhotoDatabase.create(context)
+        val room = PhotoDatabase.create(context, DB)
         runBlocking {
             val photo = room.photoDao().inSession("Ensaio").single()
             assertEquals(1L, photo.presetId)

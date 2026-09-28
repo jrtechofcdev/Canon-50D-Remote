@@ -49,6 +49,7 @@ class TetherController(
     private val dao: PhotoDao,
     private val looks: Looks,
     private val presetName: suspend (Long) -> String?,
+    private val location: () -> Pair<Double, Double>? = { null },
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private class Job(val obj: EosEventRecord.ObjectAdded, val force: Boolean, val attempt: Int = 0)
@@ -184,7 +185,7 @@ class TetherController(
         val exif = readExif(target.uri)
         var photo = existing ?: Photo(
             session = session, baseName = cameraBase, savedBase = savedBase, capturedAt = System.currentTimeMillis(), moment = moment,
-        )
+        ).let { p -> if (settings.gpsEnabled) location()?.let { (lat, lon) -> p.copy(lat = lat, lon = lon) } ?: p else p }
         photo = when (kind) {
             FileKind.JPG -> photo.copy(jpgUri = uri, jpgSize = obj.size, jpgCameraName = obj.filename)
             FileKind.RAW -> photo.copy(rawUri = uri, rawSize = obj.size, rawCameraName = obj.filename)

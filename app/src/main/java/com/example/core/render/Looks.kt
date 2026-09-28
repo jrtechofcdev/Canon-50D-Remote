@@ -9,6 +9,7 @@ import com.example.core.data.PhotoDao
 import com.example.core.data.SettingsRepository
 import com.example.core.preset.PresetRepository
 import com.example.core.preset.PresetSettings
+import com.example.core.storage.ExifCopy
 import com.example.core.storage.FileKind
 import com.example.core.storage.PhotoStore
 import kotlinx.coroutines.Dispatchers
@@ -90,12 +91,17 @@ class Looks(
         full.recycle()
         val suffix = presetName?.let { "_" + it.replace(Regex("[\\\\/:*?\"<>|]"), "-").replace(' ', '-') } ?: "_editada"
         val uri = withContext(Dispatchers.IO) {
+            // Rendered to a temp file first so the camera's EXIF (and GPS) can be added before it is stored.
+            val temp = java.io.File(context.cacheDir, "edited_${photo.id}.jpg")
+            temp.outputStream().use { rendered.compress(Bitmap.CompressFormat.JPEG, cfg.editedQuality.coerceIn(60, 100), it) }
+            rendered.recycle()
+            ExifCopy.apply(context, temp, source, photo.lat.takeIf { cfg.gpsEnabled }, photo.lon)
             photo.editedUri?.let(store::delete)
             val target = store.create(FileKind.EDITED, "${photo.savedBase}$suffix.jpg", cfg, photo.moment)
-            target.stream.use { rendered.compress(Bitmap.CompressFormat.JPEG, cfg.editedQuality.coerceIn(60, 100), it) }
+            target.stream.use { out -> temp.inputStream().use { it.copyTo(out) } }
+            temp.delete()
             target.uri.toString()
         }
-        rendered.recycle()
         photos.setEdited(photo.id, uri)
         uri
     }

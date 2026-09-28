@@ -86,7 +86,7 @@ class PhotoActions(
         val files: List<Uri> = if (set == ShareSet.LIGHT) {
             withContext(Dispatchers.IO) {
                 photos.mapNotNull { p ->
-                    p.lookUri?.let { export.exportLight(it, p.savedBase, settings) }
+                    p.lookUri?.let { export.exportLight(it, p.savedBase, settings, p.lat, p.lon) }
                         ?.let { FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", it) }
                 }
             }

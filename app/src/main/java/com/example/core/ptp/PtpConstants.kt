@@ -61,6 +61,8 @@ object EosProp {
     const val AVAILABLE_SHOTS = 0xD11B
     const val CAPTURE_DESTINATION = 0xD11C
     const val BATTERY_POWER = 0xD111
+    /** Camera clock, seconds since 1970 in the camera's local time (no time zone on the 50D). */
+    const val CAMERA_TIME = 0xD113
 
     /** Capture destination values: the card keeps a backup, the phone gets a copy via ObjectAddedEx. */
     const val DESTINATION_CARD = 2

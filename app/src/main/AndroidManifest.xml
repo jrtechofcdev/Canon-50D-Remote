@@ -13,6 +13,9 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Voice notes on photos; asked the first time the user holds the mic button. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Optional GPS in the edited copies; asked only when the option is turned on. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <queries>
         <package android:name="com.adobe.lrmobile" />

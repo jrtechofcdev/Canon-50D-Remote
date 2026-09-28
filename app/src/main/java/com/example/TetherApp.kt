@@ -5,6 +5,7 @@ import com.example.core.alerts.Alerts
 import com.example.core.camera.CameraManager
 import com.example.core.camera.ConnectionState
 import com.example.core.data.PhotoDatabase
+import com.example.core.data.SettingKeys
 import com.example.core.data.SettingsRepository
 import com.example.core.export.ExportService
 import com.example.core.ptp.EosProp
@@ -16,6 +17,8 @@ import com.example.core.preset.PresetRepository
 import com.example.core.render.Looks
 import com.example.core.render.PresetEngine
 import com.example.core.notes.VoiceNotes
+import com.example.core.location.LocationTracker
+import com.example.core.backup.SessionBackup
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -48,6 +51,10 @@ class TetherApp : Application() {
         private set
     lateinit var notes: VoiceNotes
         private set
+    lateinit var location: LocationTracker
+        private set
+    lateinit var backup: SessionBackup
+        private set
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -61,14 +68,21 @@ class TetherApp : Application() {
         settings = SettingsRepository(this)
         database = PhotoDatabase.create(this)
         store = PhotoStore(this)
-        camera = CameraManager(this) { settings.current().keepCameraAwake }
+        camera = CameraManager(
+            this,
+            keepCameraAwake = { settings.current().keepCameraAwake },
+            syncClock = { settings.current().syncCameraClock },
+            onClockRefused = { settings.set(SettingKeys.syncCameraClock, false) },
+        )
         presets = PresetRepository(this, database.presetDao(), settings)
         engine = PresetEngine()
         looks = Looks(this, engine, presets, database.photoDao(), store, settings)
-        tether = TetherController(this, camera, settings, store, database.photoDao(), looks) { id -> presets.get(id)?.name }
+        location = LocationTracker(this)
+        tether = TetherController(this, camera, settings, store, database.photoDao(), looks, { id -> presets.get(id)?.name }, location::recent)
         export = ExportService(this)
         alerts = Alerts(this)
         notes = VoiceNotes(this)
+        backup = SessionBackup(this, database.photoDao(), store)
 
         appScope.launch(Dispatchers.IO) {
             export.clearOldExports()
@@ -85,6 +99,7 @@ class TetherApp : Application() {
                     warnedPhone = false
                     CameraForegroundService.start(this@TetherApp)
                 }
+                if (state is ConnectionState.Connected && settings.current().gpsEnabled) location.start() else location.stop()
             }
         }
 

@@ -2,6 +2,20 @@
 
 Versões do **Jr_Link**. A mais recente fica no topo.
 
+## [2.5] · 2026-09-28
+
+Ferramentas do dia a dia. Tudo funciona sem internet, e cada função tem liga/desliga em Ajustes.
+
+- **Seleção pelo cliente:** no modo cliente, o cliente toca no coração das fotos que quer. No resumo da sessão você copia a lista para o filtro do Lightroom, copia as escolhidas para a pasta **Escolhidas** ou manda a seleção no WhatsApp.
+- **Galeria em lote:** toque longo seleciona várias fotos. Dá para aplicar preset, enviar (JPG leve, editadas, originais), mandar ao Lightroom, favoritar, definir momento e apagar tudo de uma vez.
+- **Mensagens prontas:** prévia, entrega, lembrete de pagamento e seleção recebida, com nome, quantidade, data e lista preenchidos. Abre direto no WhatsApp, com ou sem as fotos. Textos editáveis em Ajustes → Mensagens.
+- **Momentos do evento:** chip **Momento** na Sessão (Making of, Cerimônia, Família, Festa…). Cada foto nova recebe o momento, com subpasta opcional `02 Cerimônia` e filtro na galeria.
+- **Notas por foto:** texto ou voz (segurar para gravar), no visualizador.
+- **Flash e foco:** alcance e abertura do Yongnuo por potência e ISO, e profundidade de campo/hiperfocal da 50mm f/1.8 e da 18-55 no sensor da 50D.
+- **GPS nas fotos:** a posição do celular vai para o EXIF das cópias editadas e dos JPG leves. Funciona pelo GPS, sem internet. As cópias também levam os dados da câmera (abertura, velocidade, ISO, data).
+- **Backup da sessão:** copia RAW, JPG, editadas e notas para o cartão SD ou um pendrive OTG e confere cada arquivo.
+- **Relógio da câmera:** opção para a 50D pegar a hora do celular ao conectar. Se a câmera não aceitar, a opção se desliga sozinha.
+
 ## [2.4] · 2026-09-28
 
 Presets do Lightroom dentro do app.

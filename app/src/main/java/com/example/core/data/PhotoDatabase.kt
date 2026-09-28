@@ -208,8 +208,9 @@ abstract class PhotoDatabase : RoomDatabase() {
     abstract fun presetDao(): PresetDao
 
     companion object {
-        fun create(context: Context): PhotoDatabase =
-            Room.databaseBuilder(context, PhotoDatabase::class.java, "tether50d.db")
+        /** [name] is only changed by tests, which must not share the file the app itself opens. */
+        fun create(context: Context, name: String = "tether50d.db"): PhotoDatabase =
+            Room.databaseBuilder(context, PhotoDatabase::class.java, name)
                 .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 // Version 1 only ever held simulator entries, so dropping it loses nothing real.
                 .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1)

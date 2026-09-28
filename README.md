@@ -37,6 +37,12 @@ Sem Wi-Fi, sem FTP, sem Live View. Só a USB, só a 50D.
     <td align="center"><img src="docs/images/tela-visualizador-preset.png" width="200" alt="Foto com preset"><br><sub><b>Look</b><br>preset na foto e Calibrar</sub></td>
     <td align="center"><img src="docs/images/tela-cliente-preset.png" width="200" alt="Modo cliente"><br><sub><b>Modo cliente</b><br>o cliente escolhe o preset</sub></td>
   </tr>
+  <tr>
+    <td align="center"><img src="docs/images/tela-cliente-escolha.png" width="200" alt="Cliente escolhe fotos"><br><sub><b>Seleção</b><br>o cliente marca as fotos</sub></td>
+    <td align="center"><img src="docs/images/tela-galeria-lote.png" width="200" alt="Galeria em lote"><br><sub><b>Lote</b><br>preset, envio e mensagem de uma vez</sub></td>
+    <td align="center"><img src="docs/images/tela-flash-foco.png" width="200" alt="Flash e foco"><br><sub><b>Flash e foco</b><br>Yongnuo e profundidade de campo</sub></td>
+    <td></td>
+  </tr>
 </table>
 
 <sub>Telas renderizadas a partir do código, com fotos de exemplo.</sub>
@@ -53,6 +59,9 @@ Sem Wi-Fi, sem FTP, sem Live View. Só a USB, só a 50D.
 | **Cartão** | Navegar pelas fotos que já estão no CF e baixar só as escolhidas. Reenvio automático do que foi feito com o cabo solto. |
 | **Envio** | Lightroom com um toque, "JPG leve" para WhatsApp e marca d'água Jr_Tech_OFC aplicada só na cópia enviada. |
 | **Cliente** | Modo cliente em tela cheia, com PIN para sair e resumo ao fim da sessão. O cliente escolhe o preset da foto; o botão Calibrar (com PIN) abre os ajustes daquela foto. |
+| **Entrega** | O cliente marca as fotos no modo cliente; a lista vai para o filtro do Lightroom ou para a pasta Escolhidas. Galeria em lote e mensagens prontas no WhatsApp. |
+| **Evento** | Momentos (Cerimônia, Festa…) com subpasta, notas de texto e voz por foto, backup da sessão para cartão SD ou pendrive. |
+| **Ferramentas** | Calculadora de flash Yongnuo e de profundidade de campo, GPS nas cópias e acerto do relógio da câmera. Tudo offline. |
 | **Campo** | Vibração a cada foto, alerta se o cabo soltar, aviso de cartão e memória cheios, modo escuro total para igreja e evento noturno. |
 
 Cada função tem um liga/desliga em **Ajustes**.
@@ -131,6 +140,9 @@ app/src/main/java/com/example/
 │   ├── preset/                    presets: leitura de DNG/XMP/LRTemplate, XMP para exportar, pack inicial
 │   ├── render/                    processamento dos presets (OpenGL na GPU, com versão na CPU de reserva)
 │   ├── analysis/                  histograma e máscara de estouro
+│   ├── messages/                  modelos de mensagem do WhatsApp
+│   ├── tools/                     contas de flash e profundidade de campo
+│   ├── backup/  location/  notes/ backup da sessão, GPS e notas de voz
 │   ├── export/                    JPG leve e marca d'água
 │   ├── alerts/                    vibração e notificações de alerta
 │   └── service/                   mantém a conexão com a tela apagada
@@ -151,6 +163,8 @@ app/src/main/java/com/example/
 | Banner deste README | `branding/banner.py` |
 | Presets que vêm com o app | `core/preset/StarterPresets.kt` |
 | Sliders e faixas do editor | `ui/preset/EditorControls.kt` |
+| Mensagens padrão do WhatsApp | `core/messages/MessageTemplates.kt` (ou em Ajustes → Mensagens) |
+| Flashes da calculadora | `core/tools/FieldMath.kt` → `Flash` |
 | Textos das telas | `ui/session`, `ui/photos`, `ui/preset`, `ui/settings` |
 </details>
 
