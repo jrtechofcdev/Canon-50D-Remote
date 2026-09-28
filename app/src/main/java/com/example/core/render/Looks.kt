@@ -91,7 +91,7 @@ class Looks(
         val suffix = presetName?.let { "_" + it.replace(Regex("[\\\\/:*?\"<>|]"), "-").replace(' ', '-') } ?: "_editada"
         val uri = withContext(Dispatchers.IO) {
             photo.editedUri?.let(store::delete)
-            val target = store.create(FileKind.EDITED, "${photo.savedBase}$suffix.jpg", cfg)
+            val target = store.create(FileKind.EDITED, "${photo.savedBase}$suffix.jpg", cfg, photo.moment)
             target.stream.use { rendered.compress(Bitmap.CompressFormat.JPEG, cfg.editedQuality.coerceIn(60, 100), it) }
             target.uri.toString()
         }

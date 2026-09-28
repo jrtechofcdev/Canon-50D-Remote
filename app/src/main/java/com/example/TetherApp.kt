@@ -15,6 +15,7 @@ import com.example.core.tether.TetherController
 import com.example.core.preset.PresetRepository
 import com.example.core.render.Looks
 import com.example.core.render.PresetEngine
+import com.example.core.notes.VoiceNotes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -45,6 +46,8 @@ class TetherApp : Application() {
         private set
     lateinit var looks: Looks
         private set
+    lateinit var notes: VoiceNotes
+        private set
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -65,6 +68,7 @@ class TetherApp : Application() {
         tether = TetherController(this, camera, settings, store, database.photoDao(), looks) { id -> presets.get(id)?.name }
         export = ExportService(this)
         alerts = Alerts(this)
+        notes = VoiceNotes(this)
 
         appScope.launch(Dispatchers.IO) {
             export.clearOldExports()

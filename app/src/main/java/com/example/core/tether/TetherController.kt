@@ -166,7 +166,9 @@ class TetherController(
         } else cameraBase
         val fileName = "$savedBase.$extension"
 
-        val target = store.create(kind, fileName, settings)
+        // RAW and JPG of one frame stay in the same moment even if it changed between the two files.
+        val moment = existing?.moment ?: settings.currentMoment.takeIf { settings.momentsEnabled && it.isNotBlank() }
+        val target = store.create(kind, fileName, settings, moment)
         try {
             BufferedOutputStream(target.stream, 256 * 1024).use { out ->
                 camera.download(obj.handle, StreamSink(out) { received, total ->
@@ -180,11 +182,13 @@ class TetherController(
 
         val uri = target.uri.toString()
         val exif = readExif(target.uri)
-        var photo = existing ?: Photo(session = session, baseName = cameraBase, savedBase = savedBase, capturedAt = System.currentTimeMillis())
+        var photo = existing ?: Photo(
+            session = session, baseName = cameraBase, savedBase = savedBase, capturedAt = System.currentTimeMillis(), moment = moment,
+        )
         photo = when (kind) {
             FileKind.JPG -> photo.copy(jpgUri = uri, jpgSize = obj.size, jpgCameraName = obj.filename)
             FileKind.RAW -> photo.copy(rawUri = uri, rawSize = obj.size, rawCameraName = obj.filename)
-            FileKind.EDITED -> photo // never downloaded from the camera
+            FileKind.EDITED, FileKind.SELECTED -> photo // never downloaded from the camera
         }
         photo = photo.copy(
             aperture = exif?.aperture ?: photo.aperture,

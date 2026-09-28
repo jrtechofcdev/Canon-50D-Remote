@@ -88,6 +88,7 @@ fun SessionScreen(
     onOpenSettings: () -> Unit,
     onOpenCard: () -> Unit,
     onOpenClient: () -> Unit,
+    onOpenTools: () -> Unit = {},
 ) {
     val state by app.camera.state.collectAsState()
     val status by app.camera.status.collectAsState()
@@ -98,6 +99,7 @@ fun SessionScreen(
     val photos by remember { app.database.photoDao().observeAll() }.collectAsState(initial = emptyList())
     val looks by app.presets.presets.collectAsState(initial = emptyList())
     var showLooks by remember { mutableStateOf(false) }
+    var showMoments by remember { mutableStateOf(false) }
     val connected = state is ConnectionState.Connected
     val scope = rememberCoroutineScope()
 
@@ -159,6 +161,8 @@ fun SessionScreen(
                     onSummary = { showSummary = true },
                     sessionLook = looks.firstOrNull { it.id == settings.sessionPresetId && settings.applyPresetToNew }?.name,
                     onLook = { showLooks = true },
+                    onMoment = { showMoments = true },
+                    onTools = onOpenTools,
                 )
             }
         }
@@ -203,6 +207,16 @@ fun SessionScreen(
             },
             onSave = { preset -> scope.launch { app.settings.savePresets(settings.exposurePresets + preset) } },
             onDismiss = { showPresets = false },
+        )
+    }
+
+    if (showMoments) {
+        MomentSheet(
+            moments = settings.moments,
+            current = settings.currentMoment,
+            subfolder = settings.momentSubfolder,
+            onPick = { m -> scope.launch { app.settings.set(SettingKeys.currentMoment, m) }; showMoments = false },
+            onDismiss = { showMoments = false },
         )
     }
 

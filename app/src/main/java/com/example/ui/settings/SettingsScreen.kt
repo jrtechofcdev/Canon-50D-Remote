@@ -222,6 +222,27 @@ private fun SaveSettings(app: TetherApp, s: Settings) {
             scope.launch { app.settings.set(SettingKeys.renameWithSession, it) }
         }
     }
+
+    SettingsGroup("Momentos do evento") {
+        ToggleRow("Usar momentos", "Chip Momento na Sessão: cada foto nova recebe o momento escolhido", s.momentsEnabled) {
+            scope.launch { app.settings.set(SettingKeys.momentsEnabled, it) }
+        }
+        var list by remember { mutableStateOf(s.moments.joinToString("\n")) }
+        OutlinedTextField(
+            value = list,
+            onValueChange = {
+                list = it
+                scope.launch { app.settings.set(SettingKeys.momentList, it.lines().map(String::trim).filter(String::isNotEmpty).joinToString("|")) }
+            },
+            label = { Text("Momentos, um por linha") },
+            enabled = s.momentsEnabled,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            minLines = 3,
+        )
+        ToggleRow("Subpasta por momento", "Ex.: …/JPG/${s.sessionName.ifBlank { "Casamento" }}/02 Cerimônia/", s.momentSubfolder, enabled = s.momentsEnabled) {
+            scope.launch { app.settings.set(SettingKeys.momentSubfolder, it) }
+        }
+    }
 }
 
 @Composable
@@ -333,6 +354,9 @@ private fun ReviewSettings(app: TetherApp, s: Settings) {
     }
     SettingsGroup("Avaliação") {
         ToggleRow("Estrelas (1 a 5)", "Mostra as estrelas no visualizador e o filtro na galeria", s.ratingEnabled) { set(SettingKeys.ratingEnabled, it) }
+    }
+    SettingsGroup("Anotações") {
+        ToggleRow("Notas nas fotos", "Texto ou áudio em cada foto, pelo botão de nota no visualizador", s.notesEnabled) { set(SettingKeys.notesEnabled, it) }
     }
     SettingsGroup("Exposição") {
         ToggleRow("Histograma", null, s.histogramEnabled) { set(SettingKeys.histogramEnabled, it) }

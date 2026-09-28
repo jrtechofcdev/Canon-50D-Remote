@@ -54,6 +54,8 @@ import com.example.core.camera.BracketState
 import com.example.core.camera.CameraStatus
 import com.example.core.data.ExposurePreset
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Calculate
+import androidx.compose.material.icons.outlined.Flag
 import com.example.core.data.Photo
 import com.example.core.data.Settings
 import com.example.core.ptp.EosProp
@@ -101,9 +103,14 @@ fun ToolsRow(
     onSummary: () -> Unit,
     sessionLook: String?,
     onLook: () -> Unit,
+    onMoment: () -> Unit,
+    onTools: () -> Unit,
 ) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Tool(sessionLook?.let { "Look: $it" } ?: "Look: nenhum", Icons.Outlined.AutoAwesome, true, onLook)
+        if (settings.momentsEnabled) {
+            Tool(settings.currentMoment.ifBlank { null }?.let { "Momento: $it" } ?: "Momento", Icons.Outlined.Flag, true, onMoment)
+        }
         if (settings.presetsEnabled) Tool("Exposições", Icons.Outlined.Tune, connected, onPresets)
         if (settings.aebEnabled) {
             val label = bracket?.let { "AEB ${it.shot}/${it.total}" } ?: "AEB ${settings.aebShots}×"
@@ -112,6 +119,7 @@ fun ToolsRow(
         if (settings.cardBrowserEnabled) Tool("Cartão", Icons.Outlined.SdCard, connected, onCard)
         if (settings.clientModeEnabled) Tool("Modo cliente", Icons.Outlined.Slideshow, true, onClient)
         Tool(if (settings.nightMode) "Modo normal" else "Modo noite", Icons.Outlined.Bedtime, true, onNight)
+        if (settings.toolsEnabled) Tool("Flash e foco", Icons.Outlined.Calculate, true, onTools)
         if (settings.sessionSummary && hasSessionPhotos) Tool("Finalizar sessão", Icons.Outlined.Summarize, true, onSummary)
     }
 }

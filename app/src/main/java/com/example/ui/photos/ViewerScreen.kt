@@ -30,6 +30,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Delete
@@ -111,6 +112,7 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
     var confirmDelete by remember { mutableStateOf<Photo?>(null) }
     val zoomed = remember { mutableStateMapOf<Long, Boolean>() }
     var showClipping by remember { mutableStateOf(settings.highlightAlert) }
+    var noteFor by remember { mutableStateOf<Photo?>(null) }
 
     // Slide to a frame that just arrived. New photos are inserted at index 0; the pager keeps the
     // current photo in place by key, so "was on the latest" means we were on index 0 before it.
@@ -172,6 +174,15 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
                     tint = if (showClipping) Tone.Info else Tone.TextMuted,
                 )
             }
+            if (settings.notesEnabled) {
+                IconButton(onClick = { noteFor = current }) {
+                    Icon(
+                        Icons.AutoMirrored.Outlined.StickyNote2,
+                        contentDescription = "Nota",
+                        tint = if (current.note != null || current.audioNote != null) Tone.Accent else Tone.Text,
+                    )
+                }
+            }
             IconButton(onClick = { scope.launch { app.database.photoDao().setFavorite(current.id, !current.favorite) } }) {
                 Icon(
                     if (current.favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
@@ -216,7 +227,14 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
                         listOfNotNull(current.shutter, current.aperture, current.iso).joinToString("   ").ifEmpty { "Sem dados EXIF" },
                         style = MaterialTheme.typography.labelLarge,
                     )
-                    Text(fileSummary(current), style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+                    Text(
+                        listOfNotNull(fileSummary(current), current.moment).joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Tone.TextMuted,
+                    )
+                    current.note?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = Tone.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
                 }
                 if (settings.histogramEnabled) {
                     Histogram(analysis, settings.histogramRgb, Modifier.width(128.dp).height(52.dp))
@@ -244,6 +262,8 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
         }
     }
 
+    noteFor?.let { photo -> NoteSheet(app, photo, onDismiss = { noteFor = null }) }
+
     confirmDelete?.let { photo ->
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
@@ -256,6 +276,7 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
                     scope.launch(Dispatchers.IO) {
                         listOfNotNull(photo.jpgUri, photo.rawUri, photo.editedUri).forEach(app.store::delete)
                         photo.previewPath?.let { java.io.File(it).delete() }
+                        photo.audioNote?.let { java.io.File(it).delete() }
                         app.database.photoDao().delete(photo.id)
                     }
                 }) { Text("Apagar", color = Tone.Error) }
