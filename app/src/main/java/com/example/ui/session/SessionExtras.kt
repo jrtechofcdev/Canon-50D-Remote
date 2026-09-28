@@ -22,6 +22,7 @@ import androidx.compose.material.icons.outlined.Exposure
 import androidx.compose.material.icons.outlined.SdCard
 import androidx.compose.material.icons.outlined.Slideshow
 import androidx.compose.material.icons.outlined.Summarize
+import androidx.compose.material.icons.outlined.SettingsSuggest
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -123,8 +124,11 @@ fun ToolsRow(
     onMoment: () -> Unit,
     onTools: () -> Unit,
     onLive: () -> Unit = {},
+    profile: String = "",
+    onProfile: () -> Unit = {},
 ) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Tool(profile.ifBlank { null }?.let { "Perfil: $it" } ?: "Perfil", Icons.Outlined.SettingsSuggest, true, onProfile)
         if (settings.liveViewEnabled) Tool("Live view", Icons.Outlined.Videocam, connected, onLive)
         Tool(sessionLook?.let { "Look: $it" } ?: "Look: nenhum", Icons.Outlined.AutoAwesome, true, onLook)
         if (settings.momentsEnabled) {

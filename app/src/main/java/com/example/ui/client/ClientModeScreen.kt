@@ -71,11 +71,30 @@ import com.example.ui.photos.WhatsAppSheet
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.input.pointer.PointerEventPass
-import com.example.ui.preset.PresetStrip
+import com.example.ui.preset.PresetPicker
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.Camera
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Iso
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.ShutterSpeed
 
 /**
- * Full-screen photos for the client to follow along. No bars, no settings, no delete.
- * Exit: hold a finger on the screen for 3 s (plus the PIN when one is set).
+ * Full-screen photos for the client to follow along. No settings, no delete.
+ * The photo has its own area; the info line and the icon bar sit below it, never over it.
+ * Exit: the Sair button, or one finger held still for 3 s (plus the PIN when one is set).
  */
 @Composable
 fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> Unit, onCrop: (Long) -> Unit = {}) {
@@ -102,16 +121,18 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
     val guarded = settings.clientCalibratePin && settings.clientPin.isNotEmpty()
     val requestCalibrate = { id: Long -> if (guarded) calibrateAsk = id else onCalibrate(id) }
     val requestCrop = { id: Long -> if (guarded) cropAsk = id else onCrop(id) }
+    val holdToExit by rememberUpdatedState(settings.clientExitHold)
 
-    Box(
+    Column(
         Modifier
             .fillMaxSize()
             .background(Color.Black)
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    // Exit needs one finger held still for 3 s. A second finger (pinch to zoom), a drag
-                    // (swipe or pan) or lifting the finger all cancel it.
+                    if (!holdToExit) return@awaitEachGesture
+                    // Hold-to-exit needs one finger held still for 3 s. A second finger (pinch to zoom),
+                    // a drag (swipe or pan) or lifting the finger all cancel it.
                     var still = true
                     val lifted = withTimeoutOrNull(3_000) {
                         while (true) {
@@ -126,53 +147,83 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
                 }
             },
     ) {
-        if (photos.isEmpty()) {
-            Text(
-                "As fotos aparecem aqui assim que forem feitas.",
-                color = Color(0xFF8A8A8A),
-                modifier = Modifier.align(Alignment.Center).padding(32.dp),
-            )
-        } else {
-            val showStrip = settings.clientPresetsEnabled && presets.isNotEmpty()
-            ClientPager(app, pager, photos, presets, settings, infoAbove = showStrip || settings.clientWhatsApp)
-            val current = photos.getOrNull(pager.currentPage)
-            val showWhatsApp = settings.clientWhatsApp
-            if (current != null) {
-                // Discreet bar: the client picks the look and can get the photo on WhatsApp; Calibrar is for the photographer.
-                Row(
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.55f))
-                        .navigationBarsPadding().padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(Modifier.weight(1f)) {
-                        if (showStrip) {
-                            PresetStrip(presets, current.presetId) { picked -> scope.launch { app.looks.setLook(current, picked?.id, null) } }
-                        }
-                    }
-                    if (showWhatsApp) {
-                        IconButton(onClick = { whatsFor = current }) {
-                            Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = "Receber no WhatsApp", tint = Tone.Accent)
-                        }
-                    }
-                    IconButton(onClick = { requestCrop(current.id) }) {
-                        Icon(Icons.Outlined.Crop, contentDescription = "Recortar", tint = Color(0xFFBDBDBD))
-                    }
-                    if (showStrip) {
-                        IconButton(onClick = { requestCalibrate(current.id) }) {
-                            Icon(Icons.Outlined.Tune, contentDescription = "Calibrar", tint = Color(0xFFBDBDBD))
-                        }
+        val current = photos.getOrNull(pager.currentPage)
+
+        // Top: leave on the left, position and brand on the right.
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp).heightIn(min = 48.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (settings.clientExitButton) {
+                TextButton(onClick = requestExit) {
+                    Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null, tint = Muted, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Sair", color = Muted, style = MaterialTheme.typography.labelLarge)
+                    if (settings.clientPin.isNotEmpty()) {
+                        Spacer(Modifier.width(4.dp))
+                        Icon(Icons.Outlined.Lock, contentDescription = "Com PIN", tint = Muted, modifier = Modifier.size(14.dp))
                     }
                 }
             }
+            Spacer(Modifier.weight(1f))
+            if (photos.isNotEmpty()) {
+                Text("${pager.currentPage + 1} / ${photos.size}", style = MaterialTheme.typography.labelMedium, color = Muted)
+                Spacer(Modifier.width(12.dp))
+            }
+            if (settings.clientShowBrand) {
+                Row(Modifier.padding(end = 12.dp).alpha(0.8f), verticalAlignment = Alignment.CenterVertically) {
+                    BrandSymbol(18.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Jr_Tech_OFC", style = WordmarkStyle.copy(fontSize = 13.sp), color = Color.White)
+                }
+            }
         }
-        if (settings.clientShowBrand) {
+
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            if (photos.isEmpty()) {
+                Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Outlined.PhotoCamera, contentDescription = null, tint = Muted, modifier = Modifier.size(40.dp))
+                    Spacer(Modifier.height(12.dp))
+                    Text("As fotos aparecem aqui assim que forem feitas.", color = Muted)
+                }
+            } else {
+                ClientPager(app, pager, photos, presets, settings)
+            }
+        }
+
+        if (current != null) {
+            if (settings.clientShowInfo) PhotoInfo(current)
+            if (settings.clientPresetsEnabled && presets.isNotEmpty()) {
+                PresetPicker(
+                    app = app,
+                    presets = presets,
+                    selectedId = current.presetId,
+                    sourceUri = current.displayUri,
+                    onPick = { picked -> scope.launch { app.looks.setLook(current, picked?.id, null) } },
+                    onDark = true,
+                )
+            }
+            // Big icons with a short name under each: readable at a glance, even at arm's length.
             Row(
-                Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(16.dp).alpha(0.8f),
-                verticalAlignment = Alignment.CenterVertically,
+                Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.06f)).navigationBarsPadding().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                BrandSymbol(20.dp)
-                Spacer(Modifier.width(8.dp))
-                Text("Jr_Tech_OFC", style = WordmarkStyle.copy(fontSize = 14.sp), color = Color.White)
+                if (settings.clientPicksEnabled) {
+                    ClientAction(
+                        if (current.clientPick) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        if (current.clientPick) "Escolhida" else "Escolher",
+                        tint = if (current.clientPick) Tone.Accent else Color.White,
+                    ) { scope.launch { app.database.photoDao().setClientPick(current.id, !current.clientPick) } }
+                }
+                if (settings.clientWhatsApp) {
+                    ClientAction(Icons.AutoMirrored.Outlined.Send, "WhatsApp", tint = Tone.Accent) { whatsFor = current }
+                }
+                if (settings.clientCropEnabled) {
+                    ClientAction(Icons.Outlined.Crop, "Recortar", locked = guarded) { requestCrop(current.id) }
+                }
+                if (settings.clientPresetsEnabled && presets.isNotEmpty()) {
+                    ClientAction(Icons.Outlined.Tune, "Calibrar", locked = guarded) { requestCalibrate(current.id) }
+                }
             }
         }
     }
@@ -191,6 +242,52 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
     }
 }
 
+private val Muted = Color(0xFFBDBDBD)
+
+/** File name and exposure, each with its own icon, on a line of its own under the photo. */
+@Composable
+private fun PhotoInfo(photo: Photo) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        InfoItem(Icons.Outlined.Image, photo.savedBase)
+        photo.shutter?.let { InfoItem(Icons.Outlined.ShutterSpeed, it) }
+        photo.aperture?.let { InfoItem(Icons.Outlined.Camera, it) }
+        photo.iso?.let { InfoItem(Icons.Outlined.Iso, it) }
+    }
+}
+
+@Composable
+private fun InfoItem(icon: ImageVector, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = Muted, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(text, style = MaterialTheme.typography.labelMedium, color = Muted, maxLines = 1)
+    }
+}
+
+@Composable
+private fun ClientAction(icon: ImageVector, label: String, tint: Color = Color.White, locked: Boolean = false, onClick: () -> Unit) {
+    Column(
+        Modifier.clip(MaterialTheme.shapes.small).clickable(onClick = onClick).widthIn(min = 72.dp).padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(28.dp))
+            if (locked) {
+                Icon(
+                    Icons.Outlined.Lock, contentDescription = null, tint = Muted,
+                    modifier = Modifier.align(Alignment.BottomEnd).offset(x = 6.dp, y = 4.dp).size(12.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(2.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Muted, maxLines = 1)
+    }
+}
+
 @Composable
 private fun ClientPager(
     app: TetherApp,
@@ -198,9 +295,7 @@ private fun ClientPager(
     entries: List<Photo>,
     presets: List<Preset>,
     settings: Settings,
-    infoAbove: Boolean,
 ) {
-    val scope = rememberCoroutineScope()
     // While the client looks closely at a photo, nothing moves it away.
     var zoomed by remember { mutableStateOf(false) }
     val isZoomed by rememberUpdatedState(zoomed)
@@ -226,33 +321,8 @@ private fun ClientPager(
         modifier = Modifier.fillMaxSize(),
     ) { page ->
         val photo = entries[page]
-        Box(Modifier.fillMaxSize()) {
-            Zoomable(key = photo.id, onZoomChanged = { zoomed = it }) {
-                LookImage(app, photo, presets, Modifier.fillMaxSize())
-            }
-            if (settings.clientPicksEnabled) {
-                // The client's own pick; the photographer sees it in the gallery and the session summary.
-                IconButton(
-                    onClick = { scope.launch { app.database.photoDao().setClientPick(photo.id, !photo.clientPick) } },
-                    modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp).size(56.dp),
-                ) {
-                    Icon(
-                        if (photo.clientPick) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = if (photo.clientPick) "Tirar da seleção" else "Escolher esta foto",
-                        tint = if (photo.clientPick) Tone.Accent else Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.size(30.dp),
-                    )
-                }
-            }
-            if (settings.clientShowInfo) {
-                Text(
-                    listOfNotNull(photo.savedBase, photo.shutter, photo.aperture, photo.iso).joinToString("   "),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color(0xFFBDBDBD),
-                    modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
-                        .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = if (infoAbove) 64.dp else 12.dp),
-                )
-            }
+        Zoomable(key = photo.id, onZoomChanged = { zoomed = it }) {
+            LookImage(app, photo, presets, Modifier.fillMaxSize())
         }
     }
 }

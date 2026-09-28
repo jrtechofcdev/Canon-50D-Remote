@@ -73,26 +73,36 @@ class PhotoActions(
     }
 
     /**
-     * Opens the WhatsApp chat of [number] with the photos already attached (and [text] as caption),
-     * so it only takes tapping send. Uses WhatsApp Business when that is the one installed. Without
-     * WhatsApp, opens wa.me for that number with the text.
-     * Returns false when the number is not valid.
+     * Step 1 of sending to a client: opens the WhatsApp chat of [number] itself (not the "Enviar para"
+     * list), with [text] already typed. WhatsApp opens it even for numbers that aren't in the contacts.
+     * Without WhatsApp, opens wa.me in the browser. Returns false when the number is not valid.
      */
-    suspend fun sendToWhatsApp(number: String, photos: List<Photo>, set: ShareSet?, text: String, settings: Settings): Boolean {
+    fun openWhatsAppChat(number: String, text: String): Boolean {
         val digits = WhatsAppNumber.normalize(number) ?: return false
-        val whatsapp = listOf(WHATSAPP, WHATSAPP_BUSINESS).firstOrNull { installed(it) }
+        val url = "https://api.whatsapp.com/send?phone=$digits" + if (text.isNotBlank()) "&text=" + Uri.encode(text) else ""
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val whatsapp = whatsAppPackage()
+        if (whatsapp != null && runCatching { context.startActivity(Intent(intent).setPackage(whatsapp)) }.isSuccess) return true
+        return runCatching { context.startActivity(intent) }.isSuccess
+    }
+
+    /**
+     * Step 2: the photos, attached to that same chat. WhatsApp only skips its contact list ("jid")
+     * for a chat that already exists, which is why step 1 comes first.
+     */
+    suspend fun sendPhotosToWhatsApp(number: String, photos: List<Photo>, set: ShareSet, settings: Settings): Boolean {
+        val digits = WhatsAppNumber.normalize(number) ?: return false
+        val intent = sendIntent(photos, set, settings) ?: return false
+        val whatsapp = whatsAppPackage()
         if (whatsapp == null) {
-            val url = "https://wa.me/$digits" + if (text.isNotBlank()) "?text=" + Uri.encode(text) else ""
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            context.startActivity(Intent.createChooser(intent, "Enviar fotos").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             return true
         }
-        val intent = (if (set != null && photos.isNotEmpty()) sendIntent(photos, set, settings) else null)
-            ?: Intent(Intent.ACTION_SEND).setType("text/plain")
-        if (text.isNotBlank()) intent.putExtra(Intent.EXTRA_TEXT, text)
-        // "jid" makes WhatsApp skip its contact picker and open this number's chat directly.
         intent.putExtra("jid", WhatsAppNumber.jid(digits)).setPackage(whatsapp).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return runCatching { context.startActivity(intent) }.isSuccess
     }
+
+    fun whatsAppPackage(): String? = listOf(WHATSAPP, WHATSAPP_BUSINESS).firstOrNull { installed(it) }
 
     private fun installed(pkg: String) = runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess
 

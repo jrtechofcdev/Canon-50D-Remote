@@ -90,8 +90,11 @@ fun SessionScreen(
     onOpenClient: () -> Unit,
     onOpenTools: () -> Unit = {},
     onOpenLive: () -> Unit = {},
+    onOpenProfiles: () -> Unit = {},
 ) {
     val state by app.camera.state.collectAsState()
+    val activeProfile by app.settings.activeProfile.collectAsState(initial = "")
+    var showProfiles by remember { mutableStateOf(false) }
     val status by app.camera.status.collectAsState()
     val interval by app.camera.interval.collectAsState()
     val transfer by app.tether.transfer.collectAsState()
@@ -165,6 +168,8 @@ fun SessionScreen(
                     onMoment = { showMoments = true },
                     onTools = onOpenTools,
                     onLive = onOpenLive,
+                    profile = activeProfile,
+                    onProfile = { showProfiles = true },
                 )
             }
         }
@@ -220,6 +225,10 @@ fun SessionScreen(
             onPick = { m -> scope.launch { app.settings.set(SettingKeys.currentMoment, m) }; showMoments = false },
             onDismiss = { showMoments = false },
         )
+    }
+
+    if (showProfiles) {
+        com.example.ui.settings.ProfileSheet(app, onManage = onOpenProfiles, onDismiss = { showProfiles = false })
     }
 
     if (showLooks) {

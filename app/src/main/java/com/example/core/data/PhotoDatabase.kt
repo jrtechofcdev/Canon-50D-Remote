@@ -175,10 +175,26 @@ data class PresetEntity(
     val source: String,
     val createdAt: Long,
     val updatedAt: Long,
+    /** Pinned to the front of every preset strip. */
+    @ColumnInfo(defaultValue = "0") val favorite: Boolean = false,
+    /** Last time it was applied to a photo; recent ones come first after the favourites. */
+    @ColumnInfo(defaultValue = "0") val lastUsed: Long = 0,
 )
 
 @Dao
 interface PresetDao {
+    @Query("UPDATE presets SET favorite = :favorite WHERE id = :id")
+    suspend fun setFavorite(id: Long, favorite: Boolean)
+
+    @Query("UPDATE presets SET lastUsed = :time WHERE id = :id")
+    suspend fun markUsed(id: Long, time: Long)
+
+    @Query("UPDATE presets SET grp = :group WHERE id IN (:ids)")
+    suspend fun setGroup(ids: List<Long>, group: String)
+
+    @Query("UPDATE presets SET grp = :to WHERE grp = :from")
+    suspend fun renameGroup(from: String, to: String)
+
     @Query("SELECT * FROM presets ORDER BY grp, name COLLATE NOCASE")
     fun observeAll(): Flow<List<PresetEntity>>
 
@@ -207,7 +223,7 @@ interface PresetDao {
     suspend fun detachFromPhotos(id: Long)
 }
 
-@Database(entities = [Photo::class, PresetEntity::class], version = 6, exportSchema = false)
+@Database(entities = [Photo::class, PresetEntity::class], version = 7, exportSchema = false)
 abstract class PhotoDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
     abstract fun presetDao(): PresetDao
@@ -216,7 +232,7 @@ abstract class PhotoDatabase : RoomDatabase() {
         /** [name] is only changed by tests, which must not share the file the app itself opens. */
         fun create(context: Context, name: String = "tether50d.db"): PhotoDatabase =
             Room.databaseBuilder(context, PhotoDatabase::class.java, name)
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 // Version 1 only ever held simulator entries, so dropping it loses nothing real.
                 .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1)
                 .build()
@@ -227,6 +243,14 @@ abstract class PhotoDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE photos ADD COLUMN rating INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE photos ADD COLUMN rawCameraName TEXT")
                 db.execSQL("ALTER TABLE photos ADD COLUMN jpgCameraName TEXT")
+            }
+        }
+
+        /** Favourite presets and when each was last used, to sort the preset strips. */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE presets ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE presets ADD COLUMN lastUsed INTEGER NOT NULL DEFAULT 0")
             }
         }
 

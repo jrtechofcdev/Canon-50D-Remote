@@ -34,6 +34,67 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.SettingsSuggest
+import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.TouchApp
+import androidx.compose.material.icons.outlined.Crop
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.AddAPhoto
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.Backup
+import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.BatteryStd
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.BlurOn
+import androidx.compose.material.icons.outlined.BrandingWatermark
+import androidx.compose.material.icons.outlined.Calculate
+import androidx.compose.material.icons.outlined.Compress
+import androidx.compose.material.icons.outlined.CreateNewFolder
+import androidx.compose.material.icons.outlined.DriveFileRenameOutline
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.outlined.Exposure
+import androidx.compose.material.icons.outlined.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.FolderSpecial
+import androidx.compose.material.icons.outlined.Fullscreen
+import androidx.compose.material.icons.outlined.HdrStrong
+import androidx.compose.material.icons.outlined.HelpOutline
+import androidx.compose.material.icons.outlined.HideImage
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.LastPage
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.PowerSettingsNew
+import androidx.compose.material.icons.outlined.SaveAlt
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.SdCard
+import androidx.compose.material.icons.outlined.SdCardAlert
+import androidx.compose.material.icons.outlined.SkipNext
+import androidx.compose.material.icons.outlined.Slideshow
+import androidx.compose.material.icons.outlined.Smartphone
+import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material.icons.outlined.Style
+import androidx.compose.material.icons.outlined.Summarize
+import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.ThumbUp
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Usb
+import androidx.compose.material.icons.outlined.UsbOff
+import androidx.compose.material.icons.outlined.Verified
+import androidx.compose.material.icons.outlined.Vibration
+import androidx.compose.material.icons.outlined.Videocam
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Folder
@@ -94,10 +155,11 @@ import com.example.BuildConfig
 import kotlinx.coroutines.launch
 
 enum class SettingsSection(val route: String, val title: String, val summary: String, val icon: ImageVector) {
+    Profiles("profiles", "Perfis e backup", "Sets prontos por evento, salvar e restaurar tudo", Icons.Outlined.SettingsSuggest),
     Save("save", "Salvamento", "Formato, pastas RAW e JPG, sessão e nomes", Icons.Outlined.Folder),
-    Review("review", "Revisão", "Slide automático, estrelas, histograma, estouro", Icons.Outlined.PhotoLibrary),
+    Review("review", "Revisão", "Slide automático, galeria, culling, histograma", Icons.Outlined.PhotoLibrary),
     Camera("camera", "Câmera", "Bateria, cartão, exposições salvas, bracketing", Icons.Outlined.CameraAlt),
-    Share("share", "Envio e cliente", "WhatsApp leve, marca d'água, modo cliente", Icons.Outlined.Send),
+    Share("share", "Envio e cliente", "WhatsApp, marca d'água, modo cliente", Icons.Outlined.Send),
     Presets("presets", "Presets", "Look das fotos novas, cópia editada, pastas", Icons.Outlined.AutoAwesome),
     Messages("messages", "Mensagens", "Textos prontos para o WhatsApp do cliente", Icons.AutoMirrored.Outlined.Chat),
     Alerts("alerts", "Alertas", "Vibração, desconexão, reenvio, resumo", Icons.Outlined.NotificationsActive),
@@ -151,6 +213,7 @@ fun SettingsSectionScreen(app: TetherApp, section: SettingsSection, onBack: () -
     val settings = s ?: return
     SettingsPage(title = section.title, onBack = onBack) {
         when (section) {
+            SettingsSection.Profiles -> ProfilesSettings(app)
             SettingsSection.Save -> SaveSettings(app, settings)
             SettingsSection.Review -> ReviewSettings(app, settings)
             SettingsSection.Camera -> CameraSettings(app, settings)
@@ -200,21 +263,21 @@ private fun SaveSettings(app: TetherApp, s: Settings) {
         }
     }
 
-    SettingsGroup("O que vem para o celular") {
+    SettingsGroup("O que vem para o celular", Icons.Outlined.PhoneAndroid) {
         ChoiceRow("Formato", DownloadMode.entries.map { it to it.label }, s.downloadMode) {
             scope.launch { app.settings.setDownloadMode(it) }
         }
         InfoText("A câmera grava tudo no cartão. Aqui você escolhe o que também é salvo no celular.")
     }
 
-    SettingsGroup("Pastas") {
+    SettingsGroup("Pastas", Icons.Outlined.Folder) {
         FolderRow("Pasta dos JPG", app.store.describeTree(s.jpgFolder), s.downloadMode.jpg,
             onPick = { pickJpg.launch(null) }, onReset = s.jpgFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.jpgFolder, null) } } })
         FolderRow("Pasta dos RAW (CR2)", app.store.describeTree(s.rawFolder), s.downloadMode.raw,
             onPick = { pickRaw.launch(null) }, onReset = s.rawFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.rawFolder, null) } } })
     }
 
-    SettingsGroup("Sessão / cliente") {
+    SettingsGroup("Sessão / cliente", Icons.Outlined.Badge) {
         var name by remember { mutableStateOf(s.sessionName) }
         OutlinedTextField(
             value = name,
@@ -228,15 +291,15 @@ private fun SaveSettings(app: TetherApp, s: Settings) {
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         )
         val example = s.sessionName.ifBlank { "Casamento" }
-        ToggleRow("Criar subpasta com o nome da sessão", "Ex.: …/JPG/$example/", s.sessionSubfolder) {
+        ToggleRow(Icons.Outlined.CreateNewFolder, "Criar subpasta com o nome da sessão", "Ex.: …/JPG/$example/", s.sessionSubfolder) {
             scope.launch { app.settings.set(SettingKeys.sessionSubfolder, it) }
         }
-        ToggleRow("Renomear arquivos com o nome da sessão", "Ex.: ${example}_0001.JPG em vez de IMG_1234.JPG", s.renameWithSession) {
+        ToggleRow(Icons.Outlined.DriveFileRenameOutline, "Renomear arquivos com o nome da sessão", "Ex.: ${example}_0001.JPG em vez de IMG_1234.JPG", s.renameWithSession) {
             scope.launch { app.settings.set(SettingKeys.renameWithSession, it) }
         }
     }
 
-    SettingsGroup("Backup") {
+    SettingsGroup("Backup", Icons.Outlined.Backup) {
         FolderRow(
             "Pasta de backup",
             s.backupFolder?.let { app.store.describeTree(it) } ?: "Nenhuma (escolha o cartão SD ou um pendrive OTG)",
@@ -244,14 +307,14 @@ private fun SaveSettings(app: TetherApp, s: Settings) {
             onPick = { pickBackup.launch(null) },
             onReset = s.backupFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.backupFolder, null) } } },
         )
-        ToggleRow("Oferecer backup ao finalizar sessão", "O botão fica em destaque no resumo da sessão", s.backupOffer, enabled = s.backupFolder != null) {
+        ToggleRow(Icons.Outlined.Backup, "Oferecer backup ao finalizar sessão", "O botão fica em destaque no resumo da sessão", s.backupOffer, enabled = s.backupFolder != null) {
             scope.launch { app.settings.set(SettingKeys.backupOffer, it) }
         }
         InfoText("Copia RAW, JPG, editadas e notas da sessão e confere o tamanho de cada arquivo.")
     }
 
-    SettingsGroup("Localização") {
-        ToggleRow("GPS nas fotos", "Grava onde a foto foi feita nas cópias editadas e nos JPG leves. Usa o GPS do celular, funciona sem internet", s.gpsEnabled) { on ->
+    SettingsGroup("Localização", Icons.Outlined.LocationOn) {
+        ToggleRow(Icons.Outlined.LocationOn, "GPS nas fotos", "Grava onde a foto foi feita nas cópias editadas e nos JPG leves. Usa o GPS do celular, funciona sem internet", s.gpsEnabled) { on ->
             if (on && !app.location.hasPermission()) askLocation.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
             else scope.launch {
                 app.settings.set(SettingKeys.gpsEnabled, on)
@@ -260,8 +323,8 @@ private fun SaveSettings(app: TetherApp, s: Settings) {
         }
     }
 
-    SettingsGroup("Momentos do evento") {
-        ToggleRow("Usar momentos", "Chip Momento na Sessão: cada foto nova recebe o momento escolhido", s.momentsEnabled) {
+    SettingsGroup("Momentos do evento", Icons.Outlined.Flag) {
+        ToggleRow(Icons.Outlined.Flag, "Usar momentos", "Chip Momento na Sessão: cada foto nova recebe o momento escolhido", s.momentsEnabled) {
             scope.launch { app.settings.set(SettingKeys.momentsEnabled, it) }
         }
         var list by remember { mutableStateOf(s.moments.joinToString("\n")) }
@@ -276,7 +339,7 @@ private fun SaveSettings(app: TetherApp, s: Settings) {
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             minLines = 3,
         )
-        ToggleRow("Subpasta por momento", "Ex.: …/JPG/${s.sessionName.ifBlank { "Casamento" }}/02 Cerimônia/", s.momentSubfolder, enabled = s.momentsEnabled) {
+        ToggleRow(Icons.Outlined.FolderSpecial, "Subpasta por momento", "Ex.: …/JPG/${s.sessionName.ifBlank { "Casamento" }}/02 Cerimônia/", s.momentSubfolder, enabled = s.momentsEnabled) {
             scope.launch { app.settings.set(SettingKeys.momentSubfolder, it) }
         }
     }
@@ -309,14 +372,20 @@ private fun FolderRow(title: String, path: String, active: Boolean, onPick: () -
 @Composable
 private fun MessageSettings(app: TetherApp, s: Settings) {
     val scope = rememberCoroutineScope()
-    InfoText("Campos preenchidos sozinhos: {cliente} (nome da sessão), {quantidade}, {data} e {lista} (nomes das fotos). Use *asteriscos* para negrito no WhatsApp.")
+    SettingsGroup("Envio pelo WhatsApp", Icons.Outlined.Send) {
+        ToggleRow(Icons.AutoMirrored.Outlined.Chat, "Mensagem automática ao enviar", "Usa o texto \"Envio das fotos\" abaixo", s.whatsAutoMessage) {
+            scope.launch { app.settings.set(SettingKeys.whatsAutoMessage, it) }
+        }
+    }
+    InfoText("Campos preenchidos sozinhos: {cliente} (nome digitado ou da sessão), {quantidade}, {data} e {lista} (nomes das fotos). Use *asteriscos* para negrito no WhatsApp.")
     listOf(
+        Triple(MessageKind.WhatsApp, SettingKeys.msgWhatsApp, MessageDefaults.WHATSAPP),
         Triple(MessageKind.Preview, SettingKeys.msgPreview, MessageDefaults.PREVIEW),
         Triple(MessageKind.Delivered, SettingKeys.msgDelivered, MessageDefaults.DELIVERED),
         Triple(MessageKind.Payment, SettingKeys.msgPayment, MessageDefaults.PAYMENT),
         Triple(MessageKind.Selection, SettingKeys.msgSelection, MessageDefaults.SELECTION),
     ).forEach { (kind, key, default) ->
-        SettingsGroup(kind.label) {
+        SettingsGroup(kind.label, Icons.AutoMirrored.Outlined.Chat) {
             var text by remember(kind) { mutableStateOf(s.template(kind)) }
             OutlinedTextField(
                 value = text,
@@ -349,9 +418,10 @@ private fun PresetSettingsSection(app: TetherApp, s: Settings) {
     }
     val pickEdited = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.editedFolder, it) } }
 
-    SettingsGroup("Fotos novas") {
+    SettingsGroup("Fotos novas", Icons.Outlined.AddAPhoto) {
         val current = presets.firstOrNull { it.id == s.sessionPresetId }
         ToggleRow(
+            Icons.Outlined.AutoAwesome,
             "Aplicar o look da sessão",
             current?.let { "Preset atual: ${it.name}. Troque na Sessão (Look) ou na aba Presets." }
                 ?: "Nenhum preset escolhido. Escolha na Sessão (Look) ou na aba Presets.",
@@ -364,8 +434,8 @@ private fun PresetSettingsSection(app: TetherApp, s: Settings) {
         InfoText("O look é como um perfil de cor: a foto aparece processada, mas o JPG e o RAW da câmera não mudam.")
     }
 
-    SettingsGroup("Cópia editada") {
-        ToggleRow("Salvar cópia editada", "Um JPG com o preset aplicado, ao lado do original", s.saveEditedCopy) { set(SettingKeys.saveEditedCopy, it) }
+    SettingsGroup("Cópia editada", Icons.Outlined.SaveAlt) {
+        ToggleRow(Icons.Outlined.SaveAlt, "Salvar cópia editada", "Um JPG com o preset aplicado, ao lado do original", s.saveEditedCopy) { set(SettingKeys.saveEditedCopy, it) }
         SliderRow("Qualidade do JPG", s.editedQuality, 70..100, enabled = s.saveEditedCopy) {
             scope.launch { app.settings.set(SettingKeys.editedQuality, it) }
         }
@@ -374,7 +444,7 @@ private fun PresetSettingsSection(app: TetherApp, s: Settings) {
         InfoText("Só com RAW (sem JPG), a cópia sai do JPEG embutido no CR2, em resolução menor.")
     }
 
-    SettingsGroup("Pasta de presets") {
+    SettingsGroup("Pasta de presets", Icons.Outlined.FolderOpen) {
         FolderRow(
             "Pasta de presets",
             s.presetsFolder?.let { app.store.describeTree(it) } ?: "Só dentro do app",
@@ -385,10 +455,11 @@ private fun PresetSettingsSection(app: TetherApp, s: Settings) {
         InfoText("Cada preset é salvo nela como .xmp. Arquivos .xmp, .dng e .lrtemplate colocados nela entram no app quando ele abre.")
     }
 
-    SettingsGroup("Visualizador e modo cliente") {
-        ToggleRow("Presets no visualizador", "Faixa de presets e botão Calibrar embaixo da foto", s.viewerPresets) { set(SettingKeys.viewerPresets, it) }
-        ToggleRow("Presets no modo cliente", "O cliente pode trocar o look da foto", s.clientPresetsEnabled) { set(SettingKeys.clientPresetsEnabled, it) }
+    SettingsGroup("Visualizador e modo cliente", Icons.Outlined.Visibility) {
+        ToggleRow(Icons.Outlined.Tune, "Presets no visualizador", "Faixa de presets e botão Calibrar embaixo da foto", s.viewerPresets) { set(SettingKeys.viewerPresets, it) }
+        ToggleRow(Icons.Outlined.Style, "Presets no modo cliente", "O cliente pode trocar o look da foto", s.clientPresetsEnabled) { set(SettingKeys.clientPresetsEnabled, it) }
         ToggleRow(
+            Icons.Outlined.Lock,
             "Pedir PIN para calibrar",
             if (s.clientPin.isEmpty()) "Defina um PIN em Envio e cliente para usar" else "No modo cliente, Calibrar pede o PIN",
             s.clientCalibratePin,
@@ -396,7 +467,7 @@ private fun PresetSettingsSection(app: TetherApp, s: Settings) {
         ) { set(SettingKeys.clientCalibratePin, it) }
     }
 
-    SettingsGroup("Limites") {
+    SettingsGroup("Limites", Icons.Outlined.Info) {
         InfoText(
             "A prévia imita o processamento do Lightroom, sem ser idêntica. O XMP exportado dá o resultado exato no Lightroom. " +
                 "Máscaras, remoção de manchas, correção de lente e perfis de câmera da Adobe não são aplicados.",
@@ -411,32 +482,40 @@ private fun ReviewSettings(app: TetherApp, s: Settings) {
     val scope = rememberCoroutineScope()
     fun set(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>, v: Boolean) = scope.launch { app.settings.set(key, v) }
 
-    SettingsGroup("Foto nova") {
-        ToggleRow("Ir para a foto nova automaticamente", "Com uma foto aberta em tela cheia, desliza para a que acabou de chegar", s.autoSlideToNew) { set(SettingKeys.autoSlideToNew, it) }
-        ToggleRow("Só se eu estiver na última foto", "Não interrompe quando você está revendo fotos antigas", s.autoSlideOnlyAtLatest, enabled = s.autoSlideToNew) { set(SettingKeys.autoSlideOnlyAtLatest, it) }
-        ToggleRow("Abrir em tela cheia ao receber", "Na tela Sessão, cada foto nova abre direto no visualizador", s.autoOpenViewer) { set(SettingKeys.autoOpenViewer, it) }
+    SettingsGroup("Foto nova", Icons.Outlined.AddPhotoAlternate) {
+        ToggleRow(Icons.Outlined.SkipNext, "Ir para a foto nova automaticamente", "Com uma foto aberta em tela cheia, desliza para a que acabou de chegar", s.autoSlideToNew) { set(SettingKeys.autoSlideToNew, it) }
+        ToggleRow(Icons.Outlined.LastPage, "Só se eu estiver na última foto", "Não interrompe quando você está revendo fotos antigas", s.autoSlideOnlyAtLatest, enabled = s.autoSlideToNew) { set(SettingKeys.autoSlideOnlyAtLatest, it) }
+        ToggleRow(Icons.Outlined.Fullscreen, "Abrir em tela cheia ao receber", "Na tela Sessão, cada foto nova abre direto no visualizador", s.autoOpenViewer) { set(SettingKeys.autoOpenViewer, it) }
     }
-    SettingsGroup("Avaliação") {
-        ToggleRow("Estrelas (1 a 5)", "Mostra as estrelas no visualizador e o filtro na galeria", s.ratingEnabled) { set(SettingKeys.ratingEnabled, it) }
+    SettingsGroup("Galeria", Icons.Outlined.GridView) {
+        ChoiceRow(
+            "Tamanho das miniaturas",
+            listOf(84 to "Pequenas", 112 to "Médias", 150 to "Grandes"),
+            s.galleryThumb,
+            icon = Icons.Outlined.GridView,
+        ) { scope.launch { app.settings.set(SettingKeys.galleryThumb, it) } }
     }
-    SettingsGroup("Seleção com análise local") {
+    SettingsGroup("Avaliação", Icons.Outlined.StarOutline) {
+        ToggleRow(Icons.Outlined.StarOutline, "Estrelas (1 a 5)", "Mostra as estrelas no visualizador e o filtro na galeria", s.ratingEnabled) { set(SettingKeys.ratingEnabled, it) }
+    }
+    SettingsGroup("Seleção com análise local", Icons.Outlined.AutoAwesome) {
         InfoText("Cada foto é analisada no próprio celular, sem internet: nitidez, rostos e olhos, exposição e fotos parecidas.")
-        ToggleRow("Alerta de foto tremida", "Selo \"Tremida\" e aviso quando a foto sai tremida ou fora de foco", s.blurAlert) { set(SettingKeys.blurAlert, it) }
+        ToggleRow(Icons.Outlined.BlurOn, "Alerta de foto tremida", "Selo \"Tremida\" e aviso quando a foto sai tremida ou fora de foco", s.blurAlert) { set(SettingKeys.blurAlert, it) }
         SliderRow("Sensibilidade do alerta", s.blurThreshold, 30..70, enabled = s.blurAlert, format = { v -> when { v < 44 -> "baixa ($v)"; v < 57 -> "média ($v)"; else -> "alta ($v)" } }) {
             scope.launch { app.settings.set(SettingKeys.blurThreshold, it) }
         }
-        ToggleRow("Olhos fechados", "Detecta rostos e avisa quando alguém piscou", s.eyesCheck) { set(SettingKeys.eyesCheck, it) }
-        ToggleRow("Vibrar no problema", "Dois toques curtos, diferentes do aviso de foto recebida", s.blurVibrate, enabled = s.blurAlert || s.eyesCheck) { set(SettingKeys.blurVibrate, it) }
-        ToggleRow("Sugerir as melhores", "Entre fotos parecidas, marca a melhor como Sugerida", s.cullSuggestions) { set(SettingKeys.cullSuggestions, it) }
-        ToggleRow("Esconder rejeitadas na galeria", "Os arquivos continuam salvos; veja na aba Culling → Rejeitadas", s.hideRejected) { set(SettingKeys.hideRejected, it) }
+        ToggleRow(Icons.Outlined.VisibilityOff, "Olhos fechados", "Detecta rostos e avisa quando alguém piscou", s.eyesCheck) { set(SettingKeys.eyesCheck, it) }
+        ToggleRow(Icons.Outlined.Vibration, "Vibrar no problema", "Dois toques curtos, diferentes do aviso de foto recebida", s.blurVibrate, enabled = s.blurAlert || s.eyesCheck) { set(SettingKeys.blurVibrate, it) }
+        ToggleRow(Icons.Outlined.ThumbUp, "Sugerir as melhores", "Entre fotos parecidas, marca a melhor como Sugerida", s.cullSuggestions) { set(SettingKeys.cullSuggestions, it) }
+        ToggleRow(Icons.Outlined.HideImage, "Esconder rejeitadas na galeria", "Os arquivos continuam salvos; veja na aba Culling → Rejeitadas", s.hideRejected) { set(SettingKeys.hideRejected, it) }
     }
-    SettingsGroup("Anotações") {
-        ToggleRow("Notas nas fotos", "Texto ou áudio em cada foto, pelo botão de nota no visualizador", s.notesEnabled) { set(SettingKeys.notesEnabled, it) }
+    SettingsGroup("Anotações", Icons.Outlined.EditNote) {
+        ToggleRow(Icons.Outlined.EditNote, "Notas nas fotos", "Texto ou áudio em cada foto, pelo botão de nota no visualizador", s.notesEnabled) { set(SettingKeys.notesEnabled, it) }
     }
-    SettingsGroup("Exposição") {
-        ToggleRow("Histograma", null, s.histogramEnabled) { set(SettingKeys.histogramEnabled, it) }
-        ToggleRow("Histograma RGB", "Desligado: só luminância", s.histogramRgb, enabled = s.histogramEnabled) { set(SettingKeys.histogramRgb, it) }
-        ToggleRow("Alerta de estouro", "Áreas estouradas piscam em vermelho ao abrir a foto", s.highlightAlert) { set(SettingKeys.highlightAlert, it) }
+    SettingsGroup("Exposição", Icons.Outlined.BarChart) {
+        ToggleRow(Icons.Outlined.BarChart, "Histograma", null, s.histogramEnabled) { set(SettingKeys.histogramEnabled, it) }
+        ToggleRow(Icons.Outlined.Palette, "Histograma RGB", "Desligado: só luminância", s.histogramRgb, enabled = s.histogramEnabled) { set(SettingKeys.histogramRgb, it) }
+        ToggleRow(Icons.Outlined.WbSunny, "Alerta de estouro", "Áreas estouradas piscam em vermelho ao abrir a foto", s.highlightAlert) { set(SettingKeys.highlightAlert, it) }
         SliderRow("Limite do estouro", s.highlightThreshold, 235..255, enabled = s.highlightAlert) {
             scope.launch { app.settings.set(SettingKeys.highlightThreshold, it) }
         }
@@ -452,25 +531,26 @@ private fun CameraSettings(app: TetherApp, s: Settings) {
     val state by app.camera.state.collectAsState()
     fun set(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>, v: Boolean) = scope.launch { app.settings.set(key, v) }
 
-    SettingsGroup("Conexão") {
-        ToggleRow("Manter a câmera ligada", "Evita o desligamento automático da 50D durante a sessão", s.keepCameraAwake) { set(SettingKeys.keepCameraAwake, it) }
-        ToggleRow("Mostrar bateria da câmera", "No topo da Sessão e aviso quando estiver baixa", s.showBattery) { set(SettingKeys.showBattery, it) }
+    SettingsGroup("Conexão", Icons.Outlined.Usb) {
+        ToggleRow(Icons.Outlined.PowerSettingsNew, "Manter a câmera ligada", "Evita o desligamento automático da 50D durante a sessão", s.keepCameraAwake) { set(SettingKeys.keepCameraAwake, it) }
+        ToggleRow(Icons.Outlined.BatteryStd, "Mostrar bateria da câmera", "No topo da Sessão e aviso quando estiver baixa", s.showBattery) { set(SettingKeys.showBattery, it) }
         ToggleRow(
+            Icons.Outlined.Schedule,
             "Acertar o relógio da câmera",
             "Ao conectar, a 50D fica com a hora do celular. Útil com duas câmeras no mesmo evento. Se a câmera não aceitar, a opção se desliga sozinha",
             s.syncCameraClock,
         ) { set(SettingKeys.syncCameraClock, it) }
-        ToggleRow("Live view", "Chip Live view na Sessão: a imagem da câmera no celular, como monitor externo", s.liveViewEnabled) { set(SettingKeys.liveViewEnabled, it) }
-        ToggleRow("Calculadora de flash e foco", "Chip \"Flash e foco\" na Sessão", s.toolsEnabled) { set(SettingKeys.toolsEnabled, it) }
+        ToggleRow(Icons.Outlined.Videocam, "Live view", "Chip Live view na Sessão: a imagem da câmera no celular, como monitor externo", s.liveViewEnabled) { set(SettingKeys.liveViewEnabled, it) }
+        ToggleRow(Icons.Outlined.Calculate, "Calculadora de flash e foco", "Chip \"Flash e foco\" na Sessão", s.toolsEnabled) { set(SettingKeys.toolsEnabled, it) }
         if (state is ConnectionState.Connected) {
             OutlinedButton(onClick = app.camera::disconnect, modifier = Modifier.padding(vertical = 8.dp)) { Text("Encerrar conexão") }
         }
     }
-    SettingsGroup("Cartão") {
-        ToggleRow("Navegar no cartão", "Botão na Sessão para ver e baixar fotos que já estão no cartão", s.cardBrowserEnabled) { set(SettingKeys.cardBrowserEnabled, it) }
+    SettingsGroup("Cartão", Icons.Outlined.SdCard) {
+        ToggleRow(Icons.Outlined.SdCard, "Navegar no cartão", "Botão na Sessão para ver e baixar fotos que já estão no cartão", s.cardBrowserEnabled) { set(SettingKeys.cardBrowserEnabled, it) }
     }
-    SettingsGroup("Exposições salvas") {
-        ToggleRow("Usar exposições salvas", "Salve ISO, Av, Tv, ±EV e WB e aplique com um toque na Sessão", s.presetsEnabled) { set(SettingKeys.presetsEnabled, it) }
+    SettingsGroup("Exposições salvas", Icons.Outlined.Exposure) {
+        ToggleRow(Icons.Outlined.Exposure, "Usar exposições salvas", "Salve ISO, Av, Tv, ±EV e WB e aplique com um toque na Sessão", s.presetsEnabled) { set(SettingKeys.presetsEnabled, it) }
         val presets = s.exposurePresets
         if (presets.isEmpty()) InfoText("Nenhuma exposição salva. Na Sessão, toque em Exposições → Salvar atual.")
         presets.forEachIndexed { i, p ->
@@ -495,8 +575,8 @@ private fun CameraSettings(app: TetherApp, s: Settings) {
             }
         }
     }
-    SettingsGroup("Bracketing (AEB)") {
-        ToggleRow("Bracketing pelo app", "Botão na Sessão que faz a sequência variando a exposição", s.aebEnabled) { set(SettingKeys.aebEnabled, it) }
+    SettingsGroup("Bracketing (AEB)", Icons.Outlined.HdrStrong) {
+        ToggleRow(Icons.Outlined.HdrStrong, "Bracketing pelo app", "Botão na Sessão que faz a sequência variando a exposição", s.aebEnabled) { set(SettingKeys.aebEnabled, it) }
         ChoiceRow("Fotos por sequência", listOf(3 to "3", 5 to "5", 7 to "7"), s.aebShots, enabled = s.aebEnabled) {
             scope.launch { app.settings.set(SettingKeys.aebShots, it) }
         }
@@ -527,8 +607,8 @@ private fun ShareSettings(app: TetherApp, s: Settings) {
         }
     }
 
-    SettingsGroup("Envio leve (WhatsApp)") {
-        ToggleRow("Opção \"JPG leve\" ao enviar", "Cópia reduzida, rápida no 4G. O original não muda.", s.lightShareEnabled) { set(SettingKeys.lightShareEnabled, it) }
+    SettingsGroup("Envio leve (WhatsApp)", Icons.Outlined.Compress) {
+        ToggleRow(Icons.Outlined.Compress, "Opção \"JPG leve\" ao enviar", "Cópia reduzida, rápida no 4G. O original não muda.", s.lightShareEnabled) { set(SettingKeys.lightShareEnabled, it) }
         ChoiceRow(
             "Tamanho (lado maior)",
             listOf(1080 to "1080 px", 1600 to "1600 px", 2048 to "2048 px", 0 to "Original"),
@@ -540,8 +620,20 @@ private fun ShareSettings(app: TetherApp, s: Settings) {
         }
     }
 
-    SettingsGroup("Marca d'água") {
-        ToggleRow("Aplicar marca d'água", "Só nas cópias leves enviadas. Os arquivos salvos ficam sem marca.", s.watermarkEnabled) {
+    SettingsGroup("WhatsApp do cliente", Icons.AutoMirrored.Outlined.Chat) {
+        ToggleRow(Icons.Outlined.Person, "Pedir o nome do cliente", "Obrigatório antes de abrir a conversa; entra no {cliente} da mensagem", s.whatsRequireName) { set(SettingKeys.whatsRequireName, it) }
+        ToggleRow(Icons.AutoMirrored.Outlined.Chat, "Mensagem automática", "A conversa abre com o texto de Ajustes → Mensagens → Envio das fotos", s.whatsAutoMessage) { set(SettingKeys.whatsAutoMessage, it) }
+        ChoiceRow(
+            "O que vai por padrão",
+            listOf("LIGHT" to "Pronta (leve + marca)", "EDITED" to "Editada", "JPG" to "JPG original"),
+            s.whatsDefaultSet,
+            icon = Icons.Outlined.Image,
+        ) { scope.launch { app.settings.set(SettingKeys.whatsDefaultSet, it) } }
+        InfoText("O envio é em dois toques: 1 abre a conversa do cliente com a mensagem; 2 manda as fotos nessa mesma conversa.")
+    }
+
+    SettingsGroup("Marca d'água", Icons.Outlined.BrandingWatermark) {
+        ToggleRow(Icons.Outlined.BrandingWatermark, "Aplicar marca d'água", "Só nas cópias leves enviadas. Os arquivos salvos ficam sem marca.", s.watermarkEnabled) {
             set(SettingKeys.watermarkEnabled, it)
         }
         val source = WatermarkSource.of(s.watermarkSource)
@@ -573,13 +665,22 @@ private fun ShareSettings(app: TetherApp, s: Settings) {
         }
     }
 
-    SettingsGroup("Modo cliente") {
-        ToggleRow("Mostrar botão Modo cliente", "Tela cheia só com as fotos, para o cliente acompanhar", s.clientModeEnabled) { set(SettingKeys.clientModeEnabled, it) }
-        ToggleRow("Cliente recebe no WhatsApp", "Botão para o cliente digitar o número dele e receber a foto pronta", s.clientWhatsApp, enabled = s.clientModeEnabled) { set(SettingKeys.clientWhatsApp, it) }
-        ToggleRow("Cliente escolhe as fotos", "Coração em cada foto; a seleção aparece na galeria e no resumo da sessão", s.clientPicksEnabled, enabled = s.clientModeEnabled) { set(SettingKeys.clientPicksEnabled, it) }
-        ToggleRow("Mostrar nome e exposição", null, s.clientShowInfo, enabled = s.clientModeEnabled) { set(SettingKeys.clientShowInfo, it) }
-        ToggleRow("Assinatura Jr_Tech_OFC", "Símbolo e nome discretos no canto da tela", s.clientShowBrand, enabled = s.clientModeEnabled) { set(SettingKeys.clientShowBrand, it) }
-        ToggleRow("Só favoritas", "Mostra apenas as fotos marcadas com estrela de favorita", s.clientOnlyFavorites, enabled = s.clientModeEnabled) { set(SettingKeys.clientOnlyFavorites, it) }
+    SettingsGroup("Modo cliente", Icons.Outlined.Slideshow) {
+        ToggleRow(Icons.Outlined.Slideshow, "Mostrar botão Modo cliente", "Tela cheia só com as fotos, para o cliente acompanhar", s.clientModeEnabled) { set(SettingKeys.clientModeEnabled, it) }
+        ToggleRow(Icons.Outlined.Send, "Cliente recebe no WhatsApp", "Botão para o cliente digitar o número dele e receber a foto pronta", s.clientWhatsApp, enabled = s.clientModeEnabled) { set(SettingKeys.clientWhatsApp, it) }
+        ToggleRow(Icons.Outlined.FavoriteBorder, "Cliente escolhe as fotos", "Coração em cada foto; a seleção aparece na galeria e no resumo da sessão", s.clientPicksEnabled, enabled = s.clientModeEnabled) { set(SettingKeys.clientPicksEnabled, it) }
+        ToggleRow(Icons.Outlined.Info, "Mostrar nome e exposição", null, s.clientShowInfo, enabled = s.clientModeEnabled) { set(SettingKeys.clientShowInfo, it) }
+        ToggleRow(Icons.Outlined.Verified, "Assinatura Jr_Tech_OFC", "Símbolo e nome discretos no canto da tela", s.clientShowBrand, enabled = s.clientModeEnabled) { set(SettingKeys.clientShowBrand, it) }
+        ToggleRow(Icons.Outlined.Favorite, "Só favoritas", "Mostra apenas as fotos marcadas com estrela de favorita", s.clientOnlyFavorites, enabled = s.clientModeEnabled) { set(SettingKeys.clientOnlyFavorites, it) }
+        ToggleRow(Icons.Outlined.Crop, "Botão Recortar", "Recorte rápido no modo cliente (pede o PIN, se houver)", s.clientCropEnabled, enabled = s.clientModeEnabled) { set(SettingKeys.clientCropEnabled, it) }
+        ToggleRow(Icons.AutoMirrored.Outlined.Logout, "Botão Sair", "No canto de cima. Com PIN, ele é pedido para sair", s.clientExitButton, enabled = s.clientModeEnabled) { on ->
+            // At least one way out always stays on.
+            scope.launch {
+                app.settings.set(SettingKeys.clientExitButton, on)
+                if (!on) app.settings.set(SettingKeys.clientExitHold, true)
+            }
+        }
+        ToggleRow(Icons.Outlined.TouchApp, "Sair segurando o dedo 3 s", "Um dedo parado na tela por 3 segundos", s.clientExitHold, enabled = s.clientModeEnabled && s.clientExitButton) { set(SettingKeys.clientExitHold, it) }
         ChoiceRow(
             "Passar as fotos",
             listOf(0 to "Só quando chega foto", 3 to "A cada 3 s", 5 to "5 s", 10 to "10 s"),
@@ -601,7 +702,13 @@ private fun ShareSettings(app: TetherApp, s: Settings) {
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         )
-        InfoText("Para sair do modo cliente, segure o dedo na tela por 3 segundos.")
+        InfoText(
+            when {
+                s.clientExitButton && s.clientExitHold -> "Para sair: botão Sair no canto de cima, ou segure o dedo na tela por 3 segundos."
+                s.clientExitButton -> "Para sair: botão Sair no canto de cima."
+                else -> "Para sair: segure o dedo na tela por 3 segundos."
+            },
+        )
     }
 }
 
@@ -661,24 +768,24 @@ private fun AlertSettings(app: TetherApp, s: Settings) {
     val scope = rememberCoroutineScope()
     fun set(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>, v: Boolean) = scope.launch { app.settings.set(key, v) }
 
-    SettingsGroup("Avisos") {
-        ToggleRow("Vibrar a cada foto recebida", "Um toque curto, sem som", s.vibrateOnReceive) { set(SettingKeys.vibrateOnReceive, it) }
-        ToggleRow("Alerta se a câmera desconectar", "Vibração forte e notificação", s.alertOnDisconnect) { set(SettingKeys.alertOnDisconnect, it) }
-        ToggleRow("Aviso de cartão quase cheio", null, s.cardLowWarning) { set(SettingKeys.cardLowWarning, it) }
+    SettingsGroup("Avisos", Icons.Outlined.NotificationsActive) {
+        ToggleRow(Icons.Outlined.Vibration, "Vibrar a cada foto recebida", "Um toque curto, sem som", s.vibrateOnReceive) { set(SettingKeys.vibrateOnReceive, it) }
+        ToggleRow(Icons.Outlined.UsbOff, "Alerta se a câmera desconectar", "Vibração forte e notificação", s.alertOnDisconnect) { set(SettingKeys.alertOnDisconnect, it) }
+        ToggleRow(Icons.Outlined.SdCardAlert, "Aviso de cartão quase cheio", null, s.cardLowWarning) { set(SettingKeys.cardLowWarning, it) }
         SliderRow("Avisar abaixo de", s.cardLowShots, 10..300, step = 10, enabled = s.cardLowWarning, format = { "$it fotos" }) {
             scope.launch { app.settings.set(SettingKeys.cardLowShots, it) }
         }
-        ToggleRow("Aviso de memória do celular", null, s.phoneLowWarning) { set(SettingKeys.phoneLowWarning, it) }
+        ToggleRow(Icons.Outlined.Storage, "Aviso de memória do celular", null, s.phoneLowWarning) { set(SettingKeys.phoneLowWarning, it) }
         SliderRow("Avisar abaixo de", s.phoneLowGb, 1..20, enabled = s.phoneLowWarning, format = { "$it GB" }) {
             scope.launch { app.settings.set(SettingKeys.phoneLowGb, it) }
         }
     }
-    SettingsGroup("Reenvio automático") {
-        ToggleRow("Baixar fotos pendentes ao reconectar", "Fotos feitas com o cabo solto, ou que falharam, vêm do cartão quando a câmera volta", s.autoResend) { set(SettingKeys.autoResend, it) }
-        ToggleRow("Perguntar antes de baixar", null, s.resendAsk, enabled = s.autoResend) { set(SettingKeys.resendAsk, it) }
+    SettingsGroup("Reenvio automático", Icons.Outlined.Sync) {
+        ToggleRow(Icons.Outlined.Sync, "Baixar fotos pendentes ao reconectar", "Fotos feitas com o cabo solto, ou que falharam, vêm do cartão quando a câmera volta", s.autoResend) { set(SettingKeys.autoResend, it) }
+        ToggleRow(Icons.Outlined.HelpOutline, "Perguntar antes de baixar", null, s.resendAsk, enabled = s.autoResend) { set(SettingKeys.resendAsk, it) }
     }
-    SettingsGroup("Fim da sessão") {
-        ToggleRow("Mostrar resumo da sessão", "Ao encerrar: total, espaço usado, favoritas e envio ao Lightroom", s.sessionSummary) { set(SettingKeys.sessionSummary, it) }
+    SettingsGroup("Fim da sessão", Icons.Outlined.Summarize) {
+        ToggleRow(Icons.Outlined.Summarize, "Mostrar resumo da sessão", "Ao encerrar: total, espaço usado, favoritas e envio ao Lightroom", s.sessionSummary) { set(SettingKeys.sessionSummary, it) }
     }
 }
 
@@ -687,16 +794,16 @@ private fun AlertSettings(app: TetherApp, s: Settings) {
 @Composable
 private fun DisplaySettings(app: TetherApp, s: Settings) {
     val scope = rememberCoroutineScope()
-    SettingsGroup("Modo escuro total") {
-        ToggleRow("Ativar", "Cores ainda mais escuras e brilho reduzido, para igrejas e eventos à noite", s.nightMode) {
+    SettingsGroup("Modo escuro total", Icons.Outlined.Bedtime) {
+        ToggleRow(Icons.Outlined.Bedtime, "Ativar", "Cores ainda mais escuras e brilho reduzido, para igrejas e eventos à noite", s.nightMode) {
             scope.launch { app.settings.set(SettingKeys.nightMode, it) }
         }
         SliderRow("Brilho da tela", s.nightBrightness, 1..100, enabled = s.nightMode, format = { "$it%" }) {
             scope.launch { app.settings.set(SettingKeys.nightBrightness, it) }
         }
     }
-    SettingsGroup("Tela") {
-        ToggleRow("Manter a tela ligada", "Enquanto a câmera estiver conectada", s.keepScreenOn) {
+    SettingsGroup("Tela", Icons.Outlined.Smartphone) {
+        ToggleRow(Icons.Outlined.LightMode, "Manter a tela ligada", "Enquanto a câmera estiver conectada", s.keepScreenOn) {
             scope.launch { app.settings.set(SettingKeys.keepScreenOn, it) }
         }
     }

@@ -152,6 +152,8 @@ class ScreenshotTest {
         val photo = app.database.photoDao().inSession("Geral").last()
         app.database.photoDao().setLook(photo.id, preset.id, null)
         app.settings.set(com.example.core.data.SettingKeys.sessionPresetId, preset.id)
+        app.presets.setFavorite(preset.id, true)
+        app.presets.addCategory("Casamentos")
         photo.id
     }
 
@@ -207,7 +209,7 @@ class ScreenshotTest {
     fun clientWithLook() {
         seedLooks()
         rule.setContent { JrLinkTheme { com.example.ui.client.ClientModeScreen(app, onExit = {}, onCalibrate = {}) } }
-        save("cliente_preset", androidx.compose.ui.test.hasText("Sem preset"))
+        save("cliente_preset", androidx.compose.ui.test.hasText("Original"))
     }
 
     @Test
@@ -240,9 +242,26 @@ class ScreenshotTest {
     @Test
     fun clientHeart() {
         seedPhotos()
-        runBlocking { app.database.photoDao().inSession("Geral").last().let { app.database.photoDao().setClientPick(it.id, true) } }
+        runBlocking {
+            app.database.photoDao().inSession("Geral").forEach { app.database.photoDao().setClientPick(it.id, true) }
+            app.settings.set(com.example.core.data.SettingKeys.clientShowInfo, true)
+            app.settings.set(com.example.core.data.SettingKeys.clientPin, "1234")
+        }
         rule.setContent { JrLinkTheme { com.example.ui.client.ClientModeScreen(app, onExit = {}, onCalibrate = {}) } }
-        save("cliente_coracao", androidx.compose.ui.test.hasContentDescription("Tirar da seleção"))
+        save("cliente_coracao", androidx.compose.ui.test.hasText("Escolhida"))
+    }
+
+    @Test
+    fun settingsProfiles() {
+        runBlocking { app.settings.applyProfile(com.example.core.data.SettingsProfiles.starters.first()) }
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Profiles, onBack = {}) } }
+        save("ajustes_perfis", androidx.compose.ui.test.hasText("Ensaio externo"))
+    }
+
+    @Test
+    fun settingsReview() {
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Review, onBack = {}) } }
+        save("ajustes_revisao", androidx.compose.ui.test.hasText("Tamanho das miniaturas"))
     }
 
     @Test

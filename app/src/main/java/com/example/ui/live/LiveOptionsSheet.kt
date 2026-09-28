@@ -9,7 +9,17 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.CenterFocusStrong
+import androidx.compose.material.icons.outlined.Flip
+import androidx.compose.material.icons.outlined.TouchApp
+import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
@@ -25,6 +35,7 @@ import com.example.TetherApp
 import com.example.core.data.SettingKeys
 import com.example.core.data.Settings
 import com.example.core.preset.Preset
+import com.example.core.preset.forPicking
 import com.example.ui.photos.SheetChip
 import com.example.ui.theme.Tone
 import kotlinx.coroutines.launch
@@ -47,7 +58,7 @@ fun LiveOptionsSheet(app: TetherApp, s: Settings, presets: List<Preset>, onDismi
             ChipLine {
                 SheetChip("Sem preset", s.livePresetId < 0) { set(SettingKeys.livePresetId, -1L) }
                 SheetChip("Look da sessão", s.livePresetId == 0L) { set(SettingKeys.livePresetId, 0L) }
-                presets.forEach { p -> SheetChip(p.name, s.livePresetId == p.id) { set(SettingKeys.livePresetId, p.id) } }
+                presets.forPicking().forEach { p -> SheetChip(if (p.favorite) "★ ${p.name}" else p.name, s.livePresetId == p.id) { set(SettingKeys.livePresetId, p.id) } }
             }
             Text(
                 "Mostra a imagem como ela vai ficar, igual a um perfil de cor. As fotos continuam sendo gravadas normalmente.",
@@ -58,13 +69,13 @@ fun LiveOptionsSheet(app: TetherApp, s: Settings, presets: List<Preset>, onDismi
             Label("Guia de enquadramento")
             ChipLine { LiveGrid.entries.forEach { g -> SheetChip(g.label, s.liveGrid == g.id) { set(SettingKeys.liveGrid, g.id) } } }
 
-            Toggle("Zebra (áreas estouradas)", s.liveZebra) { set(SettingKeys.liveZebra, it) }
+            Toggle(Icons.Outlined.WbSunny, "Zebra (áreas estouradas)", s.liveZebra) { set(SettingKeys.liveZebra, it) }
             if (s.liveZebra) ChipLine {
                 listOf(235 to "92%", 245 to "96%", 250 to "98%", 254 to "100%").forEach { (v, l) ->
                     SheetChip(l, s.liveZebraLevel == v) { set(SettingKeys.liveZebraLevel, v) }
                 }
             }
-            Toggle("Focus peaking (o que está em foco)", s.livePeaking) { set(SettingKeys.livePeaking, it) }
+            Toggle(Icons.Outlined.CenterFocusStrong, "Focus peaking (o que está em foco)", s.livePeaking) { set(SettingKeys.livePeaking, it) }
             if (s.livePeaking) {
                 ChipLine {
                     listOf("mint" to "Menta", "red" to "Vermelho", "cyan" to "Ciano", "white" to "Branco").forEach { (id, l) ->
@@ -77,10 +88,10 @@ fun LiveOptionsSheet(app: TetherApp, s: Settings, presets: List<Preset>, onDismi
                     }
                 }
             }
-            Toggle("Histograma", s.liveHistogram) { set(SettingKeys.liveHistogram, it) }
-            Toggle("Toque para focar", s.liveTapToFocus) { set(SettingKeys.liveTapToFocus, it) }
-            Toggle("Espelhar a imagem", s.liveMirror) { set(SettingKeys.liveMirror, it) }
-            Toggle("Mostrar também na tela da câmera", s.liveOnCamera) { set(SettingKeys.liveOnCamera, it) }
+            Toggle(Icons.Outlined.BarChart, "Histograma", s.liveHistogram) { set(SettingKeys.liveHistogram, it) }
+            Toggle(Icons.Outlined.TouchApp, "Toque para focar", s.liveTapToFocus) { set(SettingKeys.liveTapToFocus, it) }
+            Toggle(Icons.Outlined.Flip, "Espelhar a imagem", s.liveMirror) { set(SettingKeys.liveMirror, it) }
+            Toggle(Icons.Outlined.CameraAlt, "Mostrar também na tela da câmera", s.liveOnCamera) { set(SettingKeys.liveOnCamera, it) }
             Text(
                 "Live view gasta mais bateria da 50D. Com a imagem só no celular, a tela da câmera fica apagada.",
                 style = MaterialTheme.typography.bodySmall,
@@ -99,8 +110,9 @@ private fun ChipLine(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun Toggle(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun Toggle(icon: ImageVector, label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = if (checked) Tone.Accent else Tone.TextMuted, modifier = Modifier.padding(end = 12.dp).size(22.dp))
         Text(label, modifier = Modifier.weight(1f))
         Switch(
             checked = checked,

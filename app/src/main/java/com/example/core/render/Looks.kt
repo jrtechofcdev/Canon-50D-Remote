@@ -147,6 +147,7 @@ class Looks(
      */
     suspend fun setLook(photo: Photo, presetId: Long?, adjust: String?) {
         photos.setLook(photo.id, presetId, adjust)
+        presetId?.let { presets.markUsed(it) }
         refreshEdited(photo.copy(presetId = presetId, adjust = adjust))
     }
 

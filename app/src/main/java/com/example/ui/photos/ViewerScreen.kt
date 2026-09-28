@@ -86,7 +86,7 @@ import com.example.ui.PhotoActions
 import com.example.ui.ShareSet
 import com.example.core.preset.Preset
 import com.example.ui.preset.LookImage
-import com.example.ui.preset.PresetStrip
+import com.example.ui.preset.PresetPicker
 import com.example.ui.theme.Tone
 import androidx.compose.material.icons.outlined.Tune
 import kotlinx.coroutines.Dispatchers
@@ -213,9 +213,9 @@ fun ViewerScreen(
             if (settings.viewerPresets && presets.isNotEmpty()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) {
-                        PresetStrip(presets, current.presetId) { picked ->
+                        PresetPicker(app, presets, current.presetId, current.displayUri, onPick = { picked ->
                             scope.launch { app.looks.setLook(current, picked?.id, null) }
-                        }
+                        })
                     }
                     TextButton(onClick = { onCalibrate(current.id) }) {
                         Icon(Icons.Outlined.Tune, contentDescription = null, tint = Tone.Accent, modifier = Modifier.size(18.dp))

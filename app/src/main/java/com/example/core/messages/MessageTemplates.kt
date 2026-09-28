@@ -6,6 +6,10 @@ import java.util.Locale
 
 /** Default WhatsApp texts. Editable in Ajustes → Mensagens; *asterisks* are WhatsApp bold. */
 object MessageDefaults {
+    const val WHATSAPP = "Olá, {cliente}! 📸\n\n" +
+        "Aqui estão suas fotos: *{quantidade}* do dia {data}.\n\n" +
+        "Qualquer dúvida, estou à disposição.\n\n" +
+        "*Jr_Tech_OFC*"
     const val PREVIEW = "Olá, {cliente}! 📸\n\n" +
         "Suas fotos já estão prontas para escolher: *{quantidade} fotos* do dia {data}.\n\n" +
         "Me envie os números das que você mais gostou.\n\n" +
@@ -26,6 +30,7 @@ object MessageDefaults {
 }
 
 enum class MessageKind(val label: String) {
+    WhatsApp("Envio das fotos"),
     Preview("Prévia pronta"),
     Delivered("Fotos entregues"),
     Payment("Lembrete de pagamento"),

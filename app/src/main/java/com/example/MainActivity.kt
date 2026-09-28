@@ -170,6 +170,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenClient = { nav.navigate("client") },
                                 onOpenTools = { nav.navigate("tools") },
                                 onOpenLive = { nav.navigate("live") },
+                                onOpenProfiles = { nav.navigate("settings/${SettingsSection.Profiles.route}") },
                             )
                         }
                         composable(Tab.Cull.route) { CullScreen(app, onBack = null, onOpenPhoto = { nav.navigate("photo/$it") }) }

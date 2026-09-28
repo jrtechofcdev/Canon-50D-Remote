@@ -128,6 +128,22 @@ data class Settings(
     val recentContacts: String = "",
     /** WhatsApp button in client mode: the client types their own number and gets the photo. */
     val clientWhatsApp: Boolean = true,
+    /** Preset categories created by hand, "|" separated (the others come from the presets themselves). */
+    val presetCategoryText: String = "",
+    /** Visible Sair button in client mode (asks the PIN when one is set). */
+    val clientExitButton: Boolean = true,
+    /** Also leave client mode by holding one finger still for 3 s. */
+    val clientExitHold: Boolean = true,
+    val clientCropEnabled: Boolean = true,
+    /** The client's name is asked before sending on WhatsApp. */
+    val whatsRequireName: Boolean = true,
+    /** The WhatsApp chat opens with [msgWhatsApp] already typed. */
+    val whatsAutoMessage: Boolean = true,
+    val msgWhatsApp: String = MessageDefaults.WHATSAPP,
+    /** What goes to WhatsApp by default: LIGHT, EDITED or JPG (a [com.example.ui.ShareSet] name). */
+    val whatsDefaultSet: String = "LIGHT",
+    /** Gallery thumbnail size in dp. */
+    val galleryThumb: Int = 112,
 
     // Live view
     val liveViewEnabled: Boolean = true,
@@ -154,6 +170,8 @@ data class Settings(
     val sessionKey: String get() = sessionName.trim().ifEmpty { "Geral" }
 
     val exposurePresets: List<ExposurePreset> get() = ExposurePreset.decode(presets)
+
+    val presetCategories: List<String> get() = presetCategoryText.split('|').map { it.trim() }.filter { it.isNotEmpty() }
 
     val moments: List<String> get() = momentList.split('|').map { it.trim() }.filter { it.isNotEmpty() }
 }
@@ -260,6 +278,15 @@ object SettingKeys {
     val hideRejected = booleanPreferencesKey("hide_rejected")
     val recentContacts = stringPreferencesKey("recent_contacts")
     val clientWhatsApp = booleanPreferencesKey("client_whatsapp")
+    val presetCategories = stringPreferencesKey("preset_categories")
+    val clientExitButton = booleanPreferencesKey("client_exit_button")
+    val clientExitHold = booleanPreferencesKey("client_exit_hold")
+    val clientCropEnabled = booleanPreferencesKey("client_crop_enabled")
+    val whatsRequireName = booleanPreferencesKey("whats_require_name")
+    val whatsAutoMessage = booleanPreferencesKey("whats_auto_message")
+    val msgWhatsApp = stringPreferencesKey("msg_whatsapp")
+    val whatsDefaultSet = stringPreferencesKey("whats_default_set")
+    val galleryThumb = intPreferencesKey("gallery_thumb")
     val liveViewEnabled = booleanPreferencesKey("live_view_enabled")
     val liveOnCamera = booleanPreferencesKey("live_on_camera")
     val liveGrid = stringPreferencesKey("live_grid")
@@ -291,6 +318,40 @@ class SettingsRepository(private val context: Context) {
     /** Stores a nullable string; null removes the key so the default applies again. */
     suspend fun setOrClear(key: Preferences.Key<String>, value: String?) {
         context.dataStore.edit { prefs: MutablePreferences -> if (value == null) prefs.remove(key) else prefs[key] = value }
+    }
+
+    /** Every stored option by key name, without the ones in [exclude]. Defaults never touched are absent. */
+    suspend fun snapshot(exclude: Set<String> = emptySet()): Map<String, Any> =
+        context.dataStore.data.first().asMap().mapKeys { it.key.name }.filterKeys { it !in exclude }
+
+    /**
+     * Writes [values] in one go. With [replace], stored options not in [values] go back to their
+     * defaults too, except the ones in [keep].
+     */
+    suspend fun apply(values: Map<String, Any>, replace: Boolean = false, keep: Set<String> = emptySet()) {
+        context.dataStore.edit { prefs ->
+            if (replace) prefs.asMap().keys.filter { it.name !in keep && it.name !in values }.forEach { prefs.remove(it) }
+            values.forEach { (name, value) -> SettingsProfiles.keyFor(name, value)?.let { prefs[it] = value } }
+        }
+    }
+
+    /** Profiles the photographer saved (the ready-made ones are in [SettingsProfiles.starters]). */
+    val profiles: Flow<List<SettingsProfile>> = context.dataStore.data.map { SettingsProfiles.decodeList(it[SettingsProfiles.PROFILES]) }
+
+    val activeProfile: Flow<String> = context.dataStore.data.map { it[SettingsProfiles.ACTIVE].orEmpty() }
+
+    suspend fun saveProfiles(list: List<SettingsProfile>) = set(SettingsProfiles.PROFILES, SettingsProfiles.encodeList(list))
+
+    /** Saves the current options as a profile, replacing one with the same name. */
+    suspend fun saveCurrentAs(name: String, icon: String) {
+        val clean = name.trim().take(40).ifEmpty { return }
+        val profile = SettingsProfile(clean, icon, snapshot(SettingsProfiles.personal))
+        saveProfiles(listOf(profile) + profiles.first().filter { it.name != clean })
+    }
+
+    suspend fun applyProfile(profile: SettingsProfile) {
+        apply(profile.values.filterKeys { it !in SettingsProfiles.personal })
+        set(SettingsProfiles.ACTIVE, profile.name)
     }
 
     suspend fun setDownloadMode(mode: DownloadMode) = set(SettingKeys.downloadMode, mode.name)
@@ -386,6 +447,15 @@ class SettingsRepository(private val context: Context) {
             hideRejected = this[k.hideRejected] ?: d.hideRejected,
             recentContacts = this[k.recentContacts] ?: d.recentContacts,
             clientWhatsApp = this[k.clientWhatsApp] ?: d.clientWhatsApp,
+            presetCategoryText = this[k.presetCategories] ?: d.presetCategoryText,
+            clientExitButton = this[k.clientExitButton] ?: d.clientExitButton,
+            clientExitHold = this[k.clientExitHold] ?: d.clientExitHold,
+            clientCropEnabled = this[k.clientCropEnabled] ?: d.clientCropEnabled,
+            whatsRequireName = this[k.whatsRequireName] ?: d.whatsRequireName,
+            whatsAutoMessage = this[k.whatsAutoMessage] ?: d.whatsAutoMessage,
+            msgWhatsApp = this[k.msgWhatsApp] ?: d.msgWhatsApp,
+            whatsDefaultSet = this[k.whatsDefaultSet] ?: d.whatsDefaultSet,
+            galleryThumb = this[k.galleryThumb] ?: d.galleryThumb,
             liveViewEnabled = this[k.liveViewEnabled] ?: d.liveViewEnabled,
             liveOnCamera = this[k.liveOnCamera] ?: d.liveOnCamera,
             liveGrid = this[k.liveGrid] ?: d.liveGrid,

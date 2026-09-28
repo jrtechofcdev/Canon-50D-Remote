@@ -47,7 +47,7 @@ Sem Wi-Fi, sem FTP, sem internet. Só a USB, só a 50D.
     <td align="center"><img src="docs/images/tela-live-view.png" width="200" alt="Live view"><br><sub><b>Live view</b><br>monitor com preset ao vivo</sub></td>
     <td align="center"><img src="docs/images/tela-recorte.png" width="200" alt="Recorte"><br><sub><b>Recorte</b><br>Instagram, Stories, impressão</sub></td>
     <td align="center"><img src="docs/images/tela-botao-captura.png" width="200" alt="Iniciar captura"><br><sub><b>Iniciar captura</b><br>em qualquer aba</sub></td>
-    <td></td>
+    <td align="center"><img src="docs/images/tela-perfis.png" width="200" alt="Perfis e backup"><br><sub><b>Perfis</b><br>ajustes prontos por evento</sub></td>
   </tr>
 </table>
 
@@ -117,7 +117,17 @@ Live view gasta mais bateria da câmera. Com a imagem só no celular, a tela da 
 
 - **Recortar:** no visualizador, toque no ícone de recorte. Escolha a proporção (Instagram 4:5, Stories 9:16, 10×15…), arraste a moldura para enquadrar e use **Endireitar** (régua, **Auto** ou **Traçar horizonte**). O recorte vale para a tela, a cópia editada e o envio. O arquivo original não muda.
 - **Recorte rápido:** na galeria, segure para selecionar várias fotos → **Recorte** → formato. Cada foto recebe o maior recorte centralizado.
-- **WhatsApp direto:** no visualizador, na galeria em lote ou no modo cliente, toque em **WhatsApp**, digite o número com DDD e a conversa daquele número abre com a foto já anexada. Os números usados ficam em Recentes (no modo cliente eles não aparecem).
+- **WhatsApp direto:** no visualizador, na galeria em lote ou no modo cliente, toque em **WhatsApp**, coloque o nome e o número com DDD e siga os dois botões:
+  1. **Abrir conversa:** abre o chat daquele número já com a mensagem automática (Ajustes → Mensagens → Envio das fotos). Envie a mensagem.
+  2. **Enviar fotos:** volte ao app e toque em 2. As fotos vão para a mesma conversa.
+
+  O WhatsApp só pula a tela "Enviar para" quando a conversa já existe; por isso a mensagem vai antes. Os números usados ficam em Recentes (no modo cliente eles não aparecem).
+
+### Perfis e backup
+
+- **Ajustes → Perfis e backup** tem sets prontos (Casamento / igreja, Ensaio externo, Evento / festa, Estúdio / produto). Deixe o app do seu jeito e salve como perfil. Na Sessão, o chip **Perfil** troca tudo em um toque.
+- Pastas, PIN, nome da sessão e contatos não mudam com o perfil.
+- **Backup dos ajustes:** salva um .json com ajustes, perfis e presets. Em **Restaurar**, os ajustes do arquivo substituem os atuais, e perfis e presets são somados aos que você já tem.
 
 <details>
 <summary><b>Se algo der errado</b></summary>
@@ -130,6 +140,7 @@ Live view gasta mais bateria da câmera. Com a imagem só no celular, a tela da 
 | Foto não chega | Confira se o formato em Ajustes inclui o que a câmera grava (câmera em RAW e app em "Só JPG" não baixa nada). |
 | Não dispara pelo app | AF sem foco. Use MF ou AF-ON. |
 | Live view não aparece | Ative o Disparo com Live View no menu da 50D (Configurações de Live View) e use P, Tv, Av ou M. |
+| WhatsApp abre "Enviar para" | Use o botão **1 · Abrir conversa** primeiro e mande a mensagem; depois o **2 · Enviar fotos** vai direto para o cliente. |
 | WhatsApp abre sem a foto | Atualize o WhatsApp. Sem ele instalado, o app abre o link wa.me do número só com o texto. |
 | Preset não importa | O arquivo precisa ter ajustes do Lightroom dentro. DNG de preset sim; DNG de foto comum sem ajustes, não. |
 | Qualquer outro erro | **Ajustes → Diagnóstico → Copiar log** e abra um [relato de problema](https://github.com/jrtechofcdev/Canon-50D-Remote/issues/new/choose) com o log. |

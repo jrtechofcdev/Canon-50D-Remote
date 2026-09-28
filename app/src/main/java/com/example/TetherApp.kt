@@ -4,6 +4,7 @@ import android.app.Application
 import com.example.core.alerts.Alerts
 import com.example.core.camera.CameraManager
 import com.example.core.camera.ConnectionState
+import com.example.core.data.AppBackup
 import com.example.core.data.PhotoDatabase
 import com.example.core.data.SettingKeys
 import com.example.core.data.SettingsRepository
@@ -59,6 +60,8 @@ class TetherApp : Application() {
         private set
     lateinit var culler: Culler
         private set
+    lateinit var appBackup: AppBackup
+        private set
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -88,6 +91,7 @@ class TetherApp : Application() {
         notes = VoiceNotes(this)
         backup = SessionBackup(this, database.photoDao(), store)
         culler = Culler(this, database.photoDao(), settings, MlKitFaceAnalyzer())
+        appBackup = AppBackup(settings, presets)
 
         appScope.launch(Dispatchers.IO) {
             export.clearOldExports()

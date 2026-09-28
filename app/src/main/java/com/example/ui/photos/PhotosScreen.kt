@@ -181,7 +181,7 @@ fun PhotosScreen(
         }
 
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(112.dp),
+            columns = GridCells.Adaptive(settings.galleryThumb.dp),
             // Room under the last row for the capture button.
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = if (selecting) 16.dp else 88.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),

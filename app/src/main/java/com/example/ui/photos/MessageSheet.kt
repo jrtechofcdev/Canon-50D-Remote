@@ -37,6 +37,7 @@ import com.example.ui.theme.Tone
 import kotlinx.coroutines.launch
 
 fun Settings.template(kind: MessageKind) = when (kind) {
+    MessageKind.WhatsApp -> msgWhatsApp
     MessageKind.Preview -> msgPreview
     MessageKind.Delivered -> msgDelivered
     MessageKind.Payment -> msgPayment

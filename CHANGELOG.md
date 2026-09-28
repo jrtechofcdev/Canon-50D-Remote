@@ -2,6 +2,32 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [3.1] · 2026-09-28
+
+- **WhatsApp que abre a conversa certa:** o envio agora é em dois toques.
+  - **1 · Abrir conversa:** abre direto o chat do número digitado, sem passar pela tela "Enviar para", já com a mensagem automática escrita.
+  - **2 · Enviar fotos:** de volta ao app, as fotos vão para essa mesma conversa.
+  - O **nome do cliente** passa a ser obrigatório (dá para desligar) e entra no `{cliente}` da mensagem.
+  - Novo modelo **Envio das fotos** em Ajustes → Mensagens, com liga/desliga da mensagem automática.
+- **Modo cliente refeito:**
+  - A foto tem a própria área, e as informações (nome, velocidade, abertura, ISO) ficam numa linha embaixo, sem cortar.
+  - Botão **Sair** no canto de cima, com cadeado quando há PIN. Segurar o dedo 3 s continua funcionando, e dá para desligar.
+  - Barra de ícones grandes com nome embaixo: Escolher, WhatsApp, Recortar e Calibrar.
+  - Presets em miniaturas da própria foto, com os favoritos primeiro.
+- **Presets por categoria e favoritos:**
+  - Estrela em cada preset; favoritos e os usados por último aparecem primeiro em todas as listas.
+  - Segurar a miniatura de um preset também favorita.
+  - Categorias com filtro na aba Presets. Crie, renomeie e apague categorias (apagar não apaga presets) e use **Mover para categoria** no menu.
+- **Perfis de ajustes:** sets prontos (Casamento / igreja, Ensaio externo, Evento / festa, Estúdio / produto) e os seus, aplicados em um toque pelo chip **Perfil** na Sessão.
+- **Backup dos ajustes:** um arquivo .json com ajustes, perfis e presets (com categorias e favoritos) para guardar ou passar para outro celular.
+- **Ícones em todos os ajustes** e nas opções do live view, para achar cada opção de olho.
+- Ajustes novos:
+  - botões Sair e Recortar do modo cliente;
+  - sair segurando o dedo;
+  - nome obrigatório, mensagem automática e o que vai por padrão no WhatsApp;
+  - tamanho das miniaturas da galeria.
+- Banco de dados v7 (favoritos dos presets). Fotos, ajustes e presets das versões anteriores continuam.
+
 ## [3.0] · 2026-09-28
 
 Novo nome, **JR C50D Sync** (JR da marca, C50D da Canon 50D, Sync da captura vinculada), e ícone novo: uma câmera nas cores da marca com a lente formada por setas de sincronia.
