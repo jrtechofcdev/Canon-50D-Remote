@@ -22,6 +22,7 @@ import androidx.compose.material.icons.outlined.Exposure
 import androidx.compose.material.icons.outlined.SdCard
 import androidx.compose.material.icons.outlined.Slideshow
 import androidx.compose.material.icons.outlined.Summarize
+import androidx.compose.material.icons.outlined.SettingsSuggest
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -71,6 +72,7 @@ import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.outlined.Calculate
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.Flag
 import com.example.core.data.Photo
 import com.example.core.data.Settings
@@ -121,8 +123,13 @@ fun ToolsRow(
     onLook: () -> Unit,
     onMoment: () -> Unit,
     onTools: () -> Unit,
+    onLive: () -> Unit = {},
+    profile: String = "",
+    onProfile: () -> Unit = {},
 ) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Tool(profile.ifBlank { null }?.let { "Perfil: $it" } ?: "Perfil", Icons.Outlined.SettingsSuggest, true, onProfile)
+        if (settings.liveViewEnabled) Tool("Live view", Icons.Outlined.Videocam, connected, onLive)
         Tool(sessionLook?.let { "Look: $it" } ?: "Look: nenhum", Icons.Outlined.AutoAwesome, true, onLook)
         if (settings.momentsEnabled) {
             Tool(settings.currentMoment.ifBlank { null }?.let { "Momento: $it" } ?: "Momento", Icons.Outlined.Flag, true, onMoment)

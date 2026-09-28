@@ -25,14 +25,15 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BlurOn
-import androidx.compose.material.icons.outlined.Swipe
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Crop
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Flag
@@ -51,6 +52,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -75,6 +77,7 @@ import com.example.ui.PhotoActions
 import com.example.ui.ShareSet
 import com.example.ui.components.FormatTag
 import com.example.ui.session.MomentSheet
+import com.example.ui.crop.QuickCropSheet
 import com.example.ui.theme.Tone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -96,7 +99,13 @@ private data class BatchProgress(val label: String, val done: Int, val total: In
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun PhotosScreen(app: TetherApp, actions: PhotoActions, onOpenPhoto: (Long) -> Unit, onCull: () -> Unit = {}) {
+fun PhotosScreen(
+    app: TetherApp,
+    actions: PhotoActions,
+    onOpenPhoto: (Long) -> Unit,
+    onSelectingChange: (Boolean) -> Unit = {},
+    onCrop: (Long) -> Unit = {},
+) {
     val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = emptyList())
     val settings by app.settings.settings.collectAsState(initial = Settings())
     val presets by app.presets.presets.collectAsState(initial = emptyList())
@@ -109,6 +118,7 @@ fun PhotosScreen(app: TetherApp, actions: PhotoActions, onOpenPhoto: (Long) -> U
 
     val selected = remember { mutableStateListOf<Long>() }
     val selecting = selected.isNotEmpty()
+    LaunchedEffect(selecting) { onSelectingChange(selecting) }
     val selection = photos.filter { it.id in selected }
     var progress by remember { mutableStateOf<BatchProgress?>(null) }
     var sheet by remember { mutableStateOf<String?>(null) }
@@ -137,11 +147,6 @@ fun PhotosScreen(app: TetherApp, actions: PhotoActions, onOpenPhoto: (Long) -> U
                 Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                androidx.compose.material3.AssistChip(
-                    onClick = onCull,
-                    label = { Text("Seleção rápida") },
-                    leadingIcon = { Icon(Icons.Outlined.Swipe, contentDescription = null, modifier = Modifier.size(18.dp), tint = Tone.Accent) },
-                )
                 PhotoFilter.entries.filter { it != PhotoFilter.ClientPicks || settings.clientPicksEnabled }.forEach {
                     GalleryChip(it.label, filter == it) { filter = it }
                 }
@@ -176,8 +181,9 @@ fun PhotosScreen(app: TetherApp, actions: PhotoActions, onOpenPhoto: (Long) -> U
         }
 
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(112.dp),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+            columns = GridCells.Adaptive(settings.galleryThumb.dp),
+            // Room under the last row for the capture button.
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = if (selecting) 16.dp else 88.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.weight(1f),
@@ -246,6 +252,8 @@ fun PhotosScreen(app: TetherApp, actions: PhotoActions, onOpenPhoto: (Long) -> U
                 },
                 onMoment = { sheet = "moment" },
                 onMessage = { sheet = "message" },
+                onWhatsApp = { sheet = "whatsapp" },
+                onCrop = { sheet = "crop" },
                 onDelete = { sheet = "delete" },
                 onShare = { set -> scope.launch { actions.share(selection, set, settings) } },
                 onLightroom = { set -> scope.launch { actions.openInLightroom(selection, set, settings) } },
@@ -263,6 +271,15 @@ fun PhotosScreen(app: TetherApp, actions: PhotoActions, onOpenPhoto: (Long) -> U
             scope.launch { app.database.photoDao().setMoment(selection.map { it.id }, m.ifEmpty { null }); selected.clear() }
         }, onDismiss = { sheet = null })
         "message" -> MessageSheet(actions, settings, selection, onDismiss = { sheet = null })
+        "crop" -> QuickCropSheet(
+            count = selection.size,
+            onDismiss = { sheet = null },
+            onOpenFull = selection.singleOrNull()?.let { p -> { sheet = null; selected.clear(); onCrop(p.id) } },
+        ) { ratio ->
+            sheet = null
+            runBatch(if (ratio == null) "Removendo recorte" else "Recortando ${ratio.label}", selection) { app.looks.quickCrop(it, ratio) }
+        }
+        "whatsapp" -> WhatsAppSheet(app, actions, settings, selection, onDismiss = { sheet = null; selected.clear() })
         "delete" -> AlertDialog(
             onDismissRequest = { sheet = null },
             containerColor = Tone.Surface,
@@ -316,6 +333,8 @@ private fun BatchBar(
     onFavorite: () -> Unit,
     onMoment: () -> Unit,
     onMessage: () -> Unit,
+    onWhatsApp: () -> Unit,
+    onCrop: () -> Unit,
     onDelete: () -> Unit,
     onShare: (ShareSet) -> Unit,
     onLightroom: (ShareSet) -> Unit,
@@ -327,7 +346,9 @@ private fun BatchBar(
         Modifier.fillMaxWidth().background(Tone.Surface).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        BarAction(Icons.AutoMirrored.Outlined.Send, "WhatsApp", onWhatsApp)
         BarAction(Icons.Outlined.AutoAwesome, "Preset", onPreset)
+        BarAction(Icons.Outlined.Crop, "Recorte", onCrop)
         BarMenu(Icons.Outlined.Share, "Enviar", sets, onShare)
         BarMenu(Icons.Outlined.PhotoLibrary, "Lightroom", lrSets, onLightroom)
         BarAction(Icons.AutoMirrored.Outlined.Chat, "Mensagem", onMessage)

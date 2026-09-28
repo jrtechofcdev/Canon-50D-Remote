@@ -10,6 +10,8 @@ import androidx.core.content.FileProvider
 import com.example.core.data.Photo
 import com.example.core.data.Settings
 import com.example.core.export.ExportService
+import com.example.core.messages.WhatsAppNumber
+import com.example.core.render.Looks
 import com.example.core.storage.PhotoStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -27,6 +29,8 @@ class PhotoActions(
     private val context: Context,
     private val store: PhotoStore,
     private val export: ExportService,
+    /** Renders the look when a photo has one but no edited copy on disk. */
+    private val looks: Looks? = null,
 ) {
 
     fun availableSets(photo: Photo, settings: Settings, includeLight: Boolean = true): List<ShareSet> = buildList {
@@ -68,6 +72,38 @@ class PhotoActions(
         context.startActivity(Intent.createChooser(intent, "Enviar mensagem").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
+    /**
+     * Step 1 of sending to a client: opens the WhatsApp chat of [number] itself (not the "Enviar para"
+     * list), with [text] already typed. WhatsApp opens it even for numbers that aren't in the contacts.
+     * Without WhatsApp, opens wa.me in the browser. Returns false when the number is not valid.
+     */
+    fun openWhatsAppChat(number: String, text: String): Boolean {
+        val digits = WhatsAppNumber.normalize(number) ?: return false
+        val url = "https://api.whatsapp.com/send?phone=$digits" + if (text.isNotBlank()) "&text=" + Uri.encode(text) else ""
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val whatsapp = whatsAppPackage()
+        if (whatsapp != null && runCatching { context.startActivity(Intent(intent).setPackage(whatsapp)) }.isSuccess) return true
+        return runCatching { context.startActivity(intent) }.isSuccess
+    }
+
+    /**
+     * Step 2: the photos, attached to that same chat. WhatsApp only skips its contact list ("jid")
+     * for a chat that already exists, which is why step 1 comes first.
+     */
+    suspend fun sendPhotosToWhatsApp(number: String, photos: List<Photo>, set: ShareSet, settings: Settings): Boolean {
+        val digits = WhatsAppNumber.normalize(number) ?: return false
+        val intent = sendIntent(photos, set, settings) ?: return false
+        val whatsapp = whatsAppPackage()
+        if (whatsapp == null) {
+            context.startActivity(Intent.createChooser(intent, "Enviar fotos").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return true
+        }
+        intent.putExtra("jid", WhatsAppNumber.jid(digits)).setPackage(whatsapp).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return runCatching { context.startActivity(intent) }.isSuccess
+    }
+
+    fun whatsAppPackage(): String? = listOf(WHATSAPP, WHATSAPP_BUSINESS).firstOrNull { installed(it) }
+
     private fun installed(pkg: String) = runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess
 
     fun openWith(photo: Photo) {
@@ -86,7 +122,9 @@ class PhotoActions(
         val files: List<Uri> = if (set == ShareSet.LIGHT) {
             withContext(Dispatchers.IO) {
                 photos.mapNotNull { p ->
-                    p.lookUri?.let { export.exportLight(it, p.savedBase, settings, p.lat, p.lon) }
+                    // The client gets the photo as shown on screen: edited copy, or the look rendered now.
+                    val source = p.editedUri ?: looks?.exportFile(p, 0)?.let { "file://${it.path}" } ?: p.displayUri
+                    source?.let { export.exportLight(it, p.savedBase, settings, p.lat, p.lon) }
                         ?.let { FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", it) }
                 }
             }

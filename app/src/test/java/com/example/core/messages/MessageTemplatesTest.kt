@@ -19,6 +19,14 @@ class MessageTemplatesTest {
     }
 
     @Test
+    fun whatsAppMessageUsesTheClientName() {
+        val text = MessageTemplates.fill(MessageDefaults.WHATSAPP, MessageData("Maria", 3, date))
+        assertTrue(text.startsWith("Olá, Maria!"))
+        assertTrue(text.contains("*3*"))
+        assertFalse(text.contains("{"))
+    }
+
+    @Test
     fun noClientNameStillReadsWell() {
         val text = MessageTemplates.fill(MessageDefaults.PREVIEW, MessageData("", 30, date))
         assertTrue(text.startsWith("Olá! 📸"))

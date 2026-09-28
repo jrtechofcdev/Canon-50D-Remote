@@ -23,6 +23,29 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.CreateNewFolder
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DriveFileMove
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.FolderDelete
+import androidx.compose.material.icons.outlined.IosShare
+import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import com.example.core.preset.DEFAULT_CATEGORY
 import androidx.compose.material.icons.outlined.FileOpen
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.AlertDialog
@@ -81,6 +104,13 @@ fun PresetsScreen(app: TetherApp, onEdit: (Long) -> Unit) {
     var report by remember { mutableStateOf<ImportReport?>(null) }
     var importing by remember { mutableStateOf(false) }
     var toDelete by remember { mutableStateOf<Preset?>(null) }
+    val categories by app.presets.categories.collectAsState(initial = emptyList())
+    // null = all, FAVORITES = only starred, else one category.
+    var filter by rememberSaveable { mutableStateOf<String?>(null) }
+    var toMove by remember { mutableStateOf<Preset?>(null) }
+    var newCategory by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf<String?>(null) }
+    var deletingCategory by remember { mutableStateOf<String?>(null) }
 
     // Thumbnails use the newest photo so the list shows how each look lands on today's light.
     val sample by produceState<String?>(null) {
@@ -140,6 +170,33 @@ fun PresetsScreen(app: TetherApp, onEdit: (Long) -> Unit) {
             )
         }
 
+        // Categories: tap to filter; the + creates one for a new kind of event.
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CategoryFilter(Icons.Outlined.Apps, "Todos", filter == null) { filter = null }
+            CategoryFilter(Icons.Filled.Star, "Favoritos", filter == FAVORITES) { filter = FAVORITES }
+            categories.forEach { c -> CategoryFilter(Icons.Outlined.Folder, c, filter == c) { filter = c } }
+            CategoryFilter(Icons.Outlined.CreateNewFolder, "Nova", false) { newCategory = true }
+        }
+        val selectedCategory = filter?.takeIf { it != FAVORITES && it in categories }
+        if (selectedCategory != null) {
+            Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { renaming = selectedCategory }) {
+                    Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = Tone.TextMuted)
+                    Text("  Renomear", color = Tone.TextMuted)
+                }
+                if (selectedCategory != DEFAULT_CATEGORY) {
+                    TextButton(onClick = { deletingCategory = selectedCategory }) {
+                        Icon(Icons.Outlined.FolderDelete, contentDescription = null, modifier = Modifier.size(16.dp), tint = Tone.TextMuted)
+                        Text("  Apagar categoria", color = Tone.TextMuted)
+                    }
+                }
+            }
+        }
+
         if (presets.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                 Text("Nenhum preset ainda. Importe um arquivo ou crie o seu.", color = Tone.TextMuted)
@@ -147,8 +204,26 @@ fun PresetsScreen(app: TetherApp, onEdit: (Long) -> Unit) {
             return@Column
         }
 
-        LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp)) {
-            presets.groupBy { it.group }.forEach { (group, list) ->
+        LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp)) {
+            val shown = presets.filter {
+                when (filter) {
+                    null -> true
+                    FAVORITES -> it.favorite
+                    else -> it.group == filter
+                }
+            }
+            if (shown.isEmpty()) {
+                item(key = "empty") {
+                    Text(
+                        if (filter == FAVORITES) "Toque na estrela de um preset para ele aparecer aqui e primeiro nas listas."
+                        else "Nenhum preset nesta categoria. Use Mover para, no menu de um preset.",
+                        color = Tone.TextMuted,
+                        modifier = Modifier.padding(vertical = 24.dp),
+                    )
+                }
+            }
+            shown.groupBy { it.group }.forEach { (group, unsorted) ->
+                val list = unsorted.sortedWith(compareByDescending<Preset> { it.favorite }.thenBy { it.name.lowercase() })
                 item(key = "g:$group") { SectionLabel(group, Modifier.padding(top = 16.dp)) }
                 items(list, key = { it.id }) { preset ->
                     PresetRow(
@@ -181,6 +256,8 @@ fun PresetsScreen(app: TetherApp, onEdit: (Long) -> Unit) {
                             }
                         },
                         onDelete = { toDelete = preset },
+                        onFavorite = { scope.launch { app.presets.setFavorite(preset.id, !preset.favorite) } },
+                        onMove = { toMove = preset },
                     )
                 }
             }
@@ -204,6 +281,47 @@ fun PresetsScreen(app: TetherApp, onEdit: (Long) -> Unit) {
             },
             confirmButton = { TextButton(onClick = { report = null }) { Text("OK") } },
         )
+    }
+
+    if (newCategory) {
+        CategoryNameDialog(title = "Nova categoria", initial = "", hint = "Ex.: Casamentos, Igreja, Ensaio externo", onDismiss = { newCategory = false }) { name ->
+            scope.launch { app.presets.addCategory(name) }
+            filter = name.trim()
+            newCategory = false
+        }
+    }
+    renaming?.let { old ->
+        CategoryNameDialog(title = "Renomear categoria", initial = old, hint = null, onDismiss = { renaming = null }) { name ->
+            scope.launch { app.presets.renameCategory(old, name) }
+            filter = name.trim()
+            renaming = null
+        }
+    }
+    deletingCategory?.let { c ->
+        AlertDialog(
+            onDismissRequest = { deletingCategory = null },
+            containerColor = Tone.Surface,
+            icon = { Icon(Icons.Outlined.FolderDelete, contentDescription = null) },
+            title = { Text("Apagar a categoria \"$c\"?") },
+            text = { Text("Os presets dela vão para \"$DEFAULT_CATEGORY\". Nenhum preset é apagado.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch { app.presets.deleteCategory(c) }
+                    filter = null
+                    deletingCategory = null
+                }) { Text("Apagar categoria", color = Tone.Error) }
+            },
+            dismissButton = { TextButton(onClick = { deletingCategory = null }) { Text("Cancelar") } },
+        )
+    }
+    toMove?.let { p ->
+        MoveDialog(p, categories, onDismiss = { toMove = null }) { target ->
+            scope.launch {
+                app.presets.addCategory(target)
+                app.presets.moveTo(listOf(p.id), target)
+            }
+            toMove = null
+        }
     }
 
     toDelete?.let { p ->
@@ -237,6 +355,8 @@ private fun PresetRow(
     onDuplicate: () -> Unit,
     onExport: () -> Unit,
     onDelete: () -> Unit,
+    onFavorite: () -> Unit,
+    onMove: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     Row(
@@ -252,20 +372,111 @@ private fun PresetRow(
                 color = if (inSession) Tone.Accent else Tone.TextMuted,
             )
         }
+        IconButton(onClick = onFavorite) {
+            Icon(
+                if (preset.favorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                contentDescription = if (preset.favorite) "Tirar dos favoritos" else "Favoritar",
+                tint = if (preset.favorite) Tone.Accent else Tone.TextMuted,
+            )
+        }
         Box {
             IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = "Opções", tint = Tone.TextMuted) }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = Tone.SurfaceHigh) {
-                DropdownMenuItem(
-                    text = { Text(if (inSession) "Parar de usar na sessão" else "Usar na sessão") },
-                    onClick = { menu = false; onToggleSession() },
-                )
-                DropdownMenuItem(text = { Text("Editar") }, onClick = { menu = false; onOpen() })
-                DropdownMenuItem(text = { Text("Duplicar") }, onClick = { menu = false; onDuplicate() })
-                DropdownMenuItem(text = { Text("Exportar XMP") }, onClick = { menu = false; onExport() })
-                DropdownMenuItem(text = { Text("Apagar", color = Tone.Error) }, onClick = { menu = false; onDelete() })
+                MenuItem(Icons.Outlined.PlayCircle, if (inSession) "Parar de usar na sessão" else "Usar na sessão") { menu = false; onToggleSession() }
+                MenuItem(Icons.Outlined.Edit, "Editar") { menu = false; onOpen() }
+                MenuItem(Icons.Outlined.DriveFileMove, "Mover para categoria") { menu = false; onMove() }
+                MenuItem(Icons.Outlined.ContentCopy, "Duplicar") { menu = false; onDuplicate() }
+                MenuItem(Icons.Outlined.IosShare, "Exportar XMP") { menu = false; onExport() }
+                MenuItem(Icons.Outlined.Delete, "Apagar", Tone.Error) { menu = false; onDelete() }
             }
         }
     }
+}
+
+@Composable
+private fun MenuItem(icon: ImageVector, text: String, color: androidx.compose.ui.graphics.Color = Tone.Text, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text(text, color = color) },
+        leadingIcon = { Icon(icon, contentDescription = null, tint = if (color == Tone.Text) Tone.TextMuted else color) },
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun CategoryFilter(icon: ImageVector, text: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(text, maxLines = 1) },
+        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp)) },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = Tone.SurfaceHigh,
+            selectedLabelColor = Tone.Accent,
+            selectedLeadingIconColor = Tone.Accent,
+            labelColor = Tone.TextMuted,
+            iconColor = Tone.TextMuted,
+        ),
+    )
+}
+
+/** Name input for a category. */
+@Composable
+fun CategoryNameDialog(title: String, initial: String, hint: String?, onDismiss: () -> Unit, onOk: (String) -> Unit) {
+    var name by remember { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Tone.Surface,
+        icon = { Icon(Icons.Outlined.Folder, contentDescription = null) },
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it.take(40) },
+                placeholder = hint?.let { { Text(it) } },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+            )
+        },
+        confirmButton = { TextButton(onClick = { onOk(name) }, enabled = name.isNotBlank()) { Text("Salvar") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    )
+}
+
+/** Picks the category a preset goes to, or creates a new one on the spot. */
+@Composable
+private fun MoveDialog(preset: Preset, categories: List<String>, onDismiss: () -> Unit, onPick: (String) -> Unit) {
+    var creating by remember { mutableStateOf(false) }
+    if (creating) {
+        CategoryNameDialog("Nova categoria", "", "Ex.: Aniversários", onDismiss = { creating = false }) { onPick(it.trim()) }
+        return
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Tone.Surface,
+        icon = { Icon(Icons.Outlined.DriveFileMove, contentDescription = null) },
+        title = { Text("Mover \"${preset.name}\"") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                categories.forEach { c ->
+                    Row(
+                        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable { onPick(c) }.padding(vertical = 12.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Outlined.Folder, contentDescription = null, tint = if (c == preset.group) Tone.Accent else Tone.TextMuted)
+                        Text("  $c", color = if (c == preset.group) Tone.Accent else Tone.Text)
+                    }
+                }
+                Row(
+                    Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable { creating = true }.padding(vertical = 12.dp, horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Outlined.CreateNewFolder, contentDescription = null, tint = Tone.Accent)
+                    Text("  Nova categoria", color = Tone.Accent)
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    )
 }
 
 /** A small render of [sample] with the preset's look. */
@@ -286,7 +497,7 @@ private fun sourceLabel(source: String) = when (source) {
     "dng" -> "Importado de DNG"
     "xmp" -> "Importado de XMP"
     "lrtemplate" -> "Importado de LRTemplate"
-    "jr_link" -> "Pack Jr_Link"
+    "jr_link" -> "Pack JR C50D Sync"
     else -> "Criado no app"
 }
 

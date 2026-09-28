@@ -96,8 +96,14 @@ data class PresetSettings(
 data class Preset(
     val id: Long = 0,
     val name: String,
-    val group: String = "Jr_Link",
+    val group: String = "JR C50D Sync",
     val settings: PresetSettings = PresetSettings(),
     /** Where it came from: "dng", "xmp", "lrtemplate" or "criado". */
     val source: String = "criado",
+    val favorite: Boolean = false,
+    val lastUsed: Long = 0,
 )
+
+/** Order for every preset picker: favourites first, then the most recently used, then by name. */
+fun List<Preset>.forPicking(): List<Preset> =
+    sortedWith(compareByDescending<Preset> { it.favorite }.thenByDescending { it.lastUsed }.thenBy { it.name.lowercase() })

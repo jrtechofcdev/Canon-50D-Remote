@@ -53,10 +53,7 @@ def vector(size_dp, viewport, scale, tx, ty, fill=None, header=""):
 
 res = "app/src/main/res/drawable/"
 note = "<!-- Jr_Tech_OFC symbol, traced from the brand kit (Logo_Simbolo.png). -->\n"
-# Adaptive icon foreground: 108 viewport, symbol ~56 tall centred in the 66 safe zone.
-s = 56 / 419.0
-open(res + "ic_launcher_foreground.xml", "w").write(vector(108, 108, s, 54 - 249.5, 54 - 249.5, header=note))
-open(res + "ic_launcher_monochrome.xml", "w").write(vector(108, 108, s, 54 - 249.5, 54 - 249.5, fill="#FFFFFFFF", header=note))
+# The app icon (camera + sync arrows) is made by branding/icon.py, not here.
 # In-app mark, full size.
 open(res + "ic_brand_symbol.xml", "w").write(vector(48, 500, 1.0, 0, 0, header=note))
 # Notification small icon: white, fills the 24dp box.

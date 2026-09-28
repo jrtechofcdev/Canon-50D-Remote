@@ -40,11 +40,25 @@ class Looks(
         return presets.get(id)?.settings
     }
 
-    /** The photo rendered with its look, or null when it has none (show the file itself then). */
-    suspend fun display(photo: Photo, maxEdge: Int = PREVIEW_EDGE): Bitmap? {
-        val s = settingsFor(photo) ?: return null
+    /** The photo's crop, or null when it shows the whole frame. */
+    fun cropOf(photo: Photo): CropSpec? = CropSpec.decode(photo.crop)?.takeUnless { it.isIdentity && it.targetW == 0 }
+
+    /** The photo rendered with its look and crop, or null when it has neither (show the file itself then). */
+    suspend fun display(photo: Photo, maxEdge: Int = PREVIEW_EDGE): Bitmap? =
+        renderPhoto(photo, settingsFor(photo), maxEdge)
+
+    /** [photo] cut by its crop and then given [look]; null when there is nothing to do. Cached like [render]. */
+    suspend fun renderPhoto(photo: Photo, look: PresetSettings?, maxEdge: Int): Bitmap? {
+        val crop = cropOf(photo)
         val source = photo.displayUri ?: return null
-        return render(source, s, maxEdge)
+        if (crop == null) return look?.let { render(source, it, maxEdge) }
+        val key = "$source|${look?.encode()?.hashCode()}|${crop.encode()}|$maxEdge"
+        cache.get(key)?.let { return it }
+        val base = base(source, maxEdge) ?: return null
+        val cut = CropRenderer.apply(base, crop.copy(targetW = 0, targetH = 0))
+        val out = look?.let { engine.render(cut, RenderParams.from(it)).also { if (cut !== base) cut.recycle() } } ?: cut
+        cache.put(key, out)
+        return out
     }
 
     /** Any photo with any settings, e.g. the editor preview or a preset's thumbnail. */
@@ -84,12 +98,13 @@ class Looks(
      */
     suspend fun writeEditedCopy(photo: Photo, presetName: String?): String? = copyLock.withLock {
         val cfg = settings.current()
-        val s = settingsFor(photo) ?: return@withLock null
+        val s = settingsFor(photo)
+        val crop = cropOf(photo)
+        if (s == null && crop == null) return@withLock null
         val source = photo.displayUri ?: return@withLock null
-        val full = withContext(Dispatchers.IO) { BitmapLoader.load(context, Uri.parse(source), 0) } ?: return@withLock null
-        val rendered = engine.render(full, RenderParams.from(s))
-        full.recycle()
-        val suffix = presetName?.let { "_" + it.replace(Regex("[\\\\/:*?\"<>|]"), "-").replace(' ', '-') } ?: "_editada"
+        val rendered = withContext(Dispatchers.IO) { finished(source, s, crop, 0) } ?: return@withLock null
+        val suffix = presetName?.let { "_" + it.replace(Regex("[\\\\/:*?\"<>|]"), "-").replace(' ', '-') }
+            ?: if (s == null) "_recorte" else "_editada"
         val uri = withContext(Dispatchers.IO) {
             // Rendered to a temp file first so the camera's EXIF (and GPS) can be added before it is stored.
             val temp = java.io.File(context.cacheDir, "edited_${photo.id}.jpg")
@@ -107,18 +122,70 @@ class Looks(
     }
 
     /**
+     * The photo as it should leave the phone (look applied), as a JPG in the cache, long edge [maxEdge]
+     * (0 = full size). Null when the photo has no look: then the file itself is sent.
+     */
+    suspend fun exportFile(photo: Photo, maxEdge: Int): java.io.File? {
+        val s = settingsFor(photo)
+        val crop = cropOf(photo)
+        if (s == null && crop == null) return null
+        val source = photo.displayUri ?: return null
+        val rendered = withContext(Dispatchers.IO) { finished(source, s, crop, maxEdge) } ?: return null
+        return withContext(Dispatchers.IO) {
+            val dir = java.io.File(context.cacheDir, "export").apply { mkdirs() }
+            val out = java.io.File(dir, "${photo.savedBase}_look.jpg")
+            out.outputStream().use { rendered.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+            rendered.recycle()
+            ExifCopy.apply(context, out, source, null, null)
+            out
+        }
+    }
+
+    /**
      * Gives [photo] a look (a preset, optionally with its own calibration in [adjust]) or removes it (both null).
      * Rewrites the edited copy when that is on; a copy left from the previous look is removed so it never lies.
      */
     suspend fun setLook(photo: Photo, presetId: Long?, adjust: String?) {
         photos.setLook(photo.id, presetId, adjust)
-        val updated = photo.copy(presetId = presetId, adjust = adjust)
-        if (settings.current().saveEditedCopy && (presetId != null || adjust != null)) {
-            writeEditedCopy(updated, presetId?.let { presets.get(it)?.name })
+        presetId?.let { presets.markUsed(it) }
+        refreshEdited(photo.copy(presetId = presetId, adjust = adjust))
+    }
+
+    /** "Recorte rápido": the widest centred crop of [ratio] (null removes the crop). */
+    suspend fun quickCrop(photo: Photo, ratio: CropRatio?) {
+        if (ratio == null) return setCrop(photo, null)
+        val source = photo.displayUri ?: return
+        val small = withContext(Dispatchers.IO) { BitmapLoader.load(context, Uri.parse(source), 256) } ?: return
+        val spec = ratio.centred(small.width.toFloat(), small.height.toFloat())
+        small.recycle()
+        setCrop(photo, spec)
+    }
+
+    /** Saves (or clears, with null) the photo's crop and rewrites its edited copy. */
+    suspend fun setCrop(photo: Photo, crop: CropSpec?) {
+        val text = crop?.takeUnless { it.isIdentity && it.targetW == 0 }?.encode()
+        photos.setCrop(listOf(photo.id), text)
+        refreshEdited(photo.copy(crop = text))
+    }
+
+    /** Edited copy in step with the photo's look and crop: rewritten when it has either, removed when it has neither. */
+    private suspend fun refreshEdited(photo: Photo) {
+        val hasEdit = photo.presetId != null || photo.adjust != null || cropOf(photo) != null
+        if (settings.current().saveEditedCopy && hasEdit) {
+            writeEditedCopy(photo, photo.presetId?.let { presets.get(it)?.name })
         } else if (photo.editedUri != null) {
             withContext(Dispatchers.IO) { store.delete(photo.editedUri) }
             photos.setEdited(photo.id, null)
         }
+    }
+
+    /** Full pipeline on the file: decode, crop (at the preset's pixel size), then the look. */
+    private suspend fun finished(source: String, look: PresetSettings?, crop: CropSpec?, maxEdge: Int): Bitmap? {
+        val full = BitmapLoader.load(context, Uri.parse(source), maxEdge) ?: return null
+        val cut = crop?.let { CropRenderer.apply(full, it) } ?: full
+        if (cut !== full) full.recycle()
+        if (look == null) return cut
+        return engine.render(cut, RenderParams.from(look)).also { cut.recycle() }
     }
 
     companion object {

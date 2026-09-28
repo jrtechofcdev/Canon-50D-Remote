@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Crop
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Share
@@ -85,7 +86,7 @@ import com.example.ui.PhotoActions
 import com.example.ui.ShareSet
 import com.example.core.preset.Preset
 import com.example.ui.preset.LookImage
-import com.example.ui.preset.PresetStrip
+import com.example.ui.preset.PresetPicker
 import com.example.ui.theme.Tone
 import androidx.compose.material.icons.outlined.Tune
 import kotlinx.coroutines.Dispatchers
@@ -96,7 +97,14 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: () -> Unit, onCalibrate: (Long) -> Unit) {
+fun ViewerScreen(
+    app: TetherApp,
+    actions: PhotoActions,
+    startId: Long,
+    onBack: () -> Unit,
+    onCalibrate: (Long) -> Unit,
+    onCrop: (Long) -> Unit = {},
+) {
     val photos by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
     val presets by app.presets.presets.collectAsState(initial = emptyList())
     val s by app.settings.settings.collectAsState(initial = null)
@@ -113,6 +121,7 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
     val zoomed = remember { mutableStateMapOf<Long, Boolean>() }
     var showClipping by remember { mutableStateOf(settings.highlightAlert) }
     var noteFor by remember { mutableStateOf<Photo?>(null) }
+    var whatsFor by remember { mutableStateOf<Photo?>(null) }
 
     // Slide to a frame that just arrived. New photos are inserted at index 0; the pager keeps the
     // current photo in place by key, so "was on the latest" means we were on index 0 before it.
@@ -148,7 +157,7 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { list[it].id }) { page ->
             val photo = list[page]
-            val mask = if (showClipping && photo.id == viewing?.id) analysis?.clippedMask else null
+            val mask = if (showClipping && photo.id == viewing?.id && photo.crop == null) analysis?.clippedMask else null
             PhotoPage(app, photo, presets, mask) { zoomed[photo.id] = it }
         }
 
@@ -166,6 +175,9 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
                     style = MaterialTheme.typography.bodySmall,
                     color = Tone.TextMuted,
                 )
+            }
+            IconButton(onClick = { onCrop(current.id) }) {
+                Icon(Icons.Outlined.Crop, contentDescription = "Recortar", tint = if (current.crop != null) Tone.Accent else Tone.Text)
             }
             IconButton(onClick = { showClipping = !showClipping }) {
                 Icon(
@@ -201,9 +213,9 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
             if (settings.viewerPresets && presets.isNotEmpty()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) {
-                        PresetStrip(presets, current.presetId) { picked ->
+                        PresetPicker(app, presets, current.presetId, current.displayUri, onPick = { picked ->
                             scope.launch { app.looks.setLook(current, picked?.id, null) }
-                        }
+                        })
                     }
                     TextButton(onClick = { onCalibrate(current.id) }) {
                         Icon(Icons.Outlined.Tune, contentDescription = null, tint = Tone.Accent, modifier = Modifier.size(18.dp))
@@ -249,10 +261,10 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
                     sets = actions.availableSets(current, settings, includeLight = false),
                     modifier = Modifier.weight(1f),
                 ) { scope.launch { actions.openInLightroom(listOf(current), it, settings) } }
+                OutlinedButton(onClick = { whatsFor = current }, modifier = Modifier.weight(1f)) { Text("WhatsApp", maxLines = 1) }
                 SetMenuButton(
                     label = "Enviar",
                     primary = false,
-                    icon = { Icon(Icons.Outlined.Share, contentDescription = null) },
                     sets = actions.availableSets(current, settings),
                     modifier = Modifier.weight(1f),
                 ) { scope.launch { actions.share(listOf(current), it, settings) } }
@@ -264,6 +276,7 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
     }
 
     noteFor?.let { photo -> NoteSheet(app, photo, onDismiss = { noteFor = null }) }
+    whatsFor?.let { photo -> WhatsAppSheet(app, actions, settings, listOf(photo), onDismiss = { whatsFor = null }) }
 
     confirmDelete?.let { photo ->
         AlertDialog(

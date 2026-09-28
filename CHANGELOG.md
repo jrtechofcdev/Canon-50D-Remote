@@ -1,6 +1,61 @@
 # Novidades
 
-Versões do **Jr_Link**. A mais recente fica no topo.
+Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
+
+## [3.1] · 2026-09-28
+
+- **WhatsApp que abre a conversa certa:** o envio agora é em dois toques.
+  - **1 · Abrir conversa:** abre direto o chat do número digitado, sem passar pela tela "Enviar para", já com a mensagem automática escrita.
+  - **2 · Enviar fotos:** de volta ao app, as fotos vão para essa mesma conversa.
+  - O **nome do cliente** passa a ser obrigatório (dá para desligar) e entra no `{cliente}` da mensagem.
+  - Novo modelo **Envio das fotos** em Ajustes → Mensagens, com liga/desliga da mensagem automática.
+- **Modo cliente refeito:**
+  - A foto tem a própria área, e as informações (nome, velocidade, abertura, ISO) ficam numa linha embaixo, sem cortar.
+  - Botão **Sair** no canto de cima, com cadeado quando há PIN. Segurar o dedo 3 s continua funcionando, e dá para desligar.
+  - Barra de ícones grandes com nome embaixo: Escolher, WhatsApp, Recortar e Calibrar.
+  - Presets em miniaturas da própria foto, com os favoritos primeiro.
+- **Presets por categoria e favoritos:**
+  - Estrela em cada preset; favoritos e os usados por último aparecem primeiro em todas as listas.
+  - Segurar a miniatura de um preset também favorita.
+  - Categorias com filtro na aba Presets. Crie, renomeie e apague categorias (apagar não apaga presets) e use **Mover para categoria** no menu.
+- **Perfis de ajustes:** sets prontos (Casamento / igreja, Ensaio externo, Evento / festa, Estúdio / produto) e os seus, aplicados em um toque pelo chip **Perfil** na Sessão.
+- **Backup dos ajustes:** um arquivo .json com ajustes, perfis e presets (com categorias e favoritos) para guardar ou passar para outro celular.
+- **Ícones em todos os ajustes** e nas opções do live view, para achar cada opção de olho.
+- Ajustes novos:
+  - botões Sair e Recortar do modo cliente;
+  - sair segurando o dedo;
+  - nome obrigatório, mensagem automática e o que vai por padrão no WhatsApp;
+  - tamanho das miniaturas da galeria.
+- Banco de dados v7 (favoritos dos presets). Fotos, ajustes e presets das versões anteriores continuam.
+
+## [3.0] · 2026-09-28
+
+Novo nome, **JR C50D Sync** (JR da marca, C50D da Canon 50D, Sync da captura vinculada), e ícone novo: uma câmera nas cores da marca com a lente formada por setas de sincronia.
+
+- **Live view profissional:** a imagem da 50D no celular como monitor externo.
+  - Preset em tempo real, como um perfil de cor.
+  - Guias de enquadramento: terços, áurea, centro, 1:1, Instagram 4:5 e Stories 9:16.
+  - Zebra de estouro, focus peaking e histograma RGB.
+  - Toque para focar, zoom da câmera 5× e 10×, lupa com pinça, foco fino e prévia de profundidade de campo.
+  - ISO, Tv, Av, ±EV e WB, e disparo.
+  - Tela sempre ligada, paisagem e monitor limpo.
+- **Recorte no estilo Lightroom:**
+  - Proporções prontas para Instagram (1:1, 4:5, 1,91:1), Stories/Reels/Status 9:16, Facebook, foto de perfil, YouTube e impressão (10×15, 13×18, 15×21, 20×25, 20×30, A4, 3×4).
+  - Recorte livre, com moldura de alças e arraste para enquadrar.
+  - Endireitar pela régua, com **Auto** (detecta o horizonte) ou traçando o horizonte com o dedo.
+  - Girar 90° e espelhar.
+  - Vale para a tela, a cópia editada e o envio, no tamanho de cada rede. O original não muda.
+  - Recorte rápido em lote na galeria.
+- **WhatsApp direto para o cliente:**
+  - Na galeria, no visualizador e no modo cliente, digite o número e a conversa abre com a foto pronta (preset, recorte e marca d'água) já anexada.
+  - Os números usados ficam em Recentes.
+- **Modo cliente com zoom:** pinça e duplo toque. Com zoom, a foto não troca sozinha, e segurar a tela para sair não dispara durante a pinça. O cliente também pode receber a foto no WhatsApp dele.
+- Nas versões anteriores, as fotos, os ajustes e os presets continuam; o app instala por cima.
+
+## [2.7] · 2026-09-28
+
+- **Aba Culling** na barra de baixo, entre Fotos e Presets. A seleção com análise local (tremidas, olhos fechados, sugeridas) antes ficava escondida em um chip dentro de Fotos.
+- **Botão "Iniciar captura"** flutuante em todas as abas: conecta a 50D e abre a Sessão. Enquanto conecta, mostra o andamento; depois de conectada, vira um botão de câmera que volta para a captura.
 
 ## [2.6] · 2026-09-28
 

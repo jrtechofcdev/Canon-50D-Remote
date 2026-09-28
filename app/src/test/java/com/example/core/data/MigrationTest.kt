@@ -97,11 +97,19 @@ class MigrationTest {
             assertEquals(false, photo.rejected)
             assertEquals(null, photo.moment)
             assertEquals(1, room.presetDao().count())
+            val preset = room.presetDao().all().single()
+            assertEquals(false, preset.favorite)
+            assertEquals(0L, preset.lastUsed)
+            room.presetDao().setFavorite(preset.id, true)
+            assertEquals(true, room.presetDao().get(preset.id)!!.favorite)
 
+            assertEquals(null, photo.crop)
+            room.photoDao().setCrop(listOf(photo.id), "v1;0.1;0.1;0.9;0.9;0;0;0;0;free;0;0")
             room.photoDao().setMoment(listOf(photo.id), "Cerimônia")
             room.photoDao().setClientPick(photo.id, true)
             val updated = room.photoDao().get(photo.id)!!
             assertEquals("Cerimônia", updated.moment)
+            assertEquals("v1;0.1;0.1;0.9;0.9;0;0;0;0;free;0;0", updated.crop)
             assertEquals(true, updated.clientPick)
         }
         room.close()

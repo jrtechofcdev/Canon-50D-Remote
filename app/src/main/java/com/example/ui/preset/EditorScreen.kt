@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
@@ -232,11 +233,11 @@ fun EditorScreen(app: TetherApp, target: EditTarget, onDone: () -> Unit) {
         Column(Modifier.fillMaxWidth().background(Tone.Background).navigationBarsPadding()) {
             if (target is EditTarget.PhotoTarget) {
                 val all by app.presets.presets.collectAsState(initial = emptyList())
-                PresetStrip(all, basePresetId) { chosen ->
+                PresetPicker(app, all, basePresetId, photo?.displayUri, onPick = { chosen ->
                     basePresetId = chosen?.id
                     settings = chosen?.settings ?: PresetSettings()
                     commit()
-                }
+                })
             }
             ScrollableTabRow(
                 selectedTabIndex = tab.ordinal,
@@ -260,7 +261,9 @@ fun EditorScreen(app: TetherApp, target: EditTarget, onDone: () -> Unit) {
     }
 
     askName?.let { mode ->
+        val categories by app.presets.categories.collectAsState(initial = emptyList())
         NameDialog(
+            categories = categories,
             initialName = if (mode == "save") preset?.name.orEmpty() else "Calibração ${photo?.savedBase.orEmpty()}",
             initialGroup = if (mode == "save") preset?.group ?: "Meus presets" else "Meus presets",
             onDismiss = { askName = null },
@@ -311,17 +314,6 @@ private fun clippingMask(bmp: Bitmap): Bitmap? {
 }
 
 @Composable
-fun PresetStrip(presets: List<Preset>, selected: Long?, onPick: (Preset?) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        PresetChip("Sem preset", selected == null) { onPick(null) }
-        presets.forEach { p -> PresetChip(p.name, selected == p.id) { onPick(p) } }
-    }
-}
-
-@Composable
 fun PresetChip(label: String, selected: Boolean, onClick: () -> Unit) {
     FilterChip(
         selected = selected,
@@ -334,7 +326,7 @@ fun PresetChip(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun NameDialog(initialName: String, initialGroup: String, onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
+fun NameDialog(categories: List<String>, initialName: String, initialGroup: String, onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
     var name by remember { mutableStateOf(initialName) }
     var group by remember { mutableStateOf(initialGroup) }
     AlertDialog(
@@ -344,7 +336,19 @@ fun NameDialog(initialName: String, initialGroup: String, onDismiss: () -> Unit,
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(value = name, onValueChange = { name = it.take(60) }, label = { Text("Nome") }, singleLine = true)
-                OutlinedTextField(value = group, onValueChange = { group = it.take(40) }, label = { Text("Grupo") }, singleLine = true)
+                if (categories.isNotEmpty()) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        categories.forEach { c -> PresetChip(c, group == c) { group = c } }
+                    }
+                }
+                OutlinedTextField(
+                    value = group,
+                    onValueChange = { group = it.take(40) },
+                    label = { Text("Categoria") },
+                    leadingIcon = { Icon(Icons.Outlined.Folder, contentDescription = null) },
+                    supportingText = { Text("Toque numa acima ou escreva uma nova") },
+                    singleLine = true,
+                )
             }
         },
         confirmButton = { TextButton(onClick = { onSave(name.trim(), group.trim()) }, enabled = name.isNotBlank()) { Text("Salvar") } },

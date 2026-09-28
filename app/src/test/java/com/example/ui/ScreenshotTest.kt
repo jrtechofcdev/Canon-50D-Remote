@@ -152,6 +152,8 @@ class ScreenshotTest {
         val photo = app.database.photoDao().inSession("Geral").last()
         app.database.photoDao().setLook(photo.id, preset.id, null)
         app.settings.set(com.example.core.data.SettingKeys.sessionPresetId, preset.id)
+        app.presets.setFavorite(preset.id, true)
+        app.presets.addCategory("Casamentos")
         photo.id
     }
 
@@ -207,7 +209,7 @@ class ScreenshotTest {
     fun clientWithLook() {
         seedLooks()
         rule.setContent { JrLinkTheme { com.example.ui.client.ClientModeScreen(app, onExit = {}, onCalibrate = {}) } }
-        save("cliente_preset", androidx.compose.ui.test.hasText("Sem preset"))
+        save("cliente_preset", androidx.compose.ui.test.hasText("Original"))
     }
 
     @Test
@@ -240,9 +242,26 @@ class ScreenshotTest {
     @Test
     fun clientHeart() {
         seedPhotos()
-        runBlocking { app.database.photoDao().inSession("Geral").last().let { app.database.photoDao().setClientPick(it.id, true) } }
+        runBlocking {
+            app.database.photoDao().inSession("Geral").forEach { app.database.photoDao().setClientPick(it.id, true) }
+            app.settings.set(com.example.core.data.SettingKeys.clientShowInfo, true)
+            app.settings.set(com.example.core.data.SettingKeys.clientPin, "1234")
+        }
         rule.setContent { JrLinkTheme { com.example.ui.client.ClientModeScreen(app, onExit = {}, onCalibrate = {}) } }
-        save("cliente_coracao", androidx.compose.ui.test.hasContentDescription("Tirar da seleção"))
+        save("cliente_coracao", androidx.compose.ui.test.hasText("Escolhida"))
+    }
+
+    @Test
+    fun settingsProfiles() {
+        runBlocking { app.settings.applyProfile(com.example.core.data.SettingsProfiles.starters.first()) }
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Profiles, onBack = {}) } }
+        save("ajustes_perfis", androidx.compose.ui.test.hasText("Ensaio externo"))
+    }
+
+    @Test
+    fun settingsReview() {
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Review, onBack = {}) } }
+        save("ajustes_revisao", androidx.compose.ui.test.hasText("Tamanho das miniaturas"))
     }
 
     @Test
@@ -270,5 +289,43 @@ class ScreenshotTest {
         }
         rule.setContent { JrLinkTheme { com.example.ui.cull.CullScreen(app, onBack = {}, onOpenPhoto = {}) } }
         save("selecao_rapida", androidx.compose.ui.test.hasText("Sugerida"))
+    }
+
+    @Test
+    fun crop() {
+        seedPhotos()
+        val id = runBlocking {
+            val p = app.database.photoDao().inSession("Geral").last()
+            val spec = com.example.core.render.CropRatio.IG_PORTRAIT.centred(900f, 600f).copy(angle = -4f)
+            app.database.photoDao().setCrop(listOf(p.id), com.example.core.render.CropGeometry.fitAfterRotation(spec, 900f, 600f).encode())
+            p.id
+        }
+        rule.setContent { JrLinkTheme { com.example.ui.crop.CropScreen(app, id, onDone = {}) } }
+        save("recorte", androidx.compose.ui.test.hasText("Instagram retrato"))
+    }
+
+    @Test
+    fun liveView() {
+        runBlocking {
+            app.presets.seedIfEmpty()
+            val preset = app.presets.all().first { it.name.contains("Golden") }
+            app.settings.set(com.example.core.data.SettingKeys.livePresetId, preset.id)
+            app.settings.set(com.example.core.data.SettingKeys.livePeaking, true)
+            app.settings.set(com.example.core.data.SettingKeys.liveGrid, "ig45")
+        }
+        // A live-view sized frame: soft background, a sharp subject in the middle and a blown sky.
+        val bmp = Bitmap.createBitmap(1024, 680, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        canvas.drawColor(0xFF3A4A5C.toInt())
+        canvas.drawRect(0f, 0f, 1024f, 160f, Paint().apply { color = 0xFFFFFFFF.toInt() })
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        for (i in 0 until 40) {
+            p.color = if (i % 2 == 0) 0xFF202020.toInt() else 0xFFE8D0B0.toInt()
+            canvas.drawRect(420f + (i % 8) * 24, 300f + (i / 8) * 40, 444f + (i % 8) * 24, 340f + (i / 8) * 40, p)
+        }
+        val jpeg = java.io.ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.JPEG, 85, it) }.toByteArray()
+        val frames = kotlinx.coroutines.flow.flow { while (true) { emit(jpeg); kotlinx.coroutines.delay(200) } }
+        rule.setContent { JrLinkTheme { com.example.ui.live.LiveViewScreen(app, onBack = {}, frames = frames) } }
+        save("live_view", androidx.compose.ui.test.hasContentDescription("Imagem ao vivo"))
     }
 }

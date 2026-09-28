@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/banner.png" alt="Jr_Link: captura vinculada USB para a Canon EOS 50D, por Jr_Tech_OFC" width="100%">
+  <img src="docs/images/banner.png" alt="JR C50D Sync: captura vinculada USB para a Canon EOS 50D, por Jr_Tech_OFC" width="100%">
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
 
 Você fotografa pela **Canon EOS 50D** como sempre, com botão, dials e menus funcionando. Cada foto vai para o cartão CF e **uma cópia chega sozinha no celular** pelo cabo USB OTG, salva em RAW, JPG ou nos dois, cada formato na pasta que você escolher.
 
-Sem Wi-Fi, sem FTP, sem Live View. Só a USB, só a 50D.
+Sem Wi-Fi, sem FTP, sem internet. Só a USB, só a 50D.
 
 <table>
   <tr>
@@ -41,7 +41,13 @@ Sem Wi-Fi, sem FTP, sem Live View. Só a USB, só a 50D.
     <td align="center"><img src="docs/images/tela-cliente-escolha.png" width="200" alt="Cliente escolhe fotos"><br><sub><b>Seleção</b><br>o cliente marca as fotos</sub></td>
     <td align="center"><img src="docs/images/tela-galeria-lote.png" width="200" alt="Galeria em lote"><br><sub><b>Lote</b><br>preset, envio e mensagem de uma vez</sub></td>
     <td align="center"><img src="docs/images/tela-flash-foco.png" width="200" alt="Flash e foco"><br><sub><b>Flash e foco</b><br>Yongnuo e profundidade de campo</sub></td>
-    <td align="center"><img src="docs/images/tela-selecao-rapida.png" width="200" alt="Seleção rápida"><br><sub><b>Seleção rápida</b><br>tremidas, olhos fechados, sugeridas</sub></td>
+    <td align="center"><img src="docs/images/tela-selecao-rapida.png" width="200" alt="Seleção rápida"><br><sub><b>Culling</b><br>tremidas, olhos fechados, sugeridas</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/tela-live-view.png" width="200" alt="Live view"><br><sub><b>Live view</b><br>monitor com preset ao vivo</sub></td>
+    <td align="center"><img src="docs/images/tela-recorte.png" width="200" alt="Recorte"><br><sub><b>Recorte</b><br>Instagram, Stories, impressão</sub></td>
+    <td align="center"><img src="docs/images/tela-botao-captura.png" width="200" alt="Iniciar captura"><br><sub><b>Iniciar captura</b><br>em qualquer aba</sub></td>
+    <td align="center"><img src="docs/images/tela-perfis.png" width="200" alt="Perfis e backup"><br><sub><b>Perfis</b><br>ajustes prontos por evento</sub></td>
   </tr>
 </table>
 
@@ -51,17 +57,19 @@ Sem Wi-Fi, sem FTP, sem Live View. Só a USB, só a 50D.
 
 | | |
 |---|---|
-| **Captura vinculada** | Fotos feitas pelo botão da câmera ou pelo disparador do app chegam sozinhas no celular. A câmera nunca fica travada. |
+| **Captura vinculada** | Fotos feitas pelo botão da câmera ou pelo disparador do app chegam sozinhas no celular. A câmera nunca fica travada. Botão **Iniciar captura** em todas as abas. |
+| **Live view** | A imagem da 50D no celular como monitor externo: preset em tempo real (igual perfil de cor), guias de enquadramento (terços, 4:5, 9:16), zebra, focus peaking, histograma, toque para focar, zoom 5×/10×, foco fino, prévia de profundidade, exposição e disparo. |
+| **Recorte** | Recorte no estilo Lightroom: proporções prontas para Instagram, Stories/Reels/Status, Facebook, YouTube e impressão (10×15 a A4), livre, endireitar (manual, Auto e traçando o horizonte), girar e espelhar. Recorte rápido em lote. |
 | **Auto-save** | Só JPG, só RAW ou RAW + JPG. Pasta própria para cada formato (inclusive cartão SD), subpasta por sessão, renomeação com o nome do cliente. |
 | **Revisão** | Slide automático para a foto nova, zoom para conferir foco, histograma RGB, alerta de estouro piscando, estrelas de 1 a 5 e favoritas. |
 | **Controle da câmera** | ISO, abertura, velocidade, ±EV e balanço de branco lidos da própria 50D. Exposições salvas, bracketing (AEB) e intervalômetro. |
 | **Presets** | Importa presets do Lightroom em DNG, XMP, LRTemplate ou ZIP. Edita e cria do zero num editor com os painéis do Lightroom. A foto aparece já com o preset, como um perfil de cor, e uma cópia JPG editada fica salva ao lado do original. |
 | **Cartão** | Navegar pelas fotos que já estão no CF e baixar só as escolhidas. Reenvio automático do que foi feito com o cabo solto. |
-| **Envio** | Lightroom com um toque, "JPG leve" para WhatsApp e marca d'água Jr_Tech_OFC aplicada só na cópia enviada. |
-| **Cliente** | Modo cliente em tela cheia, com PIN para sair e resumo ao fim da sessão. O cliente escolhe o preset da foto; o botão Calibrar (com PIN) abre os ajustes daquela foto. |
+| **Envio** | Lightroom com um toque, "JPG leve" com marca d'água Jr_Tech_OFC e **WhatsApp direto para o número do cliente**: digita o número e a conversa abre com a foto pronta (preset, recorte e marca d'água) já anexada. |
+| **Cliente** | Modo cliente em tela cheia com zoom (pinça e duplo toque), PIN para sair e resumo ao fim da sessão. O cliente pode receber a foto no WhatsApp dele. O cliente escolhe o preset da foto; o botão Calibrar (com PIN) abre os ajustes daquela foto. |
 | **Entrega** | O cliente marca as fotos no modo cliente; a lista vai para o filtro do Lightroom ou para a pasta Escolhidas. Galeria em lote e mensagens prontas no WhatsApp. |
 | **Evento** | Momentos (Cerimônia, Festa…) com subpasta, notas de texto e voz por foto, backup da sessão para cartão SD ou pendrive. |
-| **Seleção com análise local** | Avisa na hora se a foto saiu tremida ou se alguém piscou, agrupa fotos parecidas e sugere a melhor. Tela de seleção rápida com gestos. Roda no celular, sem internet (Google ML Kit embutido). |
+| **Seleção com análise local** | Avisa na hora se a foto saiu tremida ou se alguém piscou, agrupa fotos parecidas e sugere a melhor. Aba **Culling** com gestos. Roda no celular, sem internet (Google ML Kit embutido). |
 | **Ferramentas** | Calculadora de flash Yongnuo e de profundidade de campo, GPS nas cópias e acerto do relógio da câmera. Tudo offline. |
 | **Campo** | Vibração a cada foto, alerta se o cabo soltar, aviso de cartão e memória cheios, modo escuro total para igreja e evento noturno. |
 
@@ -77,7 +85,7 @@ Cada função tem um liga/desliga em **Ajustes**.
 
 1. Na câmera, deixe **Desligamento automático** em **Desativado** (menu de configuração, ícone amarelo).
 2. Ligue a 50D e conecte o cabo **USB OTG** no celular.
-3. O Android pergunta se deve abrir o **Jr_Link**. Marque **Usar por padrão** para ele abrir e liberar a USB sozinho das próximas vezes.
+3. O Android pergunta se deve abrir o **JR C50D Sync**. Se o app já estiver aberto, toque em **Iniciar captura** (botão verde no canto). Marque **Usar por padrão** para ele abrir e liberar a USB sozinho das próximas vezes.
 4. Na primeira vez, vá em **Ajustes → Salvamento** e escolha as pastas dos JPG e dos RAW.
 5. Fotografe.
 
@@ -93,7 +101,33 @@ O disparador do app funciona como apertar o botão até o fim: com AF ligado, a 
 
 **Análise local:** os limites de "tremida" vêm de testes com imagens de exemplo. Se o alerta avisar demais ou de menos nas suas fotos, ajuste a sensibilidade em **Ajustes → Revisão**.
 
-**Limites:** o processamento da Adobe é fechado, então a prévia do Jr_Link é uma aproximação. O `.xmp` exportado dá o resultado exato no Lightroom. Máscaras, remoção de manchas, correção de lente e perfis de câmera da Adobe não são aplicados; o corte também não, porque não faz parte de um preset.
+**Limites:** o processamento da Adobe é fechado, então a prévia do app é uma aproximação. O `.xmp` exportado dá o resultado exato no Lightroom. Máscaras, remoção de manchas, correção de lente e perfis de câmera da Adobe não são aplicados; o corte também não, porque não faz parte de um preset.
+
+### Live view
+
+1. Na 50D, ative uma vez: **Menu → Configurações de Live View → Disparo com Live View: Ativar**. Deixe o dial em P, Tv, Av ou M.
+2. Com a câmera conectada, toque em **Live view** na Sessão.
+3. No botão de camadas escolha o **preset em tempo real** (nenhum, o look da sessão ou qualquer preset), a guia (terços, Instagram 4:5, Stories 9:16…), zebra, peaking e histograma.
+4. Toque na imagem para focar ali. **5×/10×** amplia pela câmera e a pinça é uma lupa no celular. **◀ ▶** mexe o foco (lente na chave AF). Segure **DOF** para ver a profundidade de campo.
+5. O ícone de girar deixa a tela em paisagem, e o olho esconde os controles para usar o celular como monitor limpo.
+
+Live view gasta mais bateria da câmera. Com a imagem só no celular, a tela da 50D fica apagada; dá para manter nas duas em "Mostrar também na tela da câmera".
+
+### Recorte e WhatsApp
+
+- **Recortar:** no visualizador, toque no ícone de recorte. Escolha a proporção (Instagram 4:5, Stories 9:16, 10×15…), arraste a moldura para enquadrar e use **Endireitar** (régua, **Auto** ou **Traçar horizonte**). O recorte vale para a tela, a cópia editada e o envio. O arquivo original não muda.
+- **Recorte rápido:** na galeria, segure para selecionar várias fotos → **Recorte** → formato. Cada foto recebe o maior recorte centralizado.
+- **WhatsApp direto:** no visualizador, na galeria em lote ou no modo cliente, toque em **WhatsApp**, coloque o nome e o número com DDD e siga os dois botões:
+  1. **Abrir conversa:** abre o chat daquele número já com a mensagem automática (Ajustes → Mensagens → Envio das fotos). Envie a mensagem.
+  2. **Enviar fotos:** volte ao app e toque em 2. As fotos vão para a mesma conversa.
+
+  O WhatsApp só pula a tela "Enviar para" quando a conversa já existe; por isso a mensagem vai antes. Os números usados ficam em Recentes (no modo cliente eles não aparecem).
+
+### Perfis e backup
+
+- **Ajustes → Perfis e backup** tem sets prontos (Casamento / igreja, Ensaio externo, Evento / festa, Estúdio / produto). Deixe o app do seu jeito e salve como perfil. Na Sessão, o chip **Perfil** troca tudo em um toque.
+- Pastas, PIN, nome da sessão e contatos não mudam com o perfil.
+- **Backup dos ajustes:** salva um .json com ajustes, perfis e presets. Em **Restaurar**, os ajustes do arquivo substituem os atuais, e perfis e presets são somados aos que você já tem.
 
 <details>
 <summary><b>Se algo der errado</b></summary>
@@ -105,6 +139,9 @@ O disparador do app funciona como apertar o botão até o fim: com AF ligado, a 
 | "Outro app está usando a câmera" | Feche outros apps de câmera ou USB e tente de novo. |
 | Foto não chega | Confira se o formato em Ajustes inclui o que a câmera grava (câmera em RAW e app em "Só JPG" não baixa nada). |
 | Não dispara pelo app | AF sem foco. Use MF ou AF-ON. |
+| Live view não aparece | Ative o Disparo com Live View no menu da 50D (Configurações de Live View) e use P, Tv, Av ou M. |
+| WhatsApp abre "Enviar para" | Use o botão **1 · Abrir conversa** primeiro e mande a mensagem; depois o **2 · Enviar fotos** vai direto para o cliente. |
+| WhatsApp abre sem a foto | Atualize o WhatsApp. Sem ele instalado, o app abre o link wa.me do número só com o texto. |
 | Preset não importa | O arquivo precisa ter ajustes do Lightroom dentro. DNG de preset sim; DNG de foto comum sem ajustes, não. |
 | Qualquer outro erro | **Ajustes → Diagnóstico → Copiar log** e abra um [relato de problema](https://github.com/jrtechofcdev/Canon-50D-Remote/issues/new/choose) com o log. |
 
@@ -133,7 +170,7 @@ Para publicar uma versão nova: suba o `versionName` em `app/build.gradle.kts` e
 ```
 app/src/main/java/com/example/
 ├── TetherApp.kt                   cria as peças do app (câmera, banco, configurações)
-├── MainActivity.kt                navegação: Sessão, Fotos, Presets, Ajustes
+├── MainActivity.kt                navegação: Sessão, Fotos, Culling, Presets, Ajustes + botão Iniciar captura
 ├── core/
 │   ├── ptp/                       protocolo PTP da Canon: pacotes, sessão USB, eventos, valores
 │   ├── camera/CameraManager.kt    conexão com a 50D, eventos, disparo, ISO/Av/Tv, AEB, cartão
@@ -142,7 +179,8 @@ app/src/main/java/com/example/
 │   ├── data/                      banco de fotos (Room), configurações e presets (DataStore)
 │   ├── preset/                    presets: leitura de DNG/XMP/LRTemplate, XMP para exportar, pack inicial
 │   ├── render/                    processamento dos presets (OpenGL na GPU, com versão na CPU de reserva)
-│   ├── analysis/                  histograma, estouro e a seleção local (nitidez, rostos, nota)
+│   ├── analysis/                  histograma, estouro, peaking e a seleção local (nitidez, rostos, nota)
+│   ├── live/                      live view: leitura dos quadros e processamento (preset, zebra, peaking)
 │   ├── messages/                  modelos de mensagem do WhatsApp
 │   ├── tools/                     contas de flash e profundidade de campo
 │   ├── backup/  location/  notes/ backup da sessão, GPS e notas de voz
@@ -162,12 +200,13 @@ app/src/main/java/com/example/
 | Nome do app | `app/src/main/res/values/strings.xml` |
 | Padrões das opções | `core/data/AppSettings.kt` → `Settings` |
 | Logos da marca d'água | `app/src/main/assets/watermarks/` (gerados por `branding/render.py`) |
-| Ícone do app | `branding/symbol.py` |
+| Ícone do app | `branding/icon.py` (gera o vetor, os WebP e a prévia `branding/icone_jr_c50d_sync.png`) |
 | Banner deste README | `branding/banner.py` |
 | Presets que vêm com o app | `core/preset/StarterPresets.kt` |
 | Sliders e faixas do editor | `ui/preset/EditorControls.kt` |
 | Mensagens padrão do WhatsApp | `core/messages/MessageTemplates.kt` (ou em Ajustes → Mensagens) |
 | Flashes da calculadora | `core/tools/FieldMath.kt` → `Flash` |
+| Proporções do recorte | `core/render/Crop.kt` → `CropRatio` |
 | Textos das telas | `ui/session`, `ui/photos`, `ui/preset`, `ui/settings` |
 </details>
 
@@ -179,7 +218,7 @@ app/src/main/java/com/example/
 
 ## Créditos
 
-**Jr_Link** é um app da **Jr_Tech_OFC** ([@jose_renato_a](https://instagram.com/jose_renato_a)).
+**JR C50D Sync** é um app da **Jr_Tech_OFC** ([@jose_renato_a](https://instagram.com/jose_renato_a)).
 Uso exclusivo. Marca, logo e nome Jr_Tech_OFC: todos os direitos reservados.
 
 Fonte [Exo 2](https://github.com/googlefonts/Exo-2.0) (SIL Open Font License). Protocolo PTP da Canon com base na documentação do [libgphoto2](https://github.com/gphoto/libgphoto2).

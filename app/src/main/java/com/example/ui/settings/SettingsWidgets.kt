@@ -13,7 +13,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -35,11 +39,19 @@ import com.example.ui.theme.ReadoutStyle
 import com.example.ui.theme.Tone
 import kotlin.math.roundToInt
 
-/** A titled block of related options. */
+/** A titled block of related options, with an icon so each block is found at a glance. */
 @Composable
-fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
+fun SettingsGroup(title: String, icon: ImageVector? = null, content: @Composable ColumnScope.() -> Unit) {
     Spacer(Modifier.height(20.dp))
-    SectionLabel(title)
+    if (icon == null) {
+        SectionLabel(title)
+    } else {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = Tone.Accent, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            SectionLabel(title)
+        }
+    }
     Column(
         Modifier
             .fillMaxWidth()
@@ -51,7 +63,12 @@ fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-fun ToggleRow(title: String, detail: String?, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+fun ToggleRow(title: String, detail: String?, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) =
+    ToggleRow(null, title, detail, checked, enabled, onChange)
+
+/** A switch with its icon on the left, so the option is recognised before reading it. */
+@Composable
+fun ToggleRow(icon: ImageVector?, title: String, detail: String?, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -60,6 +77,7 @@ fun ToggleRow(title: String, detail: String?, checked: Boolean, enabled: Boolean
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        icon?.let { RowIcon(it, enabled && checked) }
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) Tone.Text else Tone.TextMuted)
             detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted) }
@@ -84,12 +102,14 @@ fun SliderRow(
     step: Int = 1,
     enabled: Boolean = true,
     format: (Int) -> String = { it.toString() },
+    icon: ImageVector? = null,
     onChange: (Int) -> Unit,
 ) {
     var dragging by remember(value) { mutableFloatStateOf(value.toFloat()) }
     val shown = (dragging / step).roundToInt() * step
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            icon?.let { RowIcon(it, enabled) }
             Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) Tone.Text else Tone.TextMuted, modifier = Modifier.weight(1f))
             Text(format(shown), style = ReadoutStyle.copy(fontSize = MaterialTheme.typography.bodyLarge.fontSize), color = Tone.Text)
         }
@@ -114,9 +134,12 @@ fun SliderRow(
 /** One choice out of a few, shown as chips that wrap on narrow screens. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun <T> ChoiceRow(title: String, options: List<Pair<T, String>>, selected: T, enabled: Boolean = true, onPick: (T) -> Unit) {
+fun <T> ChoiceRow(title: String, options: List<Pair<T, String>>, selected: T, enabled: Boolean = true, icon: ImageVector? = null, onPick: (T) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) Tone.Text else Tone.TextMuted)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            icon?.let { RowIcon(it, enabled) }
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) Tone.Text else Tone.TextMuted)
+        }
         Spacer(Modifier.height(6.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             options.forEach { (value, label) ->
@@ -142,6 +165,11 @@ fun <T> ChoiceRow(title: String, options: List<Pair<T, String>>, selected: T, en
             }
         }
     }
+}
+
+@Composable
+private fun RowIcon(icon: ImageVector, on: Boolean) {
+    Icon(icon, contentDescription = null, tint = if (on) Tone.Accent else Tone.TextMuted, modifier = Modifier.padding(end = 14.dp).size(22.dp))
 }
 
 @Composable

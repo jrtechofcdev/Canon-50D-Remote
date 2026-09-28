@@ -281,7 +281,7 @@ object XmpPresetWriter {
         attrs["HasSettings"] = "True"
 
         return buildString {
-            append("<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"Jr_Link\">\n")
+            append("<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"JR C50D Sync\">\n")
             append(" <rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n")
             append("  <rdf:Description rdf:about=\"\"\n    xmlns:crs=\"http://ns.adobe.com/camera-raw-settings/1.0/\"")
             attrs.forEach { (k, v) -> append("\n    crs:").append(k).append("=\"").append(escape(v)).append('"') }

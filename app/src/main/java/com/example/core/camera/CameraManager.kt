@@ -29,6 +29,8 @@ import com.example.core.ptp.PtpResponseException
 import com.example.core.ptp.PtpSession
 import com.example.core.ptp.UsbPtpTransport
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.BufferOverflow
+import com.example.core.live.LiveViewParser
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -55,6 +57,14 @@ sealed interface ConnectionState {
     data object Connecting : ConnectionState
     data class Connected(val model: String, val serial: String) : ConnectionState
     data class Failed(val message: String) : ConnectionState
+}
+
+/** Live view: off, starting, streaming (with measured frame rate and camera zoom), or failed with a hint. */
+sealed interface LiveState {
+    data object Off : LiveState
+    data object Starting : LiveState
+    data class Running(val fps: Float, val zoom: Int) : LiveState
+    data class Failed(val message: String) : LiveState
 }
 
 /** Exposure values as last reported by the camera, keyed by EOS property code. */
@@ -111,6 +121,15 @@ class CameraManager(
 
     private val _log = MutableStateFlow<List<String>>(emptyList())
     val log: StateFlow<List<String>> = _log.asStateFlow()
+
+    private val _live = MutableStateFlow<LiveState>(LiveState.Off)
+    val live: StateFlow<LiveState> = _live.asStateFlow()
+
+    /** Latest live view JPEG. Slow consumers only ever get the newest frame. */
+    private val _liveFrames = MutableSharedFlow<ByteArray>(replay = 1, extraBufferCapacity = 0, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    val liveFrames: SharedFlow<ByteArray> = _liveFrames.asSharedFlow()
+    private var liveJob: Job? = null
+    @Volatile private var liveZoom = 1
 
     private var session: PtpSession? = null
     private var device: UsbDevice? = null
@@ -341,6 +360,113 @@ class CameraManager(
             }
     }
 
+    /**
+     * Streams live view to the phone. [alsoOnCamera] keeps the picture on the camera's screen too.
+     * The event loop keeps running alongside (the session lock takes turns), so settings changed on
+     * the camera still show up and new photos still download.
+     */
+    fun startLiveView(alsoOnCamera: Boolean = false) {
+        val ptp = session ?: return
+        if (liveJob?.isActive == true) return
+        liveJob = scope.launch { runLiveView(ptp, alsoOnCamera) }
+    }
+
+    fun stopLiveView() {
+        val job = liveJob ?: return
+        liveJob = null
+        job.cancel()
+        _live.value = LiveState.Off
+        val ptp = session ?: return
+        scope.launch {
+            runCatching { if (liveZoom != 1) ptp.transact(PtpOp.EOS_ZOOM, 1) }
+            runCatching { setPropertyNow(ptp, EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_OFF) }
+            liveZoom = 1
+        }
+    }
+
+    private suspend fun runLiveView(ptp: PtpSession, alsoOnCamera: Boolean) {
+        _live.value = LiveState.Starting
+        val output = if (alsoOnCamera) EosProp.EVF_PHONE or EosProp.EVF_CAMERA else EosProp.EVF_PHONE
+        try {
+            setPropertyNow(ptp, EosProp.EVF_OUTPUT_DEVICE, output)
+        } catch (e: PtpException) {
+            _live.value = LiveState.Failed("A câmera recusou o live view (${e.message}). $LIVE_HINT")
+            return
+        }
+        log("Live view ligado")
+        var lastFrame = System.currentTimeMillis()
+        var windowStart = lastFrame
+        var windowFrames = 0
+        var fps = 0f
+        while (scope.isActive && session === ptp && liveJob?.isActive == true) {
+            val started = System.currentTimeMillis()
+            val data = try {
+                ptp.transactForData(PtpOp.EOS_GET_VIEWFINDER_DATA, LIVE_VIEW_PARAM, timeoutMs = LIVE_TIMEOUT_MS)
+            } catch (e: PtpResponseException) {
+                // "Not ready" while the mirror goes up or the camera focuses; only a long silence is a problem.
+                if (started - lastFrame > LIVE_GIVE_UP_MS) {
+                    _live.value = LiveState.Failed("A 50D não mandou imagem. $LIVE_HINT")
+                    runCatching { setPropertyNow(ptp, EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_OFF) }
+                    return
+                }
+                delay(60)
+                continue
+            }
+            val jpeg = LiveViewParser.jpeg(data) ?: continue
+            _liveFrames.tryEmit(jpeg)
+            lastFrame = System.currentTimeMillis()
+            windowFrames++
+            if (lastFrame - windowStart >= 1000) {
+                fps = windowFrames * 1000f / (lastFrame - windowStart)
+                windowFrames = 0
+                windowStart = lastFrame
+            }
+            _live.value = LiveState.Running(fps, liveZoom)
+            // Leave the cable some room for events and downloads (about 25 frames a second at most).
+            val spent = lastFrame - started
+            if (spent < MIN_FRAME_MS) delay(MIN_FRAME_MS - spent)
+        }
+    }
+
+    /** Camera zoom on the live picture: 1, 5 or 10 times. */
+    fun setLiveZoom(level: Int) = liveCommand("A câmera não aceitou o zoom") {
+        it.transact(PtpOp.EOS_ZOOM, level)
+        liveZoom = level
+    }
+
+    /** Moves the zoomed area / AF frame. [x], [y] are 0…1 across the picture. */
+    fun setLiveFocusPoint(x: Float, y: Float) = liveCommand("A câmera não aceitou a posição") {
+        it.transact(PtpOp.EOS_ZOOM_POSITION, (x.coerceIn(0f, 1f) * SENSOR_W).toInt(), (y.coerceIn(0f, 1f) * SENSOR_H).toInt())
+    }
+
+    /** Autofocus now (like half-pressing with AF-ON), using the camera's live view AF mode. */
+    fun liveAutofocus() = liveCommand("Não focou: confira se a lente está em AF") {
+        it.transact(PtpOp.EOS_DO_AF)
+    }
+
+    /** Nudges focus with the lens in AF: [step] 1…3 towards near, −1…−3 towards far. */
+    fun driveLens(step: Int) = liveCommand("A lente não se moveu: deixe a chave da lente em AF") {
+        val size = kotlin.math.abs(step).coerceIn(1, 3)
+        it.transact(PtpOp.EOS_DRIVE_LENS, if (step < 0) 0x8000 or size else size)
+    }
+
+    /** Stops the lens down to the chosen aperture on the live picture (depth of field preview). */
+    fun depthOfFieldPreview(on: Boolean) = liveCommand("A câmera não fez a prévia de profundidade") {
+        it.transact(PtpOp.EOS_DOF_PREVIEW, if (on) 1 else 0)
+    }
+
+    private fun liveCommand(failure: String, block: suspend (PtpSession) -> Unit) {
+        val ptp = session ?: return
+        scope.launch {
+            try {
+                block(ptp)
+            } catch (e: PtpException) {
+                _messages.tryEmit(failure)
+                log("$failure: ${e.message}")
+            }
+        }
+    }
+
     /** Applies a saved preset, skipping values the current dial mode doesn't let the camera change. */
     fun applyPreset(preset: ExposurePreset) {
         val ptp = session ?: return
@@ -464,6 +590,8 @@ class CameraManager(
         closeSession(closeTransport = false)
         scope.launch {
             withTimeoutOrNull(2_000) {
+                // Hand the picture back to the camera's screen before leaving remote mode.
+                runCatching { ptp.transact(PtpOp.EOS_SET_DEVICE_PROP_VALUE_EX, dataOut = PtpContainer.eosPropValue(EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_OFF), timeoutMs = 1_000) }
                 runCatching { ptp.transact(PtpOp.EOS_SET_EVENT_MODE, 0, timeoutMs = 1_000) }
                 runCatching { ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, 0, timeoutMs = 1_000) }
                 runCatching { ptp.transact(PtpOp.CLOSE_SESSION, timeoutMs = 1_000) }
@@ -476,6 +604,10 @@ class CameraManager(
 
     private fun closeSession(closeTransport: Boolean = true) {
         stopInterval()
+        liveJob?.cancel()
+        liveJob = null
+        _live.value = LiveState.Off
+        liveZoom = 1
         val ptp = session
         session = null
         device = null
@@ -505,6 +637,14 @@ class CameraManager(
         private val AV_MODES = setOf(2, 3, 4)
         private const val ACTION_USB_PERMISSION = "com.jrtechofc.tether50d.USB_PERMISSION"
         const val CANON_VENDOR_ID = 0x04A9
+        private const val LIVE_VIEW_PARAM = 0x00100000
+        private const val LIVE_TIMEOUT_MS = 3_000
+        private const val LIVE_GIVE_UP_MS = 6_000L
+        private const val MIN_FRAME_MS = 40L
+        /** Zoom position coordinates use the sensor's pixel grid (50D: 4752 × 3168). */
+        private const val SENSOR_W = 4752
+        private const val SENSOR_H = 3168
+        const val LIVE_HINT = "Na 50D, ative em Menu → Configurações de Live View → Disparo com Live View: Ativar, e deixe o dial em P, Tv, Av ou M."
         private const val POLL_IDLE_MS = 200L
         private const val POLL_BUSY_MS = 40L
         private const val KEEP_ALIVE_MS = 60_000L

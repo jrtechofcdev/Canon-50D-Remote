@@ -1,9 +1,10 @@
-# Jr_Link
+# JR C50D Sync
 
-App Android **Jr_Link** (marca Jr_Tech_OFC, Kotlin + Jetpack Compose) de captura vinculada USB para a Canon EOS 50D.
+App Android **JR C50D Sync** (antes Jr_Link; marca Jr_Tech_OFC, Kotlin + Jetpack Compose) de captura vinculada USB para a Canon EOS 50D.
 Identidade: `DESIGN.md` e `branding/` (cores, fonte Exo 2, símbolo).
 Código em `app/src/main/java/com/example/`. Protocolo PTP em `core/ptp`, sessão USB em `core/camera`,
-auto-save em `core/tether` + `core/storage`, presets em `core/preset` + `core/render` (GL com reserva na CPU), telas em `ui/`.
+auto-save em `core/tether` + `core/storage`, presets e recorte em `core/preset` + `core/render` (GL com reserva na CPU), live view em `core/live`, telas em `ui/`.
+Ícone: `python3 branding/icon.py`; banner: `python3 branding/banner.py`.
 
 - Testes: `gradle :app:testDebugUnitTest`
 - Capturas de tela das telas: `gradle :app:testDebugUnitTest --tests com.example.ui.ScreenshotTest` → `app/build/screens/`
