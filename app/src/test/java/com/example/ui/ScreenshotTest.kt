@@ -144,11 +144,22 @@ class ScreenshotTest {
         save("ajustes_envio", logo)
     }
 
+    /**
+     * A starter preset by name. Other tests in the same run can leave presets behind (so the pack is
+     * not seeded again); the one needed is added back when missing, whatever ran before.
+     */
+    private suspend fun starter(name: String): com.example.core.preset.Preset {
+        app.presets.seedIfEmpty()
+        app.presets.all().firstOrNull { it.name.contains(name) }?.let { return it }
+        val template = com.example.core.preset.StarterPresets.all.first { it.name.contains(name) }
+        val id = app.presets.save(template.copy(id = 0))
+        return app.presets.get(id)!!
+    }
+
     /** Seeds the starter pack and gives the newest sample photo a preset, as a session with a look would. */
     private fun seedLooks(): Long = runBlocking {
         seedPhotos()
-        app.presets.seedIfEmpty()
-        val preset = app.presets.all().first { it.name.contains("Golden") || it.name.contains("Outdoor") }
+        val preset = starter("Outdoor")
         val photo = app.database.photoDao().inSession("Geral").last()
         app.database.photoDao().setLook(photo.id, preset.id, null)
         app.settings.set(com.example.core.data.SettingKeys.sessionPresetId, preset.id)
@@ -324,8 +335,7 @@ class ScreenshotTest {
 
     private fun live(name: String) {
         runBlocking {
-            app.presets.seedIfEmpty()
-            val preset = app.presets.all().first { it.name.contains("Golden") }
+            val preset = starter("Golden")
             app.settings.set(com.example.core.data.SettingKeys.livePresetId, preset.id)
             app.settings.set(com.example.core.data.SettingKeys.livePeaking, true)
             app.settings.set(com.example.core.data.SettingKeys.liveGrid, "ig45")
