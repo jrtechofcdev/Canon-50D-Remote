@@ -124,6 +124,10 @@ data class Settings(
     val eyesCheck: Boolean = true,
     val cullSuggestions: Boolean = true,
     val hideRejected: Boolean = true,
+    /** Last clients sent to on WhatsApp, "number|name;…". */
+    val recentContacts: String = "",
+    /** WhatsApp button in client mode: the client types their own number and gets the photo. */
+    val clientWhatsApp: Boolean = true,
 
     // Tela
     val nightMode: Boolean = false,
@@ -238,6 +242,8 @@ object SettingKeys {
     val eyesCheck = booleanPreferencesKey("eyes_check")
     val cullSuggestions = booleanPreferencesKey("cull_suggestions")
     val hideRejected = booleanPreferencesKey("hide_rejected")
+    val recentContacts = stringPreferencesKey("recent_contacts")
+    val clientWhatsApp = booleanPreferencesKey("client_whatsapp")
 
     val nightMode = booleanPreferencesKey("night_mode")
     val nightBrightness = intPreferencesKey("night_brightness")
@@ -350,6 +356,8 @@ class SettingsRepository(private val context: Context) {
             eyesCheck = this[k.eyesCheck] ?: d.eyesCheck,
             cullSuggestions = this[k.cullSuggestions] ?: d.cullSuggestions,
             hideRejected = this[k.hideRejected] ?: d.hideRejected,
+            recentContacts = this[k.recentContacts] ?: d.recentContacts,
+            clientWhatsApp = this[k.clientWhatsApp] ?: d.clientWhatsApp,
 
             nightMode = this[k.nightMode] ?: d.nightMode,
             nightBrightness = this[k.nightBrightness] ?: d.nightBrightness,

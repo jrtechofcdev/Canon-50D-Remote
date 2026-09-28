@@ -107,6 +107,26 @@ class Looks(
     }
 
     /**
+     * The photo as it should leave the phone (look applied), as a JPG in the cache, long edge [maxEdge]
+     * (0 = full size). Null when the photo has no look: then the file itself is sent.
+     */
+    suspend fun exportFile(photo: Photo, maxEdge: Int): java.io.File? {
+        val s = settingsFor(photo) ?: return null
+        val source = photo.displayUri ?: return null
+        val base = withContext(Dispatchers.IO) { BitmapLoader.load(context, Uri.parse(source), maxEdge) } ?: return null
+        val rendered = engine.render(base, RenderParams.from(s))
+        base.recycle()
+        return withContext(Dispatchers.IO) {
+            val dir = java.io.File(context.cacheDir, "export").apply { mkdirs() }
+            val out = java.io.File(dir, "${photo.savedBase}_look.jpg")
+            out.outputStream().use { rendered.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+            rendered.recycle()
+            ExifCopy.apply(context, out, source, null, null)
+            out
+        }
+    }
+
+    /**
      * Gives [photo] a look (a preset, optionally with its own calibration in [adjust]) or removes it (both null).
      * Rewrites the edited copy when that is on; a copy left from the previous look is removed so it never lies.
      */

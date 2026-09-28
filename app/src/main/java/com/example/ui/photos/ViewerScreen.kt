@@ -113,6 +113,7 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
     val zoomed = remember { mutableStateMapOf<Long, Boolean>() }
     var showClipping by remember { mutableStateOf(settings.highlightAlert) }
     var noteFor by remember { mutableStateOf<Photo?>(null) }
+    var whatsFor by remember { mutableStateOf<Photo?>(null) }
 
     // Slide to a frame that just arrived. New photos are inserted at index 0; the pager keeps the
     // current photo in place by key, so "was on the latest" means we were on index 0 before it.
@@ -249,10 +250,10 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
                     sets = actions.availableSets(current, settings, includeLight = false),
                     modifier = Modifier.weight(1f),
                 ) { scope.launch { actions.openInLightroom(listOf(current), it, settings) } }
+                OutlinedButton(onClick = { whatsFor = current }, modifier = Modifier.weight(1f)) { Text("WhatsApp", maxLines = 1) }
                 SetMenuButton(
                     label = "Enviar",
                     primary = false,
-                    icon = { Icon(Icons.Outlined.Share, contentDescription = null) },
                     sets = actions.availableSets(current, settings),
                     modifier = Modifier.weight(1f),
                 ) { scope.launch { actions.share(listOf(current), it, settings) } }
@@ -264,6 +265,7 @@ fun ViewerScreen(app: TetherApp, actions: PhotoActions, startId: Long, onBack: (
     }
 
     noteFor?.let { photo -> NoteSheet(app, photo, onDismiss = { noteFor = null }) }
+    whatsFor?.let { photo -> WhatsAppSheet(app, actions, settings, listOf(photo), onDismiss = { whatsFor = null }) }
 
     confirmDelete?.let { photo ->
         AlertDialog(

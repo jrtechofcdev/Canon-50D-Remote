@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
@@ -248,6 +249,7 @@ fun PhotosScreen(
                 },
                 onMoment = { sheet = "moment" },
                 onMessage = { sheet = "message" },
+                onWhatsApp = { sheet = "whatsapp" },
                 onDelete = { sheet = "delete" },
                 onShare = { set -> scope.launch { actions.share(selection, set, settings) } },
                 onLightroom = { set -> scope.launch { actions.openInLightroom(selection, set, settings) } },
@@ -265,6 +267,7 @@ fun PhotosScreen(
             scope.launch { app.database.photoDao().setMoment(selection.map { it.id }, m.ifEmpty { null }); selected.clear() }
         }, onDismiss = { sheet = null })
         "message" -> MessageSheet(actions, settings, selection, onDismiss = { sheet = null })
+        "whatsapp" -> WhatsAppSheet(app, actions, settings, selection, onDismiss = { sheet = null; selected.clear() })
         "delete" -> AlertDialog(
             onDismissRequest = { sheet = null },
             containerColor = Tone.Surface,
@@ -318,6 +321,7 @@ private fun BatchBar(
     onFavorite: () -> Unit,
     onMoment: () -> Unit,
     onMessage: () -> Unit,
+    onWhatsApp: () -> Unit,
     onDelete: () -> Unit,
     onShare: (ShareSet) -> Unit,
     onLightroom: (ShareSet) -> Unit,
@@ -329,6 +333,7 @@ private fun BatchBar(
         Modifier.fillMaxWidth().background(Tone.Surface).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        BarAction(Icons.AutoMirrored.Outlined.Send, "WhatsApp", onWhatsApp)
         BarAction(Icons.Outlined.AutoAwesome, "Preset", onPreset)
         BarMenu(Icons.Outlined.Share, "Enviar", sets, onShare)
         BarMenu(Icons.Outlined.PhotoLibrary, "Lightroom", lrSets, onLightroom)

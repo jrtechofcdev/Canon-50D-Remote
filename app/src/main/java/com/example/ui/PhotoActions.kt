@@ -10,6 +10,8 @@ import androidx.core.content.FileProvider
 import com.example.core.data.Photo
 import com.example.core.data.Settings
 import com.example.core.export.ExportService
+import com.example.core.messages.WhatsAppNumber
+import com.example.core.render.Looks
 import com.example.core.storage.PhotoStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -27,6 +29,8 @@ class PhotoActions(
     private val context: Context,
     private val store: PhotoStore,
     private val export: ExportService,
+    /** Renders the look when a photo has one but no edited copy on disk. */
+    private val looks: Looks? = null,
 ) {
 
     fun availableSets(photo: Photo, settings: Settings, includeLight: Boolean = true): List<ShareSet> = buildList {
@@ -68,6 +72,28 @@ class PhotoActions(
         context.startActivity(Intent.createChooser(intent, "Enviar mensagem").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
+    /**
+     * Opens the WhatsApp chat of [number] with the photos already attached (and [text] as caption),
+     * so it only takes tapping send. Uses WhatsApp Business when that is the one installed. Without
+     * WhatsApp, opens wa.me for that number with the text.
+     * Returns false when the number is not valid.
+     */
+    suspend fun sendToWhatsApp(number: String, photos: List<Photo>, set: ShareSet?, text: String, settings: Settings): Boolean {
+        val digits = WhatsAppNumber.normalize(number) ?: return false
+        val whatsapp = listOf(WHATSAPP, WHATSAPP_BUSINESS).firstOrNull { installed(it) }
+        if (whatsapp == null) {
+            val url = "https://wa.me/$digits" + if (text.isNotBlank()) "?text=" + Uri.encode(text) else ""
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return true
+        }
+        val intent = (if (set != null && photos.isNotEmpty()) sendIntent(photos, set, settings) else null)
+            ?: Intent(Intent.ACTION_SEND).setType("text/plain")
+        if (text.isNotBlank()) intent.putExtra(Intent.EXTRA_TEXT, text)
+        // "jid" makes WhatsApp skip its contact picker and open this number's chat directly.
+        intent.putExtra("jid", WhatsAppNumber.jid(digits)).setPackage(whatsapp).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return runCatching { context.startActivity(intent) }.isSuccess
+    }
+
     private fun installed(pkg: String) = runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess
 
     fun openWith(photo: Photo) {
@@ -86,7 +112,9 @@ class PhotoActions(
         val files: List<Uri> = if (set == ShareSet.LIGHT) {
             withContext(Dispatchers.IO) {
                 photos.mapNotNull { p ->
-                    p.lookUri?.let { export.exportLight(it, p.savedBase, settings, p.lat, p.lon) }
+                    // The client gets the photo as shown on screen: edited copy, or the look rendered now.
+                    val source = p.editedUri ?: looks?.exportFile(p, 0)?.let { "file://${it.path}" } ?: p.displayUri
+                    source?.let { export.exportLight(it, p.savedBase, settings, p.lat, p.lon) }
                         ?.let { FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", it) }
                 }
             }

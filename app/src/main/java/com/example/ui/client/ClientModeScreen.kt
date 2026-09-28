@@ -65,6 +65,9 @@ import com.example.core.data.Photo
 import com.example.core.preset.Preset
 import com.example.ui.preset.LookImage
 import com.example.ui.components.Zoomable
+import com.example.ui.PhotoActions
+import com.example.ui.photos.WhatsAppSheet
+import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.input.pointer.PointerEventPass
 import com.example.ui.preset.PresetStrip
@@ -85,6 +88,7 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
     }
     var askPin by remember { mutableStateOf(false) }
     var calibrateAsk by remember { mutableStateOf<Long?>(null) }
+    var whatsFor by remember { mutableStateOf<Photo?>(null) }
     val pager = rememberPagerState { photos.size }
 
     ImmersiveMode()
@@ -127,20 +131,30 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
             )
         } else {
             val showStrip = settings.clientPresetsEnabled && presets.isNotEmpty()
-            ClientPager(app, pager, photos, presets, settings, infoAbove = showStrip)
+            ClientPager(app, pager, photos, presets, settings, infoAbove = showStrip || settings.clientWhatsApp)
             val current = photos.getOrNull(pager.currentPage)
-            if (showStrip && current != null) {
-                // Discreet strip: the client picks the look; Calibrar is for the photographer.
+            val showWhatsApp = settings.clientWhatsApp
+            if ((showStrip || showWhatsApp) && current != null) {
+                // Discreet bar: the client picks the look and can get the photo on WhatsApp; Calibrar is for the photographer.
                 Row(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.55f))
                         .navigationBarsPadding().padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(Modifier.weight(1f)) {
-                        PresetStrip(presets, current.presetId) { picked -> scope.launch { app.looks.setLook(current, picked?.id, null) } }
+                        if (showStrip) {
+                            PresetStrip(presets, current.presetId) { picked -> scope.launch { app.looks.setLook(current, picked?.id, null) } }
+                        }
                     }
-                    IconButton(onClick = { requestCalibrate(current.id) }) {
-                        Icon(Icons.Outlined.Tune, contentDescription = "Calibrar", tint = Color(0xFFBDBDBD))
+                    if (showWhatsApp) {
+                        IconButton(onClick = { whatsFor = current }) {
+                            Icon(Icons.AutoMirrored.Outlined.Send, contentDescription = "Receber no WhatsApp", tint = Tone.Accent)
+                        }
+                    }
+                    if (showStrip) {
+                        IconButton(onClick = { requestCalibrate(current.id) }) {
+                            Icon(Icons.Outlined.Tune, contentDescription = "Calibrar", tint = Color(0xFFBDBDBD))
+                        }
                     }
                 }
             }
@@ -159,6 +173,9 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
 
     if (askPin) {
         PinDialog(settings.clientPin, "PIN para sair", "Sair", onOk = { askPin = false; onExit() }, onCancel = { askPin = false })
+    }
+    whatsFor?.let { photo ->
+        WhatsAppSheet(app, remember { PhotoActions(app, app.store, app.export, app.looks) }, settings, listOf(photo), forClient = true, onDismiss = { whatsFor = null })
     }
     calibrateAsk?.let { id ->
         PinDialog(settings.clientPin, "PIN para calibrar", "Calibrar", onOk = { calibrateAsk = null; onCalibrate(id) }, onCancel = { calibrateAsk = null })

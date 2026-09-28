@@ -75,7 +75,7 @@ class MainActivity : ComponentActivity() {
         askNotificationPermissionOnce()
         app.camera.findAndConnect()
 
-        val actions = PhotoActions(this, app.store, app.export)
+        val actions = PhotoActions(this, app.store, app.export, app.looks)
 
         setContent {
             val settings by app.settings.settings.collectAsState(initial = Settings())

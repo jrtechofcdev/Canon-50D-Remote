@@ -574,6 +574,7 @@ private fun ShareSettings(app: TetherApp, s: Settings) {
 
     SettingsGroup("Modo cliente") {
         ToggleRow("Mostrar botão Modo cliente", "Tela cheia só com as fotos, para o cliente acompanhar", s.clientModeEnabled) { set(SettingKeys.clientModeEnabled, it) }
+        ToggleRow("Cliente recebe no WhatsApp", "Botão para o cliente digitar o número dele e receber a foto pronta", s.clientWhatsApp, enabled = s.clientModeEnabled) { set(SettingKeys.clientWhatsApp, it) }
         ToggleRow("Cliente escolhe as fotos", "Coração em cada foto; a seleção aparece na galeria e no resumo da sessão", s.clientPicksEnabled, enabled = s.clientModeEnabled) { set(SettingKeys.clientPicksEnabled, it) }
         ToggleRow("Mostrar nome e exposição", null, s.clientShowInfo, enabled = s.clientModeEnabled) { set(SettingKeys.clientShowInfo, it) }
         ToggleRow("Assinatura Jr_Tech_OFC", "Símbolo e nome discretos no canto da tela", s.clientShowBrand, enabled = s.clientModeEnabled) { set(SettingKeys.clientShowBrand, it) }
