@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.core.messages.MessageDefaults
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -98,6 +99,32 @@ data class Settings(
     /** Preset strip and Calibrar button in the photo viewer. */
     val viewerPresets: Boolean = true,
 
+    // Dia a dia (2.5 / 2.6)
+    val momentsEnabled: Boolean = true,
+    /** Moments offered in the Session, separated by |. */
+    val momentList: String = "Making of|Cerimônia|Fotos oficiais|Família|Recepção|Festa",
+    val currentMoment: String = "",
+    val momentSubfolder: Boolean = false,
+    val notesEnabled: Boolean = true,
+    val clientPicksEnabled: Boolean = true,
+    val msgPreview: String = MessageDefaults.PREVIEW,
+    val msgDelivered: String = MessageDefaults.DELIVERED,
+    val msgPayment: String = MessageDefaults.PAYMENT,
+    val msgSelection: String = MessageDefaults.SELECTION,
+    /** Off by default: it needs the location permission. */
+    val gpsEnabled: Boolean = false,
+    val backupFolder: String? = null,
+    val backupOffer: Boolean = true,
+    val syncCameraClock: Boolean = false,
+    val toolsEnabled: Boolean = true,
+    val blurAlert: Boolean = true,
+    /** Sharpness below this (0-100 scale) marks a frame as shaken or out of focus. */
+    val blurThreshold: Int = 35,
+    val blurVibrate: Boolean = true,
+    val eyesCheck: Boolean = true,
+    val cullSuggestions: Boolean = true,
+    val hideRejected: Boolean = true,
+
     // Tela
     val nightMode: Boolean = false,
     val nightBrightness: Int = 15,
@@ -107,6 +134,8 @@ data class Settings(
     val sessionKey: String get() = sessionName.trim().ifEmpty { "Geral" }
 
     val exposurePresets: List<ExposurePreset> get() = ExposurePreset.decode(presets)
+
+    val moments: List<String> get() = momentList.split('|').map { it.trim() }.filter { it.isNotEmpty() }
 }
 
 /** Jr_Tech_OFC logos bundled in assets/watermarks, plus the user's own PNG. */
@@ -188,6 +217,27 @@ object SettingKeys {
     val clientPresetsEnabled = booleanPreferencesKey("client_presets_enabled")
     val clientCalibratePin = booleanPreferencesKey("client_calibrate_pin")
     val viewerPresets = booleanPreferencesKey("viewer_presets")
+    val momentsEnabled = booleanPreferencesKey("moments_enabled")
+    val momentList = stringPreferencesKey("moment_list")
+    val currentMoment = stringPreferencesKey("current_moment")
+    val momentSubfolder = booleanPreferencesKey("moment_subfolder")
+    val notesEnabled = booleanPreferencesKey("notes_enabled")
+    val clientPicksEnabled = booleanPreferencesKey("client_picks_enabled")
+    val msgPreview = stringPreferencesKey("msg_preview")
+    val msgDelivered = stringPreferencesKey("msg_delivered")
+    val msgPayment = stringPreferencesKey("msg_payment")
+    val msgSelection = stringPreferencesKey("msg_selection")
+    val gpsEnabled = booleanPreferencesKey("gps_enabled")
+    val backupFolder = stringPreferencesKey("backup_folder")
+    val backupOffer = booleanPreferencesKey("backup_offer")
+    val syncCameraClock = booleanPreferencesKey("sync_camera_clock")
+    val toolsEnabled = booleanPreferencesKey("tools_enabled")
+    val blurAlert = booleanPreferencesKey("blur_alert")
+    val blurThreshold = intPreferencesKey("blur_threshold")
+    val blurVibrate = booleanPreferencesKey("blur_vibrate")
+    val eyesCheck = booleanPreferencesKey("eyes_check")
+    val cullSuggestions = booleanPreferencesKey("cull_suggestions")
+    val hideRejected = booleanPreferencesKey("hide_rejected")
 
     val nightMode = booleanPreferencesKey("night_mode")
     val nightBrightness = intPreferencesKey("night_brightness")
@@ -279,6 +329,27 @@ class SettingsRepository(private val context: Context) {
             clientPresetsEnabled = this[k.clientPresetsEnabled] ?: d.clientPresetsEnabled,
             clientCalibratePin = this[k.clientCalibratePin] ?: d.clientCalibratePin,
             viewerPresets = this[k.viewerPresets] ?: d.viewerPresets,
+            momentsEnabled = this[k.momentsEnabled] ?: d.momentsEnabled,
+            momentList = this[k.momentList] ?: d.momentList,
+            currentMoment = this[k.currentMoment] ?: d.currentMoment,
+            momentSubfolder = this[k.momentSubfolder] ?: d.momentSubfolder,
+            notesEnabled = this[k.notesEnabled] ?: d.notesEnabled,
+            clientPicksEnabled = this[k.clientPicksEnabled] ?: d.clientPicksEnabled,
+            msgPreview = this[k.msgPreview] ?: d.msgPreview,
+            msgDelivered = this[k.msgDelivered] ?: d.msgDelivered,
+            msgPayment = this[k.msgPayment] ?: d.msgPayment,
+            msgSelection = this[k.msgSelection] ?: d.msgSelection,
+            gpsEnabled = this[k.gpsEnabled] ?: d.gpsEnabled,
+            backupFolder = this[k.backupFolder],
+            backupOffer = this[k.backupOffer] ?: d.backupOffer,
+            syncCameraClock = this[k.syncCameraClock] ?: d.syncCameraClock,
+            toolsEnabled = this[k.toolsEnabled] ?: d.toolsEnabled,
+            blurAlert = this[k.blurAlert] ?: d.blurAlert,
+            blurThreshold = this[k.blurThreshold] ?: d.blurThreshold,
+            blurVibrate = this[k.blurVibrate] ?: d.blurVibrate,
+            eyesCheck = this[k.eyesCheck] ?: d.eyesCheck,
+            cullSuggestions = this[k.cullSuggestions] ?: d.cullSuggestions,
+            hideRejected = this[k.hideRejected] ?: d.hideRejected,
 
             nightMode = this[k.nightMode] ?: d.nightMode,
             nightBrightness = this[k.nightBrightness] ?: d.nightBrightness,

@@ -50,6 +50,28 @@ data class Photo(
     val adjust: String? = null,
     /** JPG copy with the preset applied, in the "editadas" folder. */
     val editedUri: String? = null,
+    /** Picked by the client (heart in client mode). */
+    @ColumnInfo(defaultValue = "0") val clientPick: Boolean = false,
+    val note: String? = null,
+    /** Voice note, an .m4a in the app folder. */
+    val audioNote: String? = null,
+    /** Part of the event (Cerimônia, Recepção…) active when the frame arrived. */
+    val moment: String? = null,
+    val lat: Double? = null,
+    val lon: Double? = null,
+    // Culling, filled in the background after the frame is saved.
+    val sharpness: Float? = null,
+    @ColumnInfo(defaultValue = "0") val blurry: Boolean = false,
+    val faces: Int? = null,
+    @ColumnInfo(defaultValue = "0") val eyesClosed: Int = 0,
+    /** 0..100, higher is better. */
+    val score: Float? = null,
+    /** Frames of one burst share the id of the burst's first frame. */
+    val burstGroup: Long? = null,
+    @ColumnInfo(defaultValue = "0") val suggested: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val rejected: Boolean = false,
+    /** 64-bit perceptual hash, used to find near-identical frames. */
+    val dHash: Long? = null,
 ) {
     /** What the viewer shows: the JPG when there is one, else the preview pulled out of the RAW. */
     val displayUri: String? get() = jpgUri ?: previewPath?.let { "file://$it" }
@@ -98,6 +120,36 @@ interface PhotoDao {
 
     @Query("SELECT * FROM photos WHERE id = :id")
     suspend fun get(id: Long): Photo?
+
+    @Query("UPDATE photos SET clientPick = :pick WHERE id = :id")
+    suspend fun setClientPick(id: Long, pick: Boolean)
+
+    @Query("UPDATE photos SET note = :note WHERE id = :id")
+    suspend fun setNote(id: Long, note: String?)
+
+    @Query("UPDATE photos SET audioNote = :path WHERE id = :id")
+    suspend fun setAudioNote(id: Long, path: String?)
+
+    @Query("UPDATE photos SET moment = :moment WHERE id IN (:ids)")
+    suspend fun setMoment(ids: List<Long>, moment: String?)
+
+    @Query("UPDATE photos SET favorite = :favorite WHERE id IN (:ids)")
+    suspend fun setFavorite(ids: List<Long>, favorite: Boolean)
+
+    @Query("UPDATE photos SET rating = :rating WHERE id IN (:ids)")
+    suspend fun setRating(ids: List<Long>, rating: Int)
+
+    @Query("UPDATE photos SET rejected = :rejected WHERE id IN (:ids)")
+    suspend fun setRejected(ids: List<Long>, rejected: Boolean)
+
+    @Query("UPDATE photos SET sharpness = :sharpness, blurry = :blurry, faces = :faces, eyesClosed = :eyesClosed, score = :score, dHash = :dHash WHERE id = :id")
+    suspend fun setAnalysis(id: Long, sharpness: Float, blurry: Boolean, faces: Int?, eyesClosed: Int, score: Float, dHash: Long)
+
+    @Query("UPDATE photos SET burstGroup = :group, suggested = :suggested WHERE id = :id")
+    suspend fun setBurst(id: Long, group: Long?, suggested: Boolean)
+
+    @Query("SELECT * FROM photos WHERE id IN (:ids)")
+    suspend fun getAll(ids: List<Long>): List<Photo>
 
     @Query("SELECT * FROM photos WHERE jpgUri IS NOT NULL OR previewPath IS NOT NULL ORDER BY capturedAt DESC LIMIT 1")
     suspend fun latestWithImage(): Photo?
@@ -150,7 +202,7 @@ interface PresetDao {
     suspend fun detachFromPhotos(id: Long)
 }
 
-@Database(entities = [Photo::class, PresetEntity::class], version = 4, exportSchema = false)
+@Database(entities = [Photo::class, PresetEntity::class], version = 5, exportSchema = false)
 abstract class PhotoDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
     abstract fun presetDao(): PresetDao
@@ -158,7 +210,7 @@ abstract class PhotoDatabase : RoomDatabase() {
     companion object {
         fun create(context: Context): PhotoDatabase =
             Room.databaseBuilder(context, PhotoDatabase::class.java, "tether50d.db")
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 // Version 1 only ever held simulator entries, so dropping it loses nothing real.
                 .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1)
                 .build()
@@ -169,6 +221,18 @@ abstract class PhotoDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE photos ADD COLUMN rating INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE photos ADD COLUMN rawCameraName TEXT")
                 db.execSQL("ALTER TABLE photos ADD COLUMN jpgCameraName TEXT")
+            }
+        }
+
+        /** Client picks, notes, moments, location and the culling results. */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf(
+                    "clientPick INTEGER NOT NULL DEFAULT 0", "note TEXT", "audioNote TEXT", "moment TEXT",
+                    "lat REAL", "lon REAL", "sharpness REAL", "blurry INTEGER NOT NULL DEFAULT 0", "faces INTEGER",
+                    "eyesClosed INTEGER NOT NULL DEFAULT 0", "score REAL", "burstGroup INTEGER",
+                    "suggested INTEGER NOT NULL DEFAULT 0", "rejected INTEGER NOT NULL DEFAULT 0", "dHash INTEGER",
+                ).forEach { db.execSQL("ALTER TABLE photos ADD COLUMN $it") }
             }
         }
 
