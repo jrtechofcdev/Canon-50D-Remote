@@ -33,7 +33,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Style
+import androidx.compose.material.icons.outlined.FactCheck
+import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.SettingsSuggest
 import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.material.icons.automirrored.outlined.Logout
@@ -83,10 +85,8 @@ import androidx.compose.material.icons.outlined.Slideshow
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Storage
-import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Summarize
 import androidx.compose.material.icons.outlined.Sync
-import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Usb
 import androidx.compose.material.icons.outlined.UsbOff
@@ -172,7 +172,7 @@ enum class SettingsSection(val route: String, val title: String, val summary: St
     Review("review", "Revisão", "Slide automático, galeria, culling, histograma", Icons.Outlined.PhotoLibrary),
     Camera("camera", "Câmera", "Bateria, cartão, exposições salvas, bracketing", Icons.Outlined.CameraAlt),
     Share("share", "Envio e cliente", "WhatsApp, marca d'água, modo cliente", Icons.Outlined.Send),
-    Presets("presets", "Presets", "Look das fotos novas, cópia editada, pastas", Icons.Outlined.AutoAwesome),
+    Presets("presets", "Presets", "Look das fotos novas, cópia editada, pastas", Icons.Outlined.Style),
     Messages("messages", "Mensagens", "Textos prontos para o WhatsApp do cliente", Icons.AutoMirrored.Outlined.Chat),
     Alerts("alerts", "Alertas", "Vibração, desconexão, reenvio, resumo", Icons.Outlined.NotificationsActive),
     Display("display", "Tela", "Modo escuro total, brilho, tela ligada", Icons.Outlined.DarkMode),
@@ -433,7 +433,7 @@ private fun PresetSettingsSection(app: TetherApp, s: Settings) {
     SettingsGroup("Fotos novas", Icons.Outlined.AddAPhoto) {
         val current = presets.firstOrNull { it.id == s.sessionPresetId }
         ToggleRow(
-            Icons.Outlined.AutoAwesome,
+            Icons.Outlined.Style,
             "Aplicar o look da sessão",
             current?.let { "Preset atual: ${it.name}. Troque na Sessão (Look) ou na aba Presets." }
                 ?: "Nenhum preset escolhido. Escolha na Sessão (Look) ou na aba Presets.",
@@ -535,7 +535,7 @@ private fun ReviewSettings(app: TetherApp, s: Settings) {
     SettingsGroup("Avaliação", Icons.Outlined.StarOutline) {
         ToggleRow(Icons.Outlined.StarOutline, "Estrelas (1 a 5)", "Mostra as estrelas no visualizador e o filtro na galeria", s.ratingEnabled) { set(SettingKeys.ratingEnabled, it) }
     }
-    SettingsGroup("Seleção com análise local", Icons.Outlined.AutoAwesome) {
+    SettingsGroup("Seleção com análise local", Icons.Outlined.FactCheck) {
         InfoText("Cada foto é analisada no próprio celular, sem internet: nitidez, rostos e olhos, exposição e fotos parecidas.")
         ToggleRow(Icons.Outlined.BlurOn, "Alerta de foto tremida", "Selo \"Tremida\" e aviso quando a foto sai tremida ou fora de foco", s.blurAlert) { set(SettingKeys.blurAlert, it) }
         SliderRow("Sensibilidade do alerta", s.blurThreshold, 30..70, enabled = s.blurAlert, format = { v -> when { v < 44 -> "baixa ($v)"; v < 57 -> "média ($v)"; else -> "alta ($v)" } }) {

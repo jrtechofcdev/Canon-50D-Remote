@@ -363,7 +363,17 @@ class ScreenshotTest {
                 })
             }
             val url = "https://example.test/uploads/$i.dng"
-            files[url] = com.example.core.shop.TestDng.build(com.example.core.shop.TestDng.jpeg(bmp), w, h, com.example.core.shop.TestDng.xmp(exposure = "+0.${i + 1}0"))
+            // The "before": the same scene flatter and less saturated, as a photo looks before a preset.
+            val flat = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            Canvas(flat).drawBitmap(bmp, 0f, 0f, Paint().apply {
+                colorFilter = android.graphics.ColorMatrixColorFilter(android.graphics.ColorMatrix().apply { setSaturation(0.35f) })
+                alpha = 255
+            })
+            Canvas(flat).drawColor(0x33808080)
+            files[url] = com.example.core.shop.TestDng.build(
+                com.example.core.shop.TestDng.jpeg(bmp), w, h, com.example.core.shop.TestDng.xmp(exposure = "+0.${i + 1}0"),
+                original = Triple(com.example.core.shop.TestDng.jpeg(flat), w, h),
+            )
             if (i > 0) list.append(',')
             list.append("""{"id":${900 + i},"filename":"presets_id_${690 + i}.dng","category":"$category","downloadUrl":"$url"}""")
         }
@@ -377,6 +387,33 @@ class ScreenshotTest {
         seedShop()
         rule.setContent { JrLinkTheme { com.example.ui.shop.ShopScreen(app, onOpen = {}) } }
         save("loja", androidx.compose.ui.test.hasText("Moody 690"))
+    }
+
+    @Test
+    fun shopSelecting() {
+        seedShop()
+        rule.setContent { JrLinkTheme { com.example.ui.shop.ShopScreen(app, onOpen = {}) } }
+        runCatching { rule.waitUntil(15_000) { rule.onAllNodes(androidx.compose.ui.test.hasText("Moody 690")).fetchSemanticsNodes().isNotEmpty() } }
+        rule.onNode(androidx.compose.ui.test.hasText("Moody 690")).performTouchInput { longClick() }
+        rule.onNode(androidx.compose.ui.test.hasText("Cinematográfico 692")).performClick()
+        save("loja_selecao", androidx.compose.ui.test.hasText("Salvar 2"))
+    }
+
+    @Test
+    fun shopBefore() {
+        seedShop()
+        rule.setContent {
+            JrLinkTheme { com.example.ui.shop.ShopDetailScreen(app, 900L, onBack = {}, onOpenPhoto = {}, onEditPhoto = {}) }
+        }
+        runCatching { rule.waitUntil(15_000) { rule.onAllNodes(androidx.compose.ui.test.hasText("Usar numa foto")).fetchSemanticsNodes().isNotEmpty() } }
+        runCatching { rule.waitUntil(8_000) { false } }
+        // Finger held on the picture: the photo without the preset, with the "Antes" label.
+        rule.onNode(androidx.compose.ui.test.hasContentDescription("Moody 690")).performTouchInput {
+            down(center)
+            advanceEventTime(600)
+        }
+        rule.mainClock.advanceTimeBy(600)
+        save("loja_antes", androidx.compose.ui.test.hasText("Antes"))
     }
 
     @Test

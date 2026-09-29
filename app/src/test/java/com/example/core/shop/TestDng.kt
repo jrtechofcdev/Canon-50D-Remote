@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.pow
 
 /** Builds DNG presets in memory and serves them like the API, for tests and screenshots. */
 object TestDng {
@@ -17,17 +18,39 @@ object TestDng {
     fun jpeg(bitmap: Bitmap): ByteArray =
         ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }.toByteArray()
 
+    /** The linearization the API's DNGs carry: the sRGB curve undone, 8 bits → 16 bits. */
+    val SRGB_TO_LINEAR = IntArray(256) { v ->
+        val s = v / 255.0
+        val l = if (s <= 0.04045) s / 12.92 else ((s + 0.055) / 1.055).pow(2.4)
+        (l * 65535 + 0.5).toInt()
+    }
+
     /**
      * Laid out like the API's presets: IFD0 with the XMP, a SubIFD with the preview (baseline JPEG,
-     * compression 7), and [gap] bytes of "raw data" before it, so the preview can sit past the first 64 KB.
+     * compression 7), and [gap] bytes of "raw data" before it, so the preview can sit past the first
+     * KBs. With [original], a second SubIFD holds the photo before the preset as LinearRaw in one
+     * lossy JPEG tile, with the linearization table, like the real files.
      */
-    fun build(preview: ByteArray, width: Int, height: Int, xmp: String = xmp(), gap: Int = 1_000): ByteArray {
+    fun build(
+        preview: ByteArray,
+        width: Int,
+        height: Int,
+        xmp: String = xmp(),
+        gap: Int = 1_000,
+        original: Triple<ByteArray, Int, Int>? = null,
+    ): ByteArray {
         val xmpBytes = xmp.toByteArray()
+        val subCount = if (original != null) 2 else 1
         val ifd0 = 8
-        val sub = ifd0 + 2 + 3 * 12 + 4
-        val xmpAt = sub + 2 + 6 * 12 + 4
+        val subList = ifd0 + 2 + 3 * 12 + 4
+        val sub = subList + 4 * subCount
+        val raw = sub + 2 + 6 * 12 + 4
+        val rawEntries = 12
+        val table = raw + (if (original != null) 2 + rawEntries * 12 + 4 else 0)
+        val xmpAt = table + (if (original != null) 512 else 0)
         val previewAt = xmpAt + xmpBytes.size + gap
-        val buf = ByteBuffer.allocate(previewAt + preview.size).order(ByteOrder.LITTLE_ENDIAN)
+        val originalAt = previewAt + preview.size
+        val buf = ByteBuffer.allocate(originalAt + (original?.first?.size ?: 0)).order(ByteOrder.LITTLE_ENDIAN)
         buf.put('I'.code.toByte()).put('I'.code.toByte()).putShort(42).putInt(ifd0)
         fun entry(tag: Int, type: Int, count: Int, value: Int) {
             buf.putShort(tag.toShort()).putShort(type.toShort()).putInt(count)
@@ -36,9 +59,12 @@ object TestDng {
         buf.position(ifd0)
         buf.putShort(3)
         entry(254, 4, 1, 1) // uncompressed thumbnail: not a preview to use
-        entry(330, 4, 1, sub)
+        entry(330, 4, subCount, if (subCount == 1) sub else subList)
         entry(700, 1, xmpBytes.size, xmpAt)
         buf.putInt(0)
+        buf.position(subList)
+        buf.putInt(sub)
+        if (original != null) buf.putInt(raw)
         buf.position(sub)
         buf.putShort(6)
         entry(254, 4, 1, 1)
@@ -48,10 +74,31 @@ object TestDng {
         entry(273, 4, 1, previewAt)
         entry(279, 4, 1, preview.size)
         buf.putInt(0)
+        if (original != null) {
+            val (bytes, w, h) = original
+            buf.position(raw)
+            buf.putShort(rawEntries.toShort())
+            entry(254, 4, 1, 0)
+            entry(256, 4, 1, w)
+            entry(257, 4, 1, h)
+            entry(258, 3, 1, 8)
+            entry(259, 3, 1, 34892)
+            entry(262, 3, 1, 34892)
+            entry(277, 3, 1, 3)
+            entry(322, 4, 1, w)
+            entry(323, 4, 1, h)
+            entry(324, 4, 1, originalAt)
+            entry(325, 4, 1, bytes.size)
+            entry(50712, 3, 256, table)
+            buf.putInt(0)
+            buf.position(table)
+            SRGB_TO_LINEAR.forEach { buf.putShort(it.toShort()) }
+        }
         buf.position(xmpAt)
         buf.put(xmpBytes)
         buf.position(previewAt)
         buf.put(preview)
+        original?.let { buf.position(originalAt); buf.put(it.first) }
         return buf.array()
     }
 

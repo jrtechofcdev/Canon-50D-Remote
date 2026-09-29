@@ -69,7 +69,9 @@ import com.example.ui.components.ScreenOverride
 import androidx.compose.material.icons.outlined.Swipe
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Style
+import androidx.compose.material.icons.outlined.FactCheck
+import androidx.compose.material.icons.outlined.ThumbUp
 import com.example.core.data.Settings
 import android.view.WindowManager
 import androidx.compose.runtime.Composable
@@ -234,6 +236,12 @@ class MainActivity : ComponentActivity() {
                                 onOpenTools = { nav.navigate("tools") },
                                 onOpenLive = { nav.navigate("live") },
                                 onOpenProfiles = { nav.navigate("settings/${SettingsSection.Profiles.route}") },
+                                onEditPhoto = { nav.navigate("editor/photo/$it") },
+                                onCropPhoto = { nav.navigate("editor/crop/$it") },
+                                onOpenShop = { goTo(Tab.Shop) },
+                                onOpenPresets = { goTo(Tab.Presets) },
+                                onOpenCull = { goTo(Tab.Cull) },
+                                onOpenSection = { nav.navigate("settings/${it.route}") },
                             )
                         }
                         composable(Tab.Cull.route) { CullScreen(app, onBack = null, onOpenPhoto = { nav.navigate("photo/$it") }) }
@@ -356,7 +364,7 @@ enum class Tab(val route: String, val label: String, val icon: ImageVector) {
     Session("session", "Sessão", Icons.Outlined.CameraAlt),
     Photos("photos", "Fotos", Icons.Outlined.PhotoLibrary),
     Cull("cull", "Culling", Icons.Outlined.Swipe),
-    Presets("presets", "Presets", Icons.Outlined.AutoAwesome),
+    Presets("presets", "Presets", Icons.Outlined.Style),
     Shop("shop", "Loja", Icons.Outlined.Storefront),
     Settings("settings", "Ajustes", Icons.Outlined.Tune),
 }

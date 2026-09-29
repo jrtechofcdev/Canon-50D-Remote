@@ -392,7 +392,7 @@ private fun ActionTileBase(label: String, modifier: Modifier, enabled: Boolean, 
 
 /** The "Lr" square photographers know from the app, drawn in the app's own colours. */
 @Composable
-private fun LightroomMark() {
+internal fun LightroomMark() {
     Box(
         Modifier.size(24.dp).clip(MaterialTheme.shapes.extraSmall).border(1.5.dp, Tone.Info, MaterialTheme.shapes.extraSmall),
         contentAlignment = Alignment.Center,

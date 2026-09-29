@@ -1,10 +1,16 @@
 package com.example.ui.shop
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -22,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -34,8 +41,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.AddAPhoto
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.BookmarkAdded
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -74,12 +81,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.example.TetherApp
 import com.example.core.data.Photo
@@ -88,12 +98,16 @@ import com.example.core.data.Settings
 import com.example.core.preset.Preset
 import com.example.core.shop.ShopDownload
 import com.example.core.shop.ShopItem
+import com.example.ui.PhotoActions
+import com.example.ui.components.ImmersiveMode
+import com.example.ui.photos.LightroomMark
 import com.example.ui.theme.Tone
 import kotlinx.coroutines.launch
 
 /**
- * One preset of the Loja: its look (the DNG preview, or rendered on one of your photos), and the
- * three things to do with it: use it on a photo, save it to Meus presets, download the DNG and XMP.
+ * One preset of the Loja: its look (the DNG preview, or rendered on one of your photos), with
+ * Lightroom's gestures: tap for full screen, hold to see the photo without the preset. Then use it
+ * on a photo, save it, download the DNG and XMP, or open it in Lightroom.
  */
 @Composable
 fun ShopDetailScreen(
@@ -129,6 +143,7 @@ private fun ShopDetail(
     onEditPhoto: (Long) -> Unit,
 ) {
     val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val settings by app.settings.settings.collectAsState(initial = Settings())
     val saved by app.shop.saved.collectAsState(initial = emptyMap())
@@ -137,12 +152,22 @@ private fun ShopDetail(
     // 0: the look as the preset's author made it; 1: on one of your photos.
     var mode by rememberSaveable { mutableStateOf(0) }
     var holding by remember { mutableStateOf(false) }
+    var chrome by rememberSaveable { mutableStateOf(true) }
     var busy by remember { mutableStateOf<String?>(null) }
     var choosing by remember { mutableStateOf(false) }
     var downloaded by remember { mutableStateOf<ShopDownload?>(null) }
     var samplePhoto by remember { mutableStateOf<Photo?>(null) }
 
-    val preview by produceState<Bitmap?>(null, item.id) { value = app.shop.preview(item, 1600) }
+    if (!chrome) ImmersiveMode()
+    BackHandler(enabled = !chrome) { chrome = true }
+
+    // The grid's picture shows at once; the sharper one replaces it when ready.
+    val preview by produceState(app.shop.cachedPreview(item), item.id) { app.shop.preview(item, 1600)?.let { value = it } }
+    // The photo without the preset: the small copy first (fast), then the full one.
+    val before by produceState<Bitmap?>(null, item.id) {
+        app.shop.original(item, full = false)?.let { value = it }
+        app.shop.original(item, full = true)?.let { value = it }
+    }
     var preset by remember { mutableStateOf<Preset?>(null) }
     var presetError by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(item.id) {
@@ -182,40 +207,87 @@ private fun ShopDetail(
         }
     }
 
-    val picture: @Composable (Modifier) -> Unit = { modifier ->
-        Box(
-            modifier.background(Color.Black).pointerInput(mode) {
-                // Hold on "Na minha foto" to see the photo without the preset.
-                detectTapGestures(onPress = {
+    val openLightroom = {
+        run("Preparando para o Lightroom…") {
+            val file = app.shop.fileForLightroom(item)
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val send = Intent(Intent.ACTION_SEND)
+                .setType(if (item.isDng) "image/x-adobe-dng" else "application/octet-stream")
+                .putExtra(Intent.EXTRA_STREAM, uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            try {
+                context.startActivity(Intent(send).setPackage(PhotoActions.LIGHTROOM))
+                toast("No Lightroom: abra a foto, toque em ⋮ e em Criar predefinição para guardar o preset lá.")
+            } catch (e: ActivityNotFoundException) {
+                toast("Lightroom não está instalado. Escolha outro app.")
+                context.startActivity(Intent.createChooser(send, "Abrir ${file.name}"))
+            }
+        }
+    }
+
+    // Before/after gestures, as in Lightroom: hold shows the photo without the preset, tap hides the rest.
+    val held = remember { booleanArrayOf(false) }
+    val gestures = Modifier.pointerInput(mode) {
+        detectTapGestures(
+            onTap = {
+                // Lifting the finger after a hold is not a tap.
+                if (held[0]) held[0] = false else chrome = !chrome
+            },
+            onPress = {
+                held[0] = false
+                if (!withTimeoutOrNullRelease(this, 180)) {
+                    held[0] = true
                     holding = true
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     tryAwaitRelease()
                     holding = false
-                })
+                }
             },
-            contentAlignment = Alignment.Center,
-        ) {
+        )
+    }
+
+    val picture: @Composable (Modifier) -> Unit = { modifier ->
+        Box(modifier.background(Color.Black).then(gestures), contentAlignment = Alignment.Center) {
+            val showing: Bitmap? = when {
+                mode == 0 && holding -> before ?: preview
+                mode == 0 -> preview
+                holding -> null
+                else -> mine
+            }
             when {
-                mode == 0 && preview != null ->
-                    Image(preview!!.asImageBitmap(), contentDescription = item.name, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
-                mode == 0 -> CircularProgressIndicator(color = Tone.Info)
-                samplePhoto == null -> Text(
+                mode == 1 && samplePhoto == null -> Text(
                     "Ainda não há fotos no app. Quando chegarem fotos da câmera, o preset aparece aplicado nelas aqui.",
                     color = Tone.TextMuted,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(32.dp),
                 )
-                holding -> AsyncImage(model = samplePhoto?.displayUri, contentDescription = "Original", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
-                mine != null -> Image(mine!!.asImageBitmap(), contentDescription = item.name, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
-                presetError != null -> Text(presetError!!, color = Tone.Error, modifier = Modifier.padding(24.dp))
+                mode == 1 && holding -> AsyncImage(model = samplePhoto?.displayUri, contentDescription = "Original", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+                showing != null -> Image(showing.asImageBitmap(), contentDescription = item.name, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+                mode == 1 && presetError != null -> Text(presetError!!, color = Tone.Error, modifier = Modifier.padding(24.dp))
                 else -> CircularProgressIndicator(color = Tone.Info)
             }
-            if (mode == 1 && samplePhoto != null) {
+            // Where the eye goes while comparing: which side of the before/after is on screen.
+            val label = when {
+                holding && mode == 0 && before == null -> "Carregando o original…"
+                holding -> "Antes"
+                else -> null
+            }
+            label?.let {
                 Text(
-                    if (holding) "Original" else "Segure para ver o original",
+                    it,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
+                    modifier = Modifier.align(Alignment.TopStart).padding(12.dp)
+                        .clip(MaterialTheme.shapes.small).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 10.dp, vertical = 4.dp),
+                )
+            }
+            if (!holding && chrome) {
+                Text(
+                    "Segure para ver sem o preset · toque para tela cheia",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White,
                     modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp)
-                        .clip(MaterialTheme.shapes.small).background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 10.dp, vertical = 4.dp),
+                        .clip(MaterialTheme.shapes.small).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 10.dp, vertical = 4.dp),
                 )
             }
         }
@@ -243,7 +315,7 @@ private fun ShopDetail(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ActionTile(
-                    icon = if (savedId != null) Icons.Outlined.BookmarkAdded else Icons.Outlined.BookmarkAdd,
+                    icon = { Icon(if (savedId != null) Icons.Outlined.BookmarkAdded else Icons.Outlined.BookmarkAdd, contentDescription = null, tint = it) },
                     label = if (savedId != null) "Salvo" else "Salvar",
                     enabled = busy == null && savedId == null && presetError == null,
                     modifier = Modifier.weight(1f),
@@ -253,11 +325,12 @@ private fun ShopDetail(
                         toast("Salvo em Meus presets › ${item.categoryLabel}")
                     }
                 }
-                ActionTile(Icons.Outlined.Download, "Baixar DNG + XMP", busy == null, Modifier.weight(1f)) {
+                ActionTile({ Icon(Icons.Outlined.Download, contentDescription = null, tint = it) }, "Baixar DNG e XMP", busy == null, Modifier.weight(1f)) {
                     if (settings.presetsFolder == null) pickFolder.launch(null) else download()
                 }
+                ActionTile({ LightroomMark() }, "Abrir no Lightroom", busy == null, Modifier.weight(1f)) { openLightroom() }
                 ActionTile(
-                    Icons.Outlined.AutoAwesome,
+                    { Icon(Icons.Outlined.AddAPhoto, contentDescription = null, tint = it) },
                     if (settings.sessionPresetId == savedId && savedId != null && settings.applyPresetToNew) "Nas fotos novas" else "Fotos novas",
                     busy == null && presetError == null,
                     Modifier.weight(1f),
@@ -280,8 +353,12 @@ private fun ShopDetail(
         }
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(Tone.Background)) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(if (chrome) Tone.Background else Color.Black)) {
         val landscape = maxWidth > maxHeight
+        if (!chrome) {
+            picture(Modifier.fillMaxSize())
+            return@BoxWithConstraints
+        }
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Tone.Text) }
@@ -338,6 +415,13 @@ private fun ShopDetail(
         )
     }
 }
+
+/**
+ * Waits up to [ms] for the finger to lift. True when it lifted (a tap), false when it is still down
+ * (a hold): the before only shows on a real hold, so a quick tap toggles full screen without a flash.
+ */
+private suspend fun withTimeoutOrNullRelease(scope: androidx.compose.foundation.gestures.PressGestureScope, ms: Long): Boolean =
+    kotlinx.coroutines.withTimeoutOrNull(ms) { scope.tryAwaitRelease() } != null
 
 /** Pick the photo to use the preset on: the app's photos (the ones that came from the camera). */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -415,6 +499,7 @@ private fun ModeChip(text: String, selected: Boolean, onClick: () -> Unit) {
             selectedLabelColor = Tone.Background,
         ),
         border = null,
+        modifier = Modifier.heightIn(min = 40.dp),
     )
 }
 
@@ -427,17 +512,19 @@ private fun StatusLine(icon: ImageVector, text: String) {
 }
 
 @Composable
-private fun ActionTile(icon: ImageVector, label: String, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun ActionTile(icon: @Composable (Color) -> Unit, label: String, enabled: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val tint = if (enabled) Tone.Text else Tone.TextMuted
     Column(
-        modifier.clip(MaterialTheme.shapes.small).background(Tone.SurfaceHigh)
-            .clickable(enabled = enabled, onClick = onClick).padding(vertical = 12.dp, horizontal = 6.dp),
+        modifier.heightIn(min = 72.dp).clip(MaterialTheme.shapes.small).background(Tone.SurfaceHigh)
+            .clickable(enabled = enabled, onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = if (enabled) Tone.Text else Tone.TextMuted)
+        icon(tint)
         Text(
             label,
             style = MaterialTheme.typography.labelSmall,
-            color = if (enabled) Tone.Text else Tone.TextMuted,
+            color = tint,
             textAlign = TextAlign.Center,
             maxLines = 2,
             modifier = Modifier.padding(top = 4.dp),

@@ -102,6 +102,34 @@ class PresetShopTest {
     }
 
     @Test
+    fun originalComesBackWithoutThePreset() = runBlocking {
+        // The "before": mid grey on the left, a warm colour on the right.
+        val before = Bitmap.createBitmap(64, 48, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.rgb(128, 128, 128))
+            for (x in 32 until 64) for (y in 0 until 48) setPixel(x, y, Color.rgb(200, 120, 60))
+        }
+        val file = TestDng.build(
+            TestDng.jpeg(Bitmap.createBitmap(64, 48, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.BLUE) }), 64, 48,
+            original = Triple(TestDng.jpeg(before), 64, 48),
+        )
+        val url = "https://example.test/uploads/Moody/orig.dng"
+        val json = """[{"id":7,"filename":"orig.dng","category":"Moody","downloadUrl":"$url"}]"""
+        val shop = PresetShop(context, settings, presets, TestDng.Server(mapOf(api to json.toByteArray(), url to file)))
+        shop.refresh()
+        val layout = DngLayout.read(file)
+        assertEquals(1, layout.originals.size)
+        assertEquals(256, layout.originals[0].linearization?.size)
+
+        val bmp = shop.original(shop.items.value.first(), full = true)!!
+        assertEquals(64, bmp.width)
+        // Linearized and put back on the sRGB curve: the original colours, within JPEG rounding.
+        val grey = bmp.getPixel(8, 24)
+        val warm = bmp.getPixel(56, 24)
+        assertTrue(kotlin.math.abs(Color.red(grey) - 128) <= 4 && kotlin.math.abs(Color.blue(grey) - 128) <= 4)
+        assertTrue(kotlin.math.abs(Color.red(warm) - 200) <= 6 && kotlin.math.abs(Color.blue(warm) - 60) <= 6)
+    }
+
+    @Test
     fun layoutFindsThePreviewAndTheXmp() {
         val bytes = dng(gap = 1_000)
         val layout = DngLayout.read(bytes)

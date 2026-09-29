@@ -2,6 +2,27 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [3.7] · 2026-09-29
+
+- **Antes e depois na Loja, como no Lightroom:** com o preset aberto, segure o dedo na foto para ver a imagem **sem o preset**; solte para ver com ele. Um toque deixa a foto em tela cheia.
+  - O "antes" é a foto original guardada dentro do próprio DNG. Aparece primeiro uma versão menor, em cerca de 0,2 s, e logo depois a de resolução cheia.
+  - Funciona nos dois tipos de DNG da API: JPEG comum e JPEG sem perdas (lossless), que o app agora sabe ler.
+- **Marcar vários presets:** na grade da Loja, segure um preset para entrar na seleção. Depois toque nos outros ou em **Todos da lista**, e use **Salvar** ou **Baixar** para todos de uma vez, com barra de progresso.
+- **Abrir no Lightroom:** botão novo em cada preset. O DNG abre no Lightroom do celular; lá, em ⋮ → **Criar predefinição**, o preset fica salvo no Lightroom também.
+- **Loja mais rápida:**
+  - A maioria das prévias chega agora numa única requisição, em vez de duas.
+  - As próximas prévias são baixadas enquanto você ainda olha as de cima, então a rolagem já encontra as imagens prontas.
+  - O app guarda até 4× mais prévias na memória, então voltar na lista é instantâneo.
+  - A tela cheia abre na hora com a imagem que já estava na grade.
+- **Tela inicial com mais ferramentas:**
+  - Grupo **Última foto**: Editar, Recortar, WhatsApp, Lightroom e Nota, sem precisar abrir a galeria.
+  - Grupo **Presets**: atalhos para a Loja e para os seus presets.
+  - Em **Sessão**, entram Culling e Pastas. Em **Cliente e extras**, entram Mensagens e Log.
+- **Visual realinhado:**
+  - Ícones que dizem o que fazem: presets com o ícone de estilo, sugestão do culling com o polegar, fotos novas com a câmera.
+  - Títulos dos grupos em caixa normal.
+  - Botões e chips com pelo menos 48 dp de altura para o dedo.
+
 ## [3.6] · 2026-09-29
 
 - **Loja de presets** (aba nova **Loja**): os presets grátis da sua API, com 1.225 DNGs em 13 categorias.

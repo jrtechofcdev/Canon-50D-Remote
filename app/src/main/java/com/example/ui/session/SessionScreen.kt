@@ -71,6 +71,7 @@ import com.example.ui.components.SectionLabel
 import com.example.ui.components.ValuePickerSheet
 import com.example.core.data.SettingKeys
 import com.example.ui.PhotoActions
+import com.example.ui.ShareSet
 import com.example.ui.theme.Tone
 import com.example.ui.preset.LookImage
 import com.example.ui.preset.SessionLookSheet
@@ -94,7 +95,15 @@ fun SessionScreen(
     onOpenTools: () -> Unit = {},
     onOpenLive: () -> Unit = {},
     onOpenProfiles: () -> Unit = {},
+    onEditPhoto: (Long) -> Unit = {},
+    onCropPhoto: (Long) -> Unit = {},
+    onOpenShop: (() -> Unit)? = null,
+    onOpenPresets: () -> Unit = {},
+    onOpenCull: () -> Unit = {},
+    onOpenSection: (com.example.ui.settings.SettingsSection) -> Unit = {},
 ) {
+    var whatsFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
+    var noteFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
     val state by app.camera.state.collectAsState()
     val shutter by app.camera.shutter.collectAsState()
     val activeProfile by app.settings.activeProfile.collectAsState(initial = "")
@@ -178,6 +187,24 @@ fun SessionScreen(
                     onLive = onOpenLive,
                     profile = activeProfile,
                     onProfile = { showProfiles = true },
+                    hasLatest = photos.firstOrNull() != null,
+                    latestName = photos.firstOrNull()?.savedBase,
+                    onEditLatest = { photos.firstOrNull()?.let { onEditPhoto(it.id) } },
+                    onCropLatest = { photos.firstOrNull()?.let { onCropPhoto(it.id) } },
+                    onWhatsAppLatest = { whatsFor = photos.firstOrNull() },
+                    onLightroomLatest = {
+                        photos.firstOrNull()?.let { p ->
+                            val set = if (p.editedUri != null) ShareSet.EDITED else if (p.jpgUri != null) ShareSet.JPG else ShareSet.RAW
+                            scope.launch { actions.openInLightroom(listOf(p), set, settings) }
+                        }
+                    },
+                    onNoteLatest = { noteFor = photos.firstOrNull() },
+                    onShop = onOpenShop?.takeIf { settings.shopEnabled },
+                    onPresetsTab = onOpenPresets,
+                    onCull = onOpenCull,
+                    onFolders = { onOpenSection(com.example.ui.settings.SettingsSection.Save) },
+                    onMessages = { onOpenSection(com.example.ui.settings.SettingsSection.Messages) },
+                    onLog = { onOpenSection(com.example.ui.settings.SettingsSection.Diagnostics) },
                 )
             }
         }
@@ -254,6 +281,13 @@ fun SessionScreen(
             },
             onDismiss = { showSummary = false },
         )
+    }
+
+    whatsFor?.let { p ->
+        com.example.ui.photos.WhatsAppSheet(app, actions, settings, listOf(p), onDismiss = { whatsFor = null })
+    }
+    noteFor?.let { p ->
+        com.example.ui.photos.NoteSheet(app, p, onDismiss = { noteFor = null })
     }
 
     if (showInterval) {

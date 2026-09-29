@@ -13,7 +13,12 @@ import com.example.core.preset.Preset
 import com.example.core.preset.PresetRepository
 import com.example.core.preset.XmpPresetParser
 import com.example.core.preset.XmpPresetWriter
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -64,7 +69,11 @@ class PresetShop(
     private val keep = File(context.filesDir, "shop")
     private val cache = File(context.cacheDir, "shop")
     private val catalogFile = File(keep, "catalog.json")
-    private val network = Semaphore(4)
+    private val network = Semaphore(6)
+    // Fetching ahead of the scroll uses two of those at most, so what is on screen always comes first.
+    private val ahead = Semaphore(2)
+    private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO + AppLog.handler("LOJA"))
+    private var prefetchJob: Job? = null
 
     private val _items = MutableStateFlow<List<ShopItem>>(emptyList())
     val items: StateFlow<List<ShopItem>> = _items.asStateFlow()
@@ -77,12 +86,18 @@ class PresetShop(
         list.filter { it.source.startsWith(ShopItem.SOURCE_PREFIX) }.associate { it.source to it.id }
     }
 
-    // Grid thumbnails; small enough that a long scroll never presses the phone's memory.
-    private val bitmaps = object : LruCache<String, Bitmap>(16 * 1024 * 1024) {
+    // Decoded pictures: an eighth of the app's memory (up to 64 MB), so scrolling back is instant.
+    // Grid thumbnails are RGB_565, half the memory of full colour, with no visible loss at that size.
+    private val bitmaps = object : LruCache<String, Bitmap>(
+        (Runtime.getRuntime().maxMemory() / 8).coerceIn(16L * 1024 * 1024, 64L * 1024 * 1024).toInt(),
+    ) {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount
     }
 
     fun trim() = bitmaps.evictAll()
+
+    /** The grid's picture of [item], if it is in memory: the full screen shows it at once while the big one loads. */
+    fun cachedPreview(item: ShopItem): Bitmap? = bitmaps.get("${item.id}@$GRID_EDGE")
 
     /** The catalogue saved on the phone, shown at once and whenever the API is out of reach. */
     suspend fun loadSaved() = withContext(Dispatchers.IO) {
@@ -125,11 +140,90 @@ class PresetShop(
     }
 
     /** The finished look of [item] (the DNG's preview), sized for [maxEdge]. Null when it can't be read. */
-    suspend fun preview(item: ShopItem, maxEdge: Int = 480): Bitmap? = withContext(Dispatchers.IO) {
+    suspend fun preview(item: ShopItem, maxEdge: Int = GRID_EDGE): Bitmap? = withContext(Dispatchers.IO) {
         val key = "${item.id}@$maxEdge"
         bitmaps.get(key)?.let { return@withContext it }
         val jpeg = runCatching { previewJpeg(item) }.getOrNull() ?: return@withContext null
-        decode(jpeg, maxEdge)?.also { bitmaps.put(key, it) }
+        decode(jpeg, maxEdge, small = maxEdge <= GRID_EDGE)?.also { bitmaps.put(key, it) }
+    }
+
+    /**
+     * Downloads the previews of [items] (the ones just below the screen) before they scroll in, so
+     * they appear already loaded. A new call replaces the previous one.
+     */
+    fun prefetch(items: List<ShopItem>) {
+        prefetchJob?.cancel()
+        if (items.isEmpty()) return
+        prefetchJob = background.launch {
+            for (item in items) {
+                if (!isActive) break
+                if (previewFile(item).exists()) continue
+                ahead.withPermit { runCatching { previewJpeg(item) } }
+            }
+        }
+    }
+
+    /**
+     * The photo inside the DNG before the preset, for the comparison. [full] false gives the small copy
+     * the file keeps (about 500 px, a few dozen KB, fast); true the largest one worth fetching.
+     */
+    suspend fun original(item: ShopItem, full: Boolean, maxEdge: Int = 1600): Bitmap? = withContext(Dispatchers.IO) {
+        if (!item.isDng) return@withContext null
+        val key = "${item.id}@orig${if (full) "F" else "Q"}"
+        bitmaps.get(key)?.let { return@withContext it }
+        val file = File(cache, "orig/${item.id}_${if (full) "f" else "q"}.jpg")
+        if (file.exists()) {
+            BitmapFactory.decodeFile(file.path)?.let { bitmaps.put(key, it); return@withContext it }
+        }
+        val bmp = runCatching {
+            val head = head(item).bytes
+            val layout = DngLayout.read(head)
+            val choices = layout.originals.filter { it.span in 1..MAX_ORIGINAL_BYTES }
+            val image = if (full) choices.lastOrNull() else (choices.firstOrNull { it.maxEdge >= 400 } ?: choices.lastOrNull())
+            image ?: return@runCatching null
+            val got = network.withPermit { fetcher.get(item.url, image.start until image.end) }
+            val bytes = if (got.start == image.start) got.bytes else got.bytes.copyOfRange((image.start - got.start).toInt(), (image.end - got.start).toInt())
+            DngOriginal.render(image, layout, bytes, maxEdge)
+        }.onFailure { AppLog.w("LOJA", "Original de ${item.name} não abriu: ${it.message}") }.getOrNull() ?: return@withContext null
+        file.parentFile?.mkdirs()
+        runCatching { file.outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 92, it) } }
+        bitmaps.put(key, bmp)
+        bmp
+    }
+
+    /** Saves several at once; [onProgress] gets how many are done. Returns how many were saved. */
+    suspend fun saveAll(items: List<ShopItem>, onProgress: (Int) -> Unit = {}): Int {
+        var ok = 0
+        items.forEachIndexed { i, item ->
+            if (runCatching { save(item) }.isSuccess) ok++
+            onProgress(i + 1)
+        }
+        return ok
+    }
+
+    /** Downloads several at once into the presets folder. Returns how many made it. */
+    suspend fun downloadAll(items: List<ShopItem>, onProgress: (Int) -> Unit = {}): Int {
+        var ok = 0
+        items.forEachIndexed { i, item ->
+            if (runCatching { download(item) }.isSuccess) ok++
+            onProgress(i + 1)
+        }
+        return ok
+    }
+
+    /**
+     * The DNG in the app's share folder, for Lightroom: opening it there brings the photo with the
+     * preset, and in Lightroom "Criar predefinição" saves the preset in its own list.
+     */
+    suspend fun fileForLightroom(item: ShopItem): File = withContext(Dispatchers.IO) {
+        val dir = File(context.cacheDir, "export").apply { mkdirs() }
+        if (item.isDng) {
+            File(dir, "${item.baseName}.dng").apply {
+                if (!exists() || length() == 0L) writeBytes(network.withPermit { fetcher.get(item.url, null) }.bytes)
+            }
+        } else {
+            File(dir, "${item.baseName}.xmp").apply { writeText(XmpPresetWriter.write(preset(item))) }
+        }
     }
 
     /** The preset's settings, read from the XMP inside the DNG (or the .xmp itself). Kept for offline use. */
@@ -177,14 +271,19 @@ class PresetShop(
     private fun headFile(item: ShopItem) = File(cache, "head/${item.id}.bin")
     private fun xmpFile(item: ShopItem) = File(keep, "xmp/${item.id}.xmp")
 
+    /**
+     * The start of the DNG. One request of 128 KB already holds the preview of most presets, so the
+     * picture comes in a single round trip. Only the first 48 KB (the file's index and settings) stay
+     * on the phone; the preview is kept as its own file.
+     */
     private suspend fun head(item: ShopItem): Fetched {
         val file = headFile(item)
         if (file.exists()) return Fetched(0, file.readBytes())
         val got = network.withPermit { fetcher.get(item.url, 0L until HEAD_BYTES) }
-        // Keep only the start: some servers ignore the range and send the whole file.
+        // Some servers ignore the range and send the whole file.
         val bytes = if (got.bytes.size > HEAD_BYTES) got.bytes.copyOf(HEAD_BYTES.toInt()) else got.bytes
         file.parentFile?.mkdirs()
-        file.writeBytes(bytes)
+        file.writeBytes(if (bytes.size > KEEP_HEAD_BYTES) bytes.copyOf(KEEP_HEAD_BYTES) else bytes)
         return Fetched(0, bytes)
     }
 
@@ -241,13 +340,16 @@ class PresetShop(
         return got.bytes.copyOfRange(from.toInt(), to.toInt())
     }
 
-    private fun decode(jpeg: ByteArray, maxEdge: Int): Bitmap? {
+    private fun decode(jpeg: ByteArray, maxEdge: Int, small: Boolean): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size, bounds)
         if (bounds.outWidth <= 0) return null
         var sample = 1
         while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxEdge) sample *= 2
-        return BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size, BitmapFactory.Options().apply { inSampleSize = sample })
+        return BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size, BitmapFactory.Options().apply {
+            inSampleSize = sample
+            if (small) inPreferredConfig = Bitmap.Config.RGB_565
+        })
     }
 
     private fun DocumentFile.dir(name: String): DocumentFile =
@@ -269,7 +371,11 @@ class PresetShop(
         const val ROOT = "JR_LR_Presets"
         const val DNG_DIR = "JR_LR_Presets_DNG"
         const val XMP_DIR = "JR_LR_Presets_XMP"
-        const val HEAD_BYTES = 64L * 1024
+        const val HEAD_BYTES = 128L * 1024
+        const val KEEP_HEAD_BYTES = 48 * 1024
+        const val GRID_EDGE = 480
+        /** Bigger originals (a few presets carry 5000 px photos) are skipped for the comparison. */
+        const val MAX_ORIGINAL_BYTES = 8L * 1024 * 1024
     }
 }
 

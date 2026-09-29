@@ -37,7 +37,12 @@ class MainScreenshotTest {
 
     @Test
     fun cullingTab() {
-        rule.onNode(hasText("Culling")).performClick()
+        // The tab, not the Culling tile of the Session's tools.
+        val tab = androidx.compose.ui.test.SemanticsMatcher.expectValue(
+            androidx.compose.ui.semantics.SemanticsProperties.Role,
+            androidx.compose.ui.semantics.Role.Tab,
+        )
+        rule.onNode(hasText("Culling") and tab).performClick()
         save("app_culling")
     }
 

@@ -29,7 +29,9 @@ import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Style
+import androidx.compose.material.icons.outlined.FactCheck
+import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.BlurOn
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Close
@@ -217,7 +219,7 @@ fun PhotosScreen(
                     Row(Modifier.align(Alignment.TopEnd).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                         if (photo.blurry) TileIcon(Icons.Outlined.BlurOn, "Tremida", Tone.Error)
                         if (settings.eyesCheck && photo.eyesClosed > 0) TileIcon(Icons.Outlined.VisibilityOff, "Olhos fechados", Tone.Error)
-                        if (settings.cullSuggestions && photo.suggested) TileIcon(Icons.Outlined.AutoAwesome, "Sugerida", Tone.Accent)
+                        if (settings.cullSuggestions && photo.suggested) TileIcon(Icons.Outlined.ThumbUp, "Sugerida", Tone.Accent)
                         if (photo.note != null || photo.audioNote != null) TileIcon(Icons.AutoMirrored.Outlined.StickyNote2, "Tem nota", Tone.Text)
                         if (photo.clientPick && settings.clientPicksEnabled) TileIcon(Icons.Filled.Favorite, "Escolhida pelo cliente", Tone.Accent)
                         else if (photo.favorite) TileIcon(Icons.Filled.Favorite, "Favorita", Tone.Text)
@@ -347,7 +349,7 @@ private fun BatchBar(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         BarAction(Icons.AutoMirrored.Outlined.Send, "WhatsApp", onWhatsApp)
-        BarAction(Icons.Outlined.AutoAwesome, "Preset", onPreset)
+        BarAction(Icons.Outlined.Style, "Preset", onPreset)
         BarAction(Icons.Outlined.Crop, "Recorte", onCrop)
         BarMenu(Icons.Outlined.Share, "Enviar", sets, onShare)
         BarMenu(Icons.Outlined.PhotoLibrary, "Lightroom", lrSets, onLightroom)
