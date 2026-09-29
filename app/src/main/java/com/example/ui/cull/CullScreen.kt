@@ -44,6 +44,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -116,6 +117,7 @@ fun CullScreen(app: TetherApp, onBack: (() -> Unit)?, onOpenPhoto: (Long) -> Uni
     val session = loaded.filter { it.session == settings.sessionKey }.ifEmpty { loaded }.sortedBy { it.capturedAt }
     val photos = session.cullFiltered(filter)
     val pager = rememberPagerState { photos.size }
+    val latestPhotos by rememberUpdatedState(photos)
     val current = photos.getOrNull(pager.currentPage.coerceAtMost(photos.lastIndex))
     val dao = app.database.photoDao()
 
@@ -195,8 +197,8 @@ fun CullScreen(app: TetherApp, onBack: (() -> Unit)?, onOpenPhoto: (Long) -> Uni
                 val other = photos.getOrNull(pager.currentPage + 1) ?: photos.getOrNull(pager.currentPage - 1)
                 CompareView(current, other)
             } else {
-                HorizontalPager(state = pager, key = { photos[it].id }, modifier = Modifier.fillMaxSize()) { page ->
-                    val p = photos[page]
+                HorizontalPager(state = pager, key = { com.example.ui.photos.pagerKey(latestPhotos, it) }, modifier = Modifier.fillMaxSize()) { page ->
+                    val p = latestPhotos.getOrNull(page) ?: return@HorizontalPager
                     SwipeCard(p, onUp = { swipeOut(p) }, onDown = { swipeIn(p) })
                 }
             }

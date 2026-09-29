@@ -314,13 +314,14 @@ private fun ClientPager(
             if (!isZoomed) pager.animateScrollToPage((pager.currentPage + 1) % entries.size)
         }
     }
+    val latest by rememberUpdatedState(entries)
     HorizontalPager(
         state = pager,
-        key = { entries[it].id },
+        key = { com.example.ui.photos.pagerKey(latest, it) },
         userScrollEnabled = !zoomed,
         modifier = Modifier.fillMaxSize(),
     ) { page ->
-        val photo = entries[page]
+        val photo = latest.getOrNull(page) ?: return@HorizontalPager
         Zoomable(key = photo.id, onZoomChanged = { zoomed = it }) {
             LookImage(app, photo, presets, Modifier.fillMaxSize())
         }

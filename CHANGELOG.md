@@ -2,6 +2,13 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [3.4] · 2026-09-29
+
+- **Corrigido o fechamento com o visualizador aberto:** o log da 3.3 mostrou a causa.
+  - Com uma foto aberta em tela cheia, a chegada de uma foto nova fazia o app procurar a foto 13 numa lista que ainda tinha 12, e ele fechava (`IndexOutOfBoundsException` no visualizador).
+  - A mesma falha foi corrigida no modo cliente e no Culling.
+  - Um teste automático agora simula fotos chegando com cada uma dessas telas abertas.
+
 ## [3.3] · 2026-09-28
 
 - **Correções do fechamento depois de várias fotos:**

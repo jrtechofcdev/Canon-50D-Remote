@@ -176,8 +176,8 @@ fun ViewerScreen(
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
         val landscape = maxWidth > maxHeight
-        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { list[it].id }) { page ->
-            val photo = list[page]
+        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { pagerKey(currentList, it) }) { page ->
+            val photo = currentList.getOrNull(page) ?: return@HorizontalPager
             val mask = if (showClipping && photo.id == viewing?.id && photo.crop == null) analysis?.clippedMask else null
             PhotoPage(app, photo, presets, mask, onTap = { chrome = !chrome }) { zoomed[photo.id] = it }
         }
@@ -318,6 +318,14 @@ fun ViewerScreen(
         )
     }
 }
+
+/**
+ * Page key read from the newest list. The pager keeps the key function it was first given, so a
+ * list captured at that moment went stale: a photo arriving with the viewer open asked for index 12
+ * of a 12-item list and closed the app (IndexOutOfBoundsException in ViewerScreen, seen in the log).
+ * A page that is momentarily past the end gets a key of its own until the list catches up.
+ */
+fun pagerKey(list: List<com.example.core.data.Photo>, index: Int): Any = list.getOrNull(index)?.id ?: "fim-$index"
 
 @Composable
 fun RatingBar(rating: Int, onRate: (Int) -> Unit) {
