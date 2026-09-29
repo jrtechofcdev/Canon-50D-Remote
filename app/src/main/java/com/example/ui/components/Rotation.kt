@@ -50,7 +50,8 @@ import kotlinx.coroutines.launch
  * 90 = right…), used to draw each option; [dx]/[dy] place it around the radial menu.
  */
 enum class ScreenTurn(val id: String, val label: String, val orientation: Int, val angle: Float, val dx: Int, val dy: Int) {
-    Auto("auto", "Automático", ActivityInfo.SCREEN_ORIENTATION_FULL_USER, 0f, 0, 0),
+    // Follows the phone's sensor even with Android's rotation lock on: "Auto" here always turns.
+    Auto("auto", "Automático", ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR, 0f, 0, 0),
     Portrait("portrait", "Em pé", ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, 0f, 0, -1),
     Right("landscape_right", "Deitado, topo à direita", ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE, 90f, 1, 0),
     UpsideDown("reverse_portrait", "De cabeça para baixo", ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT, 180f, 0, 1),
@@ -58,8 +59,46 @@ enum class ScreenTurn(val id: String, val label: String, val orientation: Int, v
     ;
 
     companion object {
-        fun of(id: String) = entries.firstOrNull { it.id == id } ?: Auto
+        fun of(id: String) = entries.firstOrNull { it.id == id } ?: Portrait
+
+        /**
+         * The fixed position for a photo's shape, keeping the side the photographer chose: a vertical
+         * photo stands up (upside down if that was the choice), a horizontal one lies on the chosen side.
+         * Null in Auto: then the phone itself decides.
+         */
+        fun forPhoto(base: ScreenTurn, portrait: Boolean): Int? = when {
+            base == Auto -> null
+            portrait -> if (base == UpsideDown) ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            else -> if (base == Right) ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        }
     }
+}
+
+/**
+ * A position asked by the screen on show (the viewer or client mode turning with the photo),
+ * above the one chosen in the menu. Null: the menu's choice applies.
+ */
+object ScreenOverride {
+    val orientation = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
+}
+
+/**
+ * While on screen, turns the phone's screen to match [photo]: a vertical photo fills a standing screen,
+ * a horizontal one a lying screen. Off (or in Auto) it leaves the menu's choice alone.
+ */
+@Composable
+fun FollowPhotoOrientation(app: TetherApp, photo: com.example.core.data.Photo?, enabled: Boolean, base: String) {
+    androidx.compose.runtime.LaunchedEffect(photo?.id, photo?.crop, photo?.displayUri, enabled, base) {
+        if (!enabled || photo == null) {
+            ScreenOverride.orientation.value = null
+            return@LaunchedEffect
+        }
+        val portrait = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.example.core.render.PhotoShape.isPortrait(app, photo)
+        } ?: return@LaunchedEffect
+        ScreenOverride.orientation.value = ScreenTurn.forPhoto(ScreenTurn.of(base), portrait)
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { ScreenOverride.orientation.value = null } }
 }
 
 /** The rotate button: opens the radial menu and remembers the choice for the whole app. */

@@ -127,6 +127,12 @@ Live view gasta mais bateria da câmera. Com a imagem só no celular, a tela da 
 
   O WhatsApp só pula a tela "Enviar para" quando a conversa já existe; por isso a mensagem vai antes. Os números usados ficam em Recentes (no modo cliente eles não aparecem).
 
+### Posição da tela
+
+- O botão de girar (Sessão, visualizador, modo cliente e live view) abre um menu com as posições: em pé, deitado para cada lado, de cabeça para baixo e Automático. Nas posições fixas a tela não gira sozinha.
+- **Girar com a foto** (Ajustes → Tela): no visualizador e no modo cliente, foto em pé deixa a tela em pé e foto deitada deixa a tela deitada, sempre em tela cheia.
+- Se a 50D salvar fotos verticais deitadas, ligue na câmera **Menu → Girar automático: Ligado**, ou use **Girar** no visualizador.
+
 ### Log do app
 
 O app escreve um diário em arquivo no celular (um por dia, os últimos 10 dias): conexão, downloads, memória, telas, avisos e erros. Se ele fechar sozinho, o erro fica gravado, e na próxima abertura **Ajustes → Diagnóstico** mostra como ele fechou.

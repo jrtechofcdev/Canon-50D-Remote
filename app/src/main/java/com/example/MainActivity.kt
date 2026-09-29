@@ -62,6 +62,7 @@ import com.example.ui.crop.CropScreen
 import com.example.ui.live.LiveViewScreen
 import com.example.ui.components.CaptureFab
 import com.example.ui.components.ScreenTurn
+import com.example.ui.components.ScreenOverride
 import androidx.compose.material.icons.outlined.Swipe
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -83,6 +84,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The last position chosen, right away (the settings load a moment later).
+        requestedOrientation = getSharedPreferences("screen", MODE_PRIVATE)
+            .getInt("orientation", android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
         enableEdgeToEdge()
         askNotificationPermissionOnce()
         app.camera.findAndConnect()
@@ -96,9 +100,19 @@ class MainActivity : ComponentActivity() {
                 nightBrightness = if (settings.nightMode) settings.nightBrightness else null,
                 keepScreenOn = settings.keepScreenOn && cameraState is ConnectionState.Connected,
             )
-            // The rotation chosen in the radial menu applies to every screen.
-            LaunchedEffect(settings.screenOrientation) {
-                requestedOrientation = ScreenTurn.of(settings.screenOrientation).orientation
+            // The position chosen in the menu applies to every screen; the viewer and client mode may ask
+            // for another one while a photo is shown. Applied only once the real choice is loaded, so the
+            // app never turns by itself on the way in.
+            val chosen by remember { app.settings.settings.map { it.screenOrientation } }.collectAsState(initial = null)
+            val override by ScreenOverride.orientation.collectAsState()
+            LaunchedEffect(chosen, override) {
+                val id = chosen ?: return@LaunchedEffect
+                val target = override ?: ScreenTurn.of(id).orientation
+                if (requestedOrientation != target) {
+                    requestedOrientation = target
+                    AppLog.i("TELA", "Posição: " + (override?.let { "segue a foto" } ?: ScreenTurn.of(id).label))
+                }
+                getSharedPreferences("screen", MODE_PRIVATE).edit().putInt("orientation", ScreenTurn.of(id).orientation).apply()
             }
             JrLinkTheme(night = settings.nightMode) {
                 val nav = rememberNavController()

@@ -819,7 +819,13 @@ private fun DisplaySettings(app: TetherApp, s: Settings) {
             com.example.ui.components.ScreenTurn.of(s.screenOrientation).id,
             icon = Icons.Outlined.ScreenRotation,
         ) { scope.launch { app.settings.set(SettingKeys.screenOrientation, it) } }
-        InfoText("Também pelo botão de girar na Sessão, no visualizador e no live view, que abre um menu com as quatro posições.")
+        ToggleRow(
+            Icons.Outlined.ScreenRotation,
+            "Girar com a foto",
+            "No visualizador e no modo cliente: foto em pé deixa a tela em pé, foto deitada deixa a tela deitada, sempre em tela cheia",
+            s.rotateWithPhoto,
+        ) { scope.launch { app.settings.set(SettingKeys.rotateWithPhoto, it) } }
+        InfoText("Automático segue o sensor do celular mesmo com a rotação do Android travada. Nas posições fixas a tela não gira sozinha. O botão de girar fica na Sessão, no visualizador, no modo cliente e no live view.")
     }
     SettingsGroup("Tela", Icons.Outlined.Smartphone) {
         ToggleRow(Icons.Outlined.LightMode, "Manter a tela ligada", "Enquanto a câmera estiver conectada", s.keepScreenOn) {

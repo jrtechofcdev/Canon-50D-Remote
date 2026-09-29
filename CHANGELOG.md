@@ -2,6 +2,20 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [3.5] · 2026-09-29
+
+- **Rotação que funciona sempre:**
+  - Nas posições fixas (em pé, deitado para cada lado, de cabeça para baixo) a tela não gira mais sozinha.
+  - Ao abrir, o app já entra na posição escolhida. Antes começava em Automático até carregar os ajustes, e girava sozinho por um instante.
+  - **Automático** agora segue o sensor do celular mesmo com a rotação do Android travada. Antes dependia dessa trava: às vezes girava, às vezes não.
+  - A posição padrão passou a ser **Em pé**.
+- **Girar com a foto** (Ajustes → Tela, ligado por padrão): no visualizador e no modo cliente, a tela se ajusta a cada foto.
+  - Foto em pé → tela em pé, em tela cheia. Foto deitada → tela deitada, do lado que você escolheu.
+  - Dá para fotografar em retrato e em paisagem na mesma sessão e mostrar cada uma inteira ao cliente.
+- **Botão de girar no modo cliente**, além da Sessão, do visualizador e do live view.
+- **Girar foto (90°)** no visualizador: para fotos que a câmera salvou deitadas. Funciona como um recorte e não altera o arquivo original.
+- **Prévia do RAW na posição certa:** a prévia tirada de dentro do CR2 agora guarda a rotação da câmera. Antes, fotos verticais feitas só em RAW apareciam deitadas.
+
 ## [3.4] · 2026-09-29
 
 - **Corrigido o fechamento com o visualizador aberto:** o log da 3.3 mostrou a causa.

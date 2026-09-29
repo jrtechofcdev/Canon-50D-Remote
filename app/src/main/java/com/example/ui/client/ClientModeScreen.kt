@@ -148,6 +148,8 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
             },
     ) {
         val current = photos.getOrNull(pager.currentPage)
+        // Vertical photos fill a standing screen, horizontal ones a lying screen.
+        com.example.ui.components.FollowPhotoOrientation(app, current, settings.rotateWithPhoto, settings.screenOrientation)
 
         // Top: leave on the left, position and brand on the right.
         Row(
@@ -166,6 +168,7 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
                 }
             }
             Spacer(Modifier.weight(1f))
+            com.example.ui.components.RotateButton(app, settings.screenOrientation, tint = Muted)
             if (photos.isNotEmpty()) {
                 Text("${pager.currentPage + 1} / ${photos.size}", style = MaterialTheme.typography.labelMedium, color = Muted)
                 Spacer(Modifier.width(12.dp))

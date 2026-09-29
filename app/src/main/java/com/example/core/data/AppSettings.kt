@@ -145,7 +145,9 @@ data class Settings(
     /** Gallery thumbnail size in dp. */
     val galleryThumb: Int = 112,
     /** Whole-app screen orientation: one of [ScreenTurn] ids. */
-    val screenOrientation: String = "auto",
+    val screenOrientation: String = "portrait",
+    /** In the viewer and client mode the screen turns with each photo: standing for vertical, lying for horizontal. */
+    val rotateWithPhoto: Boolean = true,
     /** Live view: a tap also runs AF. Off, a tap only moves the focus point and AF waits for the AF button. */
     val liveTapAf: Boolean = false,
     /** Live view: ask the 50D for its silent contrast AF ("Modo Live") instead of Quick mode (mirror flips). */
@@ -304,6 +306,7 @@ object SettingKeys {
     val whatsDefaultSet = stringPreferencesKey("whats_default_set")
     val galleryThumb = intPreferencesKey("gallery_thumb")
     val screenOrientation = stringPreferencesKey("screen_orientation")
+    val rotateWithPhoto = booleanPreferencesKey("rotate_with_photo")
     val liveTapAf = booleanPreferencesKey("live_tap_af")
     val liveSilentAf = booleanPreferencesKey("live_silent_af")
     val liveFps = intPreferencesKey("live_fps")
@@ -481,6 +484,7 @@ class SettingsRepository(private val context: Context) {
             whatsDefaultSet = this[k.whatsDefaultSet] ?: d.whatsDefaultSet,
             galleryThumb = this[k.galleryThumb] ?: d.galleryThumb,
             screenOrientation = this[k.screenOrientation] ?: d.screenOrientation,
+            rotateWithPhoto = this[k.rotateWithPhoto] ?: d.rotateWithPhoto,
             liveTapAf = this[k.liveTapAf] ?: d.liveTapAf,
             liveSilentAf = this[k.liveSilentAf] ?: d.liveSilentAf,
             liveFps = this[k.liveFps] ?: d.liveFps,

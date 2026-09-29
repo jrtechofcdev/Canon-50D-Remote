@@ -244,6 +244,19 @@ class TetherController(
             val jpeg = context.contentResolver.openInputStream(uri)?.use { Cr2Preview.extract(it) } ?: return@runCatching null
             val file = store.previewFile(session, base)
             file.writeBytes(jpeg)
+            // The JPEG inside the CR2 has no orientation of its own: the camera's (vertical photo or not)
+            // lives in the CR2 header. Without copying it, vertical frames showed lying down.
+            val orientation = context.contentResolver.openInputStream(uri)?.use {
+                ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+            } ?: ExifInterface.ORIENTATION_NORMAL
+            if (orientation != ExifInterface.ORIENTATION_NORMAL && orientation != ExifInterface.ORIENTATION_UNDEFINED) {
+                runCatching {
+                    ExifInterface(file.absolutePath).apply {
+                        setAttribute(ExifInterface.TAG_ORIENTATION, orientation.toString())
+                        saveAttributes()
+                    }
+                }.onFailure { AppLog.w("DOWNLOAD", "Rotação da prévia do RAW não gravada", it) }
+            }
             file.absolutePath
         }.getOrNull()
     }

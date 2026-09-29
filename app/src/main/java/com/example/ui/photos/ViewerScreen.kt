@@ -37,6 +37,7 @@ import androidx.compose.material.icons.outlined.Crop
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.RotateRight
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.AlertDialog
@@ -173,6 +174,8 @@ fun ViewerScreen(
 
     // One tap hides everything but the photo; another brings it back.
     var chrome by remember { mutableStateOf(true) }
+    // A vertical photo gets a standing screen, a horizontal one a lying screen (Ajustes → Tela).
+    com.example.ui.components.FollowPhotoOrientation(app, viewing, settings.rotateWithPhoto, settings.screenOrientation)
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
         val landscape = maxWidth > maxHeight
@@ -277,6 +280,10 @@ fun ViewerScreen(
                         icon = { Icon(Icons.Outlined.Share, contentDescription = null, tint = Tone.Text) },
                     ) { scope.launch { actions.share(listOf(current), it, settings) } }
                     ActionTile(Icons.Outlined.Crop, "Recortar", selected = current.crop != null) { onCrop(current.id) }
+                    // A quarter turn of the photo itself (for frames the camera saved lying down).
+                    ActionTile(Icons.Outlined.RotateRight, "Girar") {
+                        scope.launch { app.looks.setCrop(current, com.example.core.render.PhotoShape.turnedClockwise(app.looks.cropOf(current))) }
+                    }
                     if (settings.notesEnabled) {
                         ActionTile(Icons.AutoMirrored.Outlined.StickyNote2, "Nota", selected = current.note != null || current.audioNote != null) { noteFor = current }
                     }
