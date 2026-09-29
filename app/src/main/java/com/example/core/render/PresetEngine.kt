@@ -29,11 +29,13 @@ class PresetEngine {
     private val dispatcher = thread.asCoroutineDispatcher()
     private var gl: GlRenderer? = null
     private var glFailed = false
+    /** Modo desenvolvedor: render on the CPU only, to compare with the GPU. */
+    @Volatile var forceCpu = false
 
     /** Renders [src] with [params] at [src]'s size. Never returns [src] itself. */
     suspend fun render(src: Bitmap, params: RenderParams): Bitmap = withContext(dispatcher) {
         if (params.isIdentity) return@withContext src.copy(Bitmap.Config.ARGB_8888, false)
-        if (!glFailed) {
+        if (!glFailed && !forceCpu) {
             try {
                 val renderer = gl ?: GlRenderer().also { gl = it }
                 return@withContext renderer.render(src, params)

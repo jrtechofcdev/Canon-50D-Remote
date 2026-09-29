@@ -43,11 +43,13 @@ data class MessageData(
     val count: Int,
     val date: Long,
     val names: List<String> = emptyList(),
+    /** The photographer's Pix key (Ajustes → Mensagens), for {pix}. */
+    val pix: String = "",
 )
 
 object MessageTemplates {
 
-    /** Replaces {cliente}, {quantidade}, {data} and {lista}; unknown fields are left as typed. */
+    /** Replaces {cliente}, {quantidade}, {data}, {lista} and {pix}; unknown fields are left as typed. */
     fun fill(template: String, data: MessageData, locale: Locale = Locale("pt", "BR")): String {
         val date = SimpleDateFormat("dd/MM/yyyy", locale).format(Date(data.date))
         val list = data.names.joinToString("\n") { "• $it" }
@@ -56,6 +58,7 @@ object MessageTemplates {
             .replace("{quantidade}", data.count.toString())
             .replace("{data}", date)
             .replace("{lista}", list)
+            .replace("{pix}", data.pix.trim())
             // "Olá, !" when there is no client name reads wrong; drop the comma instead.
             .replace("Olá, !", "Olá!")
             .replace("Olá, ,", "Olá,")

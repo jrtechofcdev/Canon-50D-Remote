@@ -429,6 +429,30 @@ class ScreenshotTest {
     }
 
     @Test
+    fun settingsSave() {
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Save, onBack = {}) } }
+        save("ajustes_salvamento", androidx.compose.ui.test.hasText("Criar e ligar todas as pastas"))
+    }
+
+    @Test
+    fun clientWatermark() {
+        seedPhotos()
+        runBlocking {
+            app.settings.set(com.example.core.data.SettingKeys.clientWatermark, true)
+            app.settings.set(com.example.core.data.SettingKeys.sessionName, "")
+        }
+        rule.setContent { JrLinkTheme { com.example.ui.client.ClientModeScreen(app, onExit = {}, onCalibrate = {}) } }
+        save("cliente_marca_dagua", androidx.compose.ui.test.hasText("Recortar"))
+    }
+
+    @Test
+    fun developer() {
+        runBlocking { app.settings.set(com.example.core.data.SettingKeys.developerMode, true) }
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Developer, onBack = {}) } }
+        save("ajustes_desenvolvedor", androidx.compose.ui.test.hasText("Simular foto recebida"))
+    }
+
+    @Test
     fun liveView() = live("live_view")
 
     @Test

@@ -84,6 +84,7 @@ import com.example.ui.theme.Tone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.material.icons.outlined.EditNote
 
 enum class PhotoFilter(val label: String) {
     All("Todas"), Session("Sessão atual"), Favorites("Favoritas"), ClientPicks("Escolhidas pelo cliente"),
@@ -253,6 +254,7 @@ fun PhotosScreen(
                     scope.launch { app.database.photoDao().setFavorite(selection.map { it.id }, on); selected.clear() }
                 },
                 onMoment = { sheet = "moment" },
+                onNote = { sheet = "note" },
                 onMessage = { sheet = "message" },
                 onWhatsApp = { sheet = "whatsapp" },
                 onCrop = { sheet = "crop" },
@@ -273,6 +275,7 @@ fun PhotosScreen(
             scope.launch { app.database.photoDao().setMoment(selection.map { it.id }, m.ifEmpty { null }); selected.clear() }
         }, onDismiss = { sheet = null })
         "message" -> MessageSheet(actions, settings, selection, onDismiss = { sheet = null })
+        "note" -> NoteSheet(app, selection, onDismiss = { sheet = null; selected.clear() })
         "crop" -> QuickCropSheet(
             count = selection.size,
             onDismiss = { sheet = null },
@@ -334,6 +337,7 @@ private fun BatchBar(
     onPreset: () -> Unit,
     onFavorite: () -> Unit,
     onMoment: () -> Unit,
+    onNote: () -> Unit,
     onMessage: () -> Unit,
     onWhatsApp: () -> Unit,
     onCrop: () -> Unit,
@@ -356,6 +360,7 @@ private fun BatchBar(
         BarAction(Icons.AutoMirrored.Outlined.Chat, "Mensagem", onMessage)
         BarAction(if (selection.all { it.favorite }) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, "Favoritar", onFavorite)
         if (settings.momentsEnabled) BarAction(Icons.Outlined.Flag, "Momento", onMoment)
+        if (settings.notesEnabled) BarAction(Icons.Outlined.EditNote, "Nota", onNote)
         BarAction(Icons.Outlined.Delete, "Apagar", onDelete)
     }
 }

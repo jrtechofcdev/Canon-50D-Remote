@@ -104,6 +104,37 @@ O disparador do app funciona como apertar o botão até o fim: com AF ligado, a 
 
 **Limites:** o processamento da Adobe é fechado, então a prévia do app é uma aproximação. O `.xmp` exportado dá o resultado exato no Lightroom. Máscaras, remoção de manchas, correção de lente e perfis de câmera da Adobe não são aplicados; o corte também não, porque não faz parte de um preset.
 
+### Pastas do app
+
+Em **Ajustes → Salvamento → Pastas do app**, toque em **Criar e ligar todas as pastas**, crie ou abra a pasta "JR C50D Sync" na raiz do celular e toque em **Usar esta pasta**. O app cria e liga tudo:
+
+```
+JR C50D Sync/
+  01 Fotos/      JPG, RAW, Editadas
+  02 Presets/    JR_LR_Presets/JR_LR_Presets_DNG e _XMP
+  03 Marca dagua/
+  04 Notas/      uma pasta por foto (nota.txt, audio_1.m4a…)
+  05 Backup/     Espelho (2º cartão), Sessoes, Ajustes do app
+  06 Logs/
+```
+
+O **2º cartão** guarda uma cópia conferida de cada foto, como numa câmera de dois cartões. **Salvar fotos automaticamente** (mesma tela) liga e desliga o download de cada foto nova.
+
+### Mensagens
+
+Em **Ajustes → Mensagens** ficam as mensagens, cada uma com um atalho (ex.: `fotos`, `ent`, `pix`, `agenda`), e a chave Pix. Na hora de enviar pelo WhatsApp, digite o atalho: o app mostra o texto pronto com o nome do cliente e a data, e é só enviar.
+
+### Modo desenvolvedor
+
+Toque 7 vezes na marca no fim de **Ajustes**. Aparece **Ajustes → Desenvolvedor**, com:
+- teste de foco e disparo;
+- propriedades da câmera;
+- log de cada comando USB;
+- foto simulada, para testar sem a câmera;
+- render pela CPU;
+- exportar o banco;
+- teste de fechamento.
+
 ### Loja de presets
 
 1. Abra a aba **Loja**. A lista vem da sua API (endereço em **Ajustes → Presets → Loja de presets**).

@@ -41,6 +41,8 @@ import java.util.Locale
 object AppLog {
     @Volatile var enabled: Boolean = true
         private set
+    /** Modo desenvolvedor: every camera operation goes to the log too. */
+    @Volatile var verbose: Boolean = false
     @Volatile private var folder: Uri? = null
     @Volatile private var dirty = false
     private var context: Context? = null

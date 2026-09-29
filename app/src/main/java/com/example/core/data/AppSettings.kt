@@ -151,7 +151,7 @@ data class Settings(
     /** Live view: a tap also runs AF. Off, a tap only moves the focus point and AF waits for the AF button. */
     val liveTapAf: Boolean = false,
     /** Live view: ask the 50D for its silent contrast AF ("Modo Live") instead of Quick mode (mirror flips). */
-    val liveSilentAf: Boolean = true,
+    val liveSilentAf: Boolean = false,
     /** Live view frames per second cap, to leave the cable free and keep the phone cool. */
     val liveFps: Int = 20,
     /** How long the shutter keeps trying while the camera focuses, in seconds. */
@@ -166,6 +166,28 @@ data class Settings(
     val shopEnabled: Boolean = true,
     /** Address of that catalogue: a JSON list of presets, each with a download link to its DNG. */
     val shopUrl: String = DEFAULT_SHOP_URL,
+    /** Root "JR C50D Sync" folder the app created its structure in (Ajustes → Salvamento → Pastas do app). */
+    val appFolder: String? = null,
+    /** New photos download as soon as they are taken; off leaves them on the card for later. */
+    val autoDownload: Boolean = true,
+    /** Second copy of every original, like a camera with two cards. */
+    val mirrorEnabled: Boolean = false,
+    val mirrorFolder: String? = null,
+    /** Notes as files: one folder per photo with nota.txt and the voice notes. */
+    val notesFolder: String? = null,
+    /** Every WhatsApp template (JSON), each with a short code typed when sending. Empty = the defaults. */
+    val messageLibrary: String = "",
+    /** Filled into {pix} in the templates. */
+    val pixKey: String = "",
+    /** The watermark over the photo in client mode, so a phone photo of the screen carries the brand. */
+    val clientWatermark: Boolean = true,
+    val clientWatermarkOpacity: Int = 35,
+    /** Unlocked by tapping the brand at the bottom of Ajustes seven times. */
+    val developerMode: Boolean = false,
+    /** Every PTP operation and its answer goes to the log. */
+    val devVerboseLog: Boolean = false,
+    /** "auto" or "cpu": which engine renders the presets (cpu to compare when the GPU looks wrong). */
+    val devRender: String = "auto",
 
     // Live view
     val liveViewEnabled: Boolean = true,
@@ -320,6 +342,18 @@ object SettingKeys {
     val logFolder = stringPreferencesKey("log_folder")
     val shopEnabled = booleanPreferencesKey("shop_enabled")
     val shopUrl = stringPreferencesKey("shop_url")
+    val appFolder = stringPreferencesKey("app_folder")
+    val autoDownload = booleanPreferencesKey("auto_download")
+    val mirrorEnabled = booleanPreferencesKey("mirror_enabled")
+    val mirrorFolder = stringPreferencesKey("mirror_folder")
+    val notesFolder = stringPreferencesKey("notes_folder")
+    val messageLibrary = stringPreferencesKey("message_library")
+    val pixKey = stringPreferencesKey("pix_key")
+    val clientWatermark = booleanPreferencesKey("client_watermark")
+    val clientWatermarkOpacity = intPreferencesKey("client_watermark_opacity")
+    val developerMode = booleanPreferencesKey("developer_mode")
+    val devVerboseLog = booleanPreferencesKey("dev_verbose_log")
+    val devRender = stringPreferencesKey("dev_render")
     val liveViewEnabled = booleanPreferencesKey("live_view_enabled")
     val liveOnCamera = booleanPreferencesKey("live_on_camera")
     val liveGrid = stringPreferencesKey("live_grid")
@@ -500,6 +534,18 @@ class SettingsRepository(private val context: Context) {
             logFolder = this[k.logFolder],
             shopEnabled = this[k.shopEnabled] ?: d.shopEnabled,
             shopUrl = this[k.shopUrl]?.takeIf { it.isNotBlank() } ?: d.shopUrl,
+            appFolder = this[k.appFolder],
+            autoDownload = this[k.autoDownload] ?: d.autoDownload,
+            mirrorEnabled = this[k.mirrorEnabled] ?: d.mirrorEnabled,
+            mirrorFolder = this[k.mirrorFolder],
+            notesFolder = this[k.notesFolder],
+            messageLibrary = this[k.messageLibrary] ?: d.messageLibrary,
+            pixKey = this[k.pixKey] ?: d.pixKey,
+            clientWatermark = this[k.clientWatermark] ?: d.clientWatermark,
+            clientWatermarkOpacity = this[k.clientWatermarkOpacity] ?: d.clientWatermarkOpacity,
+            developerMode = this[k.developerMode] ?: d.developerMode,
+            devVerboseLog = this[k.devVerboseLog] ?: d.devVerboseLog,
+            devRender = this[k.devRender] ?: d.devRender,
             liveViewEnabled = this[k.liveViewEnabled] ?: d.liveViewEnabled,
             liveOnCamera = this[k.liveOnCamera] ?: d.liveOnCamera,
             liveGrid = this[k.liveGrid] ?: d.liveGrid,

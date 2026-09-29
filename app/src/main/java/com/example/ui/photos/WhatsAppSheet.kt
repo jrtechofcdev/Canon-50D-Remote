@@ -96,10 +96,12 @@ fun WhatsAppSheet(
         count = photos.size,
         date = photos.minOfOrNull { it.capturedAt } ?: System.currentTimeMillis(),
         names = photos.map { it.savedBase },
+        pix = settings.pixKey,
     )
-    var kind by remember { mutableStateOf(if (settings.whatsAutoMessage) MessageKind.WhatsApp else null) }
-    var edited by remember(kind) { mutableStateOf<String?>(null) }
-    val text = edited ?: kind?.let { MessageTemplates.fill(settings.template(it), data) }.orEmpty()
+    val library = remember(settings) { settings.messages() }
+    var templateId by remember { mutableStateOf(if (settings.whatsAutoMessage) com.example.core.messages.MessageLibrary.kindIds[MessageKind.WhatsApp] else null) }
+    var edited by remember(templateId) { mutableStateOf<String?>(null) }
+    val text = edited ?: library.firstOrNull { it.id == templateId }?.let { MessageTemplates.fill(it.text, data) }.orEmpty()
     var numberError by remember { mutableStateOf<String?>(null) }
     var nameError by remember { mutableStateOf(false) }
     // Which step is next: the chat first, then the photos.
@@ -180,18 +182,17 @@ fun WhatsAppSheet(
                         sets.forEach { s -> SheetChip(label(s), set == s) { set = s } }
                     }
                 }
-                SheetLabel(Icons.AutoMirrored.Outlined.Chat, "Mensagem")
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SheetChip("Sem texto", kind == null) { kind = null }
-                    MessageKind.entries.forEach { k -> SheetChip(k.label, kind == k) { kind = k } }
-                }
-                if (kind != null) {
-                    OutlinedTextField(
-                        value = text,
-                        onValueChange = { edited = it },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 240.dp),
-                    )
-                }
+            }
+            // The message: typed by its short code, shown in full before it goes.
+            SheetLabel(Icons.AutoMirrored.Outlined.Chat, "Mensagem")
+            TemplatePicker(library, templateId, allowNone = true) { templateId = it?.id }
+            if (templateId != null) {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { edited = it },
+                    label = { Text("Vai assim (dá para ajustar)") },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 240.dp),
+                )
             }
 
             StepButton(

@@ -118,7 +118,12 @@ class PhotoStore(private val context: Context) {
     /** Human-readable path of a chosen tree, e.g. "Pictures/Clientes/RAW". */
     fun describeTree(uri: String?): String {
         if (uri == null) return "Pasta do app (padrão)"
-        val docId = runCatching { DocumentsContract.getTreeDocumentId(Uri.parse(uri)) }.getOrNull() ?: return uri
+        val parsed = Uri.parse(uri)
+        // A folder the app created inside a chosen one ("Pastas do app") is a document of that tree.
+        val docId = runCatching {
+            if (parsed.pathSegments.size >= 4 && parsed.pathSegments[2] == "document") DocumentsContract.getDocumentId(parsed)
+            else DocumentsContract.getTreeDocumentId(parsed)
+        }.getOrNull() ?: return uri
         val volume = docId.substringBefore(':')
         val path = docId.substringAfter(':', "")
         val prefix = if (volume == "primary") "Armazenamento interno" else "Cartão SD"

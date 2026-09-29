@@ -51,13 +51,23 @@ import com.example.ui.theme.Tone
 import kotlinx.coroutines.launch
 
 /** Text and voice note for one photo ("mãe da noiva", "refazer com flash"). */
+@Composable
+fun NoteSheet(app: TetherApp, photo: Photo, onDismiss: () -> Unit) = NoteSheet(app, listOf(photo), onDismiss)
+
+/**
+ * The same note for [photos] (one, or several picked in the gallery). With a notes folder chosen,
+ * each photo also gets its folder there: nota.txt and audio_N.m4a.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NoteSheet(app: TetherApp, photo: Photo, onDismiss: () -> Unit) {
+fun NoteSheet(app: TetherApp, photos: List<Photo>, onDismiss: () -> Unit) {
+    val photo = photos.first()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var text by remember { mutableStateOf(photo.note.orEmpty()) }
-    var audio by remember { mutableStateOf(photo.audioNote) }
+    val export = remember { com.example.core.notes.NotesExport(context) }
+    val sameText = photos.map { it.note.orEmpty() }.distinct().singleOrNull().orEmpty()
+    var text by remember { mutableStateOf(sameText) }
+    var audio by remember { mutableStateOf(photos.map { it.audioNote }.distinct().singleOrNull()) }
     var recording by remember { mutableStateOf(false) }
     var playing by remember { mutableStateOf(false) }
     var hint by remember { mutableStateOf<String?>(null) }
@@ -68,13 +78,23 @@ fun NoteSheet(app: TetherApp, photo: Photo, onDismiss: () -> Unit) {
     DisposableEffect(Unit) { onDispose { app.notes.stop(); app.notes.stopPlayback() } }
 
     fun save() = scope.launch {
-        app.database.photoDao().setNote(photo.id, text.trim().ifEmpty { null })
+        val note = text.trim().ifEmpty { null }
+        val folder = app.settings.current().notesFolder
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            photos.forEach { p ->
+                app.database.photoDao().setNote(p.id, note)
+                if (folder != null && note != p.note) export.writeText(folder, p, note)
+            }
+        }
         onDismiss()
     }
 
     ModalBottomSheet(onDismissRequest = { save() }, containerColor = Tone.Surface) {
         Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding().padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Nota de ${photo.savedBase}", style = MaterialTheme.typography.titleMedium)
+            Text(
+                if (photos.size == 1) "Nota de ${photo.savedBase}" else "Nota para ${photos.size} fotos",
+                style = MaterialTheme.typography.titleMedium,
+            )
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it.take(300) },
@@ -89,7 +109,7 @@ fun NoteSheet(app: TetherApp, photo: Photo, onDismiss: () -> Unit) {
                         .clip(CircleShape)
                         .background(if (recording) Tone.Error else Tone.SurfaceHigh)
                         .semantics { contentDescription = "Segure para gravar" }
-                        .pointerInput(photo.id) {
+                        .pointerInput(photos.map { it.id }) {
                             detectTapGestures(onPress = {
                                 val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
                                 if (!granted) {
@@ -105,10 +125,15 @@ fun NoteSheet(app: TetherApp, photo: Photo, onDismiss: () -> Unit) {
                                     if (file == null) {
                                         hint = "Segure o botão enquanto fala."
                                     } else {
-                                        audio?.let(app.notes::delete)
+                                        // One photo keeps one voice note in the app; the folder keeps every take.
+                                        if (photos.size == 1) audio?.let(app.notes::delete)
                                         audio = file.absolutePath
                                         hint = null
-                                        app.database.photoDao().setAudioNote(photo.id, file.absolutePath)
+                                        val folder = app.settings.current().notesFolder
+                                        photos.forEach { p ->
+                                            app.database.photoDao().setAudioNote(p.id, file.absolutePath)
+                                            if (folder != null) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { export.addAudio(folder, p, file) }
+                                        }
                                     }
                                 }
                             })
@@ -135,7 +160,7 @@ fun NoteSheet(app: TetherApp, photo: Photo, onDismiss: () -> Unit) {
                     IconButton(onClick = {
                         app.notes.stopPlayback(); playing = false
                         app.notes.delete(path); audio = null
-                        scope.launch { app.database.photoDao().setAudioNote(photo.id, null) }
+                        scope.launch { photos.forEach { app.database.photoDao().setAudioNote(it.id, null) } }
                     }) { Icon(Icons.Outlined.Delete, contentDescription = "Apagar nota de voz", tint = Tone.TextMuted) }
                 }
             }

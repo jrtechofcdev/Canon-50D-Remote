@@ -133,6 +133,9 @@ class CameraManager(
     @Volatile private var liveZoom = 1
     /** Set while the shutter works, so live view stops asking for frames and the camera can focus and fire. */
     @Volatile private var liveHold = false
+    /** Live view AF runs on the sensor ("Modo Live"): slower, so every wait around it is longer. */
+    @Volatile private var liveSilentAf = false
+    private var afJob: kotlinx.coroutines.Job? = null
     @Volatile private var liveFrameMs = 50L
 
     private val _shutter = MutableStateFlow<ShutterState>(ShutterState.Idle)
@@ -314,11 +317,20 @@ class CameraManager(
             val inLive = liveJob?.isActive == true
             liveHold = true
             try {
-                if (focusFirst && inLive) {
-                    runCatching { ptp.transact(PtpOp.EOS_DO_AF) }
-                    delay(AF_SETTLE_MS)
+                if (inLive) {
+                    // A tap-AF still running (or never closed) makes the next release come back busy or do
+                    // nothing: finish it first, the way the camera expects.
+                    afJob?.cancel()
+                    cancelAf(ptp, "antes do disparo")
+                    if (focusFirst) {
+                        runAf(ptp, "antes do disparo")
+                        cancelAf(ptp, "depois do foco")
+                    }
                 }
-                ShutterRelease.fire(ptp, info.supports(PtpOp.EOS_REMOTE_RELEASE), waitSeconds.coerceIn(1, 15) * 1000L) {
+                // Contrast AF ("Modo Live") can take a few seconds per try; give the release more room.
+                val wait = (waitSeconds.coerceIn(1, 15) + if (inLive && liveSilentAf) 4 else 0) * 1000L
+                AppLog.i("DISPARO", "Disparando${if (inLive) " no live view (AF ${if (liveSilentAf) "Live" else "rápido"})" else ""}, espera até ${wait / 1000} s")
+                ShutterRelease.fire(ptp, info.supports(PtpOp.EOS_REMOTE_RELEASE), wait) {
                     _shutter.value = ShutterState.Focusing(it)
                 }
                 _shutter.value = ShutterState.Fired
@@ -335,6 +347,26 @@ class CameraManager(
             delay(1_200)
             if (_shutter.value !is ShutterState.Focusing) _shutter.value = ShutterState.Idle
         }
+    }
+
+    /** Starts AF and waits the time the chosen live view AF needs; the answer code goes to the log. */
+    private suspend fun runAf(ptp: PtpSession, why: String): Boolean = try {
+        ptp.transact(PtpOp.EOS_DO_AF)
+        AppLog.i("FOCO", "AF iniciado ($why)")
+        delay(if (liveSilentAf) AF_WAIT_LIVE_MS else AF_WAIT_QUICK_MS)
+        true
+    } catch (e: PtpResponseException) {
+        AppLog.w("FOCO", "AF recusado ($why): código 0x%04X".format(e.code))
+        false
+    } catch (e: PtpException) {
+        AppLog.w("FOCO", "AF falhou ($why): ${e.message}")
+        false
+    }
+
+    /** Ends the AF operation (the lens keeps its focus). Without it the 50D may refuse what comes next. */
+    private suspend fun cancelAf(ptp: PtpSession, why: String) {
+        runCatching { ptp.transact(PtpOp.EOS_AF_CANCEL) }
+            .onFailure { AppLog.w("FOCO", "Fim do AF ($why) não aceito: ${it.message}") }
     }
 
     private suspend fun releaseShutter(ptp: PtpSession, info: DeviceInfo) =
@@ -404,12 +436,21 @@ class CameraManager(
 
     private suspend fun runLiveView(ptp: PtpSession, alsoOnCamera: Boolean, silentAf: Boolean) {
         _live.value = LiveState.Starting
+        liveSilentAf = silentAf
+        if (!silentAf) {
+            // Quick mode (the mirror drops for AF): the most reliable on the 50D, and the one that also
+            // undoes a "Modo Live" left set by an earlier version.
+            runCatching { setPropertyNow(ptp, EosProp.LV_AF_SYSTEM, EosProp.LV_AF_QUICK) }
+                .onSuccess { log("AF do live view: Modo rápido") }
+                .onFailure { log("A câmera não aceitou o AF rápido pelo cabo: ${it.message}") }
+        }
         if (silentAf) {
             // "Modo Live" (contrast AF on the sensor) focuses without dropping the mirror; "Modo rápido"
             // drops it for every AF, which is the clack-clack. Not every firmware takes it over USB.
             runCatching { setPropertyNow(ptp, EosProp.LV_AF_SYSTEM, EosProp.LV_AF_LIVE) }
                 .onSuccess { log("AF do live view: Modo Live (silencioso)") }
                 .onFailure {
+                    liveSilentAf = false
                     log("A câmera não aceitou trocar o AF do live view: ${it.message}")
                     _messages.tryEmit("Para focar sem o barulho do espelho, na 50D escolha Menu → Live View → Modo AF: Modo Live.")
                 }
@@ -473,9 +514,18 @@ class CameraManager(
         it.transact(PtpOp.EOS_ZOOM_POSITION, (x.coerceIn(0f, 1f) * SENSOR_W).toInt(), (y.coerceIn(0f, 1f) * SENSOR_H).toInt())
     }
 
-    /** Autofocus now (like half-pressing with AF-ON), using the camera's live view AF mode. */
-    fun liveAutofocus() = liveCommand("Não focou: confira se a lente está em AF") {
-        it.transact(PtpOp.EOS_DO_AF)
+    /**
+     * Autofocus now (like AF-ON), with the camera's live view AF mode. Always closed with AF cancel,
+     * so the next focus or shot finds the camera ready; a second tap while focusing is ignored.
+     */
+    fun liveAutofocus() {
+        val ptp = session ?: return
+        if (afJob?.isActive == true || _shutter.value is ShutterState.Focusing) return
+        afJob = scope.launch {
+            val ok = runAf(ptp, "toque")
+            cancelAf(ptp, "toque")
+            if (!ok) _messages.tryEmit("Não focou. Confira a chave da lente em AF e, na 50D, Menu → Live View → Modo AF.")
+        }
     }
 
     /** Nudges focus with the lens in AF: [step] 1…3 towards near, −1…−3 towards far. */
@@ -674,7 +724,10 @@ class CameraManager(
         private const val LIVE_VIEW_PARAM = 0x00100000
         private const val LIVE_TIMEOUT_MS = 3_000
         private const val LIVE_GIVE_UP_MS = 6_000L
-        private const val AF_SETTLE_MS = 700L
+        /** Quick mode: the mirror drops, the AF sensor focuses, the mirror comes back. */
+        private const val AF_WAIT_QUICK_MS = 1_200L
+        /** "Modo Live": contrast AF on the sensor, slower in low light. */
+        private const val AF_WAIT_LIVE_MS = 2_800L
         private const val LIVE_AFTER_SHOT_MS = 600L
         /** Zoom position coordinates use the sensor's pixel grid (50D: 4752 × 3168). */
         private const val SENSOR_W = 4752

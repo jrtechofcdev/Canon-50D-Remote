@@ -2,6 +2,41 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [3.8] · 2026-09-29
+
+- **Pastas do app com um toque:** em Ajustes → Salvamento → **Criar e ligar todas as pastas**, o app cria a estrutura "JR C50D Sync" e liga cada ajuste à pasta certa.
+  - Pastas criadas: Fotos (JPG, RAW, Editadas), Presets, Marca d'água, Notas, Backup (2º cartão, sessões, ajustes) e Logs.
+  - O seletor abre na raiz do celular. Se a pasta já existir (do zip), o app só liga.
+- **Salvar fotos automaticamente:** novo liga/desliga. Desligado, as fotos ficam no cartão e aparecem no aviso da Sessão para baixar depois.
+- **2º cartão:** cada foto salva ganha uma cópia conferida, por tamanho, numa segunda pasta, separada por sessão e formato. Liga sozinho ao criar as pastas do app.
+- **Notas em pasta:** uma pasta por foto, com `nota.txt` e os áudios (`audio_1.m4a`, `audio_2.m4a`…). A mesma nota pode ir para várias fotos de uma vez, pela seleção da galeria (botão **Nota**).
+- **Mensagens com atalho:**
+  - **13 mensagens prontas**, 8 delas novas: confirmação do ensaio, local, reserva com Pix, Pix, orçamento, edição em andamento, impressos prontos e agradecimento.
+  - **Chave Pix** em Ajustes, que entra no lugar de `{pix}`.
+  - **Na hora de enviar ao cliente**, inclusive no modo cliente: digite o atalho ("ent", "pix"…), o app mostra o texto pronto e você só envia.
+  - **Em Ajustes → Mensagens**, dá para criar, editar e apagar mensagens.
+- **Modo cliente:**
+  - **Segurar para sair** foi corrigido: agora são 2 s, com um anel mostrando o tempo.
+  - **Marca d'água** na tela, sobre a foto (só na tela, o arquivo não muda).
+  - **Botão para ocultar a interface:** um toque na foto traz de volta.
+  - **Botões com a mesma largura.** O cadeado do recorte e do calibrar não desalinha mais o ícone.
+- **Live view:**
+  - Foco e disparo passam a fechar a operação de AF da 50D. Sem isso, a câmera às vezes recusava e às vezes ignorava o próximo comando.
+  - As esperas se ajustam ao modo de AF.
+  - O padrão agora é o **AF rápido**, o mais certeiro. O silencioso segue como opção.
+  - Cada passo vai para o log com o código da câmera.
+- **Navegação:**
+  - O botão **Iniciar captura** aparece só na Sessão e some ao rolar a tela.
+  - Com o celular deitado, a barra lateral rola, e **Ajustes** não some mais.
+- **Vibração leve** a cada passo dos sliders de Ajustes.
+- **Modo desenvolvedor:** 7 toques na marca, no fim de Ajustes. Traz:
+  - teste de foco e disparo com os códigos da câmera, propriedades lidas da 50D e reconexão da USB;
+  - log de cada comando USB;
+  - foto simulada, para testar tudo sem a câmera;
+  - processamento só pela CPU;
+  - exportar o banco e limpar caches;
+  - teste de fechamento.
+
 ## [3.7] · 2026-09-29
 
 - **Antes e depois na Loja, como no Lightroom:** com o preset aberto, segure o dedo na foto para ver a imagem **sem o preset**; solte para ver com ele. Um toque deixa a foto em tela cheia.

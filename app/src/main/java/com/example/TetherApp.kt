@@ -104,6 +104,13 @@ class TetherApp : Application() {
         appScope.launch {
             settings.settings.distinctUntilChangedBy { it.logEnabled to it.logFolder }.collect { AppLog.configure(it.logEnabled, it.logFolder) }
         }
+        appScope.launch {
+            // Modo desenvolvedor: detailed log and the CPU-only render follow their switches.
+            settings.settings.collect {
+                AppLog.verbose = it.developerMode && it.devVerboseLog
+                engine.forceCpu = it.developerMode && it.devRender == "cpu"
+            }
+        }
 
         appScope.launch(Dispatchers.IO) {
             export.clearOldExports()

@@ -82,6 +82,10 @@ import com.example.ui.theme.Tone
 import com.example.ui.theme.JrLinkTheme
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
 
@@ -144,10 +148,19 @@ class MainActivity : ComponentActivity() {
                         restoreState = true
                     }
                 }
-                // On every tab except Culling (its own buttons sit there) and the Session once it is capturing.
-                val showFab = onTab && route != Tab.Cull.route && route != Tab.Shop.route &&
-                    !(route == Tab.Session.route && cameraState is ConnectionState.Connected) &&
-                    !(route == Tab.Photos.route && gallerySelecting)
+                // Only on the Session, and only while the camera is not capturing yet. Scrolling the screen up
+                // hides it (it covered the tools at the bottom); scrolling back down brings it back.
+                var fabShown by remember { mutableStateOf(true) }
+                LaunchedEffect(route) { fabShown = true }
+                val showFab = route == Tab.Session.route && cameraState !is ConnectionState.Connected
+                val fabScroll = remember {
+                    object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+                        override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                            if (available.y < -6f) fabShown = false else if (available.y > 6f) fabShown = true
+                            return androidx.compose.ui.geometry.Offset.Zero
+                        }
+                    }
+                }
 
                 LaunchedEffect(Unit) {
                     val cullMessages = app.culler.warnings.map { w ->
@@ -168,7 +181,11 @@ class MainActivity : ComponentActivity() {
                     containerColor = Tone.Background,
                     snackbarHost = { SnackbarHost(snackbar) },
                     floatingActionButton = {
-                        if (showFab) {
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = showFab && fabShown,
+                            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 2 },
+                            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { it / 2 },
+                        ) {
                             CaptureFab(
                                 state = cameraState,
                                 onStart = {
@@ -205,7 +222,13 @@ class MainActivity : ComponentActivity() {
                     // Lying down, the tabs move to a rail on the side so the screen keeps its height.
                     if (landscape && onTab) {
                         NavigationRail(containerColor = Tone.Surface, modifier = Modifier.fillMaxHeight()) {
-                            Spacer(Modifier.weight(1f))
+                          // Six tabs don't fit the height of a phone lying down: the rail scrolls, so Ajustes
+                          // is never cut off.
+                          androidx.compose.foundation.layout.Column(
+                              Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(vertical = 8.dp),
+                              verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp, androidx.compose.ui.Alignment.CenterVertically),
+                              horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                          ) {
                             tabs.forEach { tab ->
                                 NavigationRailItem(
                                     selected = route == tab.route,
@@ -221,10 +244,10 @@ class MainActivity : ComponentActivity() {
                                     ),
                                 )
                             }
-                            Spacer(Modifier.weight(1f))
+                          }
                         }
                     }
-                    NavHost(nav, startDestination = Tab.Session.route, modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    NavHost(nav, startDestination = Tab.Session.route, modifier = Modifier.weight(1f).fillMaxHeight().nestedScroll(fabScroll)) {
                         composable(Tab.Session.route) {
                             SessionScreen(
                                 app = app,
