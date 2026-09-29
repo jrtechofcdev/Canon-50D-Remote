@@ -22,7 +22,7 @@
 
 Você fotografa pela **Canon EOS 50D** como sempre, com botão, dials e menus funcionando. Cada foto vai para o cartão CF e **uma cópia chega sozinha no celular** pelo cabo USB OTG, salva em RAW, JPG ou nos dois, cada formato na pasta que você escolher.
 
-Sem Wi-Fi, sem FTP, sem internet. Só a USB, só a 50D.
+Sem Wi-Fi, sem FTP, sem internet. Só a USB, só a 50D. (A única parte que usa internet é a Loja de presets, e só para pegar presets novos.)
 
 <table>
   <tr>
@@ -64,6 +64,7 @@ Sem Wi-Fi, sem FTP, sem internet. Só a USB, só a 50D.
 | **Revisão** | Slide automático para a foto nova, zoom para conferir foco, histograma RGB, alerta de estouro piscando, estrelas de 1 a 5 e favoritas. |
 | **Controle da câmera** | ISO, abertura, velocidade, ±EV e balanço de branco lidos da própria 50D. Exposições salvas, bracketing (AEB) e intervalômetro. |
 | **Presets** | Importa presets do Lightroom em DNG, XMP, LRTemplate ou ZIP. Edita e cria do zero num editor com os painéis do Lightroom. A foto aparece já com o preset, como um perfil de cor, e uma cópia JPG editada fica salva ao lado do original. |
+| **Loja de presets** | Aba com os presets grátis da sua API: prévia de cada DNG, prévia na sua foto, **Usar** numa foto da galeria ou no editor, **Salvar** em Meus presets (funciona offline em todo o app) e **Baixar** o DNG e o XMP para a pasta `JR_LR_Presets`. |
 | **Cartão** | Navegar pelas fotos que já estão no CF e baixar só as escolhidas. Reenvio automático do que foi feito com o cabo solto. |
 | **Envio** | Lightroom com um toque, "JPG leve" com marca d'água Jr_Tech_OFC e **WhatsApp direto para o número do cliente**: digita o número e a conversa abre com a foto pronta (preset, recorte e marca d'água) já anexada. |
 | **Cliente** | Modo cliente em tela cheia com zoom (pinça e duplo toque), PIN para sair e resumo ao fim da sessão. O cliente pode receber a foto no WhatsApp dele. O cliente escolhe o preset da foto; o botão Calibrar (com PIN) abre os ajustes daquela foto. |
@@ -102,6 +103,16 @@ O disparador do app funciona como apertar o botão até o fim: com AF ligado, a 
 **Análise local:** os limites de "tremida" vêm de testes com imagens de exemplo. Se o alerta avisar demais ou de menos nas suas fotos, ajuste a sensibilidade em **Ajustes → Revisão**.
 
 **Limites:** o processamento da Adobe é fechado, então a prévia do app é uma aproximação. O `.xmp` exportado dá o resultado exato no Lightroom. Máscaras, remoção de manchas, correção de lente e perfis de câmera da Adobe não são aplicados; o corte também não, porque não faz parte de um preset.
+
+### Loja de presets
+
+1. Abra a aba **Loja**. A lista vem da sua API (endereço em **Ajustes → Presets → Loja de presets**).
+2. Filtre por categoria ou busque pelo nome. Toque num preset para ver a prévia grande; **Na minha foto** mostra ele aplicado numa foto sua (segure para comparar com o original).
+3. **Usar numa foto:** escolha a foto e toque em **Aplicar e ver** ou **No editor**.
+4. **Salvar:** o preset vai para **Meus presets** e funciona sem internet no live view, no modo cliente, no visualizador e nas fotos novas. **Fotos novas** salva e já aplica nas próximas fotos.
+5. **Baixar DNG + XMP:** grava na pasta de presets, dentro de `JR_LR_Presets/JR_LR_Presets_DNG` e `JR_LR_Presets/JR_LR_Presets_XMP`. Se a pasta ainda não foi escolhida, o app pede na hora.
+
+A Loja precisa de internet só para ver e pegar presets novos. Sem sinal, ela mostra a lista salva da última vez.
 
 ### Live view
 

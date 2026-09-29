@@ -2,6 +2,20 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [3.6] · 2026-09-29
+
+- **Loja de presets** (aba nova **Loja**): os presets grátis da sua API, com 1.225 DNGs em 13 categorias.
+  - Cada preset aparece pelo resultado final, a prévia que vem dentro do próprio DNG. Busca por nome e filtro por categoria.
+  - **Na minha foto:** mostra o preset aplicado numa foto sua. Segure para ver o original.
+  - **Usar numa foto:** escolhe uma foto da galeria do app e aplica o preset. Depois abre a foto no visualizador ou no editor.
+  - **Salvar:** o preset entra em **Meus presets**, na categoria dele, e passa a funcionar **sem internet** em todo o app: live view, modo cliente, visualizador, Sessão, cópias editadas.
+  - **Fotos novas:** salva e já aplica nas próximas fotos da câmera.
+  - **Baixar DNG + XMP:** grava na pasta de presets, em `JR_LR_Presets/JR_LR_Presets_DNG` e `JR_LR_Presets/JR_LR_Presets_XMP`. O `.xmp` abre no Lightroom do celular e do PC.
+- **Leve na internet:** para mostrar um preset, o app baixa só o começo do DNG e a prévia (cerca de 100 KB), não o arquivo inteiro. O DNG completo só vem ao tocar em Baixar.
+- **Sem internet**, a Loja mostra a lista salva da última vez; os presets salvos continuam funcionando normalmente.
+- **Ajustes → Presets → Loja de presets:** liga/desliga da aba e o endereço da API. Com isso, dá para apontar para outra API no mesmo formato.
+- Só a Loja usa a internet. A captura e o resto do app continuam 100% offline.
+
 ## [3.5] · 2026-09-29
 
 - **Rotação que funciona sempre:**

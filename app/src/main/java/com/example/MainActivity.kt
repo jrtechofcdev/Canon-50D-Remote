@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material.icons.outlined.Storefront
+import com.example.ui.shop.ShopDetailScreen
+import com.example.ui.shop.ShopScreen
 import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.ui.platform.LocalConfiguration
 import android.content.pm.PackageManager
@@ -122,7 +125,9 @@ class MainActivity : ComponentActivity() {
                 val snackbar = remember { SnackbarHostState() }
                 var gallerySelecting by remember { mutableStateOf(false) }
                 val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-                val onTab = Tab.entries.any { it.route == route }
+                // The Loja tab can be switched off in Ajustes → Presets.
+                val tabs = Tab.entries.filter { it != Tab.Shop || settings.shopEnabled }
+                val onTab = tabs.any { it.route == route }
                 val goTo = { tab: Tab ->
                     nav.navigate(tab.route) {
                         popUpTo(Tab.Session.route) { saveState = true }
@@ -138,7 +143,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 // On every tab except Culling (its own buttons sit there) and the Session once it is capturing.
-                val showFab = Tab.entries.any { it.route == route } && route != Tab.Cull.route &&
+                val showFab = onTab && route != Tab.Cull.route && route != Tab.Shop.route &&
                     !(route == Tab.Session.route && cameraState is ConnectionState.Connected) &&
                     !(route == Tab.Photos.route && gallerySelecting)
 
@@ -175,12 +180,12 @@ class MainActivity : ComponentActivity() {
                     bottomBar = {
                         if (!landscape && onTab) {
                             NavigationBar(containerColor = Tone.Surface) {
-                                Tab.entries.forEach { tab ->
+                                tabs.forEach { tab ->
                                     NavigationBarItem(
                                         selected = route == tab.route,
                                         onClick = { goTo(tab) },
                                         icon = { Icon(tab.icon, contentDescription = null) },
-                                        label = { Text(tab.label) },
+                                        label = { Text(tab.label, maxLines = 1, softWrap = false) },
                                         colors = NavigationBarItemDefaults.colors(
                                             selectedIconColor = Tone.Accent,
                                             selectedTextColor = Tone.Text,
@@ -199,7 +204,7 @@ class MainActivity : ComponentActivity() {
                     if (landscape && onTab) {
                         NavigationRail(containerColor = Tone.Surface, modifier = Modifier.fillMaxHeight()) {
                             Spacer(Modifier.weight(1f))
-                            Tab.entries.forEach { tab ->
+                            tabs.forEach { tab ->
                                 NavigationRailItem(
                                     selected = route == tab.route,
                                     onClick = { goTo(tab) },
@@ -259,6 +264,18 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Tab.Presets.route) {
                             PresetsScreen(app = app, onEdit = { nav.navigate("editor/preset/$it") })
+                        }
+                        composable(Tab.Shop.route) {
+                            ShopScreen(app = app, onOpen = { nav.navigate("shop/$it") })
+                        }
+                        composable("shop/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
+                            ShopDetailScreen(
+                                app = app,
+                                itemId = it.arguments?.getLong("id") ?: 0L,
+                                onBack = { nav.popBackStack() },
+                                onOpenPhoto = { id -> nav.navigate("photo/$id") },
+                                onEditPhoto = { id -> nav.navigate("editor/photo/$id") },
+                            )
                         }
                         composable("editor/preset/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
                             EditorScreen(app, EditTarget.PresetTarget(it.arguments?.getLong("id") ?: 0L), onDone = { nav.popBackStack() })
@@ -340,5 +357,6 @@ enum class Tab(val route: String, val label: String, val icon: ImageVector) {
     Photos("photos", "Fotos", Icons.Outlined.PhotoLibrary),
     Cull("cull", "Culling", Icons.Outlined.Swipe),
     Presets("presets", "Presets", Icons.Outlined.AutoAwesome),
+    Shop("shop", "Loja", Icons.Outlined.Storefront),
     Settings("settings", "Ajustes", Icons.Outlined.Tune),
 }

@@ -23,6 +23,7 @@ import com.example.core.location.LocationTracker
 import com.example.core.backup.SessionBackup
 import com.example.core.analysis.Culler
 import com.example.core.analysis.MlKitFaceAnalyzer
+import com.example.core.shop.PresetShop
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -63,6 +64,8 @@ class TetherApp : Application() {
         private set
     lateinit var appBackup: AppBackup
         private set
+    lateinit var shop: PresetShop
+        private set
 
     // A failure in one of these collectors is written to the log instead of closing the app.
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main + AppLog.handler("APP"))
@@ -96,6 +99,7 @@ class TetherApp : Application() {
         backup = SessionBackup(this, database.photoDao(), store)
         culler = Culler(this, database.photoDao(), settings, MlKitFaceAnalyzer())
         appBackup = AppBackup(settings, presets)
+        shop = PresetShop(this, settings, presets)
 
         appScope.launch {
             settings.settings.distinctUntilChangedBy { it.logEnabled to it.logFolder }.collect { AppLog.configure(it.logEnabled, it.logFolder) }
@@ -169,6 +173,7 @@ class TetherApp : Application() {
         if (level >= TRIM_MEMORY_RUNNING_LOW) {
             AppLog.w("MEM", "Android pediu memória (nível $level) · ${AppLog.memory()}")
             if (::looks.isInitialized) looks.trim()
+            if (::shop.isInitialized) shop.trim()
         }
     }
 

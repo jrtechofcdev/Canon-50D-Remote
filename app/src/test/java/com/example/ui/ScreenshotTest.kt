@@ -335,6 +335,62 @@ class ScreenshotTest {
         save("recorte", androidx.compose.ui.test.hasText("Instagram retrato"))
     }
 
+    /** A small catalogue served from memory, with made-up "finished look" scenes as the DNG previews. */
+    private fun seedShop() {
+        val api = "https://example.test/api/presets.php"
+        val looks = listOf(
+            Triple("Moody", 0xFF1D2426.toInt(), 0xFFD9A066.toInt()), Triple("Wedding", 0xFFE9E1D6.toInt(), 0xFFB9A48C.toInt()),
+            Triple("Cinematic", 0xFF0F2A33.toInt(), 0xFFFF9A4D.toInt()), Triple("Black & White", 0xFF161616.toInt(), 0xFFD8D8D8.toInt()),
+            Triple("Bright & Airy", 0xFFF3EEE6.toInt(), 0xFF9CC7D9.toInt()), Triple("Autumn", 0xFF2A1A10.toInt(), 0xFFE08A3C.toInt()),
+            Triple("Orange & Teal", 0xFF0E3B44.toInt(), 0xFFFFA25A.toInt()), Triple("Portrait", 0xFF3A2A26.toInt(), 0xFFF2C6A8.toInt()),
+        )
+        val files = HashMap<String, ByteArray>()
+        val list = StringBuilder("[")
+        looks.forEachIndexed { i, (category, bg, light) ->
+            val w = if (i % 3 == 0) 1024 else 682
+            val h = if (i % 3 == 0) 682 else 1024
+            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bmp)
+            canvas.drawColor(bg)
+            val rnd = java.util.Random(i * 17L + 3)
+            repeat(18) {
+                val x = rnd.nextFloat() * w
+                val y = rnd.nextFloat() * h
+                val r = 60f + rnd.nextFloat() * 180f
+                val c = ((50 + rnd.nextInt(120)) shl 24) or (light and 0x00FFFFFF)
+                canvas.drawCircle(x, y, r, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    shader = android.graphics.RadialGradient(x, y, r, intArrayOf(c, c and 0x00FFFFFF), null, android.graphics.Shader.TileMode.CLAMP)
+                })
+            }
+            val url = "https://example.test/uploads/$i.dng"
+            files[url] = com.example.core.shop.TestDng.build(com.example.core.shop.TestDng.jpeg(bmp), w, h, com.example.core.shop.TestDng.xmp(exposure = "+0.${i + 1}0"))
+            if (i > 0) list.append(',')
+            list.append("""{"id":${900 + i},"filename":"presets_id_${690 + i}.dng","category":"$category","downloadUrl":"$url"}""")
+        }
+        files[api] = list.append(']').toString().toByteArray()
+        runBlocking { app.settings.set(com.example.core.data.SettingKeys.shopUrl, api) }
+        app.shop.fetcher = com.example.core.shop.TestDng.Server(files)
+    }
+
+    @Test
+    fun shop() {
+        seedShop()
+        rule.setContent { JrLinkTheme { com.example.ui.shop.ShopScreen(app, onOpen = {}) } }
+        save("loja", androidx.compose.ui.test.hasText("Moody 690"))
+    }
+
+    @Test
+    fun shopDetail() {
+        seedShop()
+        seedPhotos()
+        rule.setContent {
+            JrLinkTheme { com.example.ui.shop.ShopDetailScreen(app, 901L, onBack = {}, onOpenPhoto = {}, onEditPhoto = {}) }
+        }
+        save("loja_preset", androidx.compose.ui.test.hasText("Usar numa foto"))
+        rule.onNode(androidx.compose.ui.test.hasText("Na minha foto")).performClick()
+        save("loja_na_minha_foto")
+    }
+
     @Test
     fun liveView() = live("live_view")
 

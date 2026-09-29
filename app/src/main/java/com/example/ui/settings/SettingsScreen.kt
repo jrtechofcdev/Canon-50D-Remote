@@ -134,7 +134,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.TetherApp
 import com.example.core.camera.ConnectionState
+import com.example.core.data.DEFAULT_SHOP_URL
 import com.example.core.data.DownloadMode
+import androidx.compose.material.icons.outlined.Storefront
 import com.example.core.data.Settings
 import com.example.core.data.SettingKeys
 import com.example.core.data.WatermarkSource
@@ -463,6 +465,31 @@ private fun PresetSettingsSection(app: TetherApp, s: Settings) {
             onReset = s.presetsFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.presetsFolder, null) } } },
         )
         InfoText("Cada preset é salvo nela como .xmp. Arquivos .xmp, .dng e .lrtemplate colocados nela entram no app quando ele abre.")
+        InfoText("Baixar, na Loja, grava em JR_LR_Presets/JR_LR_Presets_DNG e JR_LR_Presets/JR_LR_Presets_XMP dentro dela.")
+    }
+
+    SettingsGroup("Loja de presets", Icons.Outlined.Storefront) {
+        ToggleRow(Icons.Outlined.Storefront, "Aba Loja", "Presets grátis da sua API, com prévia, usar, salvar e baixar", s.shopEnabled) {
+            set(SettingKeys.shopEnabled, it)
+        }
+        var url by remember(s.shopUrl) { mutableStateOf(s.shopUrl) }
+        OutlinedTextField(
+            value = url,
+            onValueChange = { url = it.trim() },
+            label = { Text("Endereço da API") },
+            singleLine = true,
+            enabled = s.shopEnabled,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (url != s.shopUrl && url.startsWith("http")) {
+                TextButton(onClick = { scope.launch { app.settings.set(SettingKeys.shopUrl, url); app.shop.refresh() } }) { Text("Salvar endereço") }
+            }
+            if (s.shopUrl != DEFAULT_SHOP_URL) {
+                TextButton(onClick = { scope.launch { app.settings.set(SettingKeys.shopUrl, DEFAULT_SHOP_URL); app.shop.refresh() } }) { Text("Voltar ao padrão") }
+            }
+        }
+        InfoText("Só a Loja usa a internet. Um preset salvo fica no celular e funciona sem sinal em todo o app.")
     }
 
     SettingsGroup("Visualizador e modo cliente", Icons.Outlined.Visibility) {

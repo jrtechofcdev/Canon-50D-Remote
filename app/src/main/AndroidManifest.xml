@@ -6,8 +6,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <!-- Android 14 requires one "connected device" prerequisite permission for the tether service.
-         This one is a normal permission (no prompt); the app does not use the network. -->
+         This one is a normal permission (no prompt). -->
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <!-- Only the Loja tab goes online (the preset catalogue); capture and everything else stay offline. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />

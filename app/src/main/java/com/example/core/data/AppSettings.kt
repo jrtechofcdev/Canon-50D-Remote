@@ -162,6 +162,10 @@ data class Settings(
     val logEnabled: Boolean = true,
     /** SAF folder the log file is copied to; null = only inside the app (share from Diagnóstico). */
     val logFolder: String? = null,
+    /** The "Loja" tab: presets from an online catalogue (the photographer's own API). */
+    val shopEnabled: Boolean = true,
+    /** Address of that catalogue: a JSON list of presets, each with a download link to its DNG. */
+    val shopUrl: String = DEFAULT_SHOP_URL,
 
     // Live view
     val liveViewEnabled: Boolean = true,
@@ -314,6 +318,8 @@ object SettingKeys {
     val shutterFocusFirst = booleanPreferencesKey("shutter_focus_first")
     val logEnabled = booleanPreferencesKey("log_enabled")
     val logFolder = stringPreferencesKey("log_folder")
+    val shopEnabled = booleanPreferencesKey("shop_enabled")
+    val shopUrl = stringPreferencesKey("shop_url")
     val liveViewEnabled = booleanPreferencesKey("live_view_enabled")
     val liveOnCamera = booleanPreferencesKey("live_on_camera")
     val liveGrid = stringPreferencesKey("live_grid")
@@ -492,6 +498,8 @@ class SettingsRepository(private val context: Context) {
             shutterFocusFirst = this[k.shutterFocusFirst] ?: d.shutterFocusFirst,
             logEnabled = this[k.logEnabled] ?: d.logEnabled,
             logFolder = this[k.logFolder],
+            shopEnabled = this[k.shopEnabled] ?: d.shopEnabled,
+            shopUrl = this[k.shopUrl]?.takeIf { it.isNotBlank() } ?: d.shopUrl,
             liveViewEnabled = this[k.liveViewEnabled] ?: d.liveViewEnabled,
             liveOnCamera = this[k.liveOnCamera] ?: d.liveOnCamera,
             liveGrid = this[k.liveGrid] ?: d.liveGrid,
@@ -511,3 +519,5 @@ class SettingsRepository(private val context: Context) {
         )
     }
 }
+
+const val DEFAULT_SHOP_URL = "https://lightroompresets.kasunpremarathna.com/api/presets.php"
