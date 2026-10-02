@@ -109,8 +109,9 @@ fun DeliveryScreen(app: TetherApp, actions: PhotoActions, onBack: () -> Unit, on
     val s = settings ?: return
 
     val now = System.currentTimeMillis()
-    val open = sessions.filter { it.isValid(now) }
-    val closed = sessions.filterNot { it.isValid(now) }
+    // Fotografia Express has its own screen.
+    val open = sessions.filter { it.isValid(now) && !it.express }
+    val closed = sessions.filterNot { it.isValid(now) || it.express }
 
     val askPermissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         if (result.values.all { it }) scope.launch { app.delivery.start() }
@@ -146,7 +147,7 @@ fun DeliveryScreen(app: TetherApp, actions: PhotoActions, onBack: () -> Unit, on
             )
 
             (status as? DeliveryStatus.Running)?.takeIf { !it.test }?.let { r ->
-                Card {
+                DeliveryCard {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         r.wifiQr?.let { QrBlock("① Entrar no Wi-Fi", it, "${r.ssid}\nSenha: ${r.password}") }
                         QrBlock(if (r.wifiQr != null) "② Abrir as fotos" else "Abrir as fotos", r.url(), r.url())
@@ -162,7 +163,7 @@ fun DeliveryScreen(app: TetherApp, actions: PhotoActions, onBack: () -> Unit, on
                 }
             }
 
-            Card {
+            DeliveryCard {
                 Text("Como as fotos chegam", style = MaterialTheme.typography.titleMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ModeChip("Manual", Icons.Outlined.TouchApp, s.deliveryMode != "auto") { scope.launch { app.settings.set(SettingKeys.deliveryMode, "manual") } }
@@ -205,7 +206,7 @@ fun DeliveryScreen(app: TetherApp, actions: PhotoActions, onBack: () -> Unit, on
             val errors = items.count { it.state == DeliveryState.ERROR }
             val waiting = items.count { it.state == DeliveryState.WAITING || it.state == DeliveryState.PREPARING }
             if (errors > 0 || waiting > 0) {
-                Card {
+                DeliveryCard {
                     Text("Fila", style = MaterialTheme.typography.titleMedium)
                     Text(
                         listOfNotNull(
@@ -271,7 +272,7 @@ fun networkLabel(id: String) = when (id) {
 
 @Composable
 private fun Intro(onEnable: () -> Unit) {
-    Card {
+    DeliveryCard {
         Icon(Icons.Outlined.WifiTethering, null, tint = Tone.Accent, modifier = Modifier.size(36.dp))
         Text("Entregue as fotos pelo Wi-Fi", style = MaterialTheme.typography.titleLarge)
         listOf(
@@ -289,7 +290,7 @@ private fun Intro(onEnable: () -> Unit) {
 }
 
 @Composable
-private fun StatusCard(
+internal fun StatusCard(
     status: DeliveryStatus,
     online: Int,
     devices: Int?,
@@ -306,7 +307,7 @@ private fun StatusCard(
         is DeliveryStatus.Failed -> Triple(Tone.Error, "Não ligou", status.reason)
         DeliveryStatus.Off -> Triple(Tone.TextMuted, "Parada", "$network · toque em Iniciar quando for entregar")
     }
-    Card {
+    DeliveryCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(12.dp).clip(CircleShape).background(dot))
             Spacer(Modifier.width(10.dp))
@@ -349,7 +350,7 @@ private fun StatusCard(
 }
 
 @Composable
-private fun Stat(icon: ImageVector, text: String) {
+internal fun Stat(icon: ImageVector, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, tint = Tone.TextMuted, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(6.dp))
@@ -358,7 +359,7 @@ private fun Stat(icon: ImageVector, text: String) {
 }
 
 @Composable
-private fun QrBlock(title: String, qr: String, caption: String) {
+internal fun QrBlock(title: String, qr: String, caption: String) {
     // Two side by side on a phone: the client scans one, then the other, without scrolling.
     Column(Modifier.width(146.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(title, style = MaterialTheme.typography.labelLarge)
@@ -427,7 +428,7 @@ private fun NewClientDialog(onDismiss: () -> Unit, onCreate: (String, String?) -
 }
 
 @Composable
-private fun Card(content: @Composable ColumnScope.() -> Unit) {
+internal fun DeliveryCard(content: @Composable ColumnScope.() -> Unit) {
     Column(
         Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(Tone.Surface).padding(16.dp).animateContentSize(),
         verticalArrangement = Arrangement.spacedBy(10.dp),

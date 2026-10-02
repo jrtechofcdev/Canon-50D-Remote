@@ -2,6 +2,18 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [4.1] · 2026-10-02
+
+- **Código do cliente com 4 números** (antes eram 6). Mais rápido de falar e digitar, e o portal entra sozinho ao completar os 4 números. Os códigos de 6 da 4.0 continuam valendo até expirar. O limite de 5 tentativas erradas por minuto continua.
+- **Fotografia Express**, um módulo novo, com as mesmas funções da Entrega local (Wi-Fi, portal, fila, QR e placa):
+  - **Sem código:** o cliente entra no Wi-Fi, abre o portal e as fotos já aparecem.
+  - **Modo prévia**, ligado no seu celular: o cliente vê as fotos menores, com o seu logo e "PRÉVIA" repetido por cima, e não consegue baixar. A foto sem marca não sai do celular antes de você liberar.
+  - **Liberar depois do pagamento:** marque as fotos pagas e toque em **Liberar**, ou use **Liberar favoritas** (as que o cliente marcou com o coração) e **Liberar todas**. No portal, a foto troca sozinha para a versão limpa, com o aviso "Foto liberada".
+  - **Finalizar e limpar:** encerra o cliente, apaga as cópias da entrega e deixa o portal pronto para o próximo. O nome vai para o histórico, com o número de fotos liberadas.
+  - **Fotos novas entram sozinhas** (padrão) ou são escolhidas na galeria em **Entregar → Fotografia Express**.
+  - **Força da marca da prévia** ajustável em Ajustes → Fotografia Express.
+  - Atalho **Express** na tela inicial.
+
 ## [4.0] · 2026-10-02
 
 **Entrega local:** o celular vira o Wi-Fi e a galeria do cliente. O cliente aponta a câmera para o QR, entra e salva as fotos no próprio celular. Sem internet e sem instalar nada.

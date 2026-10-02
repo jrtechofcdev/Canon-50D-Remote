@@ -1,5 +1,6 @@
 package com.example.core.delivery
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Index
@@ -29,6 +30,8 @@ data class DeliverySession(
     val closedAt: Long? = null,
     /** Last time the portal asked for this session, to show who is online. */
     val lastSeenAt: Long = 0,
+    /** Fotografia Express: no code, everyone on the Wi-Fi sees it; preview until the photographer releases. */
+    @ColumnInfo(defaultValue = "0") val express: Boolean = false,
 ) {
     val isOpen: Boolean get() = closedAt == null
 
@@ -56,6 +59,8 @@ data class DeliveryItem(
     val readyAt: Long? = null,
     /** Hearted by the client in the portal. */
     val picked: Boolean = false,
+    /** Fotografia Express: paid and released by the photographer, so it downloads without the preview mark. */
+    @ColumnInfo(defaultValue = "0") val released: Boolean = false,
 )
 
 /** Item states, in the order an item goes through them. */
@@ -86,6 +91,15 @@ interface DeliveryDao {
 
     @Query("SELECT * FROM delivery_sessions WHERE code = :code AND closedAt IS NULL LIMIT 1")
     suspend fun sessionByCode(code: String): DeliverySession?
+
+    @Query("SELECT * FROM delivery_sessions WHERE express = 1 AND closedAt IS NULL ORDER BY createdAt DESC LIMIT 1")
+    suspend fun openExpress(): DeliverySession?
+
+    @Query("UPDATE delivery_items SET released = :on WHERE id IN (:ids)")
+    suspend fun setReleased(ids: List<Long>, on: Boolean)
+
+    @Query("UPDATE delivery_items SET released = 1 WHERE sessionId = :sessionId")
+    suspend fun releaseAll(sessionId: Long)
 
     @Query("SELECT code FROM delivery_sessions WHERE closedAt IS NULL")
     suspend fun openCodes(): List<String>

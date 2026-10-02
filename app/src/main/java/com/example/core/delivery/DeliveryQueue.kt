@@ -98,6 +98,7 @@ class DeliveryQueue(
             .getOrDefault(false)
         if (ok && target.exists() && target.length() > 0) {
             File(dir, "${item.id}.thumb.jpg").delete()
+            File(dir, "${item.id}.pthumb.jpg").delete()
             dao.setState(item.id, DeliveryState.READY, target.path, target.length(), null, clock())
         } else {
             target.delete()

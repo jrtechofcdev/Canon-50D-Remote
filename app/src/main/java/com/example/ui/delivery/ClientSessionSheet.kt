@@ -90,7 +90,7 @@ fun ClientSessionSheet(app: TetherApp, actions: PhotoActions, session: DeliveryS
                     }
                     Column(Modifier.weight(1f)) {
                         Text("Código", style = MaterialTheme.typography.labelMedium, color = Tone.TextMuted)
-                        Text(session.code.chunked(3).joinToString(" "), fontSize = 34.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 2.sp)
+                        Text(session.code, fontSize = 40.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 6.sp)
                         Text(
                             running?.let { "O cliente aponta a câmera para o QR, ou abre ${it.url()} e digita o código." }
                                 ?: "Inicie a entrega para mostrar o QR.",

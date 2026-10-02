@@ -52,7 +52,7 @@ A captura usa só a USB, sem FTP e sem internet. Na hora de entregar, o celular 
   <tr>
     <td align="center"><img src="docs/images/entrega.png" width="200" alt="Entrega local"><br><sub><b>Entrega local</b><br>Wi-Fi e QR do cliente</sub></td>
     <td align="center"><img src="docs/images/portal_celular.png" width="200" alt="Portal no celular do cliente"><br><sub><b>Portal</b><br>o cliente salva no celular dele</sub></td>
-    <td align="center"><img src="docs/images/portal_codigo.png" width="200" alt="Código do cliente"><br><sub><b>Código</b><br>cada cliente vê só as dele</sub></td>
+    <td align="center"><img src="docs/images/portal_express.png" width="200" alt="Fotografia Express em prévia"><br><sub><b>Express</b><br>prévia até o pagamento</sub></td>
     <td align="center"><img src="docs/images/ajustes.png" width="200" alt="Ajustes por módulo"><br><sub><b>Ajustes</b><br>agrupados por etapa</sub></td>
   </tr>
 </table>
@@ -152,12 +152,25 @@ Toque 7 vezes na marca no fim de **Ajustes**. Aparece **Ajustes → Desenvolvedo
    - **Roteador do celular:** você liga o roteador nas configurações do Android, com o mesmo nome e senha.
    - **Wi-Fi do local:** o celular e os clientes ficam no mesmo Wi-Fi.
 2. Na Sessão, toque em **Entrega** e depois em **Iniciar entrega**. Aparecem dois QR: **① Entrar no Wi-Fi** e **② Abrir as fotos**. Em **Placa para imprimir**, você gera o PNG e o PDF A6 para deixar na mesa.
-3. **Novo cliente:** cada um ganha um código de 6 números e um QR só dele. No modo automático, as fotos novas vão para o **cliente da vez**.
+3. **Novo cliente:** cada um ganha um código de 4 números e um QR só dele. No modo automático, as fotos novas vão para o **cliente da vez**.
 4. **Entregar:** selecione as fotos na galeria (ou use o visualizador) e escolha o cliente. Elas ficam prontas uma por uma na fila.
 5. O cliente salva cada foto (ou todas) e pode marcar favoritas, que aparecem na galeria e no culling.
 6. **Encerrar acesso** invalida o código. **Parar** desliga a rede e o servidor.
 
 Se o celular do cliente avisar que o Wi-Fi não tem internet, ele toca em **Manter conectado**. Antes do primeiro evento, faça o **Teste de entrega local** (modo desenvolvedor) com o seu celular e um iPhone.
+
+### Fotografia Express
+
+<p><img src="docs/images/express.png" width="270" alt="Tela da Fotografia Express"> <img src="docs/images/portal_express.png" width="250" alt="Portal em prévia"></p>
+
+Para fotografar e entregar na hora, um cliente por vez:
+1. Ligue em **Ajustes → Fotografia Express** e abra o atalho **Express** na tela inicial. Toque em **Iniciar entrega**.
+2. O cliente entra no Wi-Fi pelo QR ① e abre as fotos pelo QR ②, **sem código**.
+3. Com o **Modo prévia** ligado, ele vê as fotos com marca d'água e não consegue baixar. Pode marcar as favoritas com o coração.
+4. Depois do pagamento, marque as fotos e toque em **Liberar**, ou em **Liberar favoritas** ou **Liberar todas**. No celular do cliente, elas viram a versão limpa e o botão **Salvar foto** aparece.
+5. **Finalizar e limpar para o próximo cliente** encerra o atendimento, apaga as cópias e deixa o portal vazio para o próximo.
+
+A rede, a senha e o tamanho das fotos são os da Entrega local. O pagamento é com você: o app só guarda a decisão de liberar.
 
 ### Loja de presets
 

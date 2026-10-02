@@ -102,6 +102,7 @@ fun SessionScreen(
     onOpenCull: () -> Unit = {},
     onOpenSection: (com.example.ui.settings.SettingsSection) -> Unit = {},
     onOpenDelivery: () -> Unit = {},
+    onOpenExpress: () -> Unit = {},
 ) {
     var deliverFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
     val deliveryStatus by app.delivery.status.collectAsState()
@@ -215,7 +216,11 @@ fun SessionScreen(
                         is com.example.core.delivery.DeliveryStatus.Running -> if (deliveryOnline > 0) "no ar · $deliveryOnline" else "no ar"
                         else -> null
                     },
-                    onDeliverLatest = if (settings.deliveryEnabled) ({ deliverFor = photos.firstOrNull() }) else null,
+                    onDeliverLatest = if (settings.deliveryEnabled || settings.expressEnabled) ({ deliverFor = photos.firstOrNull() }) else null,
+                    onExpress = onOpenExpress,
+                    expressState = if (settings.expressEnabled && deliveryStatus is com.example.core.delivery.DeliveryStatus.Running) {
+                        if (settings.expressPreview) "no ar · prévia" else "no ar · liberado"
+                    } else null,
                 )
             }
         }

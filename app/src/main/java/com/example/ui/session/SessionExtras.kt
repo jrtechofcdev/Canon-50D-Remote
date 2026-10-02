@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.WifiTethering
+import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -176,6 +177,8 @@ fun ToolsRow(
     onDelivery: (() -> Unit)? = null,
     deliveryState: String? = null,
     onDeliverLatest: (() -> Unit)? = null,
+    onExpress: (() -> Unit)? = null,
+    expressState: String? = null,
 ) {
     val camera = buildList {
         if (settings.liveViewEnabled) add(ToolItem(Icons.Outlined.Videocam, "Live view", enabled = connected, onClick = onLive))
@@ -206,6 +209,7 @@ fun ToolsRow(
     }
     val extras = buildList {
         onDelivery?.let { add(ToolItem(Icons.Outlined.WifiTethering, "Entrega", deliveryState, onClick = it)) }
+        onExpress?.let { add(ToolItem(Icons.Outlined.Collections, "Express", expressState, onClick = it)) }
         if (settings.clientModeEnabled) add(ToolItem(Icons.Outlined.Slideshow, "Modo cliente", onClick = onClient))
         if (settings.toolsEnabled) add(ToolItem(Icons.Outlined.Calculate, "Flash e foco", onClick = onTools))
         add(ToolItem(Icons.Outlined.Bedtime, if (settings.nightMode) "Modo normal" else "Modo noite", onClick = onNight))

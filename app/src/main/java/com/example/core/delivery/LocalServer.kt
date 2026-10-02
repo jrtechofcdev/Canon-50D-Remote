@@ -19,8 +19,14 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-/** What the portal shows besides the photos. */
-data class PortalInfo(val photographer: String, val picks: Boolean)
+/**
+ * What the portal shows besides the photos. [express] = Fotografia Express is on (its gallery opens
+ * without a code); [expressPreview] = its unreleased photos are shown only as marked previews.
+ */
+data class PortalInfo(val photographer: String, val picks: Boolean, val express: Boolean = false, val expressPreview: Boolean = true)
+
+/** A prepared photo's marked preview (Fotografia Express), next to the file itself. */
+fun previewFileOf(path: String): File = File(path.removeSuffix(".jpg") + ".preview.jpg")
 
 /**
  * The small web server of the local delivery. It runs only while the delivery is on and answers just:
@@ -31,7 +37,8 @@ data class PortalInfo(val photographer: String, val picks: Boolean)
 class LocalServer(
     private val dao: DeliveryDao,
     private val portal: (String) -> InputStream?,
-    private val thumb: (DeliveryItem) -> File?,
+    /** Small JPG for the grid; with locked = true it must be made from the marked preview. */
+    private val thumb: (DeliveryItem, Boolean) -> File?,
     private val info: () -> PortalInfo,
     private val onDownloaded: suspend (DeliveryItem) -> Unit = {},
     private val onPick: suspend (DeliveryItem, Boolean) -> Unit = { _, _ -> },
@@ -150,10 +157,12 @@ class LocalServer(
             seg.size == 1 && seg[0] in ASSETS -> asset(out, seg[0], head)
             seg == listOf("api", "ping") -> json(out, 200, """{"ok":true}""")
             seg == listOf("api", "login") -> login(r, out)
+            seg == listOf("api", "express") -> express(out)
             seg.size == 3 && seg[0] == "api" && seg[1] == "s" -> sessionJson(seg[2], out)
             seg.size == 5 && seg[0] == "api" && seg[1] == "s" && seg[3] == "pick" && r.method == "POST" -> pick(seg[2], seg[4], r, out)
             seg.size == 3 && seg[0] == "f" -> file(seg[1], seg[2], r, out, head)
             seg.size == 3 && seg[0] == "t" -> thumbnail(seg[1], seg[2], out, head)
+            seg.size == 3 && seg[0] == "p" -> view(seg[1], seg[2], out, head)
             seg == listOf("teste") && testFile != null -> html(out, TEST_PAGE)
             seg == listOf("teste.jpg") && testFile != null -> serve(out, testFile!!, r.headers["range"], head, "teste.jpg", r.query["dl"] == "1") {}
             else -> text(out, 404, "Não encontrado")
@@ -163,7 +172,8 @@ class LocalServer(
     private fun login(r: Request, out: OutputStream) {
         if (limiter.blocked(r.ip)) return json(out, 429, """{"error":"Muitas tentativas. Espere 1 minuto."}""")
         val code = r.query["code"].orEmpty().filter(Char::isDigit)
-        val session = code.takeIf { it.length == DeliveryRules.CODE_LENGTH }?.let { runBlocking { dao.sessionByCode(it) } }?.takeIf { it.isValid(clock()) }
+        val session = // 6 digits too: codes handed out by 4.0 keep working until they expire.
+        code.takeIf { it.length == DeliveryRules.CODE_LENGTH || it.length == 6 }?.let { runBlocking { dao.sessionByCode(it) } }?.takeIf { it.isValid(clock()) }
         if (session == null) {
             limiter.failed(r.ip)
             AppLog.i("ENTREGA", "Código errado de ${r.ip}")
@@ -172,6 +182,18 @@ class LocalServer(
         limiter.reset(r.ip)
         json(out, 200, """{"token":"${session.token}"}""")
     }
+
+    /** Fotografia Express: the open gallery, no code. Only while the module is on. */
+    private fun express(out: OutputStream) {
+        if (!info().express) return json(out, 404, """{"error":"Sem entrega express agora."}""")
+        val session = runBlocking { dao.openExpress() }?.takeIf { it.isValid(clock()) }
+            ?: return json(out, 404, """{"error":"Sem entrega express agora."}""")
+        json(out, 200, """{"token":"${session.token}"}""")
+    }
+
+    /** An Express photo not released yet while the preview mode is on: only its marked preview leaves the phone. */
+    private fun locked(session: DeliverySession, item: DeliveryItem): Boolean =
+        session.express && info().expressPreview && !item.released
 
     private fun validSession(token: String): DeliverySession? {
         if (!TOKEN.matches(token)) return null
@@ -187,22 +209,26 @@ class LocalServer(
         val ready = items.filter { it.state in DeliveryState.served && it.path?.let { p -> File(p).exists() } == true }
         val waiting = items.count { it.state == DeliveryState.WAITING || it.state == DeliveryState.PREPARING }
         val portalInfo = info()
-        val list = ready.joinToString(",") { """{"id":${it.id},"name":${quote(it.name)},"size":${it.size},"picked":${it.picked}}""" }
+        val list = ready.joinToString(",") {
+            """{"id":${it.id},"name":${quote(it.name)},"size":${it.size},"picked":${it.picked},"locked":${locked(session, it)}}"""
+        }
         json(
             out, 200,
-            """{"client":${quote(session.client)},"event":${session.event},"photographer":${quote(portalInfo.photographer)},""" +
+            """{"client":${quote(session.client)},"event":${session.event},"express":${session.express},""" +
+                """"preview":${session.express && portalInfo.expressPreview},"photographer":${quote(portalInfo.photographer)},""" +
                 """"picks":${portalInfo.picks},"waiting":$waiting,"items":[$list]}""",
         )
     }
 
-    private fun itemOf(token: String, id: String): DeliveryItem? {
+    private fun itemOf(token: String, id: String): Pair<DeliverySession, DeliveryItem>? {
         val session = validSession(token) ?: return null
         val item = id.toLongOrNull()?.let { runBlocking { dao.item(it) } } ?: return null
-        return item.takeIf { it.sessionId == session.id && it.state in DeliveryState.served && it.path != null }
+        return item.takeIf { it.sessionId == session.id && it.state in DeliveryState.served && it.path != null }?.let { session to it }
     }
 
     private fun file(token: String, id: String, r: Request, out: OutputStream, head: Boolean) {
-        val item = itemOf(token, id) ?: return text(out, 404, "Foto não encontrada")
+        val (session, item) = itemOf(token, id) ?: return text(out, 404, "Foto não encontrada")
+        if (locked(session, item)) return json(out, 403, """{"error":"Esta foto é uma prévia. O fotógrafo libera depois do pagamento."}""")
         val f = File(item.path!!)
         if (!f.exists()) return text(out, 404, "Foto não encontrada")
         serve(out, f, r.headers["range"], head, item.name, r.query["dl"] == "1") {
@@ -212,15 +238,25 @@ class LocalServer(
     }
 
     private fun thumbnail(token: String, id: String, out: OutputStream, head: Boolean) {
-        val item = itemOf(token, id) ?: return text(out, 404, "Foto não encontrada")
-        val f = runCatching { thumb(item) }.getOrNull() ?: File(item.path!!)
-        if (!f.exists()) return text(out, 404, "Foto não encontrada")
+        val (session, item) = itemOf(token, id) ?: return text(out, 404, "Foto não encontrada")
+        val lock = locked(session, item)
+        // A locked photo never falls back to the clean file: no preview yet means no picture.
+        val f = runCatching { thumb(item, lock) }.getOrNull() ?: if (lock) previewFileOf(item.path!!) else File(item.path!!)
+        if (!f.exists()) return text(out, 404, "Prévia ainda não está pronta")
+        serve(out, f, null, head, item.name, false) {}
+    }
+
+    /** The big picture in the portal: the clean file, or only the marked preview while the photo is locked. */
+    private fun view(token: String, id: String, out: OutputStream, head: Boolean) {
+        val (session, item) = itemOf(token, id) ?: return text(out, 404, "Foto não encontrada")
+        val f = if (locked(session, item)) previewFileOf(item.path!!) else File(item.path!!)
+        if (!f.exists()) return text(out, 404, "Prévia ainda não está pronta")
         serve(out, f, null, head, item.name, false) {}
     }
 
     private fun pick(token: String, id: String, r: Request, out: OutputStream) {
         if (!info().picks) return json(out, 403, """{"error":"Favoritas desligadas pelo fotógrafo."}""")
-        val item = itemOf(token, id) ?: return json(out, 404, """{"error":"Foto não encontrada"}""")
+        val (_, item) = itemOf(token, id) ?: return json(out, 404, """{"error":"Foto não encontrada"}""")
         val on = r.query["on"] != "0"
         runBlocking {
             dao.setPicked(item.id, on)

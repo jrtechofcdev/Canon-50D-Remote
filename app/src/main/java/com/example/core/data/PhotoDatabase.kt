@@ -228,7 +228,7 @@ interface PresetDao {
 
 @Database(
     entities = [Photo::class, PresetEntity::class, DeliverySession::class, DeliveryItem::class],
-    version = 8,
+    version = 9,
     exportSchema = false,
 )
 abstract class PhotoDatabase : RoomDatabase() {
@@ -240,7 +240,7 @@ abstract class PhotoDatabase : RoomDatabase() {
         /** [name] is only changed by tests, which must not share the file the app itself opens. */
         fun create(context: Context, name: String = "tether50d.db"): PhotoDatabase =
             Room.databaseBuilder(context, PhotoDatabase::class.java, name)
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                 // Version 1 only ever held simulator entries, so dropping it loses nothing real.
                 .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1)
                 .build()
@@ -277,6 +277,14 @@ abstract class PhotoDatabase : RoomDatabase() {
                         "`readyAt` INTEGER, `picked` INTEGER NOT NULL)",
                 )
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_delivery_items_sessionId_photoId` ON `delivery_items` (`sessionId`, `photoId`)")
+            }
+        }
+
+        /** Fotografia Express: the open-to-all session and the photos released after payment. */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE delivery_sessions ADD COLUMN express INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE delivery_items ADD COLUMN released INTEGER NOT NULL DEFAULT 0")
             }
         }
 

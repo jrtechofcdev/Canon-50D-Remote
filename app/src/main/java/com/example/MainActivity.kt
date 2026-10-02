@@ -276,6 +276,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenCull = { goTo(Tab.Cull) },
                                 onOpenSection = { nav.navigate("settings/${it.route}") },
                                 onOpenDelivery = { nav.navigate("delivery") },
+                                onOpenExpress = { nav.navigate("express") },
                             )
                         }
                         composable(Tab.Cull.route) { CullScreen(app, onBack = null, onOpenPhoto = { nav.navigate("photo/$it") }) }
@@ -286,6 +287,14 @@ class MainActivity : ComponentActivity() {
                                 actions = actions,
                                 onBack = { nav.popBackStack() },
                                 onSettings = { nav.navigate("settings/${SettingsSection.Delivery.route}") },
+                            )
+                        }
+                        composable("express") {
+                            com.example.ui.delivery.ExpressScreen(
+                                app = app,
+                                onBack = { nav.popBackStack() },
+                                onSettings = { nav.navigate("settings/${SettingsSection.Express.route}") },
+                                onOpenGallery = { goTo(Tab.Photos) },
                             )
                         }
                         composable("tools") { ToolsScreen(onBack = { nav.popBackStack() }) }

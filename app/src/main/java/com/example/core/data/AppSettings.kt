@@ -218,6 +218,15 @@ data class Settings(
     /** Name at the top of the portal and on the printed plate. */
     val deliveryPhotographer: String = "Jr_Tech_OFC",
 
+    // Fotografia Express: the same delivery, one client at a time, no code, preview until paid.
+    val expressEnabled: Boolean = false,
+    /** The client sees only marked previews and downloads nothing until the photographer releases. */
+    val expressPreview: Boolean = true,
+    /** Every new photo goes straight to the Express client. */
+    val expressAuto: Boolean = true,
+    /** Strength of the preview mark, 20..80 %. */
+    val expressMarkOpacity: Int = 45,
+
     // Live view
     val liveViewEnabled: Boolean = true,
     /** Keep the picture on the camera's screen too (uses more battery). */
@@ -397,6 +406,10 @@ object SettingKeys {
     val deliveryFolder = stringPreferencesKey("delivery_folder")
     val deliveryActiveSession = longPreferencesKey("delivery_active_session")
     val deliveryPhotographer = stringPreferencesKey("delivery_photographer")
+    val expressEnabled = booleanPreferencesKey("express_enabled")
+    val expressPreview = booleanPreferencesKey("express_preview")
+    val expressAuto = booleanPreferencesKey("express_auto")
+    val expressMarkOpacity = intPreferencesKey("express_mark_opacity")
     val liveViewEnabled = booleanPreferencesKey("live_view_enabled")
     val liveOnCamera = booleanPreferencesKey("live_on_camera")
     val liveGrid = stringPreferencesKey("live_grid")
@@ -603,6 +616,10 @@ class SettingsRepository(private val context: Context) {
             deliveryFolder = this[k.deliveryFolder],
             deliveryActiveSession = this[k.deliveryActiveSession] ?: d.deliveryActiveSession,
             deliveryPhotographer = this[k.deliveryPhotographer]?.takeIf { it.isNotBlank() } ?: d.deliveryPhotographer,
+            expressEnabled = this[k.expressEnabled] ?: d.expressEnabled,
+            expressPreview = this[k.expressPreview] ?: d.expressPreview,
+            expressAuto = this[k.expressAuto] ?: d.expressAuto,
+            expressMarkOpacity = this[k.expressMarkOpacity] ?: d.expressMarkOpacity,
             liveViewEnabled = this[k.liveViewEnabled] ?: d.liveViewEnabled,
             liveOnCamera = this[k.liveOnCamera] ?: d.liveOnCamera,
             liveGrid = this[k.liveGrid] ?: d.liveGrid,

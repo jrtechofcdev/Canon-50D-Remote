@@ -30,7 +30,8 @@ object PlateExport {
     private const val MUTED = 0xFF5C5C5C.toInt()
     private const val MINT = 0xFF00C987.toInt()
 
-    data class Plate(val ssid: String?, val password: String?, val url: String, val photographer: String)
+    /** [express]: Fotografia Express, no code; step 3 is choosing and paying. */
+    data class Plate(val ssid: String?, val password: String?, val url: String, val photographer: String, val express: Boolean = false)
 
     fun render(context: Context, plate: Plate): Bitmap {
         val bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
@@ -74,10 +75,11 @@ object PlateExport {
         if (plate.ssid != null && plate.password != null) {
             step("1", "Entre no Wi-Fi", "Aponte a câmera do celular para o código.\nRede: ${plate.ssid}\nSenha: ${plate.password}", com.example.core.delivery.DeliveryRules.wifiQr(plate.ssid, plate.password))
             step("2", "Abra as fotos", "Aponte a câmera para o código ou digite no navegador:\n${plate.url}", plate.url)
-            step("3", "Digite seu código", "O fotógrafo te passa um código de 6 números. Toque em Salvar foto.", null)
+            if (plate.express) step("3", "Escolha e pague", "As fotos aparecem em prévia. Depois do pagamento, o fotógrafo libera e você salva sem marca.", null)
+            else step("3", "Digite seu código", "O fotógrafo te passa um código de 4 números. Toque em Salvar foto.", null)
         } else {
             step("1", "Abra as fotos", "Conectado no Wi-Fi do local, aponte a câmera para o código ou digite:\n${plate.url}", plate.url)
-            step("2", "Digite seu código", "O fotógrafo te passa um código de 6 números. Toque em Salvar foto.", null)
+            step("2", "Digite seu código", "O fotógrafo te passa um código de 4 números. Toque em Salvar foto.", null)
         }
 
         text(canvas, "Se o celular avisar que o Wi-Fi não tem internet, toque em Manter conectado.", regular, 30f, MUTED, HEIGHT - 190f, center = true)

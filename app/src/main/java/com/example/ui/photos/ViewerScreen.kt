@@ -277,7 +277,7 @@ fun ViewerScreen(
                         icon = { LightroomMark() },
                     ) { scope.launch { actions.openInLightroom(listOf(current), it, settings) } }
                     ActionTile(Icons.AutoMirrored.Outlined.Send, "WhatsApp", accent = true) { whatsFor = current }
-                    if (settings.deliveryEnabled) ActionTile(Icons.Outlined.WifiTethering, "Entregar") { deliverFor = current }
+                    if (settings.deliveryEnabled || settings.expressEnabled) ActionTile(Icons.Outlined.WifiTethering, "Entregar") { deliverFor = current }
                     SetMenuTile(
                         label = "Enviar",
                         sets = actions.availableSets(current, settings),

@@ -16,9 +16,9 @@
 
 <main id="login" class="panel" hidden>
   <h1>Suas fotos estão aqui</h1>
-  <p class="muted">Digite o código de 6 números que o fotógrafo te passou.</p>
+  <p class="muted">Digite o código de 4 números que o fotógrafo te passou.</p>
   <form id="codeForm" autocomplete="off">
-    <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="000000" aria-label="Código">
+    <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="0000" aria-label="Código">
     <button class="primary" type="submit">Ver minhas fotos</button>
   </form>
   <p id="loginError" class="error" role="alert"></p>
@@ -30,6 +30,8 @@
     <h1 id="hello"></h1>
     <p id="count" class="muted"></p>
   </section>
+
+  <p id="previewNote" class="preview-note" hidden>Fotos em prévia, com marca d'água. Marque as favoritas com o coração e fale com o fotógrafo: depois do pagamento elas ficam liberadas aqui, sem marca.</p>
 
   <section id="hero" class="hero" hidden>
     <p class="tag" id="heroTag">Sua foto está pronta!</p>

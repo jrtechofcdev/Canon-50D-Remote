@@ -32,6 +32,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.WifiTethering
+import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Style
@@ -193,6 +194,7 @@ enum class SettingsSection(val route: String, val title: String, val summary: St
     Camera("camera", "Câmera", "Bateria, cartão, exposições salvas, bracketing", Icons.Outlined.CameraAlt, SettingsModule.Camera),
     Share("share", "Envio e cliente", "WhatsApp, marca d'água, modo cliente", Icons.Outlined.Send, SettingsModule.Delivery),
     Delivery("delivery", "Entrega local", "Wi-Fi do fotógrafo, portal, códigos e QR", Icons.Outlined.WifiTethering, SettingsModule.Delivery),
+    Express("express", "Fotografia Express", "Sem código, prévia com marca e liberar após o pagamento", Icons.Outlined.Collections, SettingsModule.Delivery),
     Presets("presets", "Presets", "Look das fotos novas, cópia editada, pastas", Icons.Outlined.Style, SettingsModule.Editing),
     Messages("messages", "Mensagens", "Textos prontos para o WhatsApp do cliente", Icons.AutoMirrored.Outlined.Chat, SettingsModule.Delivery),
     Alerts("alerts", "Alertas", "Vibração, desconexão, reenvio, resumo", Icons.Outlined.NotificationsActive, SettingsModule.System),
@@ -297,6 +299,7 @@ fun SettingsSectionScreen(app: TetherApp, section: SettingsSection, onBack: () -
             SettingsSection.Diagnostics -> DiagnosticsSettings(app, settings)
             SettingsSection.Developer -> DeveloperSettings(app, settings)
             SettingsSection.Delivery -> DeliverySettings(app, settings)
+            SettingsSection.Express -> ExpressSettings(app, settings)
         }
         Spacer(Modifier.height(88.dp))
     }

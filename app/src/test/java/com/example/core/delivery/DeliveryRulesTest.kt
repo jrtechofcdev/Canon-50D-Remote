@@ -16,7 +16,7 @@ class DeliveryRulesTest {
         assertTrue(tokens.all { Regex("[0-9a-f]{32}").matches(it) })
         val taken = (1..50).map { DeliveryRules.newCode(emptyList()) }
         val code = DeliveryRules.newCode(taken)
-        assertEquals(6, code.length)
+        assertEquals(4, code.length)
         assertFalse(code in taken)
         assertTrue(DeliveryRules.passwordOk(DeliveryRules.newPassword()))
     }

@@ -9,7 +9,8 @@ object DeliveryRules {
     const val PORT = 8080
     /** The phone's address in a Wi-Fi Direct group it owns; Android always uses this one. */
     const val DIRECT_HOST = "192.168.49.1"
-    const val CODE_LENGTH = 6
+    /** 4 digits: quick to say and type. 5 wrong tries a minute per phone keep guessing slow. */
+    const val CODE_LENGTH = 4
     /** Clients seen by the portal in this window count as connected. */
     const val ONLINE_MS = 2 * 60_000L
 
@@ -18,7 +19,7 @@ object DeliveryRules {
     /** 128-bit random token, as 32 hex characters; it goes in the client's QR code. */
     fun newToken(): String = ByteArray(16).also(random::nextBytes).joinToString("") { "%02x".format(it) }
 
-    /** 6 digits, different from every open session's code. */
+    /** [CODE_LENGTH] digits, different from every open session's code. */
     fun newCode(taken: Collection<String>): String {
         while (true) {
             val code = (0 until CODE_LENGTH).joinToString("") { random.nextInt(10).toString() }

@@ -108,7 +108,9 @@ class LocalDelivery(
     fun init() {
         queue.start(scope)
         scope.launch {
-            settings.settings.collect { portalInfo = PortalInfo(it.deliveryPhotographer, it.deliveryPicks) }
+            settings.settings.collect {
+                portalInfo = PortalInfo(it.deliveryPhotographer, it.deliveryPicks, express = it.expressEnabled, expressPreview = it.expressPreview)
+            }
         }
         scope.launch {
             events.events.collect { event ->
@@ -241,11 +243,66 @@ class LocalDelivery(
 
     suspend fun removeItem(item: DeliveryItem) {
         dao.deleteItem(item.id)
-        item.path?.let { withContext(Dispatchers.IO) { File(it).delete(); File(it.removeSuffix(".jpg") + ".thumb.jpg").delete() } }
+        item.path?.let { path ->
+            withContext(Dispatchers.IO) {
+                listOf(".jpg", ".thumb.jpg", ".pthumb.jpg", ".preview.jpg").forEach { File(path.removeSuffix(".jpg") + it).delete() }
+            }
+        }
     }
+
+    // ---- Fotografia Express ------------------------------------------------------------------
+
+    /** The client of the moment in Fotografia Express: the open one, or a new one. */
+    suspend fun expressSession(name: String? = null): DeliverySession = expressLock.withLock {
+        dao.openExpress()?.takeIf { it.isValid(System.currentTimeMillis()) } ?: run {
+            val s = settings.current()
+            val now = System.currentTimeMillis()
+            val session = DeliverySession(
+                client = name?.trim()?.takeIf { it.isNotEmpty() }?.take(40) ?: "Express",
+                code = DeliveryRules.newCode(dao.openCodes()),
+                token = DeliveryRules.newToken(),
+                createdAt = now,
+                expiresAt = DeliveryRules.expiresAt(now, s.deliveryValidityHours),
+                express = true,
+            )
+            session.copy(id = dao.insertSession(session)).also { AppLog.i("EXPRESS", "Cliente novo") }
+        }
+    }
+
+    /** Photos paid: they download clean from now on. */
+    suspend fun release(itemIds: List<Long>, on: Boolean = true) {
+        if (itemIds.isNotEmpty()) dao.setReleased(itemIds, on)
+        AppLog.i("EXPRESS", "${itemIds.size} foto(s) ${if (on) "liberadas" else "bloqueadas de novo"}")
+    }
+
+    suspend fun releaseAll() {
+        dao.openExpress()?.let { dao.releaseAll(it.id) }
+        AppLog.i("EXPRESS", "Todas liberadas")
+    }
+
+    /**
+     * Ends the Express client: their link stops working, the files are deleted and an empty session is
+     * ready for the next one. The history (how many photos, how many released) stays. [name] labels it.
+     */
+    suspend fun finishExpress(name: String? = null) {
+        dao.openExpress()?.let { old ->
+            name?.trim()?.takeIf { it.isNotEmpty() }?.let { dao.updateSession(old.copy(client = it.take(40))) }
+            dao.closeSession(old.id, System.currentTimeMillis())
+            withContext(Dispatchers.IO) { queue.clearFiles(old) }
+        }
+        expressSession()
+        AppLog.i("EXPRESS", "Entrega limpa: pronta para o próximo cliente")
+    }
+
+    private val expressLock = Mutex()
 
     private suspend fun autoSend(photoId: Long) {
         val s = settings.current()
+        // Fotografia Express comes first, so one photo never goes to two places.
+        if (s.expressEnabled && s.expressAuto) {
+            queue.enqueue(expressSession().id, listOf(photoId))
+            return
+        }
         if (!s.deliveryEnabled || s.deliveryMode != "auto") return
         val now = System.currentTimeMillis()
         val active = s.deliveryActiveSession.takeIf { it > 0 }?.let { dao.session(it) }
@@ -288,6 +345,7 @@ class LocalDelivery(
                 made.delete()
             }
         }
+        if (session.express) makePreview(target, s.deliveryPhotographer, s.expressMarkOpacity, s)
         s.deliveryFolder?.let { folder ->
             runCatching { MirrorCopy(context).copy(Uri.fromFile(target).toString(), folder, listOf(session.client), DeliveryRules.itemName(session.client, photo.savedBase)) }
                 .onFailure { AppLog.w("ENTREGA", "Cópia em 07 Entregas falhou", it) }
@@ -309,11 +367,22 @@ class LocalDelivery(
         }
     }.getOrNull()
 
-    /** A small JPG for the portal grid, made once next to the file. */
-    private fun thumbFor(item: DeliveryItem): File? {
+    /** The marked, smaller copy that is all an unreleased Express photo shows. */
+    private fun makePreview(target: File, photographer: String, opacity: Int, s: com.example.core.data.Settings) {
+        val bitmap = BitmapLoader.load(context, Uri.fromFile(target), ExpressPreview.EDGE) ?: return
+        val marked = bitmap.copy(Bitmap.Config.ARGB_8888, true).also { if (it !== bitmap) bitmap.recycle() }
+        val logo = export.loadLogo(s)
+        ExpressPreview.mark(marked, logo, photographer, opacity)
+        logo?.recycle()
+        previewFileOf(target.path).outputStream().use { marked.compress(Bitmap.CompressFormat.JPEG, 80, it) }
+        marked.recycle()
+    }
+
+    /** A small JPG for the portal grid, made once next to the file (from the marked preview when [locked]). */
+    private fun thumbFor(item: DeliveryItem, locked: Boolean): File? {
         val path = item.path ?: return null
-        val file = File(path)
-        val thumb = File(file.parentFile, "${item.id}.thumb.jpg")
+        val file = if (locked) previewFileOf(path).takeIf { it.exists() } ?: return null else File(path)
+        val thumb = File(file.parentFile, "${item.id}.${if (locked) "pthumb" else "thumb"}.jpg")
         if (thumb.exists()) return thumb
         synchronized(this) {
             if (thumb.exists()) return thumb

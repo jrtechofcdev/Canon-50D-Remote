@@ -521,6 +521,36 @@ class ScreenshotTest {
     }
 
     @Test
+    fun express() {
+        seedPhotos()
+        runBlocking {
+            app.settings.set(com.example.core.data.SettingKeys.expressEnabled, true)
+            app.settings.set(com.example.core.data.SettingKeys.deliveryPassword, "jrfotos2026")
+            val session = app.delivery.expressSession()
+            val dao = app.database.deliveryDao()
+            val photos = app.database.photoDao().inSession("Geral").take(6)
+            // The tiles show the prepared file: the gallery photos stand in for it.
+            photos.forEachIndexed { i, p ->
+                val id = dao.insertItem(com.example.core.delivery.DeliveryItem(sessionId = session.id, photoId = p.id, name = "${p.savedBase}.jpg", queuedAt = i.toLong(), picked = i == 1 || i == 4))
+                val path = android.net.Uri.parse(p.displayUri).path
+                dao.setState(id, com.example.core.delivery.DeliveryState.READY, path, 2_000_000L, null, 1)
+                if (i < 2) dao.setReleased(listOf(id), true)
+            }
+        }
+        app.delivery.showStatusForPreview(running())
+        rule.setContent { JrLinkTheme { com.example.ui.delivery.ExpressScreen(app, onBack = {}, onSettings = {}, onOpenGallery = {}) } }
+        save("express", androidx.compose.ui.test.hasText("Liberar todas"))
+        app.delivery.showStatusForPreview(com.example.core.delivery.DeliveryStatus.Off)
+    }
+
+    @Test
+    fun settingsExpress() {
+        runBlocking { app.settings.set(com.example.core.data.SettingKeys.expressEnabled, true) }
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Express, onBack = {}) } }
+        save("ajustes_express", androidx.compose.ui.test.hasText("Modo prévia"))
+    }
+
+    @Test
     fun liveView() = live("live_view")
 
     @Test

@@ -38,7 +38,7 @@ class LocalServerTest {
         server = LocalServer(
             dao = db.deliveryDao(),
             portal = { name -> if (name == "index.html") "<html>portal</html>".byteInputStream() else null },
-            thumb = { null },
+            thumb = { _, _ -> null },
             info = { PortalInfo("Jr_Tech_OFC", true) },
             onPick = { item, on -> picks += item.photoId to on },
         )
@@ -68,8 +68,9 @@ class LocalServerTest {
     private fun twoClients(): Triple<DeliverySession, DeliverySession, ByteArray> = runBlocking {
         val dao = db.deliveryDao()
         val photos = db.photoDao()
-        val a = DeliverySession(client = "Ana", code = "111222", token = "a".repeat(32), createdAt = 1)
-        val b = DeliverySession(client = "Bia", code = "333444", token = "b".repeat(32), createdAt = 1)
+        val a = DeliverySession(client = "Ana", code = "1122", token = "a".repeat(32), createdAt = 1)
+        val b = DeliverySession(client = "Bia", // A code handed out by 4.0 (6 digits) still opens.
+        code = "333444", token = "b".repeat(32), createdAt = 1)
         val aId = dao.insertSession(a)
         val bId = dao.insertSession(b)
         val bytes = ByteArray(10_000) { (it % 251).toByte() }
@@ -104,11 +105,12 @@ class LocalServerTest {
     @Test
     fun loginByCodeAndBlockAfterFiveWrongTries() {
         val (a, _, _) = twoClients()
-        val ok = call("/api/login?code=111222")
+        val ok = call("/api/login?code=1122")
         assertEquals(200, ok.status)
         assertTrue(ok.text.contains(a.token))
-        repeat(5) { assertEquals(401, call("/api/login?code=999999").status) }
-        assertEquals(429, call("/api/login?code=111222").status)
+        assertEquals(200, call("/api/login?code=333444").status)
+        repeat(5) { assertEquals(401, call("/api/login?code=9999").status) }
+        assertEquals(429, call("/api/login?code=1122").status)
     }
 
     @Test
@@ -116,7 +118,7 @@ class LocalServerTest {
         val (a, _, _) = twoClients()
         runBlocking { db.deliveryDao().closeSession(a.id, 5) }
         assertEquals(404, call("/api/s/${a.token}").status)
-        assertEquals(401, call("/api/login?code=111222").status)
+        assertEquals(401, call("/api/login?code=1122").status)
     }
 
     @Test
