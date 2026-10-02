@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.WifiTethering
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -172,6 +173,9 @@ fun ToolsRow(
     onFolders: () -> Unit = {},
     onMessages: () -> Unit = {},
     onLog: () -> Unit = {},
+    onDelivery: (() -> Unit)? = null,
+    deliveryState: String? = null,
+    onDeliverLatest: (() -> Unit)? = null,
 ) {
     val camera = buildList {
         if (settings.liveViewEnabled) add(ToolItem(Icons.Outlined.Videocam, "Live view", enabled = connected, onClick = onLive))
@@ -194,12 +198,14 @@ fun ToolsRow(
         add(ToolItem(Icons.AutoMirrored.Outlined.Send, "WhatsApp", enabled = hasLatest, onClick = onWhatsAppLatest))
         add(ToolItem(Icons.Outlined.PhotoLibrary, "Lightroom", enabled = hasLatest, mark = @Composable { com.example.ui.photos.LightroomMark() }, onClick = onLightroomLatest))
         if (settings.notesEnabled) add(ToolItem(Icons.Outlined.EditNote, "Nota", enabled = hasLatest, onClick = onNoteLatest))
+        onDeliverLatest?.let { add(ToolItem(Icons.Outlined.WifiTethering, "Entregar", enabled = hasLatest, onClick = it)) }
     }
     val looks = buildList {
         onShop?.let { add(ToolItem(Icons.Outlined.Storefront, "Loja", onClick = it)) }
         add(ToolItem(Icons.Outlined.Style, "Presets", onClick = onPresetsTab))
     }
     val extras = buildList {
+        onDelivery?.let { add(ToolItem(Icons.Outlined.WifiTethering, "Entrega", deliveryState, onClick = it)) }
         if (settings.clientModeEnabled) add(ToolItem(Icons.Outlined.Slideshow, "Modo cliente", onClick = onClient))
         if (settings.toolsEnabled) add(ToolItem(Icons.Outlined.Calculate, "Flash e foco", onClick = onTools))
         add(ToolItem(Icons.Outlined.Bedtime, if (settings.nightMode) "Modo normal" else "Modo noite", onClick = onNight))

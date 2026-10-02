@@ -189,6 +189,35 @@ data class Settings(
     /** "auto" or "cpu": which engine renders the presets (cpu to compare when the GPU looks wrong). */
     val devRender: String = "auto",
 
+    // Entrega local: the phone serves the photos on its own Wi-Fi, the client saves them on theirs.
+    /** Off by default: with it off nothing starts and no new permission is asked. */
+    val deliveryEnabled: Boolean = false,
+    /** "direct" (Wi-Fi Direct group made by the app), "hotspot" (the phone's own router) or "wifi" (the venue's Wi-Fi). */
+    val deliveryNetwork: String = "direct",
+    /** Wi-Fi Direct name; Android requires it to start with DIRECT- and two characters. */
+    val deliverySsid: String = "DIRECT-JR-Fotos",
+    /** Blank = one is made the first time the delivery starts, then kept so printed plates keep working. */
+    val deliveryPassword: String = "",
+    /** "manual" (the photographer sends) or "auto" (each new photo goes to the active client). */
+    val deliveryMode: String = "manual",
+    /** "light" (resized JPG), "edited" (full size with the look) or "original" (the camera JPG). */
+    val deliverySize: String = "light",
+    val deliveryWatermark: Boolean = true,
+    /** Auto mode sends to one open gallery that anyone with the event code sees. */
+    val deliveryEventGallery: Boolean = false,
+    /** Client sessions close by themselves after this many hours (0 = only when the photographer closes them). */
+    val deliveryValidityHours: Int = 24,
+    /** Delete the prepared files when the delivery stops; the history stays. */
+    val deliveryClearOnStop: Boolean = false,
+    /** Clients can heart photos in the portal; they arrive as client picks. */
+    val deliveryPicks: Boolean = true,
+    /** Copies of what was delivered go to <folder>/<client>/. */
+    val deliveryFolder: String? = null,
+    /** The client session that auto mode sends to (0 = none). */
+    val deliveryActiveSession: Long = 0L,
+    /** Name at the top of the portal and on the printed plate. */
+    val deliveryPhotographer: String = "Jr_Tech_OFC",
+
     // Live view
     val liveViewEnabled: Boolean = true,
     /** Keep the picture on the camera's screen too (uses more battery). */
@@ -354,6 +383,20 @@ object SettingKeys {
     val developerMode = booleanPreferencesKey("developer_mode")
     val devVerboseLog = booleanPreferencesKey("dev_verbose_log")
     val devRender = stringPreferencesKey("dev_render")
+    val deliveryEnabled = booleanPreferencesKey("delivery_enabled")
+    val deliveryNetwork = stringPreferencesKey("delivery_network")
+    val deliverySsid = stringPreferencesKey("delivery_ssid")
+    val deliveryPassword = stringPreferencesKey("delivery_password")
+    val deliveryMode = stringPreferencesKey("delivery_mode")
+    val deliverySize = stringPreferencesKey("delivery_size")
+    val deliveryWatermark = booleanPreferencesKey("delivery_watermark")
+    val deliveryEventGallery = booleanPreferencesKey("delivery_event_gallery")
+    val deliveryValidityHours = intPreferencesKey("delivery_validity_hours")
+    val deliveryClearOnStop = booleanPreferencesKey("delivery_clear_on_stop")
+    val deliveryPicks = booleanPreferencesKey("delivery_picks")
+    val deliveryFolder = stringPreferencesKey("delivery_folder")
+    val deliveryActiveSession = longPreferencesKey("delivery_active_session")
+    val deliveryPhotographer = stringPreferencesKey("delivery_photographer")
     val liveViewEnabled = booleanPreferencesKey("live_view_enabled")
     val liveOnCamera = booleanPreferencesKey("live_on_camera")
     val liveGrid = stringPreferencesKey("live_grid")
@@ -546,6 +589,20 @@ class SettingsRepository(private val context: Context) {
             developerMode = this[k.developerMode] ?: d.developerMode,
             devVerboseLog = this[k.devVerboseLog] ?: d.devVerboseLog,
             devRender = this[k.devRender] ?: d.devRender,
+            deliveryEnabled = this[k.deliveryEnabled] ?: d.deliveryEnabled,
+            deliveryNetwork = this[k.deliveryNetwork] ?: d.deliveryNetwork,
+            deliverySsid = this[k.deliverySsid]?.takeIf { it.isNotBlank() } ?: d.deliverySsid,
+            deliveryPassword = this[k.deliveryPassword] ?: d.deliveryPassword,
+            deliveryMode = this[k.deliveryMode] ?: d.deliveryMode,
+            deliverySize = this[k.deliverySize] ?: d.deliverySize,
+            deliveryWatermark = this[k.deliveryWatermark] ?: d.deliveryWatermark,
+            deliveryEventGallery = this[k.deliveryEventGallery] ?: d.deliveryEventGallery,
+            deliveryValidityHours = this[k.deliveryValidityHours] ?: d.deliveryValidityHours,
+            deliveryClearOnStop = this[k.deliveryClearOnStop] ?: d.deliveryClearOnStop,
+            deliveryPicks = this[k.deliveryPicks] ?: d.deliveryPicks,
+            deliveryFolder = this[k.deliveryFolder],
+            deliveryActiveSession = this[k.deliveryActiveSession] ?: d.deliveryActiveSession,
+            deliveryPhotographer = this[k.deliveryPhotographer]?.takeIf { it.isNotBlank() } ?: d.deliveryPhotographer,
             liveViewEnabled = this[k.liveViewEnabled] ?: d.liveViewEnabled,
             liveOnCamera = this[k.liveOnCamera] ?: d.liveOnCamera,
             liveGrid = this[k.liveGrid] ?: d.liveGrid,

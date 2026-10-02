@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.WifiTethering
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
@@ -108,6 +109,7 @@ fun PhotosScreen(
     onOpenPhoto: (Long) -> Unit,
     onSelectingChange: (Boolean) -> Unit = {},
     onCrop: (Long) -> Unit = {},
+    onOpenDelivery: () -> Unit = {},
 ) {
     val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = emptyList())
     val settings by app.settings.settings.collectAsState(initial = Settings())
@@ -257,6 +259,7 @@ fun PhotosScreen(
                 onNote = { sheet = "note" },
                 onMessage = { sheet = "message" },
                 onWhatsApp = { sheet = "whatsapp" },
+                onDeliver = { sheet = "deliver" },
                 onCrop = { sheet = "crop" },
                 onDelete = { sheet = "delete" },
                 onShare = { set -> scope.launch { actions.share(selection, set, settings) } },
@@ -284,6 +287,11 @@ fun PhotosScreen(
             sheet = null
             runBatch(if (ratio == null) "Removendo recorte" else "Recortando ${ratio.label}", selection) { app.looks.quickCrop(it, ratio) }
         }
+        "deliver" -> com.example.ui.delivery.DeliverSheet(
+            app, selection.map { it.id },
+            onDismiss = { sheet = null; selected.clear() },
+            onOpenDelivery = onOpenDelivery,
+        )
         "whatsapp" -> WhatsAppSheet(app, actions, settings, selection, onDismiss = { sheet = null; selected.clear() })
         "delete" -> AlertDialog(
             onDismissRequest = { sheet = null },
@@ -340,6 +348,7 @@ private fun BatchBar(
     onNote: () -> Unit,
     onMessage: () -> Unit,
     onWhatsApp: () -> Unit,
+    onDeliver: () -> Unit,
     onCrop: () -> Unit,
     onDelete: () -> Unit,
     onShare: (ShareSet) -> Unit,
@@ -353,6 +362,7 @@ private fun BatchBar(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         BarAction(Icons.AutoMirrored.Outlined.Send, "WhatsApp", onWhatsApp)
+        BarAction(Icons.Outlined.WifiTethering, "Entregar", onDeliver)
         BarAction(Icons.Outlined.Style, "Preset", onPreset)
         BarAction(Icons.Outlined.Crop, "Recorte", onCrop)
         BarMenu(Icons.Outlined.Share, "Enviar", sets, onShare)

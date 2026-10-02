@@ -18,6 +18,7 @@ import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Photo
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Usb
+import androidx.compose.material.icons.outlined.WifiTethering
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -102,6 +103,8 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
         }
     }
 
+    DeliveryTest(app, s)
+
     SettingsGroup("Processamento", Icons.Outlined.Memory) {
         ToggleRow(Icons.Outlined.Memory, "Processar presets só pela CPU", "Para comparar com a GPU quando alguma cor parecer errada (mais lento)", s.devRender == "cpu") {
             scope.launch { app.settings.set(SettingKeys.devRender, if (it) "cpu" else "auto"); app.looks.trim() }
@@ -168,4 +171,65 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
 @Composable
 private fun DevButton(text: String, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
     OutlinedButton(onClick = onClick, enabled = enabled, modifier = modifier.heightIn(min = 48.dp)) { Text(text, color = if (enabled) Tone.Text else Tone.TextMuted) }
+}
+
+/**
+ * Fase 0 of the local delivery: proves on the real phone what only it can answer. Makes the
+ * DIRECT-JR-Teste network, serves a page with one photo at /teste and logs each connection.
+ */
+@Composable
+private fun DeliveryTest(app: TetherApp, s: Settings) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val status by app.delivery.status.collectAsState()
+    val recent by AppLog.recent.collectAsState()
+    val running = status as? com.example.core.delivery.DeliveryStatus.Running
+    val start = {
+        scope.launch {
+            val photo = withContext(Dispatchers.IO) { testPhoto(app) }
+            app.delivery.start(test = photo)
+        }
+    }
+    val ask = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()) { start() }
+
+    SettingsGroup("Teste de entrega local", Icons.Outlined.WifiTethering) {
+        InfoText(
+            "Cria a rede ${com.example.core.delivery.LocalDelivery.TEST_SSID} (senha ${com.example.core.delivery.LocalDelivery.TEST_PASSWORD}) e uma página com a última foto. " +
+                "Confira: o Wi-Fi aparece com a 50D ligada no cabo, um Android e um iPhone entram pelo QR, a página abre com o aviso de sem internet e a foto baixa nos dois.",
+        )
+        if (running?.test == true) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(vertical = 6.dp)) {
+                running.wifiQr?.let { com.example.ui.delivery.QrImage(it, 120.dp, contentDescription = "Entrar no Wi-Fi de teste") }
+                com.example.ui.delivery.QrImage(running.url() + "teste", 120.dp, contentDescription = "Abrir a página de teste")
+            }
+            Text("${running.network} · ${running.url()}teste", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+            DevButton("Parar o teste", true, Modifier.fillMaxWidth()) { scope.launch { app.delivery.stop() } }
+        } else {
+            (status as? com.example.core.delivery.DeliveryStatus.Failed)?.let { Text(it.reason, style = MaterialTheme.typography.bodySmall, color = Tone.Error) }
+            DevButton("Iniciar o teste", status !is com.example.core.delivery.DeliveryStatus.Starting, Modifier.fillMaxWidth()) {
+                val needed = com.example.ui.delivery.permissionsFor(s.copy(deliveryNetwork = s.deliveryNetwork))
+                    .filter { androidx.core.content.ContextCompat.checkSelfPermission(context, it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
+                if (needed.isEmpty()) start() else ask.launch(needed.toTypedArray())
+            }
+        }
+        val lines = recent.filter { it.contains("ENTREGA") }.takeLast(10)
+        Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            lines.forEach { Text(it, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), color = Tone.TextMuted) }
+        }
+    }
+}
+
+/** The latest photo as a JPG in the cache, or a plain test image when there is none yet. */
+private fun testPhoto(app: TetherApp): File {
+    val out = File(app.cacheDir, "delivery_test.jpg")
+    val latest = kotlinx.coroutines.runBlocking { app.database.photoDao().latestWithImage() }
+    val bitmap = latest?.displayUri?.let { com.example.core.render.BitmapLoader.load(app, android.net.Uri.parse(it), 2048) }
+        ?: android.graphics.Bitmap.createBitmap(1200, 800, android.graphics.Bitmap.Config.ARGB_8888).apply {
+            val c = android.graphics.Canvas(this)
+            c.drawColor(0xFF292929.toInt())
+            c.drawCircle(600f, 400f, 220f, android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF00FCA8.toInt() })
+        }
+    out.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
+    bitmap.recycle()
+    return out
 }

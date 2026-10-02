@@ -452,6 +452,74 @@ class ScreenshotTest {
         save("ajustes_desenvolvedor", androidx.compose.ui.test.hasText("Simular foto recebida"))
     }
 
+    /** Three clients with photos in every state, for the delivery screens. */
+    private fun seedDelivery(): com.example.core.delivery.DeliverySession = runBlocking {
+        seedPhotos()
+        app.settings.set(com.example.core.data.SettingKeys.deliveryEnabled, true)
+        app.settings.set(com.example.core.data.SettingKeys.deliveryPassword, "jrfotos2026")
+        val dao = app.database.deliveryDao()
+        val photos = app.database.photoDao().inSession("Geral")
+        val existing = dao.openSessions()
+        if (existing.isNotEmpty()) return@runBlocking existing.last()
+        val ana = app.delivery.newClient("Ana e Pedro", "11999990000")
+        val bia = app.delivery.newClient("Bia Martins")
+        val states = listOf(com.example.core.delivery.DeliveryState.DOWNLOADED, com.example.core.delivery.DeliveryState.READY, com.example.core.delivery.DeliveryState.READY,
+            com.example.core.delivery.DeliveryState.PREPARING, com.example.core.delivery.DeliveryState.WAITING, com.example.core.delivery.DeliveryState.ERROR)
+        photos.take(6).forEachIndexed { i, p ->
+            val id = dao.insertItem(com.example.core.delivery.DeliveryItem(sessionId = ana.id, photoId = p.id, name = "Ana-e-Pedro_${p.savedBase}.jpg", queuedAt = i.toLong(), picked = i == 1))
+            dao.setState(id, states[i], if (i < 3) "/x/$id.jpg" else null, 2_400_000L, if (i == 5) "Não deu para preparar a foto" else null, 1)
+            if (i == 0) dao.countDownload(id)
+        }
+        photos.drop(6).take(2).forEach { p -> dao.insertItem(com.example.core.delivery.DeliveryItem(sessionId = bia.id, photoId = p.id, name = "Bia-Martins_${p.savedBase}.jpg", queuedAt = 9)) }
+        app.settings.set(com.example.core.data.SettingKeys.deliveryActiveSession, ana.id)
+        ana
+    }
+
+    private fun running() = com.example.core.delivery.DeliveryStatus.Running("192.168.49.1", 8080, "DIRECT-JR-Fotos", "jrfotos2026", "Wi-Fi Direct")
+
+    @Test
+    fun deliveryIntro() {
+        runBlocking { app.settings.set(com.example.core.data.SettingKeys.deliveryEnabled, false) }
+        val actions = com.example.ui.PhotoActions(rule.activity, app.store, app.export, app.looks)
+        rule.setContent { JrLinkTheme { com.example.ui.delivery.DeliveryScreen(app, actions, onBack = {}, onSettings = {}) } }
+        save("entrega_inicio", androidx.compose.ui.test.hasText("Ligar a entrega local"))
+    }
+
+    @Test
+    fun delivery() {
+        seedDelivery()
+        app.delivery.showStatusForPreview(running())
+        val actions = com.example.ui.PhotoActions(rule.activity, app.store, app.export, app.looks)
+        rule.setContent { JrLinkTheme { com.example.ui.delivery.DeliveryScreen(app, actions, onBack = {}, onSettings = {}) } }
+        save("entrega", androidx.compose.ui.test.hasText("Bia Martins"))
+        app.delivery.showStatusForPreview(com.example.core.delivery.DeliveryStatus.Off)
+    }
+
+    @Test
+    fun deliveryClient() {
+        val ana = seedDelivery()
+        app.delivery.showStatusForPreview(running())
+        val actions = com.example.ui.PhotoActions(rule.activity, app.store, app.export, app.looks)
+        rule.setContent { JrLinkTheme { com.example.ui.delivery.ClientSessionSheet(app, actions, ana, onDismiss = {}) } }
+        save("entrega_cliente", androidx.compose.ui.test.hasText("Encerrar acesso"))
+        app.delivery.showStatusForPreview(com.example.core.delivery.DeliveryStatus.Off)
+    }
+
+    @Test
+    fun deliverSheet() {
+        seedDelivery()
+        val ids = runBlocking { app.database.photoDao().inSession("Geral").take(3).map { it.id } }
+        rule.setContent { JrLinkTheme { com.example.ui.delivery.DeliverSheet(app, ids, onDismiss = {}, onOpenDelivery = {}) } }
+        save("entrega_entregar", androidx.compose.ui.test.hasText("Criar e entregar"))
+    }
+
+    @Test
+    fun settingsDelivery() {
+        runBlocking { app.settings.set(com.example.core.data.SettingKeys.deliveryEnabled, true) }
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Delivery, onBack = {}) } }
+        save("ajustes_entrega", androidx.compose.ui.test.hasText("Como o cliente se conecta"))
+    }
+
     @Test
     fun liveView() = live("live_view")
 

@@ -5,6 +5,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import com.example.TetherApp
@@ -71,6 +72,8 @@ class ClientExitAndDevTest {
         runBlocking { app.settings.set(SettingKeys.developerMode, false) }
         rule.setContent { JrLinkTheme { SettingsScreen(onOpen = {}) } }
         val brand = rule.onNode(hasText("por Jr_Tech_OFC", substring = true), useUnmergedTree = true)
+        // With the sections grouped by module the footer sits below the fold.
+        brand.performScrollTo()
         repeat(7) { brand.performClick(); rule.waitForIdle() }
         runCatching { rule.waitUntil(5_000) { runBlocking { app.settings.current().developerMode } } }
         assertTrue(runBlocking { app.settings.current().developerMode })

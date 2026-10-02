@@ -61,6 +61,7 @@ import com.example.ui.preset.EditorScreen
 import com.example.ui.preset.PresetsScreen
 import com.example.ui.tools.ToolsScreen
 import com.example.ui.cull.CullScreen
+import com.example.ui.delivery.DeliveryScreen
 import com.example.ui.crop.CropScreen
 import com.example.ui.live.LiveViewScreen
 import com.example.ui.components.CaptureFab
@@ -91,6 +92,9 @@ class MainActivity : ComponentActivity() {
 
     private val app get() = application as TetherApp
 
+    /** A screen asked from outside (the delivery notification). */
+    private val pendingRoute = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // The last position chosen, right away (the settings load a moment later).
@@ -99,6 +103,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         askNotificationPermissionOnce()
         app.camera.findAndConnect()
+        if (intent?.action == ACTION_DELIVERY) pendingRoute.value = "delivery"
 
         val actions = PhotoActions(this, app.store, app.export, app.looks)
 
@@ -128,6 +133,11 @@ class MainActivity : ComponentActivity() {
                 val entry by nav.currentBackStackEntryAsState()
                 val route = entry?.destination?.route ?: Tab.Session.route
                 LaunchedEffect(route) { AppLog.i("TELA", route) }
+                val asked by pendingRoute.collectAsState()
+                LaunchedEffect(asked) {
+                    asked?.let { nav.navigate(it) { launchSingleTop = true } }
+                    pendingRoute.value = null
+                }
                 val snackbar = remember { SnackbarHostState() }
                 var gallerySelecting by remember { mutableStateOf(false) }
                 val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -265,10 +275,19 @@ class MainActivity : ComponentActivity() {
                                 onOpenPresets = { goTo(Tab.Presets) },
                                 onOpenCull = { goTo(Tab.Cull) },
                                 onOpenSection = { nav.navigate("settings/${it.route}") },
+                                onOpenDelivery = { nav.navigate("delivery") },
                             )
                         }
                         composable(Tab.Cull.route) { CullScreen(app, onBack = null, onOpenPhoto = { nav.navigate("photo/$it") }) }
                         composable("live") { LiveViewScreen(app, onBack = { nav.popBackStack() }) }
+                        composable("delivery") {
+                            DeliveryScreen(
+                                app = app,
+                                actions = actions,
+                                onBack = { nav.popBackStack() },
+                                onSettings = { nav.navigate("settings/${SettingsSection.Delivery.route}") },
+                            )
+                        }
                         composable("tools") { ToolsScreen(onBack = { nav.popBackStack() }) }
                         composable("card") { CardScreen(app = app, onBack = { nav.popBackStack() }) }
                         composable("client") {
@@ -291,6 +310,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenPhoto = { nav.navigate("photo/$it") },
                                 onSelectingChange = { gallerySelecting = it },
                                 onCrop = { id -> nav.navigate("editor/crop/$id") },
+                                onOpenDelivery = { nav.navigate("delivery") },
                             )
                         }
                         composable(Tab.Presets.route) {
@@ -326,6 +346,7 @@ class MainActivity : ComponentActivity() {
                                 onBack = { nav.popBackStack() },
                                 onCalibrate = { id -> nav.navigate("editor/photo/$id") },
                                 onCrop = { id -> nav.navigate("editor/crop/$id") },
+                                onOpenDelivery = { nav.navigate("delivery") },
                             )
                         }
                     }
@@ -337,6 +358,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (intent.action == ACTION_DELIVERY) pendingRoute.value = "delivery"
         // Plugging the camera in while the app is open lands here.
         app.camera.findAndConnect()
     }
@@ -357,6 +379,10 @@ class MainActivity : ComponentActivity() {
         // Only retry silently from "no camera"; after a failure or a denied permission the user taps Conectar,
         // otherwise the permission dialog would reopen every time the activity resumes.
         if (app.camera.state.value == ConnectionState.NoCamera) app.camera.findAndConnect()
+    }
+
+    companion object {
+        const val ACTION_DELIVERY = "com.example.OPEN_DELIVERY"
     }
 
     private fun askNotificationPermissionOnce() {

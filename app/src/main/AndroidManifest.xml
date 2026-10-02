@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-feature android:name="android.hardware.usb.host" android:required="true" />
 
@@ -18,6 +19,15 @@
     <!-- Optional GPS in the edited copies; asked only when the option is turned on. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Entrega local: asked only when the photographer turns it on. Wi-Fi Direct needs "Dispositivos
+         por perto" on Android 13+ (never used for location) and location before that. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission
+        android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="33" />
 
     <queries>
         <package android:name="com.adobe.lrmobile" />
@@ -62,6 +72,11 @@
 
         <service
             android:name="com.example.core.service.CameraForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <service
+            android:name="com.example.core.delivery.DeliveryService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 

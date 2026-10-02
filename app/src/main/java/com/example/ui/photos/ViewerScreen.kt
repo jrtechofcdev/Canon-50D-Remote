@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.WifiTethering
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
@@ -122,6 +123,7 @@ fun ViewerScreen(
     onBack: () -> Unit,
     onCalibrate: (Long) -> Unit,
     onCrop: (Long) -> Unit = {},
+    onOpenDelivery: () -> Unit = {},
 ) {
     val photos by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
     val presets by app.presets.presets.collectAsState(initial = emptyList())
@@ -140,6 +142,7 @@ fun ViewerScreen(
     var showClipping by remember { mutableStateOf(settings.highlightAlert) }
     var noteFor by remember { mutableStateOf<Photo?>(null) }
     var whatsFor by remember { mutableStateOf<Photo?>(null) }
+    var deliverFor by remember { mutableStateOf<Photo?>(null) }
 
     // Slide to a frame that just arrived. New photos are inserted at index 0; the pager keeps the
     // current photo in place by key, so "was on the latest" means we were on index 0 before it.
@@ -274,6 +277,7 @@ fun ViewerScreen(
                         icon = { LightroomMark() },
                     ) { scope.launch { actions.openInLightroom(listOf(current), it, settings) } }
                     ActionTile(Icons.AutoMirrored.Outlined.Send, "WhatsApp", accent = true) { whatsFor = current }
+                    if (settings.deliveryEnabled) ActionTile(Icons.Outlined.WifiTethering, "Entregar") { deliverFor = current }
                     SetMenuTile(
                         label = "Enviar",
                         sets = actions.availableSets(current, settings),
@@ -307,6 +311,7 @@ fun ViewerScreen(
     }
 
     noteFor?.let { photo -> NoteSheet(app, photo, onDismiss = { noteFor = null }) }
+    deliverFor?.let { photo -> com.example.ui.delivery.DeliverSheet(app, listOf(photo.id), onDismiss = { deliverFor = null }, onOpenDelivery = onOpenDelivery) }
     whatsFor?.let { photo -> WhatsAppSheet(app, actions, settings, listOf(photo), onDismiss = { whatsFor = null }) }
 
     confirmDelete?.let { photo ->

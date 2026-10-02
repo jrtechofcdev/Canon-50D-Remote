@@ -14,6 +14,9 @@ import androidx.room.RoomDatabase
 import androidx.room.Update
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.core.delivery.DeliveryDao
+import com.example.core.delivery.DeliveryItem
+import com.example.core.delivery.DeliverySession
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -223,16 +226,21 @@ interface PresetDao {
     suspend fun detachFromPhotos(id: Long)
 }
 
-@Database(entities = [Photo::class, PresetEntity::class], version = 7, exportSchema = false)
+@Database(
+    entities = [Photo::class, PresetEntity::class, DeliverySession::class, DeliveryItem::class],
+    version = 8,
+    exportSchema = false,
+)
 abstract class PhotoDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
     abstract fun presetDao(): PresetDao
+    abstract fun deliveryDao(): DeliveryDao
 
     companion object {
         /** [name] is only changed by tests, which must not share the file the app itself opens. */
         fun create(context: Context, name: String = "tether50d.db"): PhotoDatabase =
             Room.databaseBuilder(context, PhotoDatabase::class.java, name)
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                 // Version 1 only ever held simulator entries, so dropping it loses nothing real.
                 .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1)
                 .build()
@@ -251,6 +259,24 @@ abstract class PhotoDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE presets ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE presets ADD COLUMN lastUsed INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /** Entrega local: client sessions and the queue of photos for each one. Photos and presets are untouched. */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `delivery_sessions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`client` TEXT NOT NULL, `phone` TEXT, `code` TEXT NOT NULL, `token` TEXT NOT NULL, `event` INTEGER NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL, `expiresAt` INTEGER NOT NULL, `closedAt` INTEGER, `lastSeenAt` INTEGER NOT NULL)",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `delivery_items` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`sessionId` INTEGER NOT NULL, `photoId` INTEGER NOT NULL, `name` TEXT NOT NULL, `state` TEXT NOT NULL, " +
+                        "`path` TEXT, `size` INTEGER NOT NULL, `downloads` INTEGER NOT NULL, `error` TEXT, `queuedAt` INTEGER NOT NULL, " +
+                        "`readyAt` INTEGER, `picked` INTEGER NOT NULL)",
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_delivery_items_sessionId_photoId` ON `delivery_items` (`sessionId`, `photoId`)")
             }
         }
 

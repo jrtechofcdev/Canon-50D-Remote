@@ -14,7 +14,7 @@ import kotlinx.coroutines.withContext
 /**
  * The app's folder structure, created in one go inside the folder the photographer picks
  * ("JR C50D Sync" at the root of the phone) and linked to every setting that saves something.
- * The same layout as the zip handed out in 3.7, plus Notas and the second-card copy.
+ * The same layout as the zip handed out in 3.7, plus Notas, the second-card copy and the local delivery.
  */
 object AppFolders {
 
@@ -36,6 +36,7 @@ object AppFolders {
         Folder(listOf("05 Backup", "Sessoes"), "Backup da sessão", SettingKeys.backupFolder),
         Folder(listOf("05 Backup", "Ajustes do app"), "Backup dos ajustes", null),
         Folder(listOf("06 Logs"), "Logs", SettingKeys.logFolder),
+        Folder(listOf("07 Entregas"), "Entregas (uma pasta por cliente)", SettingKeys.deliveryFolder),
     )
 
     /** The folders a setting points at, for the checklist in Salvamento. */

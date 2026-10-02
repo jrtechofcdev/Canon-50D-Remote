@@ -2,6 +2,35 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [4.0] · 2026-10-02
+
+**Entrega local:** o celular vira o Wi-Fi e a galeria do cliente. O cliente aponta a câmera para o QR, entra e salva as fotos no próprio celular. Sem internet e sem instalar nada.
+
+- **Rede:** o app cria um Wi-Fi Direct com nome e senha fixos (`DIRECT-JR-Fotos`, Android 10+). Alternativas: o roteador do celular ou o Wi-Fi do local, em Ajustes → Entrega local.
+- **Portal do cliente:**
+  - abre em `http://192.168.49.1:8080`, no visual do app (grafite, menta, Exo 2), no celular e no computador;
+  - mostra a foto mais recente, **Salvar foto**, a grade das outras e **Salvar todas**;
+  - atualiza sozinho a cada 3 s e avisa quando chega foto nova;
+  - no iPhone, explica como adicionar às Fotos.
+- **Um código por cliente:**
+  - cada cliente tem um código de 6 números e um QR só dele, e ninguém vê as fotos de outra pessoa;
+  - depois de 5 códigos errados, o aparelho espera 1 minuto;
+  - o acesso vale 6 h, 24 h, 3 dias ou até você encerrar.
+- **Entregar:**
+  - na galeria (seleção), no visualizador e na Sessão (Última foto → **Entregar**);
+  - escolha um cliente ou crie na hora;
+  - a mesma foto vai uma vez só para cada cliente.
+- **Modo automático:** cada foto nova vai para o **cliente da vez**, já com o look da sessão. A opção **Galeria do evento** manda para uma galeria aberta a quem tem o código do evento.
+- **Fila visível** com o estado de cada foto: aguardando, preparando, pronta, baixada ou erro, com **Tentar de novo**. Os downloads continuam de onde pararam (Range), e a foto só conta como baixada quando chega inteira.
+- **Favoritas pelo portal:** o coração do cliente chega como escolha do cliente na galeria e no culling.
+- **Placa para imprimir:** PNG e PDF A6 com o QR do Wi-Fi, o QR das fotos e a marca, pronta para a gráfica.
+- **Mensagem "Fotos no Wi-Fi"** com `{codigo}`, `{wifi}`, `{senha}` e `{link}`, enviada ao WhatsApp do cliente pela tela dele.
+- **Notificação "Entrega ativa"** com o botão Parar. A entrega segue com a tela apagada.
+- **Pasta `07 Entregas`:** cópia do que foi entregue, uma pasta por cliente. Entra no botão de criar as pastas do app.
+- **Desenvolvedor → Teste de entrega local:** cria a rede `DIRECT-JR-Teste` com uma página de teste. Serve para conferir no seu celular e num iPhone antes do primeiro evento.
+- **Ajustes agrupados** pela cadeia do app: Câmera, Captura e salvamento, Fotografia, Edição, Entrega e Sistema.
+- Desligada (o padrão), a entrega não roda nada e não pede permissão nova.
+
 ## [3.8] · 2026-09-29
 
 - **Pastas do app com um toque:** em Ajustes → Salvamento → **Criar e ligar todas as pastas**, o app cria a estrutura "JR C50D Sync" e liga cada ajuste à pasta certa.

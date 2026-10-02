@@ -24,6 +24,9 @@ import com.example.core.backup.SessionBackup
 import com.example.core.analysis.Culler
 import com.example.core.analysis.MlKitFaceAnalyzer
 import com.example.core.shop.PresetShop
+import com.example.core.delivery.DeliveryEvents
+import com.example.core.delivery.LocalDelivery
+import com.example.core.delivery.PhotoEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -66,6 +69,10 @@ class TetherApp : Application() {
         private set
     lateinit var shop: PresetShop
         private set
+    /** Photo events (captured, edited, approved): the only link between capture and delivery. */
+    val events = DeliveryEvents()
+    lateinit var delivery: LocalDelivery
+        private set
 
     // A failure in one of these collectors is written to the log instead of closing the app.
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main + AppLog.handler("APP"))
@@ -100,6 +107,9 @@ class TetherApp : Application() {
         culler = Culler(this, database.photoDao(), settings, MlKitFaceAnalyzer())
         appBackup = AppBackup(settings, presets)
         shop = PresetShop(this, settings, presets)
+        looks.onEdited = { id -> events.emit(PhotoEvent.Edited(id)) }
+        delivery = LocalDelivery(this, settings, database.deliveryDao(), database.photoDao(), looks, export, events, appScope)
+        delivery.init()
 
         appScope.launch {
             settings.settings.distinctUntilChangedBy { it.logEnabled to it.logFolder }.collect { AppLog.configure(it.logEnabled, it.logFolder) }
@@ -140,6 +150,7 @@ class TetherApp : Application() {
         appScope.launch {
             tether.saved.collect {
                 AppLog.i("FOTO", "${it.savedBase} salva · ${AppLog.memory()}")
+                events.emit(PhotoEvent.Captured(it.id))
                 val s = settings.current()
                 if (s.blurAlert || s.eyesCheck || s.cullSuggestions) culler.enqueue(it.id)
                 if (s.vibrateOnReceive) alerts.photoReceived()

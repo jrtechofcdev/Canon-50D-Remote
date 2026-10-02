@@ -31,6 +31,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.WifiTethering
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Style
@@ -175,18 +176,29 @@ import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Code
 
-enum class SettingsSection(val route: String, val title: String, val summary: String, val icon: ImageVector) {
-    Profiles("profiles", "Perfis e backup", "Sets prontos por evento, salvar e restaurar tudo", Icons.Outlined.SettingsSuggest),
-    Save("save", "Salvamento", "Formato, pastas RAW e JPG, sessão e nomes", Icons.Outlined.Folder),
-    Review("review", "Revisão", "Slide automático, galeria, culling, histograma", Icons.Outlined.PhotoLibrary),
-    Camera("camera", "Câmera", "Bateria, cartão, exposições salvas, bracketing", Icons.Outlined.CameraAlt),
-    Share("share", "Envio e cliente", "WhatsApp, marca d'água, modo cliente", Icons.Outlined.Send),
-    Presets("presets", "Presets", "Look das fotos novas, cópia editada, pastas", Icons.Outlined.Style),
-    Messages("messages", "Mensagens", "Textos prontos para o WhatsApp do cliente", Icons.AutoMirrored.Outlined.Chat),
-    Alerts("alerts", "Alertas", "Vibração, desconexão, reenvio, resumo", Icons.Outlined.NotificationsActive),
-    Display("display", "Tela", "Modo escuro total, brilho, tela ligada", Icons.Outlined.DarkMode),
-    Diagnostics("diagnostics", "Diagnóstico", "Log do app salvo no celular, pasta e envio", Icons.Outlined.BugReport),
-    Developer("developer", "Desenvolvedor", "Testes da câmera, foto simulada, log detalhado", Icons.Outlined.Code),
+/** The app's chain, Capturar → Controlar → Melhorar → Entregar, plus the system: how Ajustes is grouped. */
+enum class SettingsModule(val title: String) {
+    Camera("Câmera"),
+    Capture("Captura e salvamento"),
+    Photography("Fotografia"),
+    Editing("Edição"),
+    Delivery("Entrega"),
+    System("Sistema"),
+}
+
+enum class SettingsSection(val route: String, val title: String, val summary: String, val icon: ImageVector, val module: SettingsModule) {
+    Profiles("profiles", "Perfis e backup", "Sets prontos por evento, salvar e restaurar tudo", Icons.Outlined.SettingsSuggest, SettingsModule.System),
+    Save("save", "Salvamento", "Formato, pastas RAW e JPG, sessão e nomes", Icons.Outlined.Folder, SettingsModule.Capture),
+    Review("review", "Revisão", "Slide automático, galeria, culling, histograma", Icons.Outlined.PhotoLibrary, SettingsModule.Photography),
+    Camera("camera", "Câmera", "Bateria, cartão, exposições salvas, bracketing", Icons.Outlined.CameraAlt, SettingsModule.Camera),
+    Share("share", "Envio e cliente", "WhatsApp, marca d'água, modo cliente", Icons.Outlined.Send, SettingsModule.Delivery),
+    Delivery("delivery", "Entrega local", "Wi-Fi do fotógrafo, portal, códigos e QR", Icons.Outlined.WifiTethering, SettingsModule.Delivery),
+    Presets("presets", "Presets", "Look das fotos novas, cópia editada, pastas", Icons.Outlined.Style, SettingsModule.Editing),
+    Messages("messages", "Mensagens", "Textos prontos para o WhatsApp do cliente", Icons.AutoMirrored.Outlined.Chat, SettingsModule.Delivery),
+    Alerts("alerts", "Alertas", "Vibração, desconexão, reenvio, resumo", Icons.Outlined.NotificationsActive, SettingsModule.System),
+    Display("display", "Tela", "Modo escuro total, brilho, tela ligada", Icons.Outlined.DarkMode, SettingsModule.System),
+    Diagnostics("diagnostics", "Diagnóstico", "Log do app salvo no celular, pasta e envio", Icons.Outlined.BugReport, SettingsModule.System),
+    Developer("developer", "Desenvolvedor", "Testes da câmera, foto simulada, teste de entrega", Icons.Outlined.Code, SettingsModule.System),
 }
 
 /** Category list. Each category opens its own page so no page gets too long to scan. */
@@ -196,7 +208,16 @@ fun SettingsScreen(onOpen: (SettingsSection) -> Unit) {
     val developer by (app?.settings?.settings?.collectAsState(initial = null) ?: remember { mutableStateOf(null) })
     SettingsPage(title = "Ajustes", onBack = null) {
         Spacer(Modifier.height(8.dp))
-        SettingsSection.entries.filter { it != SettingsSection.Developer || developer?.developerMode == true }.forEach { section ->
+        val shown = SettingsSection.entries.filter { it != SettingsSection.Developer || developer?.developerMode == true }
+        SettingsModule.entries.forEach { module ->
+          val sections = shown.filter { it.module == module }
+          if (sections.isNotEmpty()) Text(
+              module.title,
+              style = MaterialTheme.typography.labelLarge,
+              color = Tone.TextMuted,
+              modifier = Modifier.padding(start = 4.dp, top = 14.dp, bottom = 2.dp),
+          )
+          sections.forEach { section ->
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -214,6 +235,7 @@ fun SettingsScreen(onOpen: (SettingsSection) -> Unit) {
                 }
                 Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = Tone.TextMuted)
             }
+        }
         }
         Spacer(Modifier.height(40.dp))
         AboutFooter(app, developer?.developerMode == true)
@@ -274,6 +296,7 @@ fun SettingsSectionScreen(app: TetherApp, section: SettingsSection, onBack: () -
             SettingsSection.Display -> DisplaySettings(app, settings)
             SettingsSection.Diagnostics -> DiagnosticsSettings(app, settings)
             SettingsSection.Developer -> DeveloperSettings(app, settings)
+            SettingsSection.Delivery -> DeliverySettings(app, settings)
         }
         Spacer(Modifier.height(88.dp))
     }
@@ -502,7 +525,7 @@ private fun AppFoldersCard(app: TetherApp, s: Settings) {
 }
 
 @Composable
-private fun rememberFolderPicker(app: TetherApp, onPicked: (String) -> Unit) =
+internal fun rememberFolderPicker(app: TetherApp, onPicked: (String) -> Unit) =
     rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         if (uri != null) {
             app.store.takePersistablePermission(uri)
@@ -511,7 +534,7 @@ private fun rememberFolderPicker(app: TetherApp, onPicked: (String) -> Unit) =
     }
 
 @Composable
-private fun FolderRow(title: String, path: String, active: Boolean, onPick: () -> Unit, onReset: (() -> Unit)?) {
+internal fun FolderRow(title: String, path: String, active: Boolean, onPick: () -> Unit, onReset: (() -> Unit)?) {
     Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
         Text(title, style = MaterialTheme.typography.bodyLarge, color = if (active) Tone.Text else Tone.TextMuted)
         Text(path, style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)

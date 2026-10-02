@@ -101,7 +101,11 @@ fun SessionScreen(
     onOpenPresets: () -> Unit = {},
     onOpenCull: () -> Unit = {},
     onOpenSection: (com.example.ui.settings.SettingsSection) -> Unit = {},
+    onOpenDelivery: () -> Unit = {},
 ) {
+    var deliverFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
+    val deliveryStatus by app.delivery.status.collectAsState()
+    val deliveryOnline by app.delivery.online.collectAsState()
     var whatsFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
     var noteFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
     val state by app.camera.state.collectAsState()
@@ -205,6 +209,13 @@ fun SessionScreen(
                     onFolders = { onOpenSection(com.example.ui.settings.SettingsSection.Save) },
                     onMessages = { onOpenSection(com.example.ui.settings.SettingsSection.Messages) },
                     onLog = { onOpenSection(com.example.ui.settings.SettingsSection.Diagnostics) },
+                    // Capturar → Selecionar → Editar → Entregar: the last step one tap away.
+                    onDelivery = onOpenDelivery,
+                    deliveryState = when (val d = deliveryStatus) {
+                        is com.example.core.delivery.DeliveryStatus.Running -> if (deliveryOnline > 0) "no ar · $deliveryOnline" else "no ar"
+                        else -> null
+                    },
+                    onDeliverLatest = if (settings.deliveryEnabled) ({ deliverFor = photos.firstOrNull() }) else null,
                 )
             }
         }
@@ -283,6 +294,7 @@ fun SessionScreen(
         )
     }
 
+    deliverFor?.let { p -> com.example.ui.delivery.DeliverSheet(app, listOf(p.id), onDismiss = { deliverFor = null }, onOpenDelivery = onOpenDelivery) }
     whatsFor?.let { p ->
         com.example.ui.photos.WhatsAppSheet(app, actions, settings, listOf(p), onDismiss = { whatsFor = null })
     }

@@ -60,15 +60,27 @@ object MessageLibrary {
             "Olá, {cliente}! 🖨️\n\nSeus impressos estão prontos para retirada.\n\n*Horário:* " + SIGN,
         ),
         MessageTemplate(
+            "wifi", "Fotos no Wi-Fi (entrega local)", "wifi",
+            "Olá, {cliente}! 📸\n\nSuas fotos estão prontas no Wi-Fi do fotógrafo.\n\n" +
+                "*1.* Conecte no Wi-Fi *{wifi}* (senha: *{senha}*)\n*2.* Abra *{link}*\n*3.* Digite o código *{codigo}*\n\n" +
+                "Se o celular avisar que o Wi-Fi não tem internet, toque em *Manter conectado*." + SIGN,
+        ),
+        MessageTemplate(
             "obrigado", "Agradecimento", "obg",
             "Olá, {cliente}! 💚\n\nObrigado pela confiança. Foi um prazer fotografar vocês.\n\n" +
                 "Se puder, marque *@jr_tech_ofc* quando postar as fotos." + SIGN,
         ),
     )
 
+    /** Ids of the ready messages added after the list became editable (4.0: the local delivery one). */
+    private val addedLater = setOf("wifi")
+
     /** Every template: the saved list, or the defaults built from the old per-kind texts. */
     fun all(saved: String, legacy: (MessageKind) -> String): List<MessageTemplate> {
-        decode(saved).takeIf { it.isNotEmpty() }?.let { return it }
+        decode(saved).takeIf { it.isNotEmpty() }?.let { list ->
+            // Messages that arrived in a later version join a list saved before them.
+            return list + extras.filter { it.id in addedLater && list.none { saved -> saved.id == it.id } }
+        }
         return defaults(legacy)
     }
 

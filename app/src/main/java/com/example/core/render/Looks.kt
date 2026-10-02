@@ -179,8 +179,12 @@ class Looks(
         refreshEdited(photo.copy(crop = text))
     }
 
+    /** Told when a photo's look or crop changed (the delivery makes its copy again). */
+    var onEdited: (Long) -> Unit = {}
+
     /** Edited copy in step with the photo's look and crop: rewritten when it has either, removed when it has neither. */
     private suspend fun refreshEdited(photo: Photo) {
+        onEdited(photo.id)
         val hasEdit = photo.presetId != null || photo.adjust != null || cropOf(photo) != null
         if (settings.current().saveEditedCopy && hasEdit) {
             writeEditedCopy(photo, photo.presetId?.let { presets.get(it)?.name })

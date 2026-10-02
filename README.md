@@ -22,7 +22,7 @@
 
 Você fotografa pela **Canon EOS 50D** como sempre, com botão, dials e menus funcionando. Cada foto vai para o cartão CF e **uma cópia chega sozinha no celular** pelo cabo USB OTG, salva em RAW, JPG ou nos dois, cada formato na pasta que você escolher.
 
-Sem Wi-Fi, sem FTP, sem internet. Só a USB, só a 50D. (A única parte que usa internet é a Loja de presets, e só para pegar presets novos.)
+A captura usa só a USB, sem FTP e sem internet. Na hora de entregar, o celular cria o próprio Wi-Fi e o cliente baixa as fotos pelo QR, também sem internet. (A única parte que usa internet é a Loja de presets, e só para pegar presets novos.)
 
 <table>
   <tr>
@@ -49,6 +49,12 @@ Sem Wi-Fi, sem FTP, sem internet. Só a USB, só a 50D. (A única parte que usa 
     <td align="center"><img src="docs/images/tela-botao-captura.png" width="200" alt="Iniciar captura"><br><sub><b>Iniciar captura</b><br>em qualquer aba</sub></td>
     <td align="center"><img src="docs/images/tela-perfis.png" width="200" alt="Perfis e backup"><br><sub><b>Perfis</b><br>ajustes prontos por evento</sub></td>
   </tr>
+  <tr>
+    <td align="center"><img src="docs/images/entrega.png" width="200" alt="Entrega local"><br><sub><b>Entrega local</b><br>Wi-Fi e QR do cliente</sub></td>
+    <td align="center"><img src="docs/images/portal_celular.png" width="200" alt="Portal no celular do cliente"><br><sub><b>Portal</b><br>o cliente salva no celular dele</sub></td>
+    <td align="center"><img src="docs/images/portal_codigo.png" width="200" alt="Código do cliente"><br><sub><b>Código</b><br>cada cliente vê só as dele</sub></td>
+    <td align="center"><img src="docs/images/ajustes.png" width="200" alt="Ajustes por módulo"><br><sub><b>Ajustes</b><br>agrupados por etapa</sub></td>
+  </tr>
 </table>
 
 <sub>Telas renderizadas a partir do código, com fotos de exemplo.</sub>
@@ -68,7 +74,8 @@ Sem Wi-Fi, sem FTP, sem internet. Só a USB, só a 50D. (A única parte que usa 
 | **Cartão** | Navegar pelas fotos que já estão no CF e baixar só as escolhidas. Reenvio automático do que foi feito com o cabo solto. |
 | **Envio** | Lightroom com um toque, "JPG leve" com marca d'água Jr_Tech_OFC e **WhatsApp direto para o número do cliente**: digita o número e a conversa abre com a foto pronta (preset, recorte e marca d'água) já anexada. |
 | **Cliente** | Modo cliente em tela cheia com zoom (pinça e duplo toque), PIN para sair e resumo ao fim da sessão. O cliente pode receber a foto no WhatsApp dele. O cliente escolhe o preset da foto; o botão Calibrar (com PIN) abre os ajustes daquela foto. |
-| **Entrega** | O cliente marca as fotos no modo cliente; a lista vai para o filtro do Lightroom ou para a pasta Escolhidas. Galeria em lote e mensagens prontas no WhatsApp. |
+| **Entrega local** | O celular cria o Wi-Fi e um portal com as fotos de cada cliente. O cliente entra pelo QR, digita o código dele e salva no próprio celular. Modo manual ou automático (cada foto nova vai para o cliente da vez), fila com estado de cada foto, favoritas pelo portal, placa para imprimir. Sem internet. |
+| **Seleção do cliente** | O cliente marca as fotos no modo cliente; a lista vai para o filtro do Lightroom ou para a pasta Escolhidas. Galeria em lote e mensagens prontas no WhatsApp. |
 | **Evento** | Momentos (Cerimônia, Festa…) com subpasta, notas de texto e voz por foto, backup da sessão para cartão SD ou pendrive. |
 | **Seleção com análise local** | Avisa na hora se a foto saiu tremida ou se alguém piscou, agrupa fotos parecidas e sugere a melhor. Aba **Culling** com gestos. Roda no celular, sem internet (Google ML Kit embutido). |
 | **Ferramentas** | Calculadora de flash Yongnuo e de profundidade de campo, GPS nas cópias e acerto do relógio da câmera. Tudo offline. |
@@ -116,6 +123,7 @@ JR C50D Sync/
   04 Notas/      uma pasta por foto (nota.txt, audio_1.m4a…)
   05 Backup/     Espelho (2º cartão), Sessoes, Ajustes do app
   06 Logs/
+  07 Entregas/   uma pasta por cliente da entrega local
 ```
 
 O **2º cartão** guarda uma cópia conferida de cada foto, como numa câmera de dois cartões. **Salvar fotos automaticamente** (mesma tela) liga e desliga o download de cada foto nova.
@@ -134,6 +142,22 @@ Toque 7 vezes na marca no fim de **Ajustes**. Aparece **Ajustes → Desenvolvedo
 - render pela CPU;
 - exportar o banco;
 - teste de fechamento.
+
+### Entrega local
+
+<p><img src="docs/images/portal_computador.png" width="100%" alt="Portal da entrega local no computador"></p>
+
+1. **Ajustes → Entrega local:** ligue e escolha a rede.
+   - **Wi-Fi Direct:** o app cria a rede `DIRECT-JR-Fotos`, com senha fixa. É o padrão.
+   - **Roteador do celular:** você liga o roteador nas configurações do Android, com o mesmo nome e senha.
+   - **Wi-Fi do local:** o celular e os clientes ficam no mesmo Wi-Fi.
+2. Na Sessão, toque em **Entrega** e depois em **Iniciar entrega**. Aparecem dois QR: **① Entrar no Wi-Fi** e **② Abrir as fotos**. Em **Placa para imprimir**, você gera o PNG e o PDF A6 para deixar na mesa.
+3. **Novo cliente:** cada um ganha um código de 6 números e um QR só dele. No modo automático, as fotos novas vão para o **cliente da vez**.
+4. **Entregar:** selecione as fotos na galeria (ou use o visualizador) e escolha o cliente. Elas ficam prontas uma por uma na fila.
+5. O cliente salva cada foto (ou todas) e pode marcar favoritas, que aparecem na galeria e no culling.
+6. **Encerrar acesso** invalida o código. **Parar** desliga a rede e o servidor.
+
+Se o celular do cliente avisar que o Wi-Fi não tem internet, ele toca em **Manter conectado**. Antes do primeiro evento, faça o **Teste de entrega local** (modo desenvolvedor) com o seu celular e um iPhone.
 
 ### Loja de presets
 
@@ -272,6 +296,10 @@ app/src/main/java/com/example/
 | Proporções do recorte | `core/render/Crop.kt` → `CropRatio` |
 | Textos das telas | `ui/session`, `ui/photos`, `ui/preset`, `ui/settings` |
 </details>
+
+## Origem: Fotografia Express
+
+A Entrega local nasceu da ideia da **Fotografia Express**: fotografar e entregar na hora, no evento, sem internet. O app segue com a identidade JR C50D Sync e serve a qualquer trabalho. Cada função nova responde a uma etapa da cadeia **Capturar → Controlar → Melhorar → Entregar**. O plano completo está em [`docs/PLANO_EVOLUCAO.md`](docs/PLANO_EVOLUCAO.md).
 
 ## Documentação
 
