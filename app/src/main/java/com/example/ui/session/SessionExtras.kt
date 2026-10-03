@@ -103,6 +103,7 @@ import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.ui.graphics.graphicsLayer
+import com.example.ui.components.pressScale
 
 /** Shown when the card has frames shot while the cable was out and "perguntar antes" is on. */
 @Composable
@@ -252,7 +253,8 @@ private fun ToolGroup(icon: ImageVector, title: String, items: List<ToolItem>) {
 private fun ToolTile(item: ToolItem, modifier: Modifier) {
     val alpha = if (item.enabled) 1f else 0.38f
     Column(
-        modifier.clip(MaterialTheme.shapes.small).clickable(enabled = item.enabled, onClick = item.onClick).padding(vertical = 6.dp, horizontal = 2.dp),
+        modifier.then(if (item.enabled) Modifier.pressScale() else Modifier).clip(MaterialTheme.shapes.small)
+            .clickable(enabled = item.enabled, onClick = item.onClick).padding(vertical = 6.dp, horizontal = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(

@@ -91,6 +91,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.ui.components.arrive
 
 /**
  * FOTOGRAFIA EXPRESS: one client at a time, no code. The photos arrive in the portal as marked previews;
@@ -269,10 +270,12 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
                         style = MaterialTheme.typography.labelLarge, color = if (selected.isEmpty()) Tone.TextMuted else Tone.Accent,
                     )
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items.forEach { item ->
-                            ExpressTile(item, item.id in selected, previewOn = s.expressPreview) {
+                        items.forEachIndexed { index, item ->
+                          androidx.compose.runtime.key(item.id) {
+                            ExpressTile(item, item.id in selected, previewOn = s.expressPreview, index = index) {
                                 if (item.id in selected) selected.remove(item.id) else selected.add(item.id)
                             }
+                          }
                         }
                     }
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -408,22 +411,27 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
 
 /** One photo of the Express client: picture, liberada or prévia, the client's heart, and the mark selection. */
 @Composable
-private fun ExpressTile(item: DeliveryItem, selected: Boolean, previewOn: Boolean, onClick: () -> Unit) {
+private fun ExpressTile(item: DeliveryItem, selected: Boolean, previewOn: Boolean, index: Int = 0, onClick: () -> Unit) {
     val ready = item.state in DeliveryState.served && item.path != null
+    val edge by androidx.compose.animation.animateColorAsState(if (selected) Tone.Accent else Color.Transparent, label = "edge")
     Box(
-        Modifier.size(104.dp).clip(RoundedCornerShape(8.dp)).background(Tone.SurfaceHigh)
-            .then(if (selected) Modifier.border(3.dp, Tone.Accent, RoundedCornerShape(8.dp)) else Modifier)
+        Modifier.arrive(index).size(104.dp).clip(RoundedCornerShape(8.dp)).background(Tone.SurfaceHigh)
+            .border(3.dp, edge, RoundedCornerShape(8.dp))
             .clickable(enabled = ready, onClick = onClick),
     ) {
-        if (ready) {
-            AsyncImage(model = File(item.path!!), contentDescription = item.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-        } else {
-            Icon(Icons.Outlined.HourglassEmpty, "Preparando", tint = Tone.TextMuted, modifier = Modifier.align(Alignment.Center))
+        // The hourglass turns into the photo when it is ready: preparing and arriving read as one motion.
+        androidx.compose.animation.Crossfade(ready, animationSpec = androidx.compose.animation.core.tween(com.example.ui.components.Motion.LONG), label = "ready") { isReady ->
+            if (isReady && item.path != null) {
+                AsyncImage(model = File(item.path), contentDescription = item.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            } else {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Icon(Icons.Outlined.HourglassEmpty, "Preparando", tint = Tone.TextMuted) }
+            }
         }
-        val (label, color) = when {
+        val (label, target) = when {
             item.released || !previewOn -> "Liberada" to Tone.Accent
             else -> "Prévia" to Tone.TextMuted
         }
+        val color by androidx.compose.animation.animateColorAsState(target, label = "release")
         Row(
             Modifier.align(Alignment.TopStart).padding(4.dp).clip(RoundedCornerShape(999.dp)).background(Color(0x99000000)).padding(horizontal = 6.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,

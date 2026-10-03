@@ -369,7 +369,7 @@ internal fun Stat(icon: ImageVector, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, tint = Tone.TextMuted, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(6.dp))
-        Text(text, style = MaterialTheme.typography.bodySmall)
+        com.example.ui.components.RollingText(text, style = MaterialTheme.typography.bodySmall)
     }
 }
 

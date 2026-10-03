@@ -38,6 +38,7 @@ import com.example.ui.components.SectionLabel
 import com.example.ui.theme.ReadoutStyle
 import com.example.ui.theme.Tone
 import kotlin.math.roundToInt
+import androidx.compose.animation.animateContentSize
 
 /** A titled block of related options, with an icon so each block is found at a glance. */
 @Composable
@@ -57,6 +58,8 @@ fun SettingsGroup(title: String, icon: ImageVector? = null, content: @Composable
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
             .background(Tone.Surface)
+            // Options that appear when a switch turns on slide the group open instead of jumping.
+            .animateContentSize(androidx.compose.animation.core.spring(dampingRatio = 0.9f, stiffness = 400f))
             .padding(horizontal = 12.dp, vertical = 4.dp),
         content = content,
     )

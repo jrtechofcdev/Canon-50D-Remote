@@ -87,6 +87,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.ui.graphics.graphicsLayer
 
 enum class PhotoFilter(val label: String) {
     All("Todas"), Session("Sessão atual"), Favorites("Favoritas"), ClientPicks("Escolhidas pelo cliente"),
@@ -198,8 +199,13 @@ fun PhotosScreen(
         ) {
             items(photos, key = { it.id }) { photo ->
                 val isSelected = photo.id in selected
+                // A chosen photo sinks a little inside its frame, like a print pressed into an album.
+                val inset by androidx.compose.animation.core.animateFloatAsState(
+                    if (isSelected) 0.9f else 1f, androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 500f), label = "pick",
+                )
                 Box(
                     Modifier
+                        .animateItem()
                         .aspectRatio(1f)
                         .clip(MaterialTheme.shapes.extraSmall)
                         .background(Tone.Surface)
@@ -219,7 +225,7 @@ fun PhotosScreen(
                         model = photo.lookUri,
                         contentDescription = photo.savedBase,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = inset; scaleY = inset },
                     )
                     FormatTag(photo.rawUri != null, photo.jpgUri != null, Modifier.align(Alignment.BottomStart).padding(4.dp))
                     Row(Modifier.align(Alignment.TopEnd).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -238,10 +244,15 @@ fun PhotosScreen(
                             modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp),
                         )
                     }
-                    if (isSelected) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        isSelected,
+                        enter = androidx.compose.animation.scaleIn(androidx.compose.animation.core.spring(dampingRatio = 0.5f, stiffness = 600f)) + androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut(),
+                        modifier = Modifier.align(Alignment.TopStart),
+                    ) {
                         Icon(
                             Icons.Filled.CheckCircle, contentDescription = "Selecionada", tint = Tone.Accent,
-                            modifier = Modifier.align(Alignment.TopStart).padding(4.dp).size(22.dp),
+                            modifier = Modifier.padding(4.dp).size(22.dp),
                         )
                     }
                 }

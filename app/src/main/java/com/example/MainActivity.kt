@@ -99,6 +99,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material.icons.outlined.WifiTethering
 import androidx.compose.material.icons.outlined.Collections
+import androidx.compose.ui.graphics.graphicsLayer
 
 class MainActivity : ComponentActivity() {
 
@@ -250,7 +251,14 @@ class MainActivity : ComponentActivity() {
                           }
                         }
                     }
-                    NavHost(nav, startDestination = Tab.Session.route, modifier = Modifier.weight(1f).fillMaxHeight().nestedScroll(fabScroll)) {
+                    com.example.ui.components.Motion.tabRoutes = Tab.entries.map { it.route }.toSet()
+                    NavHost(
+                        nav, startDestination = Tab.Session.route, modifier = Modifier.weight(1f).fillMaxHeight().nestedScroll(fabScroll),
+                        enterTransition = com.example.ui.components.Motion.enter,
+                        exitTransition = com.example.ui.components.Motion.exit,
+                        popEnterTransition = com.example.ui.components.Motion.popEnter,
+                        popExitTransition = com.example.ui.components.Motion.popExit,
+                    ) {
                         composable(Tab.Session.route) {
                             SessionScreen(
                                 app = app,
@@ -421,6 +429,25 @@ private fun goToTab(nav: androidx.navigation.NavHostController, tab: Tab) {
     }
 }
 
+/** A tab's icon: it gives a small spring hop when its tab is chosen, so the move is seen where the finger is. */
+@Composable
+private fun TabIcon(tab: Tab, selected: Boolean, tint: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Unspecified) {
+    val hop = remember { androidx.compose.animation.core.Animatable(1f) }
+    val first = remember { mutableStateOf(true) }
+    LaunchedEffect(selected) {
+        if (first.value) { first.value = false; return@LaunchedEffect }
+        if (selected) {
+            hop.snapTo(0.82f)
+            hop.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.4f, stiffness = 420f))
+        }
+    }
+    Icon(
+        tab.icon, contentDescription = null,
+        tint = if (tint == androidx.compose.ui.graphics.Color.Unspecified) androidx.compose.material3.LocalContentColor.current else tint,
+        modifier = Modifier.graphicsLayer { scaleX = hop.value; scaleY = hop.value },
+    )
+}
+
 /**
  * The tab bar. Up to five tabs share the width as usual; with more, each keeps a readable width and the
  * bar scrolls sideways, so a label is never squeezed and the open tab is scrolled into view.
@@ -433,7 +460,7 @@ private fun BottomTabs(tabs: List<Tab>, route: String, onClick: (Tab) -> Unit) {
                 NavigationBarItem(
                     selected = route == tab.route,
                     onClick = { onClick(tab) },
-                    icon = { Icon(tab.icon, contentDescription = null) },
+                    icon = { TabIcon(tab, route == tab.route) },
                     label = { Text(tab.label, maxLines = 1, softWrap = false) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Tone.Accent,
@@ -472,7 +499,7 @@ private fun BottomTabs(tabs: List<Tab>, route: String, onClick: (Tab) -> Unit) {
                         Modifier.size(width = 64.dp, height = 32.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
                             .background(if (on) Tone.SurfaceHigh else androidx.compose.ui.graphics.Color.Transparent),
                         contentAlignment = androidx.compose.ui.Alignment.Center,
-                    ) { Icon(tab.icon, contentDescription = null, tint = if (on) Tone.Accent else Tone.TextMuted) }
+                    ) { TabIcon(tab, on, tint = if (on) Tone.Accent else Tone.TextMuted) }
                     Text(
                         tab.label,
                         style = MaterialTheme.typography.labelMedium,

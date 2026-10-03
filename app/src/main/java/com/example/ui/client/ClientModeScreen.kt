@@ -97,6 +97,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.verticalScroll
+import com.example.ui.components.pressScale
 
 /**
  * Full-screen photos for the client to follow along. No settings, no delete.
@@ -376,13 +377,22 @@ private fun InfoItem(icon: ImageVector, text: String) {
 
 @Composable
 private fun ClientAction(icon: ImageVector, label: String, modifier: Modifier = Modifier, tint: Color = Color.White, locked: Boolean = false, onClick: () -> Unit) {
+    // When the icon changes (the heart filling in), it pops and settles: the client sees the choice was taken.
+    val pop = remember { androidx.compose.animation.core.Animatable(1f) }
+    val first = remember { mutableStateOf(true) }
+    LaunchedEffect(icon) {
+        if (first.value) { first.value = false; return@LaunchedEffect }
+        pop.snapTo(1.4f)
+        pop.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.35f, stiffness = 360f))
+    }
+    val shade by androidx.compose.animation.animateColorAsState(tint, label = "action")
     Column(
-        modifier.clip(MaterialTheme.shapes.small).clickable(onClick = onClick).heightIn(min = 56.dp).padding(horizontal = 4.dp, vertical = 6.dp),
+        modifier.pressScale().clip(MaterialTheme.shapes.small).clickable(onClick = onClick).heightIn(min = 56.dp).padding(horizontal = 4.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // The lock sits inside the icon's own square, so a locked button lines up with the others.
         Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(26.dp))
+            Icon(icon, contentDescription = null, tint = shade, modifier = Modifier.size(26.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value })
             if (locked) {
                 Box(
                     Modifier.align(Alignment.BottomEnd).size(14.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color.Black),

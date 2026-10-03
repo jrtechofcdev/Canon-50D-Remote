@@ -83,6 +83,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import kotlinx.coroutines.launch
+import androidx.compose.animation.togetherWith
+import com.example.ui.components.shutterFlash
 
 @Composable
 fun SessionScreen(
@@ -339,17 +341,29 @@ private fun ConnectionHeader(state: ConnectionState, received: Int, status: Came
     val live = state is ConnectionState.Connected
 
     Row(verticalAlignment = Alignment.CenterVertically) {
-        StateTile(
+        // The state block eases to its new colour, and the title slides to the new state, so connecting reads as a change.
+        val tile by androidx.compose.animation.animateColorAsState(
             when (state) {
                 is ConnectionState.Connected -> Tone.Accent
                 is ConnectionState.Failed -> Tone.Error
                 else -> Tone.Line
             },
+            androidx.compose.animation.core.tween(com.example.ui.components.Motion.LONG),
+            label = "state",
         )
+        StateTile(tile)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleLarge)
-            Text(detail, style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted)
+            androidx.compose.animation.AnimatedContent(
+                targetState = title,
+                transitionSpec = {
+                    (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, 80)) +
+                        androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(320, 80, com.example.ui.components.Motion.Emphasized)) { it / 2 }) togetherWith
+                        androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(100))
+                },
+                label = "title",
+            ) { Text(it, style = MaterialTheme.typography.titleLarge) }
+            com.example.ui.components.RollingText(detail, style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted)
         }
         if (!live && state != ConnectionState.Connecting) {
             OutlinedButton(onClick = onConnect) { Text("Conectar") }
@@ -439,7 +453,7 @@ private fun ShutterRow(
                         tint = if (interval.running) Tone.OnAccent else if (connected) Tone.Text else Tone.TextMuted,
                     )
                 }
-                Text(
+                com.example.ui.components.RollingText(
                     if (interval.running) "${interval.done}/${interval.total}" else "Intervalo",
                     style = MaterialTheme.typography.labelSmall,
                     color = if (connected) Tone.TextMuted else Tone.Line,
@@ -464,6 +478,7 @@ private fun ShutterRow(
                     .clip(MaterialTheme.shapes.small)
                     .background(Tone.Surface)
                     .border(1.dp, Tone.Line, MaterialTheme.shapes.small)
+                    .shutterFlash(latest?.id)
                     .clickable(enabled = latest != null) { latest?.let { onOpenLatest(it.id) } },
             ) {
                 latest?.lookUri?.let {
@@ -488,6 +503,8 @@ private fun LatestPhoto(
             .aspectRatio(3f / 2f)
             .clip(MaterialTheme.shapes.large)
             .background(Tone.Surface)
+            // Every new frame lands with a shutter blink: the photographer sees it arrived without reading.
+            .shutterFlash(photo?.id)
             .clickable(enabled = photo != null) { photo?.let { onOpen(it.id) } },
     ) {
         Crossfade(targetState = photo?.takeIf { it.displayUri != null }, label = "latest") { shown ->
@@ -551,6 +568,7 @@ private fun RecentStrip(photos: List<Photo>, onOpen: (Long) -> Unit) {
                 contentDescription = photo.savedBase,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
+                    .animateItem()
                     .size(width = 84.dp, height = 56.dp)
                     .clip(MaterialTheme.shapes.extraSmall)
                     .background(Tone.Surface)

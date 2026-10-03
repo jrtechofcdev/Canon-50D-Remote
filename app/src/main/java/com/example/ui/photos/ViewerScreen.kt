@@ -116,6 +116,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import androidx.compose.material.icons.outlined.FilterNone
+import com.example.ui.components.pressScale
 
 @Composable
 fun ViewerScreen(
@@ -393,15 +394,16 @@ private fun ActionTile(
     box: androidx.compose.ui.unit.Dp = 44.dp,
     onClick: () -> Unit,
 ) {
+    val tint by androidx.compose.animation.animateColorAsState(if (accent || selected) Tone.Accent else Tone.Text, label = "tile")
     ActionTileBase(label, modifier, enabled, onClick, box) {
-        Icon(icon, contentDescription = null, tint = if (accent || selected) Tone.Accent else Tone.Text)
+        Icon(icon, contentDescription = null, tint = tint)
     }
 }
 
 @Composable
 private fun ActionTileBase(label: String, modifier: Modifier, enabled: Boolean, onClick: () -> Unit, box: androidx.compose.ui.unit.Dp = 44.dp, icon: @Composable () -> Unit) {
     Column(
-        modifier.clip(MaterialTheme.shapes.small).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 4.dp, vertical = 4.dp)
+        modifier.pressScale().clip(MaterialTheme.shapes.small).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 4.dp, vertical = 4.dp)
             .alpha(if (enabled) 1f else 0.4f),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
