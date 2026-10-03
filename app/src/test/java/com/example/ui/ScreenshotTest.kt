@@ -740,4 +740,29 @@ class ScreenshotTest {
         rule.setContent { JrLinkTheme { com.example.ui.live.LiveViewScreen(app, onBack = {}, frames = frames) } }
         save(name, androidx.compose.ui.test.hasContentDescription("Imagem ao vivo"))
     }
+
+    @Test
+    fun rotationDial() {
+        val actions = PhotoActions(rule.activity, app.store, app.export, app.looks)
+        rule.setContent {
+            JrLinkTheme {
+                androidx.compose.foundation.layout.Box {
+                    SessionScreen(app, actions, {}, {}, {}, {})
+                    com.example.ui.components.RotationMenu(com.example.ui.components.ScreenTurn.Right, onPick = {}, onDismiss = {}, inline = true)
+                }
+            }
+        }
+        save("rotation_dial")
+    }
+
+    @Test
+    @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun rotationDialLandscape() {
+        rule.setContent {
+            JrLinkTheme {
+                com.example.ui.components.RotationMenu(com.example.ui.components.ScreenTurn.Auto, onPick = {}, onDismiss = {}, inline = true)
+            }
+        }
+        save("rotation_dial_landscape")
+    }
 }
