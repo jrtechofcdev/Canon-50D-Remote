@@ -124,6 +124,7 @@ JR C50D Sync/
   05 Backup/     Espelho (2º cartão), Sessoes, Ajustes do app
   06 Logs/
   07 Entregas/   uma pasta por cliente da entrega local
+  08 Express/    uma pasta por cliente da Fotografia Express
 ```
 
 O **2º cartão** guarda uma cópia conferida de cada foto, como numa câmera de dois cartões. **Salvar fotos automaticamente** (mesma tela) liga e desliga o download de cada foto nova.
@@ -151,7 +152,7 @@ Toque 7 vezes na marca no fim de **Ajustes**. Aparece **Ajustes → Desenvolvedo
    - **Wi-Fi Direct:** o app cria a rede `DIRECT-JR-Fotos`, com senha fixa. É o padrão.
    - **Roteador do celular:** você liga o roteador nas configurações do Android, com o mesmo nome e senha.
    - **Wi-Fi do local:** o celular e os clientes ficam no mesmo Wi-Fi.
-2. Na Sessão, toque em **Entrega** e depois em **Iniciar entrega**. Aparecem dois QR: **① Entrar no Wi-Fi** e **② Abrir as fotos**. Em **Placa para imprimir**, você gera o PNG e o PDF A6 para deixar na mesa.
+2. Abra a aba **Entrega** e toque em **Iniciar entrega**. Aparecem dois QR: **① Entrar no Wi-Fi** e **② Abrir as fotos**. Em **Placa para imprimir**, você gera o PNG e o PDF A6 para deixar na mesa.
 3. **Novo cliente:** cada um ganha um código de 4 números e um QR só dele. No modo automático, as fotos novas vão para o **cliente da vez**.
 4. **Entregar:** selecione as fotos na galeria (ou use o visualizador) e escolha o cliente. Elas ficam prontas uma por uma na fila.
 5. O cliente salva cada foto (ou todas) e pode marcar favoritas, que aparecem na galeria e no culling.
@@ -161,16 +162,17 @@ Se o celular do cliente avisar que o Wi-Fi não tem internet, ele toca em **Mant
 
 ### Fotografia Express
 
-<p><img src="docs/images/express.png" width="270" alt="Tela da Fotografia Express"> <img src="docs/images/portal_express.png" width="250" alt="Portal em prévia"></p>
+<p><img src="docs/images/express.png" width="270" alt="Aba da Fotografia Express"> <img src="docs/images/portal_express.png" width="250" alt="Página do cliente em prévia"></p>
 
-Para fotografar e entregar na hora, um cliente por vez:
-1. Ligue em **Ajustes → Fotografia Express** e abra o atalho **Express** na tela inicial. Toque em **Iniciar entrega**.
+Uma ferramenta separada da Entrega local, com aba, rede, senha, página e ajustes próprios. Ela não precisa da Entrega para funcionar. Serve para fotografar e entregar na hora, um cliente por vez:
+1. Abra a aba **Express**, toque em **Ligar a Fotografia Express** e depois em **Iniciar entrega**.
 2. O cliente entra no Wi-Fi pelo QR ① e abre as fotos pelo QR ②, **sem código**.
 3. Com o **Modo prévia** ligado, ele vê as fotos com marca d'água e não consegue baixar. Pode marcar as favoritas com o coração.
+   A página mostra o valor de cada foto, o total das favoritas e a sua chave Pix, se você ligar essas opções em Ajustes → Fotografia Express.
 4. Depois do pagamento, marque as fotos e toque em **Liberar**, ou em **Liberar favoritas** ou **Liberar todas**. No celular do cliente, elas viram a versão limpa e o botão **Salvar foto** aparece.
 5. **Finalizar e limpar para o próximo cliente** encerra o atendimento, apaga as cópias e deixa o portal vazio para o próximo.
 
-A rede, a senha e o tamanho das fotos são os da Entrega local. O pagamento é com você: o app só guarda a decisão de liberar.
+Para mandar fotos ao cliente, use o botão **Mandar fotos** na aba, ou **Express** na galeria, no visualizador e na Sessão. Com **Fotos novas entram sozinhas** ligado, cada foto da câmera já vai direto. O pagamento é com você: o app só guarda a decisão de liberar.
 
 ### Loja de presets
 

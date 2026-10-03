@@ -23,7 +23,16 @@ import java.util.concurrent.Executors
  * What the portal shows besides the photos. [express] = Fotografia Express is on (its gallery opens
  * without a code); [expressPreview] = its unreleased photos are shown only as marked previews.
  */
-data class PortalInfo(val photographer: String, val picks: Boolean, val express: Boolean = false, val expressPreview: Boolean = true)
+data class PortalInfo(
+    val photographer: String,
+    val picks: Boolean,
+    val express: Boolean = false,
+    val expressPreview: Boolean = true,
+    /** Price of one photo, already formatted ("R$ 15,00"); null = not shown. */
+    val price: String? = null,
+    /** Pix key for payment; null = not shown. */
+    val pix: String? = null,
+)
 
 /** A prepared photo's marked preview (Fotografia Express), next to the file itself. */
 fun previewFileOf(path: String): File = File(path.removeSuffix(".jpg") + ".preview.jpg")
@@ -42,6 +51,11 @@ class LocalServer(
     private val info: () -> PortalInfo,
     private val onDownloaded: suspend (DeliveryItem) -> Unit = {},
     private val onPick: suspend (DeliveryItem, Boolean) -> Unit = { _, _ -> },
+    /**
+     * Which tool this server belongs to. An Express server only knows Express clients (no code, no
+     * login) and a Entrega local server only its own: a token from one is unknown to the other.
+     */
+    private val expressServer: Boolean = false,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     @Volatile private var socket: ServerSocket? = null
@@ -156,8 +170,8 @@ class LocalServer(
             seg.isEmpty() || seg == listOf("index.html") -> asset(out, "index.html", head)
             seg.size == 1 && seg[0] in ASSETS -> asset(out, seg[0], head)
             seg == listOf("api", "ping") -> json(out, 200, """{"ok":true}""")
-            seg == listOf("api", "login") -> login(r, out)
-            seg == listOf("api", "express") -> express(out)
+            seg == listOf("api", "login") && !expressServer -> login(r, out)
+            seg == listOf("api", "express") && expressServer -> express(out)
             seg.size == 3 && seg[0] == "api" && seg[1] == "s" -> sessionJson(seg[2], out)
             seg.size == 5 && seg[0] == "api" && seg[1] == "s" && seg[3] == "pick" && r.method == "POST" -> pick(seg[2], seg[4], r, out)
             seg.size == 3 && seg[0] == "f" -> file(seg[1], seg[2], r, out, head)
@@ -197,7 +211,7 @@ class LocalServer(
 
     private fun validSession(token: String): DeliverySession? {
         if (!TOKEN.matches(token)) return null
-        return runBlocking { dao.sessionByToken(token) }?.takeIf { it.isValid(clock()) }
+        return runBlocking { dao.sessionByToken(token, expressServer) }?.takeIf { it.isValid(clock()) }
     }
 
     private fun sessionJson(token: String, out: OutputStream) {
@@ -216,7 +230,8 @@ class LocalServer(
             out, 200,
             """{"client":${quote(session.client)},"event":${session.event},"express":${session.express},""" +
                 """"preview":${session.express && portalInfo.expressPreview},"photographer":${quote(portalInfo.photographer)},""" +
-                """"picks":${portalInfo.picks},"waiting":$waiting,"items":[$list]}""",
+                """"picks":${portalInfo.picks},"waiting":$waiting,""" +
+                """"price":${portalInfo.price?.let(::quote) ?: "null"},"pix":${portalInfo.pix?.let(::quote) ?: "null"},"items":[$list]}""",
         )
     }
 

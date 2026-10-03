@@ -15,6 +15,7 @@ import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material.icons.outlined.WifiTethering
+import androidx.compose.material.icons.outlined.Vibration
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,7 +47,11 @@ fun DeliverySettings(app: TetherApp, s: Settings) {
             "O cliente baixa as fotos pelo Wi-Fi do seu celular. Desligada, nada roda e nenhuma permissão é pedida.",
             s.deliveryEnabled,
         ) { set(SettingKeys.deliveryEnabled, it) }
-        InfoText("As mudanças de rede valem na próxima vez que a entrega for iniciada.")
+        ToggleRow(
+            Icons.Outlined.Vibration, "Vibrar quando o cliente baixa ou marca favorita",
+            "Vale também para a Fotografia Express", s.deliveryVibrate, enabled = s.deliveryEnabled || s.expressEnabled,
+        ) { set(SettingKeys.deliveryVibrate, it) }
+        InfoText("A Entrega local é separada da Fotografia Express: rede, senha, fotos e clientes de cada uma ficam nos próprios ajustes. As mudanças de rede valem na próxima vez que a entrega for iniciada.")
     }
 
     SettingsGroup("Rede", Icons.Outlined.Wifi) {

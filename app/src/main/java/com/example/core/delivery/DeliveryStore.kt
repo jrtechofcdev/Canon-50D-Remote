@@ -77,19 +77,20 @@ object DeliveryState {
 
 @Dao
 interface DeliveryDao {
-    @Query("SELECT * FROM delivery_sessions ORDER BY (closedAt IS NULL) DESC, createdAt DESC")
-    fun observeSessions(): Flow<List<DeliverySession>>
+    @Query("SELECT * FROM delivery_sessions WHERE express = :express ORDER BY (closedAt IS NULL) DESC, createdAt DESC")
+    fun observeSessions(express: Boolean): Flow<List<DeliverySession>>
 
-    @Query("SELECT * FROM delivery_sessions WHERE closedAt IS NULL ORDER BY createdAt DESC")
+    @Query("SELECT * FROM delivery_sessions WHERE closedAt IS NULL AND express = 0 ORDER BY createdAt DESC")
     suspend fun openSessions(): List<DeliverySession>
 
     @Query("SELECT * FROM delivery_sessions WHERE id = :id")
     suspend fun session(id: Long): DeliverySession?
 
-    @Query("SELECT * FROM delivery_sessions WHERE token = :token AND closedAt IS NULL LIMIT 1")
-    suspend fun sessionByToken(token: String): DeliverySession?
+    @Query("SELECT * FROM delivery_sessions WHERE token = :token AND express = :express AND closedAt IS NULL LIMIT 1")
+    suspend fun sessionByToken(token: String, express: Boolean): DeliverySession?
 
-    @Query("SELECT * FROM delivery_sessions WHERE code = :code AND closedAt IS NULL LIMIT 1")
+    /** Codes are only for the Entrega local; Express has no code. */
+    @Query("SELECT * FROM delivery_sessions WHERE code = :code AND express = 0 AND closedAt IS NULL LIMIT 1")
     suspend fun sessionByCode(code: String): DeliverySession?
 
     @Query("SELECT * FROM delivery_sessions WHERE express = 1 AND closedAt IS NULL ORDER BY createdAt DESC LIMIT 1")
@@ -113,7 +114,7 @@ interface DeliveryDao {
     @Query("UPDATE delivery_sessions SET closedAt = :time WHERE id = :id AND closedAt IS NULL")
     suspend fun closeSession(id: Long, time: Long)
 
-    @Query("UPDATE delivery_sessions SET closedAt = :time WHERE closedAt IS NULL AND expiresAt > 0 AND expiresAt <= :time")
+    @Query("UPDATE delivery_sessions SET closedAt = :time WHERE closedAt IS NULL AND express = 0 AND expiresAt > 0 AND expiresAt <= :time")
     suspend fun closeExpired(time: Long): Int
 
     @Query("UPDATE delivery_sessions SET lastSeenAt = :time WHERE id = :id")
@@ -138,28 +139,28 @@ interface DeliveryDao {
     @Query("SELECT * FROM delivery_items WHERE photoId = :photoId")
     suspend fun itemsOfPhoto(photoId: Long): List<DeliveryItem>
 
-    @Query("SELECT * FROM delivery_items ORDER BY queuedAt DESC, id DESC")
-    fun observeItems(): Flow<List<DeliveryItem>>
+    @Query("SELECT i.* FROM delivery_items i JOIN delivery_sessions s ON s.id = i.sessionId WHERE s.express = :express ORDER BY i.queuedAt DESC, i.id DESC")
+    fun observeItems(express: Boolean): Flow<List<DeliveryItem>>
 
-    @Query("SELECT * FROM delivery_items WHERE state = 'waiting' ORDER BY queuedAt ASC, id ASC LIMIT 1")
-    suspend fun nextWaiting(): DeliveryItem?
+    @Query("SELECT i.* FROM delivery_items i JOIN delivery_sessions s ON s.id = i.sessionId WHERE i.state = 'waiting' AND s.express = :express ORDER BY i.queuedAt ASC, i.id ASC LIMIT 1")
+    suspend fun nextWaiting(express: Boolean): DeliveryItem?
 
     @Query("UPDATE delivery_items SET state = :state, path = :path, size = :size, error = :error, readyAt = :readyAt WHERE id = :id")
     suspend fun setState(id: Long, state: String, path: String?, size: Long, error: String?, readyAt: Long?)
 
     /** After a crash or a stop mid-way, what was being prepared starts again. */
-    @Query("UPDATE delivery_items SET state = 'waiting' WHERE state = 'preparing'")
-    suspend fun resetPreparing()
+    @Query("UPDATE delivery_items SET state = 'waiting' WHERE state = 'preparing' AND sessionId IN (SELECT id FROM delivery_sessions WHERE express = :express)")
+    suspend fun resetPreparing(express: Boolean)
 
     @Query("UPDATE delivery_items SET state = 'waiting', error = NULL WHERE id = :id")
     suspend fun retry(id: Long)
 
-    @Query("UPDATE delivery_items SET state = 'waiting', error = NULL WHERE state = 'error'")
-    suspend fun retryAll()
+    @Query("UPDATE delivery_items SET state = 'waiting', error = NULL WHERE state = 'error' AND sessionId IN (SELECT id FROM delivery_sessions WHERE express = :express)")
+    suspend fun retryAll(express: Boolean)
 
     /** Files cleared on stop: the items go back to waiting so they are made again on the next start. */
-    @Query("UPDATE delivery_items SET state = 'waiting', path = NULL, size = 0, readyAt = NULL WHERE state IN ('ready', 'downloaded')")
-    suspend fun forgetFiles()
+    @Query("UPDATE delivery_items SET state = 'waiting', path = NULL, size = 0, readyAt = NULL WHERE state IN ('ready', 'downloaded') AND sessionId IN (SELECT id FROM delivery_sessions WHERE express = :express)")
+    suspend fun forgetFiles(express: Boolean)
 
     @Query("UPDATE delivery_items SET downloads = downloads + 1, state = 'downloaded' WHERE id = :id")
     suspend fun countDownload(id: Long)

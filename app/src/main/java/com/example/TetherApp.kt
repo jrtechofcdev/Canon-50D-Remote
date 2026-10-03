@@ -71,7 +71,11 @@ class TetherApp : Application() {
         private set
     /** Photo events (captured, edited, approved): the only link between capture and delivery. */
     val events = DeliveryEvents()
+    /** Entrega local: clients with a code. */
     lateinit var delivery: LocalDelivery
+        private set
+    /** Fotografia Express: its own tool, no code, preview until paid. Independent of [delivery]. */
+    lateinit var express: LocalDelivery
         private set
 
     // A failure in one of these collectors is written to the log instead of closing the app.
@@ -108,8 +112,18 @@ class TetherApp : Application() {
         appBackup = AppBackup(settings, presets)
         shop = PresetShop(this, settings, presets)
         looks.onEdited = { id -> events.emit(PhotoEvent.Edited(id)) }
-        delivery = LocalDelivery(this, settings, database.deliveryDao(), database.photoDao(), looks, export, events, appScope)
+        delivery = LocalDelivery(this, settings, database.deliveryDao(), database.photoDao(), looks, export, events, appScope, com.example.core.delivery.DeliveryMode.Normal)
+        express = LocalDelivery(this, settings, database.deliveryDao(), database.photoDao(), looks, export, events, appScope, com.example.core.delivery.DeliveryMode.Express)
+        // One Wi-Fi at a time: starting either tool stops the other.
+        delivery.peer = express
+        express.peer = delivery
         delivery.init()
+        express.init()
+        appScope.launch {
+            events.events.collect { e ->
+                if ((e is PhotoEvent.Delivered || e is PhotoEvent.Approved) && settings.current().deliveryVibrate) alerts.photoReceived()
+            }
+        }
 
         appScope.launch {
             settings.settings.distinctUntilChangedBy { it.logEnabled to it.logFolder }.collect { AppLog.configure(it.logEnabled, it.logFolder) }

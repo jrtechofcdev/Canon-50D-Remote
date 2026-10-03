@@ -61,13 +61,10 @@ fun DeliverSheet(app: TetherApp, photoIds: List<Long>, onDismiss: () -> Unit, on
     val settings by app.settings.settings.collectAsState(initial = null)
     val sessions by app.delivery.sessions.collectAsState(initial = emptyList())
     val now = remember { System.currentTimeMillis() }
-    // The Express client first (when that module is on), then the active client.
-    val open = sessions.filter { it.isValid(now) && (!it.express || settings?.expressEnabled == true) }
-        .sortedWith(compareByDescending<DeliverySession> { it.express }.thenByDescending { it.id == settings?.deliveryActiveSession })
+    val open = sessions.filter { it.isValid(now) }.sortedByDescending { it.id == settings?.deliveryActiveSession }
     var name by remember { mutableStateOf("") }
     val count = photoIds.size
-    // With Fotografia Express on, its client is always there to receive photos.
-    androidx.compose.runtime.LaunchedEffect(settings?.expressEnabled) { if (settings?.expressEnabled == true) app.delivery.expressSession() }
+
 
     fun send(session: DeliverySession) = scope.launch {
         val added = app.delivery.send(session.id, photoIds)
@@ -86,7 +83,7 @@ fun DeliverSheet(app: TetherApp, photoIds: List<Long>, onDismiss: () -> Unit, on
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(if (count == 1) "Entregar 1 foto" else "Entregar $count fotos", style = MaterialTheme.typography.titleLarge)
-            if (settings?.deliveryEnabled == false && open.none { it.express }) {
+            if (settings?.deliveryEnabled == false) {
                 Text("A entrega local está desligada. Ligue em Entrega local para o cliente baixar pelo Wi-Fi.", style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted)
                 Button(onClick = { onDismiss(); onOpenDelivery() }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                     Icon(Icons.Outlined.Wifi, null)
@@ -108,7 +105,7 @@ fun DeliverSheet(app: TetherApp, photoIds: List<Long>, onDismiss: () -> Unit, on
                         Column(Modifier.weight(1f)) {
                             Text(s.client, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
-                                if (s.express) "Fotografia Express · sem código" else (if (s.event) "Galeria do evento · " else "") + "código ${s.code}" + if (active) " · cliente da vez" else "",
+                                (if (s.event) "Galeria do evento · " else "") + "código ${s.code}" + if (active) " · cliente da vez" else "",
                                 style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted,
                             )
                         }

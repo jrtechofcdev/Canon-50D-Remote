@@ -54,11 +54,13 @@ sealed interface DeliveryStatus {
 }
 
 /**
- * Entrega local: the phone makes (or joins) a Wi-Fi, serves each client's photos through a small
- * portal, and the client saves them on their own phone. No internet, nothing to install.
+ * One delivery tool, [mode] Normal (Entrega local: clients with a code) or Express (Fotografia Express:
+ * one client at a time, no code, preview until paid). The phone makes (or joins) a Wi-Fi, serves the
+ * photos through its own page, and the client saves them on their own phone. No internet, nothing to install.
  *
- * It only listens to [events]: captured, edited, approved. It knows nothing of the camera or USB, and
- * with the option off in Ajustes nothing here starts.
+ * The app holds one instance per tool. They share no state: separate settings, port, page, files and
+ * clients. Only the Wi-Fi is one at a time, so starting one stops the other ([peer]).
+ * It only listens to [events]: captured, edited. It knows nothing of the camera or USB.
  */
 class LocalDelivery(
     private val context: Context,
@@ -69,15 +71,21 @@ class LocalDelivery(
     private val export: ExportService,
     val events: DeliveryEvents,
     private val scope: CoroutineScope,
+    val mode: DeliveryMode = DeliveryMode.Normal,
 ) {
-    private val root = File(context.cacheDir, "delivery")
+    private val root = File(context.cacheDir, mode.dir)
     private val lock = Mutex()
+    private val expressLock = Mutex()
     private var network: DeliveryNetwork? = null
     private var devicesJob: Job? = null
+    private val tag = mode.tag
 
-    @Volatile private var portalInfo = PortalInfo("Jr_Tech_OFC", true)
+    /** The other tool: stopped before this one takes the Wi-Fi. */
+    var peer: LocalDelivery? = null
 
-    val queue = DeliveryQueue(dao, photos, DeliveryPreparer { photo, session, target -> prepare(photo, session, target) }, root, events)
+    @Volatile private var portalInfo = PortalInfo("Jr_Tech_OFC", true, express = mode.express)
+
+    val queue = DeliveryQueue(dao, photos, DeliveryPreparer { photo, session, target -> prepare(photo, session, target) }, root, events, express = mode.express)
 
     val server = LocalServer(
         dao = dao,
@@ -89,6 +97,7 @@ class LocalDelivery(
             photos.setClientPick(item.photoId, on)
             if (on) events.emit(PhotoEvent.Approved(item.photoId))
         },
+        expressServer = mode.express,
     )
 
     private val _status = MutableStateFlow<DeliveryStatus>(DeliveryStatus.Off)
@@ -98,24 +107,35 @@ class LocalDelivery(
     /** Phones in the Wi-Fi Direct group (null when the network can't tell). */
     val devices: StateFlow<Int?> = _devices.asStateFlow()
 
-    /** Phones that opened the portal in the last 2 minutes. */
+    /** Phones that opened the page in the last 2 minutes. */
     val online: StateFlow<Int> = server.online
 
-    val sessions: Flow<List<DeliverySession>> = dao.observeSessions()
-    val items: Flow<List<DeliveryItem>> = dao.observeItems()
+    /** This tool's clients and photos only. */
+    val sessions: Flow<List<DeliverySession>> = dao.observeSessions(mode.express)
+    val items: Flow<List<DeliveryItem>> = dao.observeItems(mode.express)
+
+    private suspend fun config() = mode.config(settings.current())
 
     /** Starts the queue and the listeners; called once by the app. */
     fun init() {
         queue.start(scope)
         scope.launch {
             settings.settings.collect {
-                portalInfo = PortalInfo(it.deliveryPhotographer, it.deliveryPicks, express = it.expressEnabled, expressPreview = it.expressPreview)
+                val c = mode.config(it)
+                portalInfo = PortalInfo(
+                    photographer = c.photographer,
+                    picks = c.picks,
+                    express = mode.express && it.expressEnabled,
+                    expressPreview = it.expressPreview,
+                    price = if (mode.express) DeliveryRules.price(it.expressPriceCents) else null,
+                    pix = if (mode.express && it.expressShowPix) it.pixKey.trim().takeIf { k -> k.isNotEmpty() } else null,
+                )
             }
         }
         scope.launch {
             events.events.collect { event ->
                 when (event) {
-                    is PhotoEvent.Captured -> runCatching { autoSend(event.photoId) }.onFailure { AppLog.w("ENTREGA", "Envio automático falhou", it) }
+                    is PhotoEvent.Captured -> runCatching { autoSend(event.photoId) }.onFailure { AppLog.w(tag, "Envio automático falhou", it) }
                     is PhotoEvent.Edited -> queue.refresh(event.photoId)
                     else -> Unit
                 }
@@ -126,18 +146,24 @@ class LocalDelivery(
     // ---- start and stop ----------------------------------------------------------------------
 
     /** Brings the Wi-Fi and the server up. [test] = developer test page with that photo. */
-    suspend fun start(test: File? = null): DeliveryStatus = lock.withLock {
+    suspend fun start(test: File? = null): DeliveryStatus {
+        // One Wi-Fi at a time: the other tool lets go first.
+        peer?.takeIf { it.status.value !is DeliveryStatus.Off }?.stop()
+        return lock.withLock { startLocked(test) }
+    }
+
+    private suspend fun startLocked(test: File?): DeliveryStatus {
         (_status.value as? DeliveryStatus.Running)?.let { if (it.test == (test != null)) return it }
         stopLocked()
         _status.value = DeliveryStatus.Starting
-        val s = settings.current()
-        val ssid = if (test != null) TEST_SSID else DeliveryRules.ssid(s.deliverySsid)
-        var password = if (test != null) TEST_PASSWORD else s.deliveryPassword
+        val c = config()
+        val ssid = if (test != null) TEST_SSID else DeliveryRules.ssid(c.ssid)
+        var password = if (test != null) TEST_PASSWORD else c.password
         if (!DeliveryRules.passwordOk(password)) {
             password = DeliveryRules.newPassword()
-            settings.set(SettingKeys.deliveryPassword, password)
+            settings.set(mode.passwordKey, password)
         }
-        val net = when (s.deliveryNetwork) {
+        val net = when (c.network) {
             "hotspot" -> SystemHotspotNetwork()
             "wifi" -> SameWifiNetwork()
             else -> WifiDirectNetwork(context)
@@ -146,16 +172,17 @@ class LocalDelivery(
         if (state !is NetState.Up) {
             runCatching { net.stop() }
             val reason = (state as? NetState.Failed)?.reason ?: "A rede não ligou"
-            AppLog.w("ENTREGA", "Rede não ligou: $reason")
+            AppLog.w(tag, "Rede não ligou: $reason")
             return DeliveryStatus.Failed(reason).also { _status.value = it }
         }
-        val port = runCatching { withContext(Dispatchers.IO) { server.start(DeliveryRules.PORT) } }.getOrElse {
+        val port = runCatching { withContext(Dispatchers.IO) { server.start(mode.port) } }.getOrElse {
             runCatching { net.stop() }
             return DeliveryStatus.Failed("O servidor não ligou: ${it.message}").also { s2 -> _status.value = s2 }
         }
         server.testFile = test
         network = net
         dao.closeExpired(System.currentTimeMillis())
+        if (mode.express) expressSession()
         queue.poke()
         val running = DeliveryStatus.Running(state.host, port, state.ssid, state.password, state.label, test != null)
         _status.value = running
@@ -165,9 +192,9 @@ class LocalDelivery(
                 delay(5_000)
             }
         }
-        AppLog.i("ENTREGA", "Entrega ligada: ${state.label}, ${running.url()}")
+        AppLog.i(tag, "${mode.label} ligada: ${state.label}, ${running.url()}")
         DeliveryService.start(context)
-        running
+        return running
     }
 
     suspend fun stop() = lock.withLock { stopLocked() }
@@ -187,14 +214,14 @@ class LocalDelivery(
         withContext(Dispatchers.IO) { server.stop() }
         network?.let { runCatching { it.stop() } }
         network = null
-        if (was is DeliveryStatus.Running && !was.test && settings.current().deliveryClearOnStop) queue.clearFiles()
+        if (was is DeliveryStatus.Running && !was.test && config().clearOnStop) queue.clearFiles()
         _status.value = DeliveryStatus.Off
     }
 
-    // ---- clients -----------------------------------------------------------------------------
+    // ---- clients (Entrega local) -------------------------------------------------------------
 
     suspend fun newClient(name: String, phone: String? = null, event: Boolean = false): DeliverySession {
-        val s = settings.current()
+        val c = config()
         val now = System.currentTimeMillis()
         val session = DeliverySession(
             client = name.trim().ifEmpty { if (event) "Galeria do evento" else "Cliente" }.take(40),
@@ -203,12 +230,13 @@ class LocalDelivery(
             token = DeliveryRules.newToken(),
             event = event,
             createdAt = now,
-            expiresAt = DeliveryRules.expiresAt(now, s.deliveryValidityHours),
+            expiresAt = DeliveryRules.expiresAt(now, c.validityHours),
+            express = mode.express,
         )
         val id = dao.insertSession(session)
         // The newest client becomes the one auto mode sends to.
-        if (!event) settings.set(SettingKeys.deliveryActiveSession, id)
-        AppLog.i("ENTREGA", "Cliente novo: ${session.client}")
+        if (!event && !mode.express) settings.set(SettingKeys.deliveryActiveSession, id)
+        AppLog.i(tag, "Cliente novo: ${session.client}")
         return session.copy(id = id)
     }
 
@@ -237,7 +265,7 @@ class LocalDelivery(
     }
 
     suspend fun retryAll() {
-        dao.retryAll()
+        dao.retryAll(mode.express)
         queue.poke()
     }
 
@@ -254,34 +282,36 @@ class LocalDelivery(
 
     /** The client of the moment in Fotografia Express: the open one, or a new one. */
     suspend fun expressSession(name: String? = null): DeliverySession = expressLock.withLock {
+        check(mode.express) { "Só a Fotografia Express tem cliente da vez sem código" }
         dao.openExpress()?.takeIf { it.isValid(System.currentTimeMillis()) } ?: run {
-            val s = settings.current()
             val now = System.currentTimeMillis()
             val session = DeliverySession(
                 client = name?.trim()?.takeIf { it.isNotEmpty() }?.take(40) ?: "Express",
                 code = DeliveryRules.newCode(dao.openCodes()),
                 token = DeliveryRules.newToken(),
                 createdAt = now,
-                expiresAt = DeliveryRules.expiresAt(now, s.deliveryValidityHours),
                 express = true,
             )
-            session.copy(id = dao.insertSession(session)).also { AppLog.i("EXPRESS", "Cliente novo") }
+            session.copy(id = dao.insertSession(session)).also { AppLog.i(tag, "Cliente novo") }
         }
     }
+
+    /** "Mandar para o Express": the photos go to the client of the moment. Returns how many were new. */
+    suspend fun sendToExpress(photoIds: List<Long>): Int = queue.enqueue(expressSession().id, photoIds)
 
     /** Photos paid: they download clean from now on. */
     suspend fun release(itemIds: List<Long>, on: Boolean = true) {
         if (itemIds.isNotEmpty()) dao.setReleased(itemIds, on)
-        AppLog.i("EXPRESS", "${itemIds.size} foto(s) ${if (on) "liberadas" else "bloqueadas de novo"}")
+        AppLog.i(tag, "${itemIds.size} foto(s) ${if (on) "liberadas" else "bloqueadas de novo"}")
     }
 
     suspend fun releaseAll() {
         dao.openExpress()?.let { dao.releaseAll(it.id) }
-        AppLog.i("EXPRESS", "Todas liberadas")
+        AppLog.i(tag, "Todas liberadas")
     }
 
     /**
-     * Ends the Express client: their link stops working, the files are deleted and an empty session is
+     * Ends the Express client: their page stops working, the files are deleted and an empty session is
      * ready for the next one. The history (how many photos, how many released) stays. [name] labels it.
      */
     suspend fun finishExpress(name: String? = null) {
@@ -291,19 +321,17 @@ class LocalDelivery(
             withContext(Dispatchers.IO) { queue.clearFiles(old) }
         }
         expressSession()
-        AppLog.i("EXPRESS", "Entrega limpa: pronta para o próximo cliente")
+        AppLog.i(tag, "Entrega limpa: pronta para o próximo cliente")
     }
-
-    private val expressLock = Mutex()
 
     private suspend fun autoSend(photoId: Long) {
         val s = settings.current()
-        // Fotografia Express comes first, so one photo never goes to two places.
-        if (s.expressEnabled && s.expressAuto) {
+        val c = mode.config(s)
+        if (!c.enabled || !c.auto) return
+        if (mode.express) {
             queue.enqueue(expressSession().id, listOf(photoId))
             return
         }
-        if (!s.deliveryEnabled || s.deliveryMode != "auto") return
         val now = System.currentTimeMillis()
         val active = s.deliveryActiveSession.takeIf { it > 0 }?.let { dao.session(it) }
         val event = if (s.deliveryEventGallery) {
@@ -313,7 +341,7 @@ class LocalDelivery(
         }
         val target = DeliveryRules.autoTarget(s, active, event, now)
         if (target == null) {
-            AppLog.i("ENTREGA", "Modo automático sem cliente ativo: foto não enviada")
+            AppLog.i(tag, "Modo automático sem cliente ativo: foto não enviada")
             return
         }
         queue.enqueue(target, listOf(photoId))
@@ -323,21 +351,23 @@ class LocalDelivery(
 
     /**
      * The JPG a client gets: "light" (resized, with the look, optional watermark), "edited" (full size
-     * with the look) or "original" (the camera's JPG as it is). With the 07 Entregas folder set, a copy
-     * also goes to <folder>/<client>/.
+     * with the look) or "original" (the camera's JPG as it is). Express also makes the marked preview,
+     * and fails the photo when it can't, so an unmarked file is never the only one. With a copies folder
+     * set, a copy goes to <folder>/<client>/.
      */
     private suspend fun prepare(photo: Photo, session: DeliverySession, target: File): Boolean = withContext(Dispatchers.IO) {
         val s = settings.current()
+        val c = mode.config(s)
         val source = photo.displayUri ?: return@withContext false
-        if (s.deliverySize == "original") {
+        if (c.size == "original") {
             val uri = Uri.parse(photo.jpgUri ?: source)
             val input = if (uri.scheme == "file") File(uri.path!!).inputStream() else context.contentResolver.openInputStream(uri)
             input?.use { i -> target.outputStream().use { i.copyTo(it) } } ?: return@withContext false
         } else {
-            val edge = if (s.deliverySize == "edited") 0 else s.lightShareSize.takeIf { it > 0 } ?: 2048
+            val edge = if (c.size == "edited") 0 else s.lightShareSize.takeIf { it > 0 } ?: 2048
             val looked = looks.exportFile(photo, edge)
             val from = looked?.let { Uri.fromFile(it).toString() } ?: source
-            val made = export.exportLight(from, "entrega_${photo.id}", s.copy(lightShareSize = edge, watermarkEnabled = s.deliveryWatermark), photo.lat, photo.lon)
+            val made = export.exportLight(from, "${mode.dir}_${photo.id}", s.copy(lightShareSize = edge, watermarkEnabled = c.watermark), photo.lat, photo.lon)
             looked?.delete()
             made ?: return@withContext false
             if (!made.renameTo(target)) {
@@ -345,17 +375,21 @@ class LocalDelivery(
                 made.delete()
             }
         }
-        if (session.express) makePreview(target, s.deliveryPhotographer, s.expressMarkOpacity, s)
-        s.deliveryFolder?.let { folder ->
+        if (session.express && !makePreview(target, c.photographer, s.expressMarkOpacity, s)) {
+            target.delete()
+            return@withContext false
+        }
+        c.folder?.let { folder ->
             runCatching { MirrorCopy(context).copy(Uri.fromFile(target).toString(), folder, listOf(session.client), DeliveryRules.itemName(session.client, photo.savedBase)) }
-                .onFailure { AppLog.w("ENTREGA", "Cópia em 07 Entregas falhou", it) }
+                .onFailure { AppLog.w(tag, "Cópia na pasta de entregas falhou", it) }
         }
         true
     }
 
     /**
-     * The portal's files: the page from assets/portal, the brand's font and logos from the app itself.
-     * A font resource is stored as the plain .ttf, so it opens as raw without a second copy in the APK.
+     * The page's files: assets/portal (Entrega local) or assets/express (Fotografia Express), and the
+     * brand's font and logos from the app itself. A font resource is stored as the plain .ttf, so it
+     * opens as raw without a second copy in the APK.
      */
     @android.annotation.SuppressLint("ResourceType")
     private fun portalFile(name: String): java.io.InputStream? = runCatching {
@@ -363,22 +397,24 @@ class LocalDelivery(
             "exo2.ttf" -> context.resources.openRawResource(com.example.R.font.exo2_semibold)
             "logo.png" -> context.assets.open("watermarks/horizontal_branco.png")
             "icon.png" -> context.assets.open("watermarks/simbolo.png")
-            else -> context.assets.open("portal/$name")
+            else -> context.assets.open("${mode.assets}/$name")
         }
     }.getOrNull()
 
-    /** The marked, smaller copy that is all an unreleased Express photo shows. */
-    private fun makePreview(target: File, photographer: String, opacity: Int, s: com.example.core.data.Settings) {
-        val bitmap = BitmapLoader.load(context, Uri.fromFile(target), ExpressPreview.EDGE) ?: return
+    /** The marked, smaller copy that is all an unreleased Express photo shows. False when it could not be made. */
+    private fun makePreview(target: File, photographer: String, opacity: Int, s: com.example.core.data.Settings): Boolean {
+        val bitmap = BitmapLoader.load(context, Uri.fromFile(target), ExpressPreview.EDGE) ?: return false
         val marked = bitmap.copy(Bitmap.Config.ARGB_8888, true).also { if (it !== bitmap) bitmap.recycle() }
         val logo = export.loadLogo(s)
         ExpressPreview.mark(marked, logo, photographer, opacity)
         logo?.recycle()
-        previewFileOf(target.path).outputStream().use { marked.compress(Bitmap.CompressFormat.JPEG, 80, it) }
+        val out = previewFileOf(target.path)
+        out.outputStream().use { marked.compress(Bitmap.CompressFormat.JPEG, 80, it) }
         marked.recycle()
+        return out.length() > 0
     }
 
-    /** A small JPG for the portal grid, made once next to the file (from the marked preview when [locked]). */
+    /** A small JPG for the page's grid, made once next to the file (from the marked preview when [locked]). */
     private fun thumbFor(item: DeliveryItem, locked: Boolean): File? {
         val path = item.path ?: return null
         val file = if (locked) previewFileOf(path).takeIf { it.exists() } ?: return null else File(path)

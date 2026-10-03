@@ -207,7 +207,7 @@ private fun DeliveryTest(app: TetherApp, s: Settings) {
         } else {
             (status as? com.example.core.delivery.DeliveryStatus.Failed)?.let { Text(it.reason, style = MaterialTheme.typography.bodySmall, color = Tone.Error) }
             DevButton("Iniciar o teste", status !is com.example.core.delivery.DeliveryStatus.Starting, Modifier.fillMaxWidth()) {
-                val needed = com.example.ui.delivery.permissionsFor(s.copy(deliveryNetwork = s.deliveryNetwork))
+                val needed = com.example.ui.delivery.permissionsFor(s.deliveryNetwork)
                     .filter { androidx.core.content.ContextCompat.checkSelfPermission(context, it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
                 if (needed.isEmpty()) start() else ask.launch(needed.toTypedArray())
             }

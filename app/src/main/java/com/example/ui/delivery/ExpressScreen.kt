@@ -97,21 +97,30 @@ import java.util.Locale
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
-fun ExpressScreen(app: TetherApp, onBack: () -> Unit, onSettings: () -> Unit, onOpenGallery: () -> Unit) {
+fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val settings by app.settings.settings.collectAsState(initial = null)
-    val status by app.delivery.status.collectAsState()
-    val online by app.delivery.online.collectAsState()
-    val devices by app.delivery.devices.collectAsState()
-    val sessions by app.delivery.sessions.collectAsState(initial = emptyList())
-    val allItems by app.delivery.items.collectAsState(initial = emptyList())
+    val status by app.express.status.collectAsState()
+    val online by app.express.online.collectAsState()
+    val devices by app.express.devices.collectAsState()
+    val sessions by app.express.sessions.collectAsState(initial = emptyList())
+    val allItems by app.express.items.collectAsState(initial = emptyList())
     val selected = remember { mutableStateListOf<Long>() }
     var finishing by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
     val s = settings ?: return
 
-    LaunchedEffect(s.expressEnabled) { if (s.expressEnabled) app.delivery.expressSession() }
+    var picking by remember { mutableStateOf(false) }
+    LaunchedEffect(s.expressEnabled) {
+        if (!s.expressEnabled) return@LaunchedEffect
+        app.express.expressSession()
+        // "Ligar o Wi-Fi ao abrir": the network comes up with the tab, no extra tap.
+        if (s.expressAutoStart && app.express.status.value is DeliveryStatus.Off) {
+            val needed = permissionsFor(s.expressNetwork).filter { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
+            if (needed.isEmpty()) app.express.start()
+        }
+    }
 
     val now = System.currentTimeMillis()
     val current = sessions.firstOrNull { it.express && it.isValid(now) }
@@ -119,12 +128,12 @@ fun ExpressScreen(app: TetherApp, onBack: () -> Unit, onSettings: () -> Unit, on
     val history = sessions.filter { it.express && !it.isValid(now) }
 
     val askPermissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-        if (result.values.all { it }) scope.launch { app.delivery.start() }
+        if (result.values.all { it }) scope.launch { app.express.start() }
         else Toast.makeText(context, "Sem a permissão de Wi-Fi o celular não cria a rede. Use o roteador do celular em Ajustes da entrega.", Toast.LENGTH_LONG).show()
     }
     val start: () -> Unit = {
-        val needed = permissionsFor(s).filter { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
-        if (needed.isEmpty()) scope.launch { app.delivery.start() } else askPermissions.launch(needed.toTypedArray())
+        val needed = permissionsFor(s.expressNetwork).filter { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
+        if (needed.isEmpty()) scope.launch { app.express.start() } else askPermissions.launch(needed.toTypedArray())
     }
     fun toast(t: String) = Toast.makeText(context, t, Toast.LENGTH_SHORT).show()
 
@@ -134,7 +143,7 @@ fun ExpressScreen(app: TetherApp, onBack: () -> Unit, onSettings: () -> Unit, on
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar") }
+                onBack?.let { IconButton(onClick = it) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar") } }
                 Text("Fotografia Express", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                 IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, contentDescription = "Ajustes do Express") }
             }
@@ -159,11 +168,12 @@ fun ExpressScreen(app: TetherApp, onBack: () -> Unit, onSettings: () -> Unit, on
             }
 
             StatusCard(
-                status = status, online = online, devices = devices, network = networkLabel(s.deliveryNetwork),
+                status = status, online = online, devices = devices, network = networkLabel(s.expressNetwork),
                 ready = items.count { it.state in DeliveryState.served },
                 onStart = start,
-                onStop = { scope.launch { app.delivery.stop() } },
+                onStop = { scope.launch { app.express.stop() } },
                 onOpenPortal = { (status as? DeliveryStatus.Running)?.let { r -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(r.url())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } } },
+                liveTitle = "Express no ar",
             )
 
             (status as? DeliveryStatus.Running)?.takeIf { !it.test }?.let { r ->
@@ -173,7 +183,7 @@ fun ExpressScreen(app: TetherApp, onBack: () -> Unit, onSettings: () -> Unit, on
                         QrBlock(if (r.wifiQr != null) "② Ver as fotos" else "Ver as fotos", r.url(), "${r.url()}\nSem código")
                     }
                     OutlinedButton(
-                        onClick = { runCatching { PlateExport.share(context, PlateExport.Plate(r.ssid, r.password, r.url(), s.deliveryPhotographer, express = true)) } },
+                        onClick = { runCatching { PlateExport.share(context, PlateExport.Plate(r.ssid, r.password, r.url(), s.expressPhotographer, express = true)) } },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     ) {
                         Icon(Icons.Outlined.Print, null)
@@ -214,12 +224,27 @@ fun ExpressScreen(app: TetherApp, onBack: () -> Unit, onSettings: () -> Unit, on
                             "${items.size} ${if (items.size == 1) "foto" else "fotos"} · $released liberadas · ${picked.size} favoritas do cliente",
                             style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted,
                         )
+                        // What to charge: the client's hearts, or the photos marked here.
+                        com.example.core.delivery.DeliveryRules.price(s.expressPriceCents * (if (selected.isNotEmpty()) selected.size else picked.size))?.let { total ->
+                            Text(
+                                (if (selected.isNotEmpty()) "${selected.size} marcadas: " else "${picked.size} favoritas: ") + total,
+                                style = MaterialTheme.typography.labelLarge, color = Tone.Accent,
+                            )
+                        }
                     }
-                    IconButton(onClick = onOpenGallery) { Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = "Adicionar fotos da galeria") }
+                    Button(
+                        onClick = { picking = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) {
+                        Icon(Icons.Outlined.AddPhotoAlternate, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Mandar fotos")
+                    }
                 }
                 if (items.isEmpty()) {
                     Text(
-                        if (s.expressAuto) "Cada foto nova da câmera entra aqui sozinha." else "Na galeria, selecione as fotos e toque em Entregar → Fotografia Express.",
+                        if (s.expressAuto) "Cada foto nova da câmera entra aqui sozinha. Para mandar outras, toque em Mandar fotos." else "Toque em Mandar fotos, ou na galeria selecione e toque em Express.",
                         style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted,
                     )
                 } else {
@@ -237,7 +262,7 @@ fun ExpressScreen(app: TetherApp, onBack: () -> Unit, onSettings: () -> Unit, on
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (selected.isNotEmpty()) {
                             Button(
-                                onClick = { scope.launch { app.delivery.release(selected.toList()); toast("${selected.size} liberadas"); selected.clear() } },
+                                onClick = { scope.launch { app.express.release(selected.toList()); toast("${selected.size} liberadas"); selected.clear() } },
                                 colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
                                 modifier = Modifier.heightIn(min = 48.dp),
                             ) {
@@ -245,18 +270,18 @@ fun ExpressScreen(app: TetherApp, onBack: () -> Unit, onSettings: () -> Unit, on
                                 Spacer(Modifier.width(8.dp))
                                 Text("Liberar ${selected.size}")
                             }
-                            OutlinedButton(onClick = { scope.launch { app.delivery.release(selected.toList(), on = false); selected.clear() } }, modifier = Modifier.heightIn(min = 48.dp)) {
+                            OutlinedButton(onClick = { scope.launch { app.express.release(selected.toList(), on = false); selected.clear() } }, modifier = Modifier.heightIn(min = 48.dp)) {
                                 Text("Bloquear de novo")
                             }
                         } else {
                             if (picked.any { !it.released }) {
-                                OutlinedButton(onClick = { scope.launch { app.delivery.release(picked.map { it.id }); toast("Favoritas liberadas") } }, modifier = Modifier.heightIn(min = 48.dp)) {
+                                OutlinedButton(onClick = { scope.launch { app.express.release(picked.map { it.id }); toast("Favoritas liberadas") } }, modifier = Modifier.heightIn(min = 48.dp)) {
                                     Icon(Icons.Outlined.Favorite, null, tint = Tone.Accent)
                                     Spacer(Modifier.width(8.dp))
                                     Text("Liberar favoritas (${picked.size})")
                                 }
                             }
-                            OutlinedButton(onClick = { scope.launch { app.delivery.releaseAll(); toast("Todas liberadas") } }, enabled = released < items.size, modifier = Modifier.heightIn(min = 48.dp)) {
+                            OutlinedButton(onClick = { scope.launch { app.express.releaseAll(); toast("Todas liberadas") } }, enabled = released < items.size, modifier = Modifier.heightIn(min = 48.dp)) {
                                 Icon(Icons.Outlined.DoneAll, null)
                                 Spacer(Modifier.width(8.dp))
                                 Text("Liberar todas")
@@ -298,6 +323,16 @@ fun ExpressScreen(app: TetherApp, onBack: () -> Unit, onSettings: () -> Unit, on
         }
     }
 
+    if (picking) {
+        ExpressPickSheet(app, alreadyIn = items.map { it.photoId }.toSet(), onDismiss = { picking = false }) { ids ->
+            picking = false
+            scope.launch {
+                val added = app.express.sendToExpress(ids)
+                toast(if (added == 0) "Essas fotos já estavam no Express" else "$added ${if (added == 1) "foto mandada" else "fotos mandadas"} ao cliente")
+            }
+        }
+    }
+
     if (finishing) {
         var name by remember { mutableStateOf("") }
         AlertDialog(
@@ -318,7 +353,7 @@ fun ExpressScreen(app: TetherApp, onBack: () -> Unit, onSettings: () -> Unit, on
                 TextButton(onClick = {
                     finishing = false
                     selected.clear()
-                    scope.launch { app.delivery.finishExpress(name); toast("Pronto para o próximo cliente") }
+                    scope.launch { app.express.finishExpress(name); toast("Pronto para o próximo cliente") }
                 }) { Text("Finalizar e limpar") }
             },
             dismissButton = { TextButton(onClick = { finishing = false }) { Text("Cancelar") } },

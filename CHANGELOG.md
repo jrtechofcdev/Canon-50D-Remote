@@ -2,6 +2,36 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [4.2] · 2026-10-03
+
+**Entrega local e Fotografia Express agora são duas ferramentas separadas.** Uma não depende da outra para funcionar.
+
+- **Abas próprias:** **Entrega** e **Express** ganharam abas na barra. Com mais de 5 abas, a barra rola para o lado. Em Ajustes → Tela → **Abas da barra** dá para esconder as que você não usa (Sessão e Ajustes ficam sempre).
+- **Separação completa:**
+  - cada ferramenta tem a sua rede, senha, página, porta (Entrega 8080, Express 8090), fila, pasta de cópias e clientes;
+  - um acesso da Entrega não abre o Express, e o Express não aceita código;
+  - só uma usa o Wi-Fi por vez: ligar uma desliga a outra.
+- **Correção:** ao ler o QR do Express, o celular do cliente podia abrir a página da Entrega, com fotos sem prévia. Agora o Express tem página e endereço próprios e não guarda acesso no celular do cliente.
+- **Página nova do Express**, diferente da Entrega:
+  - lista de fotos grandes, cada uma com o selo "Prévia" ou "Liberada";
+  - valor por foto e total das favoritas;
+  - chave Pix com botão de copiar;
+  - barra fixa com as favoritas e **Salvar liberadas**.
+- **Mandar fotos ao Express:**
+  - botão **Mandar fotos** dentro da aba Express, com uma grade das fotos recentes;
+  - botão **Express** na seleção da galeria, no visualizador e na Sessão (Última foto), separado do **Entregar**.
+- **Ajustes novos:**
+  - **Fotografia Express:**
+    - rede e senha próprias (`DIRECT-JR-Express`);
+    - o que a foto liberada é (editada inteira por padrão) e se leva marca;
+    - valor de cada foto;
+    - mostrar a chave Pix;
+    - ligar o Wi-Fi ao abrir a aba;
+    - pasta `08 Express`.
+  - **Entrega local e Express:** vibrar quando o cliente baixa ou marca uma favorita.
+  - **Tela:** abas da barra.
+- A prévia do Express precisa existir antes de a foto aparecer. Se ela não puder ser feita, a foto fica com erro, e nunca aparece sem marca.
+
 ## [4.1] · 2026-10-02
 
 - **Código do cliente com 4 números** (antes eram 6). Mais rápido de falar e digitar, e o portal entra sozinho ao completar os 4 números. Os códigos de 6 da 4.0 continuam valendo até expirar. O limite de 5 tentativas erradas por minuto continua.

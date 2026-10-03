@@ -226,6 +226,28 @@ data class Settings(
     val expressAuto: Boolean = true,
     /** Strength of the preview mark, 20..80 %. */
     val expressMarkOpacity: Int = 45,
+    // Its own network, files and page: Express never needs the Entrega local set up.
+    val expressNetwork: String = "direct",
+    val expressSsid: String = "DIRECT-JR-Express",
+    val expressPassword: String = "",
+    /** "light", "edited" or "original": what a released photo is. */
+    val expressSize: String = "edited",
+    /** The brand mark on released photos too (off: paid photos go clean). */
+    val expressWatermark: Boolean = false,
+    val expressPhotographer: String = "Jr_Tech_OFC",
+    val expressPicks: Boolean = true,
+    /** Copies of what each Express client received, one folder per client. */
+    val expressFolder: String? = null,
+    /** Price of one photo in cents, shown to the client and in the totals (0 = not shown). */
+    val expressPriceCents: Int = 0,
+    /** The Pix key from Ajustes → Mensagens, shown in the portal for payment. */
+    val expressShowPix: Boolean = false,
+    /** Brings the Wi-Fi up as soon as the Express tab opens. */
+    val expressAutoStart: Boolean = false,
+    /** A short vibration when a client hearts or downloads a photo. */
+    val deliveryVibrate: Boolean = true,
+    /** Tabs hidden from the bar (routes, comma separated). Sessão and Ajustes always stay. */
+    val hiddenTabs: String = "",
 
     // Live view
     val liveViewEnabled: Boolean = true,
@@ -410,6 +432,19 @@ object SettingKeys {
     val expressPreview = booleanPreferencesKey("express_preview")
     val expressAuto = booleanPreferencesKey("express_auto")
     val expressMarkOpacity = intPreferencesKey("express_mark_opacity")
+    val expressNetwork = stringPreferencesKey("express_network")
+    val expressSsid = stringPreferencesKey("express_ssid")
+    val expressPassword = stringPreferencesKey("express_password")
+    val expressSize = stringPreferencesKey("express_size")
+    val expressWatermark = booleanPreferencesKey("express_watermark")
+    val expressPhotographer = stringPreferencesKey("express_photographer")
+    val expressPicks = booleanPreferencesKey("express_picks")
+    val expressFolder = stringPreferencesKey("express_folder")
+    val expressPriceCents = intPreferencesKey("express_price_cents")
+    val expressShowPix = booleanPreferencesKey("express_show_pix")
+    val expressAutoStart = booleanPreferencesKey("express_auto_start")
+    val deliveryVibrate = booleanPreferencesKey("delivery_vibrate")
+    val hiddenTabs = stringPreferencesKey("hidden_tabs")
     val liveViewEnabled = booleanPreferencesKey("live_view_enabled")
     val liveOnCamera = booleanPreferencesKey("live_on_camera")
     val liveGrid = stringPreferencesKey("live_grid")
@@ -620,6 +655,19 @@ class SettingsRepository(private val context: Context) {
             expressPreview = this[k.expressPreview] ?: d.expressPreview,
             expressAuto = this[k.expressAuto] ?: d.expressAuto,
             expressMarkOpacity = this[k.expressMarkOpacity] ?: d.expressMarkOpacity,
+            expressNetwork = this[k.expressNetwork] ?: d.expressNetwork,
+            expressSsid = this[k.expressSsid]?.takeIf { it.isNotBlank() } ?: d.expressSsid,
+            expressPassword = this[k.expressPassword] ?: d.expressPassword,
+            expressSize = this[k.expressSize] ?: d.expressSize,
+            expressWatermark = this[k.expressWatermark] ?: d.expressWatermark,
+            expressPhotographer = this[k.expressPhotographer]?.takeIf { it.isNotBlank() } ?: d.expressPhotographer,
+            expressPicks = this[k.expressPicks] ?: d.expressPicks,
+            expressFolder = this[k.expressFolder],
+            expressPriceCents = this[k.expressPriceCents] ?: d.expressPriceCents,
+            expressShowPix = this[k.expressShowPix] ?: d.expressShowPix,
+            expressAutoStart = this[k.expressAutoStart] ?: d.expressAutoStart,
+            deliveryVibrate = this[k.deliveryVibrate] ?: d.deliveryVibrate,
+            hiddenTabs = this[k.hiddenTabs] ?: d.hiddenTabs,
             liveViewEnabled = this[k.liveViewEnabled] ?: d.liveViewEnabled,
             liveOnCamera = this[k.liveOnCamera] ?: d.liveOnCamera,
             liveGrid = this[k.liveGrid] ?: d.liveGrid,

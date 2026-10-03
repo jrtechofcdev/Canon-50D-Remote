@@ -43,22 +43,35 @@ class DeliveryService : LifecycleService() {
             (applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).createWifiLock(mode, "jrlink:delivery").apply { acquire() }
         }.getOrNull()
 
-        val delivery = (application as TetherApp).delivery
+        val app = application as TetherApp
         lifecycleScope.launch {
-            combine(delivery.status, delivery.online, delivery.items, delivery.sessions) { status, online, items, sessions ->
-                if (status !is DeliveryStatus.Running) return@combine null
-                val clients = sessions.count { it.isOpen }
-                val ready = items.count { it.state in DeliveryState.served }
-                val people = if (online > 0) "$online ${if (online == 1) "celular" else "celulares"} no portal" else "$clients ${if (clients == 1) "cliente" else "clientes"}"
-                "${status.network} · $people · $ready ${if (ready == 1) "foto" else "fotos"}"
-            }.distinctUntilChanged().collect { text -> if (text == null) stopSelf() else update(text) }
+            // Whichever tool holds the Wi-Fi (only one at a time).
+            combine(line(app.delivery), line(app.express)) { a, b -> a ?: b }
+                .distinctUntilChanged().collect { text -> if (text == null) stopSelf() else update(text) }
         }
     }
+
+    private fun line(tool: LocalDelivery) =
+        combine(tool.status, tool.online, tool.items, tool.sessions) { status, online, items, sessions ->
+            if (status !is DeliveryStatus.Running) return@combine null
+            val ready = items.count { it.state in DeliveryState.served }
+            val people = if (tool.mode.express) {
+                if (online > 0) "$online no portal" else "aguardando o cliente"
+            } else {
+                val clients = sessions.count { it.isOpen }
+                if (online > 0) "$online ${if (online == 1) "celular" else "celulares"} no portal" else "$clients ${if (clients == 1) "cliente" else "clientes"}"
+            }
+            "${tool.mode.label} · $people · $ready ${if (ready == 1) "foto" else "fotos"}"
+        }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         if (intent?.action == ACTION_STOP) {
-            lifecycleScope.launch { (application as TetherApp).delivery.stop() }
+            lifecycleScope.launch {
+                val app = application as TetherApp
+                app.delivery.stop()
+                app.express.stop()
+            }
         }
         return START_NOT_STICKY
     }
@@ -76,14 +89,16 @@ class DeliveryService : LifecycleService() {
 
     private fun notification(text: String) = NotificationCompat.Builder(this, CHANNEL_ID)
         .setSmallIcon(com.example.R.drawable.ic_stat_symbol)
-        .setContentTitle("Entrega ativa")
+        .setContentTitle("Entrega no ar")
         .setColor(0xFF00FCA8.toInt())
         .setContentText(text)
         .setOngoing(true)
         .setOnlyAlertOnce(true)
         .setContentIntent(
             PendingIntent.getActivity(
-                this, 1, Intent(this, MainActivity::class.java).setAction(MainActivity.ACTION_DELIVERY), PendingIntent.FLAG_IMMUTABLE,
+                this, 1, Intent(this, MainActivity::class.java).setAction(MainActivity.ACTION_DELIVERY)
+                    // Opens the tab of the tool that is on the air.
+                    .putExtra(MainActivity.EXTRA_ROUTE, if ((application as TetherApp).express.status.value is DeliveryStatus.Running) "express" else "delivery"), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             ),
         )
         .addAction(

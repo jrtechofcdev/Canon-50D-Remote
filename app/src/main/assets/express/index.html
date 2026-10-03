@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#121212">
+<title>Fotografia Express</title>
+<link rel="icon" href="/icon.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="bar">
+  <img class="logo" src="/logo.png" alt="Jr_Tech_OFC">
+  <span class="chip">Fotografia Express</span>
+</header>
+
+<main>
+  <section class="intro">
+    <h1 id="title">Suas fotos de hoje</h1>
+    <p id="sub" class="muted">Conectando ao celular do fotógrafo…</p>
+  </section>
+
+  <section id="pay" class="pay" hidden>
+    <div class="pay-head">
+      <span class="lock" aria-hidden="true"></span>
+      <div>
+        <p class="pay-title">Fotos em prévia</p>
+        <p class="muted small">Toque no coração das que você quer. Depois do pagamento, o fotógrafo libera e elas aparecem aqui sem marca, prontas para salvar.</p>
+      </div>
+    </div>
+    <p id="price" class="price" hidden></p>
+    <div id="pixRow" class="pix" hidden>
+      <span class="muted small">Pix</span>
+      <code id="pixKey"></code>
+      <button id="copyPix" class="ghost small">Copiar</button>
+    </div>
+  </section>
+
+  <p id="waiting" class="waiting" hidden></p>
+
+  <section id="feed" class="feed" aria-live="polite"></section>
+
+  <div id="empty" class="empty" hidden>
+    <div class="pulse" aria-hidden="true"></div>
+    <p>As fotos aparecem aqui assim que o fotógrafo tirar.</p>
+    <p class="muted small">Deixe esta página aberta.</p>
+  </div>
+
+  <p id="closed" class="empty" hidden>Nenhum atendimento aberto agora. Fale com o fotógrafo.</p>
+</main>
+
+<footer id="dock" class="dock" hidden>
+  <p id="dockText"></p>
+  <button id="saveAll" class="primary" hidden>Salvar liberadas</button>
+</footer>
+
+<div id="viewer" class="viewer" hidden>
+  <div class="viewer-bar">
+    <button id="close" class="ghost">Fechar</button>
+    <span id="pos" class="muted"></span>
+  </div>
+  <img id="big" alt="">
+  <div class="viewer-actions">
+    <button id="prev" class="ghost nav" aria-label="Anterior">‹</button>
+    <a id="vSave" class="primary">Salvar foto</a>
+    <button id="vPick" class="ghost heart" aria-label="Favorita">♡</button>
+    <button id="next" class="ghost nav" aria-label="Próxima">›</button>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status"></div>
+<script src="/app.js"></script>
+</body>
+</html>

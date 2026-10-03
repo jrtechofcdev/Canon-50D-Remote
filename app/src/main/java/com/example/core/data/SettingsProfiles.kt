@@ -55,7 +55,8 @@ object SettingsProfiles {
         SettingKeys.recentContacts, SettingKeys.clientPin, SettingKeys.sessionAdjust, SettingKeys.presetCategories,
         SettingKeys.sessionPresetId, SettingKeys.livePresetId, SettingKeys.presets, SettingKeys.logFolder,
         SettingKeys.appFolder, SettingKeys.mirrorFolder, SettingKeys.notesFolder, SettingKeys.pixKey, SettingKeys.developerMode,
-        SettingKeys.deliveryFolder, SettingKeys.deliveryPassword, SettingKeys.deliveryActiveSession, PROFILES, ACTIVE,
+        SettingKeys.deliveryFolder, SettingKeys.deliveryPassword, SettingKeys.deliveryActiveSession,
+        SettingKeys.expressFolder, SettingKeys.expressPassword, PROFILES, ACTIVE,
     ).map { it.name }.toSet()
 
     /** Left out of a backup file: folder permissions and preset ids don't carry over to another phone. */
@@ -63,7 +64,7 @@ object SettingsProfiles {
         SettingKeys.jpgFolder, SettingKeys.rawFolder, SettingKeys.presetsFolder, SettingKeys.editedFolder,
         SettingKeys.backupFolder, SettingKeys.watermarkPath, SettingKeys.sessionPresetId, SettingKeys.livePresetId,
         SettingKeys.logFolder, SettingKeys.appFolder, SettingKeys.mirrorFolder, SettingKeys.notesFolder,
-        SettingKeys.deliveryFolder, SettingKeys.deliveryActiveSession, PROFILES, ACTIVE,
+        SettingKeys.deliveryFolder, SettingKeys.deliveryActiveSession, SettingKeys.expressFolder, PROFILES, ACTIVE,
     ).map { it.name }.toSet()
 
     private class Builder {

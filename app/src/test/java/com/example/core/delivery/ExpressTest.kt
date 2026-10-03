@@ -28,6 +28,9 @@ class ExpressTest {
 
     private lateinit var db: PhotoDatabase
     private lateinit var server: LocalServer
+    /** A Entrega local server on the same phone: it must know nothing of Express. */
+    private lateinit var normal: LocalServer
+    private var normalPort = 0
     private lateinit var dir: File
     private var port = 0
     private var info = PortalInfo("Jr_Tech_OFC", true, express = true, expressPreview = true)
@@ -39,18 +42,21 @@ class ExpressTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         db = Room.inMemoryDatabaseBuilder(context, PhotoDatabase::class.java).allowMainThreadQueries().build()
         dir = File(context.cacheDir, "express_test").apply { deleteRecursively(); mkdirs() }
-        server = LocalServer(db.deliveryDao(), portal = { null }, thumb = { _, _ -> null }, info = { info })
+        server = LocalServer(db.deliveryDao(), portal = { null }, thumb = { _, _ -> null }, info = { info }, expressServer = true)
         port = server.start(0)
+        normal = LocalServer(db.deliveryDao(), portal = { null }, thumb = { _, _ -> null }, info = { info.copy(express = false) })
+        normalPort = normal.start(0)
     }
 
     @After
     fun tearDown() {
         server.stop()
+        normal.stop()
         db.close()
     }
 
-    private fun get(path: String): Pair<Int, ByteArray> {
-        val c = URL("http://127.0.0.1:$port$path").openConnection() as HttpURLConnection
+    private fun get(path: String, at: Int = port): Pair<Int, ByteArray> {
+        val c = URL("http://127.0.0.1:$at$path").openConnection() as HttpURLConnection
         val status = c.responseCode
         return status to ((if (status < 400) c.inputStream else c.errorStream)?.use { it.readBytes() } ?: ByteArray(0))
     }
@@ -106,6 +112,45 @@ class ExpressTest {
         assertEquals(403, get("/f/${s.token}/${item.id}").first)
         info = info.copy(expressPreview = false)
         assertEquals(200, get("/f/${s.token}/${item.id}").first)
+    }
+
+    @Test
+    fun theTwoToolsNeverOpenEachOthersClients() {
+        val (s, item) = express()
+        // The Express token is unknown to the Entrega local server, and it has no open gallery.
+        assertEquals(404, get("/api/s/${s.token}", normalPort).first)
+        assertEquals(404, get("/f/${s.token}/${item.id}", normalPort).first)
+        assertEquals(404, get("/api/express", normalPort).first)
+        // A Entrega local client is unknown to the Express server, and Express has no code login.
+        val client = runBlocking {
+            val c = DeliverySession(client = "Ana", code = "1234", token = "a".repeat(32), createdAt = 1)
+            c.copy(id = db.deliveryDao().insertSession(c))
+        }
+        assertEquals(200, get("/api/s/${client.token}", normalPort).first)
+        assertEquals(404, get("/api/s/${client.token}").first)
+        assertEquals(404, get("/api/login?code=1234").first)
+        assertEquals(200, get("/api/login?code=1234", normalPort).first)
+    }
+
+    @Test
+    fun eachQueueOnlyPreparesItsOwnTool() = runBlocking {
+        val dao = db.deliveryDao()
+        val made = mutableListOf<Boolean>()
+        fun queue(express: Boolean) = DeliveryQueue(
+            dao, db.photoDao(), DeliveryPreparer { _, session, t -> made += session.express; t.writeText("x"); true },
+            File(dir, "q$express"), DeliveryEvents(), express = express,
+        )
+        val (s, _) = express()
+        val pid = db.photoDao().insert(Photo(session = "S", baseName = "IMG_2", savedBase = "IMG_2", capturedAt = 2))
+        val normalClient = dao.insertSession(DeliverySession(client = "Bia", code = "5678", token = "b".repeat(32), createdAt = 1))
+        // Each queue refuses the other tool's client.
+        assertEquals(0, queue(express = false).enqueue(s.id, listOf(pid)))
+        assertEquals(0, queue(express = true).enqueue(normalClient, listOf(pid)))
+        assertEquals(1, queue(express = true).enqueue(s.id, listOf(pid)))
+        assertEquals(1, queue(express = false).enqueue(normalClient, listOf(pid)))
+        assertTrue(queue(express = true).processNext())
+        assertTrue(queue(express = false).processNext())
+        assertEquals(listOf(true, false), made)
     }
 
     @Test

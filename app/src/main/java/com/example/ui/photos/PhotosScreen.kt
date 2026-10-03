@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.WifiTethering
+import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
@@ -110,7 +111,9 @@ fun PhotosScreen(
     onSelectingChange: (Boolean) -> Unit = {},
     onCrop: (Long) -> Unit = {},
     onOpenDelivery: () -> Unit = {},
+    onOpenExpress: () -> Unit = {},
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = emptyList())
     val settings by app.settings.settings.collectAsState(initial = Settings())
     val presets by app.presets.presets.collectAsState(initial = emptyList())
@@ -260,6 +263,7 @@ fun PhotosScreen(
                 onMessage = { sheet = "message" },
                 onWhatsApp = { sheet = "whatsapp" },
                 onDeliver = { sheet = "deliver" },
+                onExpress = { com.example.ui.delivery.sendToExpress(app, context, scope, selection.map { it.id }, onOpenExpress) { selected.clear() } },
                 onCrop = { sheet = "crop" },
                 onDelete = { sheet = "delete" },
                 onShare = { set -> scope.launch { actions.share(selection, set, settings) } },
@@ -349,6 +353,7 @@ private fun BatchBar(
     onMessage: () -> Unit,
     onWhatsApp: () -> Unit,
     onDeliver: () -> Unit,
+    onExpress: () -> Unit,
     onCrop: () -> Unit,
     onDelete: () -> Unit,
     onShare: (ShareSet) -> Unit,
@@ -363,6 +368,7 @@ private fun BatchBar(
     ) {
         BarAction(Icons.AutoMirrored.Outlined.Send, "WhatsApp", onWhatsApp)
         BarAction(Icons.Outlined.WifiTethering, "Entregar", onDeliver)
+        BarAction(Icons.Outlined.Collections, "Express", onExpress)
         BarAction(Icons.Outlined.Style, "Preset", onPreset)
         BarAction(Icons.Outlined.Crop, "Recorte", onCrop)
         BarMenu(Icons.Outlined.Share, "Enviar", sets, onShare)

@@ -33,6 +33,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.WifiTethering
 import androidx.compose.material.icons.outlined.Collections
+import androidx.compose.material.icons.outlined.Tab
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Style
@@ -1087,6 +1088,16 @@ private fun DisplaySettings(app: TetherApp, s: Settings) {
     SettingsGroup("Tela", Icons.Outlined.Smartphone) {
         ToggleRow(Icons.Outlined.LightMode, "Manter a tela ligada", "Enquanto a câmera estiver conectada", s.keepScreenOn) {
             scope.launch { app.settings.set(SettingKeys.keepScreenOn, it) }
+        }
+    }
+    SettingsGroup("Abas da barra", Icons.Outlined.Tab) {
+        InfoText("Esconda as abas que não usa. Sessão e Ajustes ficam sempre. Com mais de 5 abas, a barra rola para o lado.")
+        val hidden = s.hiddenTabs.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        com.example.Tab.entries.filter { it.hideable }.forEach { tab ->
+            ToggleRow(tab.icon, tab.label, null, tab.route !in hidden) { show ->
+                val next = if (show) hidden - tab.route else hidden + tab.route
+                scope.launch { app.settings.set(SettingKeys.hiddenTabs, next.joinToString(",")) }
+            }
         }
     }
 }

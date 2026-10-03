@@ -94,7 +94,7 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun DeliveryScreen(app: TetherApp, actions: PhotoActions, onBack: () -> Unit, onSettings: () -> Unit) {
+fun DeliveryScreen(app: TetherApp, actions: PhotoActions, onBack: (() -> Unit)?, onSettings: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val settings by app.settings.settings.collectAsState(initial = null)
@@ -109,16 +109,15 @@ fun DeliveryScreen(app: TetherApp, actions: PhotoActions, onBack: () -> Unit, on
     val s = settings ?: return
 
     val now = System.currentTimeMillis()
-    // Fotografia Express has its own screen.
-    val open = sessions.filter { it.isValid(now) && !it.express }
-    val closed = sessions.filterNot { it.isValid(now) || it.express }
+    val open = sessions.filter { it.isValid(now) }
+    val closed = sessions.filterNot { it.isValid(now) }
 
     val askPermissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         if (result.values.all { it }) scope.launch { app.delivery.start() }
         else Toast.makeText(context, "Sem a permissão de Wi-Fi o celular não cria a rede. Use o roteador do celular em Ajustes da entrega.", Toast.LENGTH_LONG).show()
     }
     val start: () -> Unit = {
-        val needed = permissionsFor(s).filter { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
+        val needed = permissionsFor(s.deliveryNetwork).filter { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
         if (needed.isEmpty()) scope.launch { app.delivery.start() } else askPermissions.launch(needed.toTypedArray())
     }
 
@@ -128,7 +127,7 @@ fun DeliveryScreen(app: TetherApp, actions: PhotoActions, onBack: () -> Unit, on
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar") }
+                onBack?.let { IconButton(onClick = it) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar") } }
                 Text("Entrega local", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                 IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, contentDescription = "Ajustes da entrega") }
             }
@@ -258,8 +257,8 @@ fun DeliveryScreen(app: TetherApp, actions: PhotoActions, onBack: () -> Unit, on
 }
 
 /** What the Wi-Fi Direct group needs from Android before it starts. */
-fun permissionsFor(s: Settings): List<String> = when {
-    s.deliveryNetwork != "direct" -> emptyList()
+fun permissionsFor(network: String): List<String> = when {
+    network != "direct" -> emptyList()
     Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> listOf(Manifest.permission.NEARBY_WIFI_DEVICES)
     else -> listOf(Manifest.permission.ACCESS_FINE_LOCATION)
 }
@@ -299,10 +298,12 @@ internal fun StatusCard(
     onStart: () -> Unit,
     onStop: () -> Unit,
     onOpenPortal: () -> Unit,
+    /** What "on the air" is called on this tool's screen. */
+    liveTitle: String = "Entrega ativa",
 ) {
     val running = status as? DeliveryStatus.Running
     val (dot, title, detail) = when (status) {
-        is DeliveryStatus.Running -> Triple(Tone.Accent, if (status.test) "Teste de entrega no ar" else "Entrega ativa", "${status.network} · ${status.url()}")
+        is DeliveryStatus.Running -> Triple(Tone.Accent, if (status.test) "Teste de entrega no ar" else liveTitle, "${status.network} · ${status.url()}")
         DeliveryStatus.Starting -> Triple(Tone.Info, "Ligando…", network)
         is DeliveryStatus.Failed -> Triple(Tone.Error, "Não ligou", status.reason)
         DeliveryStatus.Off -> Triple(Tone.TextMuted, "Parada", "$network · toque em Iniciar quando for entregar")

@@ -57,6 +57,12 @@ object DeliveryRules {
     fun portalUrl(host: String, port: Int = PORT, token: String? = null): String =
         "http://$host" + (if (port == 80) "" else ":$port") + "/" + (token?.let { "?s=$it" } ?: "")
 
+    /** "R$ 15,00" from cents; null for 0 (no price shown). */
+    fun price(cents: Int): String? {
+        if (cents <= 0) return null
+        return "R$ %d,%02d".format(cents / 100, cents % 100)
+    }
+
     /** Client name as a file prefix: "Ana Lúcia" → "Ana-Lucia". */
     fun fileSafe(name: String): String {
         val plain = java.text.Normalizer.normalize(name.trim(), java.text.Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "")

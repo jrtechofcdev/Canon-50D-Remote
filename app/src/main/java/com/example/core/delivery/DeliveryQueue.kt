@@ -26,6 +26,8 @@ class DeliveryQueue(
     private val preparer: DeliveryPreparer,
     private val root: File,
     private val events: DeliveryEvents,
+    /** Which tool this queue works for: it only ever touches that tool's clients. */
+    private val express: Boolean = false,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val wake = Channel<Unit>(Channel.CONFLATED)
@@ -33,7 +35,7 @@ class DeliveryQueue(
 
     /** Adds [photoIds] to a client's queue; the ones already there are skipped. Returns how many were added. */
     suspend fun enqueue(sessionId: Long, photoIds: List<Long>): Int {
-        val session = dao.session(sessionId)?.takeIf { it.isOpen } ?: return 0
+        val session = dao.session(sessionId)?.takeIf { it.isOpen && it.express == express } ?: return 0
         var added = 0
         photos.getAll(photoIds.distinct()).sortedBy { it.capturedAt }.forEach { photo ->
             val id = dao.insertItem(
@@ -69,7 +71,7 @@ class DeliveryQueue(
     fun start(scope: CoroutineScope) {
         if (job?.isActive == true) return
         job = scope.launch {
-            dao.resetPreparing()
+            dao.resetPreparing(express)
             while (isActive) {
                 if (!processNext()) wake.receive()
             }
@@ -83,7 +85,7 @@ class DeliveryQueue(
 
     /** Prepares the oldest waiting item. False when there was nothing to do. */
     suspend fun processNext(): Boolean {
-        val item = dao.nextWaiting() ?: return false
+        val item = dao.nextWaiting(express) ?: return false
         dao.setState(item.id, DeliveryState.PREPARING, null, 0, null, null)
         val session = dao.session(item.sessionId)
         val photo = photos.get(item.photoId)
@@ -109,7 +111,7 @@ class DeliveryQueue(
 
     /** Deletes every prepared file (the history stays; items go back to waiting). */
     suspend fun clearFiles() {
-        dao.forgetFiles()
+        dao.forgetFiles(express)
         root.deleteRecursively()
     }
 

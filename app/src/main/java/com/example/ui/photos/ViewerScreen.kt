@@ -29,6 +29,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.WifiTethering
+import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
@@ -124,6 +125,7 @@ fun ViewerScreen(
     onCalibrate: (Long) -> Unit,
     onCrop: (Long) -> Unit = {},
     onOpenDelivery: () -> Unit = {},
+    onOpenExpress: () -> Unit = {},
 ) {
     val photos by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
     val presets by app.presets.presets.collectAsState(initial = emptyList())
@@ -136,6 +138,7 @@ fun ViewerScreen(
     }
     val start = list.indexOfFirst { it.id == startId }.coerceAtLeast(0)
     val pager = rememberPagerState(initialPage = start) { list.size }
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var confirmDelete by remember { mutableStateOf<Photo?>(null) }
     val zoomed = remember { mutableStateMapOf<Long, Boolean>() }
@@ -277,7 +280,10 @@ fun ViewerScreen(
                         icon = { LightroomMark() },
                     ) { scope.launch { actions.openInLightroom(listOf(current), it, settings) } }
                     ActionTile(Icons.AutoMirrored.Outlined.Send, "WhatsApp", accent = true) { whatsFor = current }
-                    if (settings.deliveryEnabled || settings.expressEnabled) ActionTile(Icons.Outlined.WifiTethering, "Entregar") { deliverFor = current }
+                    if (settings.deliveryEnabled) ActionTile(Icons.Outlined.WifiTethering, "Entregar") { deliverFor = current }
+                    if (settings.expressEnabled) ActionTile(Icons.Outlined.Collections, "Express") {
+                        com.example.ui.delivery.sendToExpress(app, context, scope, listOf(current.id), onOpenExpress)
+                    }
                     SetMenuTile(
                         label = "Enviar",
                         sets = actions.availableSets(current, settings),

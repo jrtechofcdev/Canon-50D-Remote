@@ -37,6 +37,7 @@ object AppFolders {
         Folder(listOf("05 Backup", "Ajustes do app"), "Backup dos ajustes", null),
         Folder(listOf("06 Logs"), "Logs", SettingKeys.logFolder),
         Folder(listOf("07 Entregas"), "Entregas (uma pasta por cliente)", SettingKeys.deliveryFolder),
+        Folder(listOf("08 Express"), "Fotografia Express (uma pasta por cliente)", SettingKeys.expressFolder),
     )
 
     /** The folders a setting points at, for the checklist in Salvamento. */

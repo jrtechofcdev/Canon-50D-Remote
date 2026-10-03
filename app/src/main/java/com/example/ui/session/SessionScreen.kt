@@ -107,6 +107,8 @@ fun SessionScreen(
     var deliverFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
     val deliveryStatus by app.delivery.status.collectAsState()
     val deliveryOnline by app.delivery.online.collectAsState()
+    val expressStatus by app.express.status.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
     var whatsFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
     var noteFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
     val state by app.camera.state.collectAsState()
@@ -216,9 +218,12 @@ fun SessionScreen(
                         is com.example.core.delivery.DeliveryStatus.Running -> if (deliveryOnline > 0) "no ar · $deliveryOnline" else "no ar"
                         else -> null
                     },
-                    onDeliverLatest = if (settings.deliveryEnabled || settings.expressEnabled) ({ deliverFor = photos.firstOrNull() }) else null,
+                    onDeliverLatest = if (settings.deliveryEnabled) ({ deliverFor = photos.firstOrNull() }) else null,
+                    onExpressLatest = if (settings.expressEnabled) ({
+                        photos.firstOrNull()?.let { com.example.ui.delivery.sendToExpress(app, context, scope, listOf(it.id), onOpenExpress) }
+                    }) else null,
                     onExpress = onOpenExpress,
-                    expressState = if (settings.expressEnabled && deliveryStatus is com.example.core.delivery.DeliveryStatus.Running) {
+                    expressState = if (settings.expressEnabled && expressStatus is com.example.core.delivery.DeliveryStatus.Running) {
                         if (settings.expressPreview) "no ar · prévia" else "no ar · liberado"
                     } else null,
                 )

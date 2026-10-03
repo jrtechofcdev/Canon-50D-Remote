@@ -526,7 +526,7 @@ class ScreenshotTest {
         runBlocking {
             app.settings.set(com.example.core.data.SettingKeys.expressEnabled, true)
             app.settings.set(com.example.core.data.SettingKeys.deliveryPassword, "jrfotos2026")
-            val session = app.delivery.expressSession()
+            val session = app.express.expressSession()
             val dao = app.database.deliveryDao()
             val photos = app.database.photoDao().inSession("Geral").take(6)
             // The tiles show the prepared file: the gallery photos stand in for it.
@@ -537,10 +537,10 @@ class ScreenshotTest {
                 if (i < 2) dao.setReleased(listOf(id), true)
             }
         }
-        app.delivery.showStatusForPreview(running())
-        rule.setContent { JrLinkTheme { com.example.ui.delivery.ExpressScreen(app, onBack = {}, onSettings = {}, onOpenGallery = {}) } }
+        app.express.showStatusForPreview(running().copy(port = 8090, ssid = "DIRECT-JR-Express"))
+        rule.setContent { JrLinkTheme { com.example.ui.delivery.ExpressScreen(app, onBack = null, onSettings = {}) } }
         save("express", androidx.compose.ui.test.hasText("Liberar todas"))
-        app.delivery.showStatusForPreview(com.example.core.delivery.DeliveryStatus.Off)
+        app.express.showStatusForPreview(com.example.core.delivery.DeliveryStatus.Off)
     }
 
     @Test

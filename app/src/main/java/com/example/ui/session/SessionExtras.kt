@@ -179,6 +179,7 @@ fun ToolsRow(
     onDeliverLatest: (() -> Unit)? = null,
     onExpress: (() -> Unit)? = null,
     expressState: String? = null,
+    onExpressLatest: (() -> Unit)? = null,
 ) {
     val camera = buildList {
         if (settings.liveViewEnabled) add(ToolItem(Icons.Outlined.Videocam, "Live view", enabled = connected, onClick = onLive))
@@ -202,6 +203,7 @@ fun ToolsRow(
         add(ToolItem(Icons.Outlined.PhotoLibrary, "Lightroom", enabled = hasLatest, mark = @Composable { com.example.ui.photos.LightroomMark() }, onClick = onLightroomLatest))
         if (settings.notesEnabled) add(ToolItem(Icons.Outlined.EditNote, "Nota", enabled = hasLatest, onClick = onNoteLatest))
         onDeliverLatest?.let { add(ToolItem(Icons.Outlined.WifiTethering, "Entregar", enabled = hasLatest, onClick = it)) }
+        onExpressLatest?.let { add(ToolItem(Icons.Outlined.Collections, "Express", enabled = hasLatest, onClick = it)) }
     }
     val looks = buildList {
         onShop?.let { add(ToolItem(Icons.Outlined.Storefront, "Loja", onClick = it)) }

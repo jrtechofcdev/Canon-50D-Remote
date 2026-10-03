@@ -52,11 +52,7 @@
   function refresh() {
     if (!token) return;
     get("/api/s/" + token).then(function (r) {
-      if (r.status === 404) {
-        // The Express client was finished: the next one is already waiting, no code needed.
-        token = null; store(null); known = {}; firstLoad = true;
-        return tryExpress(function () { showLogin("Este acesso foi encerrado. Peça um código novo ao fotógrafo."); });
-      }
+      if (r.status === 404) return showLogin("Este acesso foi encerrado. Peça um código novo ao fotógrafo.");
       if (r.status !== 200) return;
       render(r.body);
     }).catch(function () { /* the Wi-Fi blinked; the next round tries again */ });
@@ -70,10 +66,7 @@
       known[it.id] = !!it.locked;
     });
     data = d;
-    var name = d.event ? d.client : d.express && d.client === "Express" ? "Suas fotos" : "Olá, " + d.client.split(" ")[0];
-    $("previewNote").hidden = !d.items.some(function (i) { return i.locked; });
-    // Express has no login to leave.
-    $("leave").hidden = !!d.express;
+    var name = d.event ? d.client : "Olá, " + d.client.split(" ")[0];
     $("hello").textContent = name;
     $("count").textContent = d.items.length ? plural(d.items.length, "foto pronta", "fotos prontas") + " · " + d.photographer : d.photographer;
     $("foot").textContent = "Fotos de " + d.photographer + " · entregues pelo JR C50D Sync";
@@ -193,14 +186,6 @@
     });
   };
 
-  // Fotografia Express: one open gallery, no code. Checked first; a client code or link still works.
-  function tryExpress(fallback) {
-    get("/api/express").then(function (r) {
-      if (r.status === 200 && r.body.token) { token = r.body.token; store(token); showGallery(); }
-      else fallback();
-    }).catch(fallback);
-  }
-
   var fromLink = new URLSearchParams(location.search).get("s");
   if (fromLink && /^[0-9a-f]{32}$/.test(fromLink)) {
     token = fromLink; store(token);
@@ -208,5 +193,5 @@
     showGallery();
   } else if (stored()) {
     token = stored(); showGallery();
-  } else tryExpress(function () { showLogin(""); });
+  } else showLogin("");
 })();
