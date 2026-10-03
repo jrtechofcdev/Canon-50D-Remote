@@ -172,7 +172,16 @@ Uma ferramenta separada da Entrega local, com aba, rede, senha, página e ajuste
 4. Depois do pagamento, marque as fotos e toque em **Liberar**, ou em **Liberar favoritas** ou **Liberar todas**. No celular do cliente, elas viram a versão limpa e o botão **Salvar foto** aparece.
 5. **Finalizar e limpar para o próximo cliente** encerra o atendimento, apaga as cópias e deixa o portal vazio para o próximo.
 
-Para mandar fotos ao cliente, use o botão **Mandar fotos** na aba, ou **Express** na galeria, no visualizador e na Sessão. Com **Fotos novas entram sozinhas** ligado, cada foto da câmera já vai direto. O pagamento é com você: o app só guarda a decisão de liberar.
+Para mandar fotos ao cliente, use o botão **Mandar fotos** na aba, ou **Express** na galeria, no visualizador e na Sessão. Para mandar a mesma foto com outro preset, veja [Versões da mesma foto](#versões-da-mesma-foto). Com **Fotos novas entram sozinhas** ligado, cada foto da câmera já vai direto. O pagamento é com você: o app só guarda a decisão de liberar.
+
+### Versões da mesma foto
+
+No visualizador, toque em **Versões**:
+1. Em **Para quem**, escolha um cliente da Entrega local ou a Fotografia Express.
+2. Toque nos visuais que quer mandar: **Como está** (a edição atual), **Sem preset** ou qualquer preset. O número em cada um é a ordem das versões.
+3. Toque em **Mandar**. Cada versão vira um arquivo próprio, como `Ana_IMG_1234_v2_Preto-e-branco.jpg`, e aparece na página do cliente com o nome do visual.
+
+O recorte da foto vale para todas as versões. Uma versão guarda o visual do momento em que foi mandada, então editar a foto depois não muda o que o cliente já tem. Só a cópia comum (mandada por **Entregar** ou **Express**) acompanha as edições.
 
 ### Pagamentos
 
@@ -223,9 +232,33 @@ Live view gasta mais bateria da câmera. Com a imagem só no celular, a tela da 
 
 ### Posição da tela
 
-- O botão de girar (Sessão, visualizador, modo cliente e live view) abre um menu com as posições: em pé, deitado para cada lado, de cabeça para baixo e Automático. Nas posições fixas a tela não gira sozinha.
+- O botão de girar (Sessão, visualizador, modo cliente e live view) abre o dial de posição: toque em **Em pé**, **Direita**, **Invertido** ou **Esquerda**, ou arraste em volta do anel, e o celular desenhado no centro gira até lá. **Automático** segue o sensor do celular, mesmo com a rotação do Android travada. Nas posições fixas a tela não gira sozinha.
+- Escolher no dial vale até a próxima foto, mesmo no visualizador com **Girar com a foto** ligado.
+
+<p><img src="docs/images/dial_posicao.png" width="250" alt="Dial de posição da tela"></p>
 - **Girar com a foto** (Ajustes → Tela): no visualizador e no modo cliente, foto em pé deixa a tela em pé e foto deitada deixa a tela deitada, sempre em tela cheia.
 - Se a 50D salvar fotos verticais deitadas, ligue na câmera **Menu → Girar automático: Ligado**, ou use **Girar** no visualizador.
+
+### Abertura e animações
+
+<p><img src="docs/intro/abertura.gif" width="220" alt="Animação de abertura do JR C50D Sync"></p>
+
+Ao abrir, o app mostra a abertura da marca, em menos de 3 segundos:
+1. os blocos do símbolo se encaixam;
+2. o foco trava;
+3. o diafragma dispara;
+4. o nome entra.
+
+- **Um toque pula.**
+- Em **Ajustes → Tela → Abertura** dá para desligar ou tocar em **Ver agora**.
+- Ela não aparece com as animações do Android desligadas.
+- O vídeo em 1080 × 1920 está em [`docs/intro/abertura_jr_c50d_sync.mp4`](docs/intro/abertura_jr_c50d_sync.mp4).
+
+As outras animações mostram o que aconteceu, e nenhuma fica repetindo:
+- o disparador fecha e solta um anel quando fotografa, e a foto nova chega com um flash;
+- as telas entram pelo lado;
+- a seleção afunda a foto;
+- os números rolam.
 
 ### Log do app
 

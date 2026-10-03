@@ -41,13 +41,34 @@ Regra: no máximo **um** elemento menta por área da tela. O degradê só aparec
 
 ## Formas e movimento
 - Raio 8dp em cartões e campos, 4dp nas miniaturas, círculo só no disparador.
-- Sem sombras decorativas e sem brilho. O movimento serve só para mostrar a chegada de foto nova (fade curto) e o alerta de estouro.
+- Sem sombras decorativas e sem brilho.
+
+## Movimento
+Cada animação responde a algo que aconteceu, e nada fica em loop. As curvas e durações ficam em `ui/components/Motion.kt` (160, 280 e 420 ms, curva "emphasized").
+
+| Momento | Movimento |
+|---|---|
+| Abrir tela | Entra pelo lado. Abas trocam com fade, e a foto cresce a partir da grade |
+| Tocar | Botões e blocos afundam um pouco e voltam com mola |
+| Disparar | O disco fecha como a cortina e um anel se abre |
+| Foto nova | Flash de obturador curto na última foto |
+| Número mudou | O número rola para cima quando cresce e para baixo quando diminui |
+| Escolher | A foto afunda na moldura, o coração pulsa e o ícone da aba pula |
+| Girar a tela | Dial redondo: o celular desenhado gira com mola e encaixa a cada 90° |
+
+A abertura (`ui/intro/BrandIntro.kt`) é a única peça longa:
+- os blocos do símbolo entram pela própria inclinação;
+- o quadro de foco trava em menta;
+- o diafragma de 6 lâminas dispara;
+- o nome entra com a leitura de exposição.
+
+Ela dura menos de 3 s, pula com um toque e respeita a opção de animações do Android.
 
 ## Modo escuro total
 - Fundo preto, menta escurecida `#00A870`, ciano escurecido `#1290AA`, texto `#B5B5B5`.
 
 ## Dials
-- ENERGY 2 / RHYTHM 2 / MOTION 1
+- ENERGY 2 / RHYTHM 2 / MOTION 3
 
 ## Portal da entrega local
 - É a página que o cliente abre no celular dele (`assets/portal`), com a mesma identidade: grafite `#1F1F1F`, menta `#00FCA8` só na ação principal (**Salvar foto**) e Exo 2 servida pelo próprio app.

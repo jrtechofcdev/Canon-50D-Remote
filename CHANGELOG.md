@@ -2,6 +2,39 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [4.4] · 2026-10-03
+
+- **Versões da mesma foto:**
+  - no visualizador, **Versões** manda a mesma foto de novo para o cliente (Entrega ou Express), cada vez com outro preset ou edição;
+  - escolha um ou mais visuais ("Como está", "Sem preset" ou qualquer preset) e o cliente recebe todos, como arquivos separados (`Ana_IMG_1234_v2_Preto-e-branco.jpg`);
+  - mudar a edição da foto depois não altera uma versão já enviada;
+  - na página do cliente, cada versão aparece com o nome do visual.
+- **Girar a tela corrigido:**
+  - escolher uma posição no botão de girar não mudava nada: a escolha era cancelada no mesmo instante em que o menu fechava;
+  - agora ela vale na hora e fica salva para o app todo, sem mexer na rotação do Android;
+  - no visualizador e no modo cliente, a posição escolhida vale até a próxima foto, mesmo com **Girar com a foto** ligado.
+- **Dial de posição novo:**
+  - um seletor redondo no estilo do dial de modos da câmera, com o celular no centro girando com efeito de mola até a posição escolhida;
+  - dá para tocar numa posição ou arrastar em volta, e ele encaixa a cada quarto de volta com uma vibração leve;
+  - deitado, o dial fica à esquerda e os textos à direita.
+- **Animações pelo app todo**, cada uma ligada a uma função:
+  - as telas entram pelo lado e as abas trocam com um fade, e a foto aberta cresce a partir da grade;
+  - o ícone da aba escolhida dá um pulinho;
+  - o botão **Iniciar captura** muda de forma a cada etapa da conexão;
+  - o disparador fecha como a cortina e solta um anel a cada foto, e a foto nova chega na Sessão com um flash de obturador;
+  - contadores rolam ao mudar, a seleção na galeria afunda a foto e o coração do modo cliente pulsa ao ser marcado;
+  - no Express, cada foto passa de "preparando" para a imagem com um fade, e os grupos de Ajustes abrem suaves.
+- **Abertura com a marca:**
+  - os quatro blocos do símbolo Jr_Tech_OFC entram e se encaixam;
+  - o quadro de foco procura e trava em menta, como na 50D;
+  - o diafragma de seis lâminas fecha e abre como um disparo;
+  - "JR C50D Sync" entra letra por letra, sobre a exposição da 50 mm f/1.8.
+- **Controle da abertura:**
+  - dura menos de 3 segundos e **um toque pula**;
+  - liga e desliga em **Ajustes → Tela → Abertura**, onde **Ver agora** mostra de novo;
+  - não aparece quando as animações do Android estão desligadas nem quando a tela gira;
+  - o vídeo dela em 1080 × 1920, pronto para story, fica em `docs/intro/`.
+
 ## [4.3] · 2026-10-03
 
 - **Envio automático só com fotos boas** (Entrega e Express):

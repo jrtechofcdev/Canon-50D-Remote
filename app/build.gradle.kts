@@ -12,8 +12,8 @@ android {
     applicationId = "com.jrtechofc.tether50d"
     minSdk = 24
     targetSdk = 36
-    versionCode = 22
-    versionName = "4.3"
+    versionCode = 23
+    versionName = "4.4"
     // Phones only (the face model ships native code for each CPU type; x86 is emulators).
     // "-Pabis=arm64-v8a" builds a smaller APK for modern phones only.
     ndk { abiFilters += ((project.findProperty("abis") as String?) ?: "arm64-v8a,armeabi-v7a").split(",") }
