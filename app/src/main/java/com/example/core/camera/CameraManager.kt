@@ -130,6 +130,8 @@ class CameraManager(
     private val _liveFrames = MutableSharedFlow<ByteArray>(replay = 1, extraBufferCapacity = 0, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val liveFrames: SharedFlow<ByteArray> = _liveFrames.asSharedFlow()
     private var liveJob: Job? = null
+    /** The "turn live view off" still on its way to the camera; a new start waits for it. */
+    private var liveStopJob: Job? = null
     @Volatile private var liveZoom = 1
     /** Set while the shutter works, so live view stops asking for frames and the camera can focus and fire. */
     @Volatile private var liveHold = false
@@ -418,7 +420,15 @@ class CameraManager(
         val ptp = session ?: return
         if (liveJob?.isActive == true) return
         liveFrameMs = 1000L / fps.coerceIn(5, 30)
-        liveJob = scope.launch { runLiveView(ptp, alsoOnCamera, silentAf) }
+        // No picture from an earlier session: the screen waits for this camera's first frame.
+        _liveFrames.resetReplayCache()
+        val pendingStop = liveStopJob
+        liveJob = scope.launch {
+            // A stop sent just before (reopening the screen, a changed option) must reach the camera
+            // first; otherwise its "off" lands after this "on" and no frame ever comes.
+            pendingStop?.join()
+            runLiveView(ptp, alsoOnCamera, silentAf)
+        }
     }
 
     fun stopLiveView() {
@@ -426,11 +436,14 @@ class CameraManager(
         liveJob = null
         job.cancel()
         _live.value = LiveState.Off
+        _liveFrames.resetReplayCache()
         val ptp = session ?: return
-        scope.launch {
+        liveStopJob = scope.launch {
+            job.join()
             runCatching { if (liveZoom != 1) ptp.transact(PtpOp.EOS_ZOOM, 1) }
             runCatching { setPropertyNow(ptp, EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_OFF) }
             liveZoom = 1
+            log("Live view desligado")
         }
     }
 
@@ -462,12 +475,13 @@ class CameraManager(
             _live.value = LiveState.Failed("A câmera recusou o live view (${e.message}). $LIVE_HINT")
             return
         }
-        log("Live view ligado")
+        log("Live view ligado (saída ${if (alsoOnCamera) "celular e câmera" else "celular"}), esperando a primeira imagem")
         var lastFrame = System.currentTimeMillis()
         var windowStart = lastFrame
         var windowFrames = 0
         var fps = 0f
-        while (scope.isActive && session === ptp && liveJob?.isActive == true) {
+        var firstFrame = false
+        while (kotlinx.coroutines.currentCoroutineContext().isActive && session === ptp) {
             if (liveHold) {
                 // The shutter has the camera: no frames, and the pause doesn't count as silence.
                 delay(50)
@@ -487,7 +501,22 @@ class CameraManager(
                 delay(60)
                 continue
             }
-            val jpeg = LiveViewParser.jpeg(data) ?: continue
+            val jpeg = LiveViewParser.jpeg(data)
+            if (jpeg == null) {
+                // A frame without a picture (the camera still starting): count it as silence, not as life.
+                if (started - lastFrame > LIVE_GIVE_UP_MS) {
+                    log("Live view: ${data.size} bytes sem imagem por ${LIVE_GIVE_UP_MS / 1000} s")
+                    _live.value = LiveState.Failed("A 50D não mandou imagem. $LIVE_HINT")
+                    runCatching { setPropertyNow(ptp, EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_OFF) }
+                    return
+                }
+                delay(60)
+                continue
+            }
+            if (!firstFrame) {
+                firstFrame = true
+                log("Live view: primeira imagem em ${System.currentTimeMillis() - windowStart} ms")
+            }
             _liveFrames.tryEmit(jpeg)
             lastFrame = System.currentTimeMillis()
             windowFrames++

@@ -158,10 +158,14 @@ fun LiveViewScreen(
 
     // Start when the screen opens (and after a reconnect or a change of output); stop when it closes.
     val connected = connection is ConnectionState.Connected
-    LaunchedEffect(connected, settings.liveOnCamera, settings.liveSilentAf, settings.liveFps) {
+    // Started only with the real options: the defaults shown for a moment while they load would start
+    // it once and restart it right away, which the 50D answered with no picture at all.
+    val loaded by remember { app.settings.settings }.collectAsState(initial = null)
+    LaunchedEffect(connected, loaded?.liveOnCamera, loaded?.liveSilentAf, loaded?.liveFps) {
+        val real = loaded ?: return@LaunchedEffect
         if (connected) {
             app.camera.stopLiveView()
-            app.camera.startLiveView(alsoOnCamera = settings.liveOnCamera, silentAf = settings.liveSilentAf, fps = settings.liveFps)
+            app.camera.startLiveView(alsoOnCamera = real.liveOnCamera, silentAf = real.liveSilentAf, fps = real.liveFps)
         }
     }
     DisposableEffect(Unit) {
