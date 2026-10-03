@@ -2,6 +2,42 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [4.3] · 2026-10-03
+
+- **Envio automático só com fotos boas** (Entrega e Express):
+  - o automático espera a análise de cada foto e deixa de fora as tremidas ou fora de foco e, se você ligar, as com olhos fechados;
+  - a tela avisa quais ficaram de fora, com **Mandar mesmo assim**;
+  - as opções ficam nos ajustes de cada ferramenta.
+- **Fotos entrando mais rápido:**
+  - duas fotos preparadas ao mesmo tempo;
+  - cada arquivo codificado uma vez só;
+  - miniaturas da página prontas antes do cliente pedir;
+  - páginas atualizando a cada 2 s.
+- **Endereço com nome:** além do número, o cliente pode digitar `http://jrexpress.local:8090` (ou `jrfotos.local:8080` na Entrega). Funciona no iPhone e no computador; alguns Android só abrem pelo número, por isso o QR continua com ele. Os nomes podem ser mudados nos ajustes.
+- **Nome do cliente no Express:**
+  - ao entrar, a página pergunta "Como podemos te chamar?";
+  - depois cumprimenta pela hora do dia ("Boa tarde, Ana!") e agradece pelo nome quando ele curte uma foto;
+  - na Entrega local, vale o nome que você cadastrou.
+- **Aviso de curtida:** a notificação "Ana gostou de uma foto ♥" vem com a miniatura e abre a ferramenta certa. Liga e desliga na Entrega e no Express.
+- **Pagamentos:**
+  - **seção própria em Ajustes:** chave e tipo do Pix, recebedor, cidade, valor por foto, pacote (ex.: 5 por R$ 60), "todas as fotos", formas aceitas e uma observação;
+  - **Pix Copia e Cola com o valor exato**, gerado no celular, sem internet, com botão de teste;
+  - **o app sempre cobra o mais barato para o cliente.**
+- **Express mais discreto:**
+  - uma linha simples com os valores;
+  - o botão **Pagar R$ X** na barra abre o QR do Pix e o copia e cola;
+  - na sua tela, **Cobrar** mostra o QR para o cliente ler direto do seu celular.
+- **Modo cliente:**
+  - topo alinhado: Sair à esquerda, a marca no centro, contador e botões do mesmo tamanho à direita;
+  - deitado, as ações ficam numa coluna lateral e a foto mantém a altura.
+- **Live view corrigido:**
+  - ao abrir, ele começava com os ajustes padrão e reiniciava, e o desligar antigo chegava à 50D depois do ligar novo: nenhuma imagem vinha;
+  - agora a ordem é garantida e a tela não mostra mais o último quadro antigo como se estivesse congelada;
+  - o log registra ligado, primeira imagem e desligado.
+- **Deitado em tudo:**
+  - o Recorte mostra a foto grande com as ferramentas na lateral;
+  - Entrega e Express usam a largura toda, com status e QR lado a lado.
+
 ## [4.2] · 2026-10-03
 
 **Entrega local e Fotografia Express agora são duas ferramentas separadas.** Uma não depende da outra para funcionar.

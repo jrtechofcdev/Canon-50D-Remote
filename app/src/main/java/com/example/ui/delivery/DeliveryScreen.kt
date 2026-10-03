@@ -123,7 +123,7 @@ fun DeliveryScreen(app: TetherApp, actions: PhotoActions, onBack: (() -> Unit)?,
 
     Box(Modifier.fillMaxSize().statusBarsPadding(), contentAlignment = Alignment.TopCenter) {
         Column(
-            Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
+            Modifier.widthIn(max = 1100.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -137,6 +137,8 @@ fun DeliveryScreen(app: TetherApp, actions: PhotoActions, onBack: (() -> Unit)?,
                 return@Column
             }
 
+            TwoUp(
+                first = {
             StatusCard(
                 status = status, online = online, devices = devices, network = networkLabel(s.deliveryNetwork),
                 ready = items.count { it.state in DeliveryState.served && open.any { o -> o.id == it.sessionId } },
@@ -144,7 +146,8 @@ fun DeliveryScreen(app: TetherApp, actions: PhotoActions, onBack: (() -> Unit)?,
                 onStop = { scope.launch { app.delivery.stop() } },
                 onOpenPortal = { (status as? DeliveryStatus.Running)?.let { r -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(r.url())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } } },
             )
-
+                },
+                second = {
             (status as? DeliveryStatus.Running)?.takeIf { !it.test }?.let { r ->
                 DeliveryCard {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -161,6 +164,8 @@ fun DeliveryScreen(app: TetherApp, actions: PhotoActions, onBack: (() -> Unit)?,
                     }
                 }
             }
+                },
+            )
 
             DeliveryCard {
                 Text("Como as fotos chegam", style = MaterialTheme.typography.titleMedium)
@@ -446,3 +451,24 @@ internal fun DeliveryCard(content: @Composable ColumnScope.() -> Unit) {
     )
 }
 
+
+/**
+ * Two cards side by side when the screen is wide (phone lying down, tablet), one under the other
+ * when it is narrow. Used for the status and the QR codes, which belong together.
+ */
+@Composable
+internal fun TwoUp(first: @Composable () -> Unit, second: @Composable () -> Unit) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth >= 680.dp) {
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) { first() }
+                Column(Modifier.weight(1f)) { second() }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                first()
+                second()
+            }
+        }
+    }
+}

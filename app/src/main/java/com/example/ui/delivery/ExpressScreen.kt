@@ -141,7 +141,7 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
 
     Box(Modifier.fillMaxSize().statusBarsPadding(), contentAlignment = Alignment.TopCenter) {
         Column(
-            Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
+            Modifier.widthIn(max = 1100.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -169,6 +169,8 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
                 return@Column
             }
 
+            TwoUp(
+                first = {
             StatusCard(
                 status = status, online = online, devices = devices, network = networkLabel(s.expressNetwork),
                 ready = items.count { it.state in DeliveryState.served },
@@ -177,7 +179,8 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
                 onOpenPortal = { (status as? DeliveryStatus.Running)?.let { r -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(r.url())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } } },
                 liveTitle = "Express no ar",
             )
-
+                },
+                second = {
             (status as? DeliveryStatus.Running)?.takeIf { !it.test }?.let { r ->
                 DeliveryCard {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -194,6 +197,8 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
                     }
                 }
             }
+                },
+            )
 
             SkippedCard(app.express) { ids ->
                 scope.launch { val n = app.express.sendToExpress(ids); toast("$n ${if (n == 1) "foto mandada" else "fotos mandadas"}") }

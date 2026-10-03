@@ -162,17 +162,28 @@ Se o celular do cliente avisar que o Wi-Fi não tem internet, ele toca em **Mant
 
 ### Fotografia Express
 
-<p><img src="docs/images/express.png" width="270" alt="Aba da Fotografia Express"> <img src="docs/images/portal_express.png" width="250" alt="Página do cliente em prévia"></p>
+<p><img src="docs/images/express.png" width="250" alt="Aba da Fotografia Express"> <img src="docs/images/portal_express_nome.png" width="230" alt="O cliente diz o nome ao entrar"> <img src="docs/images/portal_express.png" width="230" alt="Página do cliente em prévia"> <img src="docs/images/portal_express_pagar.png" width="230" alt="Pagamento com Pix"></p>
 
 Uma ferramenta separada da Entrega local, com aba, rede, senha, página e ajustes próprios. Ela não precisa da Entrega para funcionar. Serve para fotografar e entregar na hora, um cliente por vez:
 1. Abra a aba **Express**, toque em **Ligar a Fotografia Express** e depois em **Iniciar entrega**.
 2. O cliente entra no Wi-Fi pelo QR ① e abre as fotos pelo QR ②, **sem código**.
 3. Com o **Modo prévia** ligado, ele vê as fotos com marca d'água e não consegue baixar. Pode marcar as favoritas com o coração.
-   A página mostra o valor de cada foto, o total das favoritas e a sua chave Pix, se você ligar essas opções em Ajustes → Fotografia Express.
+   Ao entrar, a página pergunta o nome do cliente e passa a tratá-lo pelo nome. Quando ele curte uma foto, você recebe a notificação "Ana gostou de uma foto". Com **Ajustes → Pagamentos** preenchido, a página mostra os valores numa linha discreta e o botão **Pagar**, que abre o QR do Pix com o total exato.
 4. Depois do pagamento, marque as fotos e toque em **Liberar**, ou em **Liberar favoritas** ou **Liberar todas**. No celular do cliente, elas viram a versão limpa e o botão **Salvar foto** aparece.
 5. **Finalizar e limpar para o próximo cliente** encerra o atendimento, apaga as cópias e deixa o portal vazio para o próximo.
 
 Para mandar fotos ao cliente, use o botão **Mandar fotos** na aba, ou **Express** na galeria, no visualizador e na Sessão. Com **Fotos novas entram sozinhas** ligado, cada foto da câmera já vai direto. O pagamento é com você: o app só guarda a decisão de liberar.
+
+### Pagamentos
+
+Em **Ajustes → Pagamentos** ficam:
+- **Pix:** a chave e o tipo, o nome de quem recebe e a cidade;
+- **Valores:** por foto, pacote e "todas as fotos";
+- **Formas de pagamento** aceitas e uma observação para o cliente.
+
+Com isso, o app monta o **Pix Copia e Cola com o valor exato** das fotos escolhidas, no próprio celular e sem internet, e sempre cobra o preço mais barato para o cliente. Use **Testar** para conferir o QR no app do seu banco. Na aba Express, **Cobrar** mostra o QR na sua tela.
+
+<p><img src="docs/images/ajustes_pagamentos.png" width="270" alt="Ajustes de pagamentos"></p>
 
 ### Loja de presets
 
