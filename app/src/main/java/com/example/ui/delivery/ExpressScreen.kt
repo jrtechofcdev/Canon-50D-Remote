@@ -223,7 +223,10 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
             DeliveryCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Fotos do cliente", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            current?.client?.takeUnless { it == "Express" }?.let { "Fotos de $it" } ?: "Fotos do cliente",
+                            style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
                         Text(
                             "${items.size} ${if (items.size == 1) "foto" else "fotos"} · $released liberadas · ${picked.size} favoritas do cliente",
                             style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted,
@@ -338,7 +341,7 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
     }
 
     if (finishing) {
-        var name by remember { mutableStateOf("") }
+        var name by remember { mutableStateOf(current?.client?.takeUnless { it == "Express" } ?: "") }
         AlertDialog(
             onDismissRequest = { finishing = false },
             containerColor = Tone.Surface,

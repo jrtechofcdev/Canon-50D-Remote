@@ -14,6 +14,19 @@
   <span class="chip">Fotografia Express</span>
 </header>
 
+<div id="welcome" class="welcome" hidden>
+  <div class="welcome-card">
+    <img src="/icon.png" alt="" class="welcome-icon">
+    <h2 id="welcomeTitle">Que bom ter você aqui</h2>
+    <p class="muted">Suas fotos vão aparecer nesta página. Como podemos te chamar?</p>
+    <form id="nameForm" autocomplete="off">
+      <input id="nameInput" maxlength="40" placeholder="Seu nome" aria-label="Seu nome" autocapitalize="words" enterkeyhint="go">
+      <button class="primary" type="submit">Ver minhas fotos</button>
+    </form>
+    <button id="skipName" class="link">Agora não</button>
+  </div>
+</div>
+
 <main>
   <section class="intro">
     <h1 id="title">Suas fotos de hoje</h1>

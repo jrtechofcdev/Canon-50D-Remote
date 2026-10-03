@@ -154,6 +154,23 @@ class ExpressTest {
     }
 
     @Test
+    fun theExpressClientSaysTheirNameOnce() {
+        val (s, _) = express()
+        fun post(path: String, at: Int = port): Int {
+            val c = URL("http://127.0.0.1:$at$path").openConnection() as HttpURLConnection
+            c.requestMethod = "POST"
+            return c.responseCode
+        }
+        assertEquals(400, post("/api/s/${s.token}/name?n=%20"))
+        assertEquals(200, post("/api/s/${s.token}/name?n=Ana%20Clara"))
+        assertEquals("Ana Clara", runBlocking { db.deliveryDao().session(s.id)!!.client })
+        // Once named, another phone can't rename them.
+        assertEquals(200, post("/api/s/${s.token}/name?n=Outro"))
+        assertEquals("Ana Clara", runBlocking { db.deliveryDao().session(s.id)!!.client })
+        assertEquals("Ana", LocalServer.cleanName("  Ana \n "))
+    }
+
+    @Test
     fun finishingClosesTheOldLink() {
         val (s, _) = express()
         runBlocking { db.deliveryDao().closeSession(s.id, 5) }

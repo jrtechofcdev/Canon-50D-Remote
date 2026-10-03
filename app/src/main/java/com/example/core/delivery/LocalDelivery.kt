@@ -94,6 +94,9 @@ class LocalDelivery(
     /** The other tool: stopped before this one takes the Wi-Fi. */
     var peer: LocalDelivery? = null
 
+    /** A client hearted a photo (the app shows a notification when that is on). */
+    var onLike: suspend (DeliverySession, DeliveryItem) -> Unit = { _, _ -> }
+
     @Volatile private var portalInfo = PortalInfo("Jr_Tech_OFC", true, express = mode.express)
 
     val queue = DeliveryQueue(dao, photos, DeliveryPreparer { photo, session, target -> prepare(photo, session, target) }, root, events, express = mode.express)
@@ -104,9 +107,12 @@ class LocalDelivery(
         thumb = ::thumbFor,
         info = { portalInfo },
         onDownloaded = { item -> events.emit(PhotoEvent.Delivered(item.photoId, item.sessionId)) },
-        onPick = { item, on ->
+        onPick = { item, on, session ->
             photos.setClientPick(item.photoId, on)
-            if (on) events.emit(PhotoEvent.Approved(item.photoId))
+            if (on) {
+                events.emit(PhotoEvent.Approved(item.photoId))
+                onLike(session, item)
+            }
         },
         expressServer = mode.express,
     )

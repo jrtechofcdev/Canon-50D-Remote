@@ -18,6 +18,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Vibration
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -207,6 +208,11 @@ fun ExpressSettings(app: TetherApp, s: Settings) {
             "O coração ajuda a escolher o que comprar e aparece na galeria e no culling",
             s.expressPicks, enabled = on,
         ) { set(SettingKeys.expressPicks, it) }
+        ToggleRow(
+            Icons.Outlined.NotificationsActive, "Avisar quando o cliente curte uma foto",
+            "Notificação com o nome que o cliente digitou ao entrar e a miniatura da foto",
+            s.expressNotifyLikes, enabled = on,
+        ) { set(SettingKeys.expressNotifyLikes, it) }
         ToggleRow(
             Icons.Outlined.Vibration, "Vibrar quando o cliente marca ou baixa",
             null, s.deliveryVibrate, enabled = on,

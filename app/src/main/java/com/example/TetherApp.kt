@@ -117,6 +117,9 @@ class TetherApp : Application() {
         // One Wi-Fi at a time: starting either tool stops the other.
         delivery.peer = express
         express.peer = delivery
+        val likes = com.example.core.delivery.LikeNotifier(this)
+        delivery.onLike = { session, item -> if (settings.current().deliveryNotifyLikes) likes.liked(session, item) }
+        express.onLike = { session, item -> if (settings.current().expressNotifyLikes) likes.liked(session, item) }
         delivery.init()
         express.init()
         appScope.launch {

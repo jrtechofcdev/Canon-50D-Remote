@@ -252,6 +252,9 @@ data class Settings(
     /** Name typed instead of the number (jrfotos.local), answered by the phone on the Wi-Fi. Blank = off. */
     val deliveryDomain: String = "jrfotos",
     val expressDomain: String = "jrexpress",
+    /** A notification "Ana gostou de uma foto" when a client hearts one. */
+    val deliveryNotifyLikes: Boolean = true,
+    val expressNotifyLikes: Boolean = true,
     /** A short vibration when a client hearts or downloads a photo. */
     val deliveryVibrate: Boolean = true,
     /** Tabs hidden from the bar (routes, comma separated). Sessão and Ajustes always stay. */
@@ -452,6 +455,8 @@ object SettingKeys {
     val expressShowPix = booleanPreferencesKey("express_show_pix")
     val expressAutoStart = booleanPreferencesKey("express_auto_start")
     val deliveryVibrate = booleanPreferencesKey("delivery_vibrate")
+    val deliveryNotifyLikes = booleanPreferencesKey("delivery_notify_likes")
+    val expressNotifyLikes = booleanPreferencesKey("express_notify_likes")
     val deliveryDomain = stringPreferencesKey("delivery_domain")
     val expressDomain = stringPreferencesKey("express_domain")
     val deliveryAutoSkipBlurry = booleanPreferencesKey("delivery_auto_skip_blurry")
@@ -681,6 +686,8 @@ class SettingsRepository(private val context: Context) {
             expressShowPix = this[k.expressShowPix] ?: d.expressShowPix,
             expressAutoStart = this[k.expressAutoStart] ?: d.expressAutoStart,
             deliveryVibrate = this[k.deliveryVibrate] ?: d.deliveryVibrate,
+            deliveryNotifyLikes = this[k.deliveryNotifyLikes] ?: d.deliveryNotifyLikes,
+            expressNotifyLikes = this[k.expressNotifyLikes] ?: d.expressNotifyLikes,
             deliveryDomain = this[k.deliveryDomain] ?: d.deliveryDomain,
             expressDomain = this[k.expressDomain] ?: d.expressDomain,
             deliveryAutoSkipBlurry = this[k.deliveryAutoSkipBlurry] ?: d.deliveryAutoSkipBlurry,

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.WifiTethering
 import androidx.compose.material.icons.outlined.BlurOn
 import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.Vibration
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,6 +51,11 @@ fun DeliverySettings(app: TetherApp, s: Settings) {
             "O cliente baixa as fotos pelo Wi-Fi do seu celular. Desligada, nada roda e nenhuma permissão é pedida.",
             s.deliveryEnabled,
         ) { set(SettingKeys.deliveryEnabled, it) }
+        ToggleRow(
+            Icons.Outlined.NotificationsActive, "Avisar quando o cliente curte uma foto",
+            "Notificação \"Ana gostou de uma foto\", com a miniatura",
+            s.deliveryNotifyLikes, enabled = s.deliveryEnabled,
+        ) { set(SettingKeys.deliveryNotifyLikes, it) }
         ToggleRow(
             Icons.Outlined.Vibration, "Vibrar quando o cliente baixa ou marca favorita",
             "Vale também para a Fotografia Express", s.deliveryVibrate, enabled = s.deliveryEnabled || s.expressEnabled,

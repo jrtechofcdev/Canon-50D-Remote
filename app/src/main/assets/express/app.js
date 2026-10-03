@@ -3,7 +3,7 @@
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
-  var token = null, data = null, known = {}, first = true, current = 0;
+  var token = null, data = null, known = {}, first = true, current = 0, asked = false;
   var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
   function toast(t) {
@@ -16,6 +16,8 @@
     });
   }
   function plural(n, one, many) { return n + " " + (n === 1 ? one : many); }
+  function greeting() { var h = new Date().getHours(); return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"; }
+  function firstName(d) { return d && d.client && d.client !== "Express" ? d.client.split(" ")[0] : null; }
   // Locked photos ask for their marked version (a different address, so the browser never mixes them up).
   function view(it) { return "/p/" + token + "/" + it.id + (it.locked ? "?m=1" : ""); }
   function save(it) { return "/f/" + token + "/" + it.id + "?dl=1"; }
@@ -23,7 +25,7 @@
   function join() {
     get("/api/express").then(function (r) {
       if (r.status === 200 && r.body.token) {
-        if (token !== r.body.token) { token = r.body.token; known = {}; first = true; $("feed").innerHTML = ""; }
+        if (token !== r.body.token) { token = r.body.token; known = {}; first = true; asked = false; $("feed").innerHTML = ""; }
         $("closed").hidden = true;
         refresh();
       } else {
@@ -53,7 +55,10 @@
     var free = d.items.filter(function (i) { return !i.locked; });
     var picked = d.items.filter(function (i) { return i.picked; });
 
-    $("title").textContent = d.client && d.client !== "Express" ? "Fotos de " + d.client.split(" ")[0] : "Suas fotos de hoje";
+    var name = firstName(d);
+    $("title").textContent = name ? greeting() + ", " + name + "!" : "Suas fotos de hoje";
+    // A new client is asked their name once, kindly; they can skip it.
+    if (!name && !asked) { asked = true; $("welcome").hidden = false; setTimeout(function () { $("nameInput").focus(); }, 80); }
     $("sub").textContent = d.items.length ? plural(d.items.length, "foto", "fotos") + " · " + d.photographer : "Fotografia de " + d.photographer;
     $("pay").hidden = !locked.length;
     $("price").hidden = !d.price;
@@ -124,7 +129,12 @@
       e.stopPropagation();
       var on = !it.picked;
       fetch("/api/s/" + token + "/pick/" + it.id + "?on=" + (on ? 1 : 0), { method: "POST" }).then(function (r) {
-        if (r.ok) { it.picked = on; heart(btn, it); toast(on ? "Favorita marcada" : "Desmarcada"); refresh(); }
+        if (r.ok) {
+          it.picked = on; heart(btn, it);
+          var n = firstName(data);
+          toast(on ? (n ? "Obrigado, " + n + "! O fotógrafo já recebeu." : "Favorita marcada") : "Desmarcada");
+          refresh();
+        }
       });
     };
   }
@@ -174,6 +184,16 @@
       setTimeout(function () { var a = document.createElement("a"); a.href = save(it); a.download = it.name; document.body.appendChild(a); a.click(); a.remove(); }, i * 900);
     });
   };
+
+  $("nameForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var n = $("nameInput").value.trim();
+    if (n.length < 2) { $("nameInput").focus(); return; }
+    fetch("/api/s/" + token + "/name?n=" + encodeURIComponent(n), { method: "POST" }).then(function () {
+      $("welcome").hidden = true; toast("Prazer, " + n.split(" ")[0] + "!"); refresh();
+    }).catch(function () { $("welcome").hidden = true; });
+  });
+  $("skipName").onclick = function () { $("welcome").hidden = true; };
 
   join();
   setInterval(refresh, 2000);

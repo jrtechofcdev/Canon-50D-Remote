@@ -66,7 +66,8 @@
       known[it.id] = !!it.locked;
     });
     data = d;
-    var name = d.event ? d.client : "Olá, " + d.client.split(" ")[0];
+    var h = new Date().getHours();
+    var name = d.event ? d.client : (h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite") + ", " + d.client.split(" ")[0] + "!";
     $("hello").textContent = name;
     $("count").textContent = d.items.length ? plural(d.items.length, "foto pronta", "fotos prontas") + " · " + d.photographer : d.photographer;
     $("foot").textContent = "Fotos de " + d.photographer + " · entregues pelo JR C50D Sync";
@@ -122,7 +123,7 @@
     btn.onclick = function () {
       var on = !item.picked;
       fetch("/api/s/" + token + "/pick/" + item.id + "?on=" + (on ? 1 : 0), { method: "POST" }).then(function (r) {
-        if (r.ok) { item.picked = on; setPick(btn, item, enabled); toast(on ? "Marcada como favorita" : "Desmarcada"); refresh(); }
+        if (r.ok) { item.picked = on; setPick(btn, item, enabled); toast(on ? (data && !data.event ? "Obrigado, " + data.client.split(" ")[0] + "! O fotógrafo já recebeu." : "Marcada como favorita") : "Desmarcada"); refresh(); }
       });
     };
   }

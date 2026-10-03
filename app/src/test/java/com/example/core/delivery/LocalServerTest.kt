@@ -40,7 +40,7 @@ class LocalServerTest {
             portal = { name -> if (name == "index.html") "<html>portal</html>".byteInputStream() else null },
             thumb = { _, _ -> null },
             info = { PortalInfo("Jr_Tech_OFC", true) },
-            onPick = { item, on -> picks += item.photoId to on },
+            onPick = { item, on, _ -> picks += item.photoId to on },
         )
         port = server.start(0)
     }

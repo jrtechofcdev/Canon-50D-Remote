@@ -50,7 +50,7 @@ class LocalServer(
     private val thumb: (DeliveryItem, Boolean) -> File?,
     private val info: () -> PortalInfo,
     private val onDownloaded: suspend (DeliveryItem) -> Unit = {},
-    private val onPick: suspend (DeliveryItem, Boolean) -> Unit = { _, _ -> },
+    private val onPick: suspend (DeliveryItem, Boolean, DeliverySession) -> Unit = { _, _, _ -> },
     /**
      * Which tool this server belongs to. An Express server only knows Express clients (no code, no
      * login) and a Entrega local server only its own: a token from one is unknown to the other.
@@ -174,6 +174,7 @@ class LocalServer(
             seg == listOf("api", "express") && expressServer -> express(out)
             seg.size == 3 && seg[0] == "api" && seg[1] == "s" -> sessionJson(seg[2], out)
             seg.size == 5 && seg[0] == "api" && seg[1] == "s" && seg[3] == "pick" && r.method == "POST" -> pick(seg[2], seg[4], r, out)
+            seg.size == 4 && seg[0] == "api" && seg[1] == "s" && seg[3] == "name" && r.method == "POST" -> name(seg[2], r, out)
             seg.size == 3 && seg[0] == "f" -> file(seg[1], seg[2], r, out, head)
             seg.size == 3 && seg[0] == "t" -> thumbnail(seg[1], seg[2], out, head)
             seg.size == 3 && seg[0] == "p" -> view(seg[1], seg[2], out, head)
@@ -271,13 +272,28 @@ class LocalServer(
 
     private fun pick(token: String, id: String, r: Request, out: OutputStream) {
         if (!info().picks) return json(out, 403, """{"error":"Favoritas desligadas pelo fotógrafo."}""")
-        val (_, item) = itemOf(token, id) ?: return json(out, 404, """{"error":"Foto não encontrada"}""")
+        val (session, item) = itemOf(token, id) ?: return json(out, 404, """{"error":"Foto não encontrada"}""")
         val on = r.query["on"] != "0"
         runBlocking {
             dao.setPicked(item.id, on)
-            onPick(item, on)
+            onPick(item, on, session)
         }
         json(out, 200, """{"picked":$on}""")
+    }
+
+    /**
+     * Fotografia Express: the client says their name when they arrive. Only for Express (a Entrega local
+     * client was named by the photographer) and only while it is still the default "Express".
+     */
+    private fun name(token: String, r: Request, out: OutputStream) {
+        val session = validSession(token) ?: return json(out, 404, """{"error":"Acesso encerrado"}""")
+        if (!session.express) return json(out, 403, """{"error":"O nome já foi cadastrado pelo fotógrafo"}""")
+        val typed = cleanName(r.query["n"].orEmpty()) ?: return json(out, 400, """{"error":"Digite seu nome"}""")
+        if (session.client == EXPRESS_DEFAULT || session.client.isBlank()) {
+            runBlocking { dao.updateSession(session.copy(client = typed)) }
+            AppLog.i("EXPRESS", "Cliente se apresentou: $typed")
+        }
+        json(out, 200, """{"client":${quote(if (session.client == EXPRESS_DEFAULT) typed else session.client)}}""")
     }
 
     // ---- responses ---------------------------------------------------------------------------
@@ -377,6 +393,11 @@ class LocalServer(
     companion object {
         private const val WORKERS = 6
         private val TOKEN = Regex("[0-9a-f]{32}")
+        const val EXPRESS_DEFAULT = "Express"
+
+        /** A typed name, tidy: no control characters, single spaces, 2 to 40 characters. */
+        fun cleanName(typed: String): String? =
+            typed.filter { !it.isISOControl() }.replace(Regex("\\s+"), " ").trim().take(40).takeIf { it.length >= 2 }
         val ASSETS = setOf("index.html", "app.js", "style.css", "exo2.ttf", "logo.png", "icon.png")
         private val COMMON = listOf(
             "Connection" to "close",
