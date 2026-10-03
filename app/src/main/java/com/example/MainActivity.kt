@@ -114,6 +114,11 @@ class MainActivity : ComponentActivity() {
         requestedOrientation = getSharedPreferences("screen", MODE_PRIVATE)
             .getInt("orientation", android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
         enableEdgeToEdge()
+        // The opening plays on a fresh start only (not after a turn of the screen), unless it was switched
+        // off in Ajustes or Android's animations are off. Read from a small mirror so there is no blank wait.
+        val screenPrefs = getSharedPreferences("screen", MODE_PRIVATE)
+        val animationsOn = android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
+        val intro = androidx.compose.runtime.mutableStateOf(savedInstanceState == null && animationsOn && screenPrefs.getBoolean("intro", true))
         askNotificationPermissionOnce()
         app.camera.findAndConnect()
         if (intent?.action == ACTION_DELIVERY) pendingRoute.value = intent.getStringExtra(EXTRA_ROUTE) ?: "delivery"
@@ -141,7 +146,13 @@ class MainActivity : ComponentActivity() {
                 }
                 getSharedPreferences("screen", MODE_PRIVATE).edit().putInt("orientation", ScreenTurn.of(id).orientation).apply()
             }
+            LaunchedEffect(settings.introEnabled) { screenPrefs.edit().putBoolean("intro", settings.introEnabled).apply() }
+            LaunchedEffect(Unit) {
+                var first = true
+                com.example.ui.intro.IntroRequests.replay.collect { if (!first) intro.value = true; first = false }
+            }
             JrLinkTheme(night = settings.nightMode) {
+              androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                 val nav = rememberNavController()
                 val entry by nav.currentBackStackEntryAsState()
                 val route = entry?.destination?.route ?: Tab.Session.route
@@ -363,6 +374,9 @@ class MainActivity : ComponentActivity() {
                     }
                   }
                 }
+                // The opening plays over the app, which is already loading underneath.
+                if (intro.value) com.example.ui.intro.BrandIntro(onDone = { intro.value = false })
+              }
             }
         }
     }

@@ -177,6 +177,7 @@ import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Animation
 
 /** The app's chain, Capturar → Controlar → Melhorar → Entregar, plus the system: how Ajustes is grouped. */
 enum class SettingsModule(val title: String) {
@@ -1086,6 +1087,18 @@ private fun DisplaySettings(app: TetherApp, s: Settings) {
             s.rotateWithPhoto,
         ) { scope.launch { app.settings.set(SettingKeys.rotateWithPhoto, it) } }
         InfoText("Automático segue o sensor do celular mesmo com a rotação do Android travada. Nas posições fixas a tela não gira sozinha. O botão de girar fica na Sessão, no visualizador, no modo cliente e no live view.")
+    }
+    SettingsGroup("Abertura", Icons.Outlined.Animation) {
+        ToggleRow(
+            Icons.Outlined.Animation,
+            "Animação de abertura",
+            "A marca entra como uma foto sendo feita: foco, diafragma e o nome. Um toque pula.",
+            s.introEnabled,
+        ) { scope.launch { app.settings.set(SettingKeys.introEnabled, it) } }
+        androidx.compose.material3.TextButton(
+            onClick = { com.example.ui.intro.IntroRequests.replay.value += 1 },
+            modifier = Modifier.heightIn(min = 48.dp),
+        ) { Text("Ver agora") }
     }
     SettingsGroup("Tela", Icons.Outlined.Smartphone) {
         ToggleRow(Icons.Outlined.LightMode, "Manter a tela ligada", "Enquanto a câmera estiver conectada", s.keepScreenOn) {
