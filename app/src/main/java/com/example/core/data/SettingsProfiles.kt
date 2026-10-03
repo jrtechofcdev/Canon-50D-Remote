@@ -56,7 +56,7 @@ object SettingsProfiles {
         SettingKeys.sessionPresetId, SettingKeys.livePresetId, SettingKeys.presets, SettingKeys.logFolder,
         SettingKeys.appFolder, SettingKeys.mirrorFolder, SettingKeys.notesFolder, SettingKeys.pixKey, SettingKeys.developerMode,
         SettingKeys.deliveryFolder, SettingKeys.deliveryPassword, SettingKeys.deliveryActiveSession,
-        SettingKeys.expressFolder, SettingKeys.expressPassword, PROFILES, ACTIVE,
+        SettingKeys.expressFolder, SettingKeys.expressPassword, SettingKeys.pixName, SettingKeys.pixCity, PROFILES, ACTIVE,
     ).map { it.name }.toSet()
 
     /** Left out of a backup file: folder permissions and preset ids don't carry over to another phone. */

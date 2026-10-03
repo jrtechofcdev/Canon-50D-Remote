@@ -29,7 +29,7 @@
         $("closed").hidden = true;
         refresh();
       } else {
-        token = null; data = null; $("feed").innerHTML = ""; $("pay").hidden = true; $("dock").hidden = true; $("empty").hidden = true;
+        token = null; data = null; $("feed").innerHTML = ""; $("hint").hidden = true; $("dock").hidden = true; $("paySheet").hidden = true; $("empty").hidden = true;
         $("closed").hidden = false; $("sub").textContent = "";
       }
     }).catch(function () { $("sub").textContent = "Sem conexão com o celular do fotógrafo. Confira o Wi-Fi."; });
@@ -60,11 +60,9 @@
     // A new client is asked their name once, kindly; they can skip it.
     if (!name && !asked) { asked = true; $("welcome").hidden = false; setTimeout(function () { $("nameInput").focus(); }, 80); }
     $("sub").textContent = d.items.length ? plural(d.items.length, "foto", "fotos") + " · " + d.photographer : "Fotografia de " + d.photographer;
-    $("pay").hidden = !locked.length;
-    $("price").hidden = !d.price;
-    if (d.price) $("price").textContent = "Cada foto: " + d.price;
-    $("pixRow").hidden = !d.pix;
-    if (d.pix) $("pixKey").textContent = d.pix;
+    // Discreet: one line while there are previews; prices only when the photographer set them.
+    $("hint").hidden = !locked.length;
+    $("hintText").textContent = "Prévia com marca. Toque no coração das que quiser" + (d.price ? " · " + d.price : "");
     $("waiting").hidden = !d.waiting;
     $("waiting").textContent = d.waiting ? plural(d.waiting, "foto chegando", "fotos chegando") + "…" : "";
     $("empty").hidden = d.items.length > 0 || d.waiting > 0;
@@ -79,10 +77,11 @@
 
     // Dock: what the client chose and, once released, saving everything at once.
     var dockText = "";
-    if (locked.length) {
-      dockText = picked.length ? plural(picked.length, "favorita", "favoritas") : "Marque suas favoritas";
-      if (d.price && picked.length) dockText += " · " + total(d.price, picked.length);
-    } else if (free.length) dockText = plural(free.length, "foto liberada", "fotos liberadas");
+    if (locked.length) dockText = picked.length ? plural(picked.length, "favorita", "favoritas") : "Marque suas favoritas";
+    else if (free.length) dockText = plural(free.length, "foto liberada", "fotos liberadas");
+    // "Pagar" appears once something is hearted and the photographer shows payment.
+    var pickedLocked = picked.filter(function (i) { return i.locked; }).length;
+    if (pickedLocked && d.price !== null && d.price !== undefined) loadPay(); else $("payBtn").hidden = true;
     $("dockText").textContent = dockText;
     $("dock").hidden = !d.items.length;
     $("saveAll").hidden = ios || free.length < 2;
@@ -93,9 +92,25 @@
     if (!$("viewer").hidden) show();
   }
 
-  function total(price, n) {
-    var cents = parseInt(price.replace(/\D/g, ""), 10) * n;
-    return "R$ " + Math.floor(cents / 100) + "," + String(cents % 100).padStart(2, "0");
+  var pay = null, payKey = "";
+  function loadPay() {
+    get("/api/s/" + token + "/pay").then(function (r) {
+      if (r.status !== 200) return;
+      pay = r.body;
+      $("payBtn").hidden = !(pay.total || pay.pix || (pay.methods && pay.methods.length));
+      $("payBtn").textContent = pay.total ? "Pagar " + pay.total : "Pagar";
+      if (!$("paySheet").hidden) showPay();
+    }).catch(function () {});
+  }
+  function showPay() {
+    if (!pay) return;
+    $("payTotal").textContent = pay.total || "";
+    $("payDetail").textContent = pay.detail || pay.table || "";
+    $("pixBox").hidden = !pay.pix;
+    if (pay.pix && payKey !== pay.pix) { payKey = pay.pix; $("pixQr").src = "/api/s/" + token + "/pix.png?k=" + encodeURIComponent(pay.pix.slice(-8)); }
+    $("payMethods").textContent = pay.methods && pay.methods.length ? "Aceito: " + pay.methods.join(", ") : "";
+    $("payNote").textContent = pay.note || "";
+    $("paySheet").hidden = false;
   }
 
   function card(it, index, d, isNew) {
@@ -170,11 +185,19 @@
     if (e.key === "ArrowLeft") { current--; show(); }
     if (e.key === "ArrowRight") { current++; show(); }
   });
+  $("payBtn").onclick = function () { loadPay(); showPay(); };
+  $("payClose").onclick = function () { $("paySheet").hidden = true; };
+  $("paySheet").addEventListener("click", function (e) { if (e.target === $("paySheet")) $("paySheet").hidden = true; });
   $("copyPix").onclick = function () {
-    var k = $("pixKey").textContent;
-    (navigator.clipboard ? navigator.clipboard.writeText(k) : Promise.reject()).then(function () { toast("Chave Pix copiada"); }, function () {
-      var r = document.createRange(); r.selectNodeContents($("pixKey")); var s = getSelection(); s.removeAllRanges(); s.addRange(r); toast("Chave selecionada: copie");
-    });
+    if (!pay || !pay.pix) return;
+    var code = pay.pix;
+    function fallback() {
+      var t = document.createElement("textarea"); t.value = code; document.body.appendChild(t); t.select();
+      try { document.execCommand("copy"); toast("Código Pix copiado"); } catch (e) { toast("Copie o código no app do banco"); }
+      t.remove();
+    }
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(code).then(function () { toast("Código Pix copiado"); }, fallback);
+    else fallback();
   };
   $("saveAll").onclick = function () {
     if (!data) return;

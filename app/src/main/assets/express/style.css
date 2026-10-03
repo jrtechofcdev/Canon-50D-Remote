@@ -16,17 +16,20 @@ main { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
 .chip { font-size: 13px; font-weight: 600; color: var(--on-mint); background: var(--mint); padding: 5px 12px; border-radius: 999px; white-space: nowrap; }
 .intro { padding: 22px 0 14px; }
 h1 { font-size: 30px; line-height: 1.15; margin: 0 0 6px; font-weight: 700; }
-.pay { background: linear-gradient(135deg, rgba(0,252,168,.10), rgba(28,218,255,.08)); border: 1px solid rgba(0,252,168,.35);
-  border-radius: var(--radius); padding: 16px; margin-bottom: 18px; }
-.pay-head { display: flex; gap: 12px; align-items: flex-start; }
-.pay-title { margin: 0 0 4px; font-weight: 700; font-size: 18px; }
-.pay p { margin: 0; }
 .lock { flex: none; width: 36px; height: 36px; border-radius: 12px; background: var(--mint); position: relative; }
 .lock::before { content: ""; position: absolute; left: 8px; top: 7px; width: 14px; height: 12px; border: 3px solid var(--on-mint); border-bottom: 0; border-radius: 8px 8px 0 0; }
 .lock::after { content: ""; position: absolute; left: 9px; top: 17px; width: 18px; height: 12px; background: var(--on-mint); border-radius: 3px; }
-.price { margin: 14px 0 0 !important; font-size: 20px; font-weight: 700; color: var(--mint); }
-.pix { display: flex; align-items: center; gap: 10px; margin-top: 12px; background: var(--card); border-radius: 12px; padding: 8px 8px 8px 12px; }
-.pix code { flex: 1; font-family: inherit; font-weight: 600; overflow-wrap: anywhere; }
+.hint { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+.hint .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--mint); }
+.sheet { position: fixed; inset: 0; z-index: 25; background: rgba(0,0,0,.6); display: flex; align-items: flex-end; justify-content: center; }
+.sheet-card { width: 100%; max-width: 520px; background: var(--card); border-radius: 22px 22px 0 0; padding: 18px 18px calc(18px + env(safe-area-inset-bottom)); animation: up .25s ease both; max-height: 92vh; overflow-y: auto; }
+@keyframes up { from { transform: translateY(40px); opacity: 0; } }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; }
+.sheet-title { margin: 0; font-weight: 700; font-size: 18px; }
+.pay-total { margin: 6px 0 2px; font-size: 30px; font-weight: 700; color: var(--mint); }
+.pix-box { display: grid; justify-items: center; gap: 10px; margin: 14px 0; padding: 14px; background: var(--high); border-radius: 18px; }
+.pix-box img { width: 220px; height: 220px; background: #fff; border-radius: 12px; padding: 6px; }
+.pix-box .primary { width: 100%; }
 .waiting { display: flex; align-items: center; gap: 10px; color: var(--muted); margin: 0 0 14px; }
 .waiting::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--cyan); border-right-color: transparent; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

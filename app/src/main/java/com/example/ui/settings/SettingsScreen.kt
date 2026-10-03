@@ -195,6 +195,7 @@ enum class SettingsSection(val route: String, val title: String, val summary: St
     Camera("camera", "Câmera", "Bateria, cartão, exposições salvas, bracketing", Icons.Outlined.CameraAlt, SettingsModule.Camera),
     Share("share", "Envio e cliente", "WhatsApp, marca d'água, modo cliente", Icons.Outlined.Send, SettingsModule.Delivery),
     Delivery("delivery", "Entrega local", "Wi-Fi do fotógrafo, portal, códigos e QR", Icons.Outlined.WifiTethering, SettingsModule.Delivery),
+    Payments("payments", "Pagamentos", "Pix copia e cola, valores, pacotes e formas de pagamento", Icons.Outlined.Payments, SettingsModule.Delivery),
     Express("express", "Fotografia Express", "Sem código, prévia com marca e liberar após o pagamento", Icons.Outlined.Collections, SettingsModule.Delivery),
     Presets("presets", "Presets", "Look das fotos novas, cópia editada, pastas", Icons.Outlined.Style, SettingsModule.Editing),
     Messages("messages", "Mensagens", "Textos prontos para o WhatsApp do cliente", Icons.AutoMirrored.Outlined.Chat, SettingsModule.Delivery),
@@ -301,6 +302,7 @@ fun SettingsSectionScreen(app: TetherApp, section: SettingsSection, onBack: () -
             SettingsSection.Developer -> DeveloperSettings(app, settings)
             SettingsSection.Delivery -> DeliverySettings(app, settings)
             SettingsSection.Express -> ExpressSettings(app, settings)
+            SettingsSection.Payments -> PaymentSettings(app, settings)
         }
         Spacer(Modifier.height(88.dp))
     }

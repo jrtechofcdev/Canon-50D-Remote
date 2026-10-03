@@ -115,7 +115,34 @@ class LocalDelivery(
             }
         },
         expressServer = mode.express,
+        payment = { count, available -> paymentInfo(count, available) },
+        qrPng = ::qrPng,
     )
+
+    @Volatile private var lastSettings: com.example.core.data.Settings? = null
+
+    private fun paymentInfo(count: Int, available: Int): PaymentInfo? {
+        val s = lastSettings ?: return null
+        if (!s.expressShowPix) return null
+        val quote = com.example.core.payments.PricePlan.quote(s, count, available)
+        return PaymentInfo(
+            total = quote?.let { com.example.core.payments.PricePlan.money(it.cents) },
+            detail = quote?.detail,
+            pix = com.example.core.payments.PricePlan.pix(s, quote?.cents),
+            methods = com.example.core.payments.PricePlan.methods(s),
+            note = s.payNote.trim(),
+            table = com.example.core.payments.PricePlan.table(s),
+        )
+    }
+
+    private fun qrPng(text: String): ByteArray? = runCatching {
+        val hints = mapOf(com.google.zxing.EncodeHintType.MARGIN to 2, com.google.zxing.EncodeHintType.ERROR_CORRECTION to com.google.zxing.qrcode.decoder.ErrorCorrectionLevel.M)
+        val size = 480
+        val m = com.google.zxing.qrcode.QRCodeWriter().encode(text, com.google.zxing.BarcodeFormat.QR_CODE, size, size, hints)
+        val px = IntArray(size * size) { i -> if (m.get(i % size, i / size)) 0xFF000000.toInt() else 0xFFFFFFFF.toInt() }
+        val bmp = Bitmap.createBitmap(px, size, size, Bitmap.Config.ARGB_8888)
+        java.io.ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.PNG, 100, it); bmp.recycle() }.toByteArray()
+    }.getOrNull()
 
     private val _status = MutableStateFlow<DeliveryStatus>(DeliveryStatus.Off)
     val status: StateFlow<DeliveryStatus> = _status.asStateFlow()
@@ -146,13 +173,14 @@ class LocalDelivery(
         queue.start(scope)
         scope.launch {
             settings.settings.collect {
+                lastSettings = it
                 val c = mode.config(it)
                 portalInfo = PortalInfo(
                     photographer = c.photographer,
                     picks = c.picks,
                     express = mode.express && it.expressEnabled,
                     expressPreview = it.expressPreview,
-                    price = if (mode.express) DeliveryRules.price(it.expressPriceCents) else null,
+                    price = if (mode.express && it.expressShowPix) com.example.core.payments.PricePlan.table(it) else null,
                     pix = if (mode.express && it.expressShowPix) it.pixKey.trim().takeIf { k -> k.isNotEmpty() } else null,
                 )
             }

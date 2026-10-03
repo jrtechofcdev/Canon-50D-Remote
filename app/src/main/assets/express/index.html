@@ -33,21 +33,7 @@
     <p id="sub" class="muted">Conectando ao celular do fotógrafo…</p>
   </section>
 
-  <section id="pay" class="pay" hidden>
-    <div class="pay-head">
-      <span class="lock" aria-hidden="true"></span>
-      <div>
-        <p class="pay-title">Fotos em prévia</p>
-        <p class="muted small">Toque no coração das que você quer. Depois do pagamento, o fotógrafo libera e elas aparecem aqui sem marca, prontas para salvar.</p>
-      </div>
-    </div>
-    <p id="price" class="price" hidden></p>
-    <div id="pixRow" class="pix" hidden>
-      <span class="muted small">Pix</span>
-      <code id="pixKey"></code>
-      <button id="copyPix" class="ghost small">Copiar</button>
-    </div>
-  </section>
+  <p id="hint" class="hint" hidden><span class="dot" aria-hidden="true"></span><span id="hintText"></span></p>
 
   <p id="waiting" class="waiting" hidden></p>
 
@@ -64,8 +50,28 @@
 
 <footer id="dock" class="dock" hidden>
   <p id="dockText"></p>
+  <button id="payBtn" class="ghost" hidden>Pagar</button>
   <button id="saveAll" class="primary" hidden>Salvar liberadas</button>
 </footer>
+
+<div id="paySheet" class="sheet" hidden role="dialog" aria-label="Pagamento">
+  <div class="sheet-card">
+    <div class="sheet-head">
+      <p class="sheet-title">Pagamento</p>
+      <button id="payClose" class="link" aria-label="Fechar">Fechar</button>
+    </div>
+    <p id="payTotal" class="pay-total"></p>
+    <p id="payDetail" class="muted small"></p>
+    <div id="pixBox" class="pix-box" hidden>
+      <img id="pixQr" alt="QR do Pix">
+      <button id="copyPix" class="primary">Copiar Pix copia e cola</button>
+      <p class="muted small">Abra o app do banco, escolha Pix e leia o QR ou cole o código.</p>
+    </div>
+    <p id="payMethods" class="small"></p>
+    <p id="payNote" class="small"></p>
+    <p class="muted small">Depois de pagar, avise o fotógrafo: ele libera as fotos aqui mesmo, sem marca.</p>
+  </div>
+</div>
 
 <div id="viewer" class="viewer" hidden>
   <div class="viewer-bar">

@@ -45,6 +45,7 @@ import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.Print
+import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.AlertDialog
@@ -112,6 +113,7 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
     val s = settings ?: return
 
     var picking by remember { mutableStateOf(false) }
+    var charging by remember { mutableStateOf(false) }
     LaunchedEffect(s.expressEnabled) {
         if (!s.expressEnabled) return@LaunchedEffect
         app.express.expressSession()
@@ -231,10 +233,12 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
                             "${items.size} ${if (items.size == 1) "foto" else "fotos"} · $released liberadas · ${picked.size} favoritas do cliente",
                             style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted,
                         )
-                        // What to charge: the client's hearts, or the photos marked here.
-                        com.example.core.delivery.DeliveryRules.price(s.expressPriceCents * (if (selected.isNotEmpty()) selected.size else picked.size))?.let { total ->
+                        // What to charge: the photos marked here, or the client's hearts (best price for them).
+                        val chargeCount = if (selected.isNotEmpty()) selected.size else picked.count { !it.released }
+                        com.example.core.payments.PricePlan.quote(s, chargeCount, items.size)?.let { q ->
                             Text(
-                                (if (selected.isNotEmpty()) "${selected.size} marcadas: " else "${picked.size} favoritas: ") + total,
+                                (if (selected.isNotEmpty()) "${selected.size} marcadas: " else "$chargeCount favoritas: ") +
+                                    com.example.core.payments.PricePlan.money(q.cents) + " (${q.detail})",
                                 style = MaterialTheme.typography.labelLarge, color = Tone.Accent,
                             )
                         }
@@ -288,6 +292,13 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
                                     Text("Liberar favoritas (${picked.size})")
                                 }
                             }
+                            if (s.pixKey.isNotBlank()) {
+                                OutlinedButton(onClick = { charging = true }, modifier = Modifier.heightIn(min = 48.dp)) {
+                                    Icon(Icons.Outlined.QrCode2, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Cobrar")
+                                }
+                            }
                             OutlinedButton(onClick = { scope.launch { app.express.releaseAll(); toast("Todas liberadas") } }, enabled = released < items.size, modifier = Modifier.heightIn(min = 48.dp)) {
                                 Icon(Icons.Outlined.DoneAll, null)
                                 Spacer(Modifier.width(8.dp))
@@ -328,6 +339,28 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
             }
             Spacer(Modifier.height(80.dp))
         }
+    }
+
+    if (charging) {
+        val count = if (selected.isNotEmpty()) selected.size else items.count { it.picked && !it.released }
+        val quote = com.example.core.payments.PricePlan.quote(s, count, items.size)
+        val code = com.example.core.payments.PricePlan.pix(s.copy(payMethods = "pix"), quote?.cents)
+        AlertDialog(
+            onDismissRequest = { charging = false },
+            containerColor = Tone.Surface,
+            title = { Text(quote?.let { com.example.core.payments.PricePlan.money(it.cents) } ?: "Pix") },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        quote?.let { "$count ${if (count == 1) "foto" else "fotos"} · ${it.detail}" } ?: "Sem valor definido: o cliente digita o valor no banco.",
+                        style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted,
+                    )
+                    code?.let { QrImage(it, 240.dp, contentDescription = "QR do Pix") }
+                    Text("O cliente lê com o app do banco. Depois do pagamento, toque em Liberar.", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+                }
+            },
+            confirmButton = { TextButton(onClick = { charging = false }) { Text("Fechar") } },
+        )
     }
 
     if (picking) {

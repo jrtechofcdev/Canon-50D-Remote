@@ -42,7 +42,11 @@ class ExpressTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         db = Room.inMemoryDatabaseBuilder(context, PhotoDatabase::class.java).allowMainThreadQueries().build()
         dir = File(context.cacheDir, "express_test").apply { deleteRecursively(); mkdirs() }
-        server = LocalServer(db.deliveryDao(), portal = { null }, thumb = { _, _ -> null }, info = { info }, expressServer = true)
+        server = LocalServer(
+            db.deliveryDao(), portal = { null }, thumb = { _, _ -> null }, info = { info }, expressServer = true,
+            payment = { count, available -> PaymentInfo("R$ ${count * 15},00", "$count de $available", "PIXCODE", listOf("Pix"), "", null) },
+            qrPng = { byteArrayOf(1, 2, 3) },
+        )
         port = server.start(0)
         normal = LocalServer(db.deliveryDao(), portal = { null }, thumb = { _, _ -> null }, info = { info.copy(express = false) })
         normalPort = normal.start(0)
@@ -168,6 +172,19 @@ class ExpressTest {
         assertEquals(200, post("/api/s/${s.token}/name?n=Outro"))
         assertEquals("Ana Clara", runBlocking { db.deliveryDao().session(s.id)!!.client })
         assertEquals("Ana", LocalServer.cleanName("  Ana \n "))
+    }
+
+    @Test
+    fun paymentCountsOnlyHeartedPhotosNotReleasedYet() {
+        val (s, item) = express()
+        runBlocking { db.deliveryDao().setPicked(item.id, true) }
+        val pay = String(get("/api/s/${s.token}/pay").second)
+        assertTrue(pay, pay.contains("\"total\":\"R$ 15,00\"") && pay.contains("PIXCODE"))
+        assertArrayEquals(byteArrayOf(1, 2, 3), get("/api/s/${s.token}/pix.png").second)
+        runBlocking { db.deliveryDao().setReleased(listOf(item.id), true) }
+        assertTrue(String(get("/api/s/${s.token}/pay").second).contains("R$ 0,00"))
+        // The Entrega local has no payment page.
+        assertEquals(404, get("/api/s/${s.token}/pay", normalPort).first)
     }
 
     @Test

@@ -169,7 +169,7 @@ fun ExpressSettings(app: TetherApp, s: Settings) {
         ) { set(SettingKeys.expressWatermark, it) }
     }
 
-    SettingsGroup("Cliente e pagamento", Icons.Outlined.Payments) {
+    SettingsGroup("Cliente", Icons.Outlined.Payments) {
         var photographer by remember { mutableStateOf(s.expressPhotographer) }
         OutlinedTextField(
             value = photographer,
@@ -179,30 +179,7 @@ fun ExpressSettings(app: TetherApp, s: Settings) {
             enabled = on,
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         )
-        var price by remember { mutableStateOf(if (s.expressPriceCents > 0) "%d,%02d".format(s.expressPriceCents / 100, s.expressPriceCents % 100) else "") }
-        OutlinedTextField(
-            value = price,
-            onValueChange = { typed ->
-                price = typed.filter { it.isDigit() || it == ',' || it == '.' }.take(9)
-                val cents = price.replace('.', ',').split(',').let { parts ->
-                    val reais = parts.getOrNull(0)?.toIntOrNull() ?: 0
-                    val dec = parts.getOrNull(1)?.padEnd(2, '0')?.take(2)?.toIntOrNull() ?: 0
-                    reais * 100 + dec
-                }
-                scope.launch { app.settings.set(SettingKeys.expressPriceCents, cents) }
-            },
-            label = { Text("Valor de cada foto (R$)") },
-            supportingText = { Text(if (s.expressPriceCents > 0) "Aparece para o cliente, com o total das favoritas" else "Vazio: o valor não aparece") },
-            singleLine = true,
-            enabled = on,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        )
-        ToggleRow(
-            Icons.Outlined.Payments, "Mostrar a chave Pix na página",
-            if (s.pixKey.isBlank()) "Cadastre a chave em Ajustes → Mensagens" else "Chave: ${s.pixKey}, com botão de copiar",
-            s.expressShowPix, enabled = on && s.pixKey.isNotBlank(),
-        ) { set(SettingKeys.expressShowPix, it) }
+        InfoText("Valores, pacotes, Pix e formas de pagamento ficam em Ajustes → Pagamentos.")
         ToggleRow(
             Icons.Outlined.Favorite, "Cliente marca favoritas",
             "O coração ajuda a escolher o que comprar e aparece na galeria e no culling",

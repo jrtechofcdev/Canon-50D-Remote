@@ -34,6 +34,16 @@ data class PortalInfo(
     val pix: String? = null,
 )
 
+/** What the Express page shows when the client taps Pagar. */
+data class PaymentInfo(
+    val total: String?,
+    val detail: String?,
+    val pix: String?,
+    val methods: List<String>,
+    val note: String,
+    val table: String?,
+)
+
 /** A prepared photo's marked preview (Fotografia Express), next to the file itself. */
 fun previewFileOf(path: String): File = File(path.removeSuffix(".jpg") + ".preview.jpg")
 
@@ -56,6 +66,10 @@ class LocalServer(
      * login) and a Entrega local server only its own: a token from one is unknown to the other.
      */
     private val expressServer: Boolean = false,
+    /** Payment for [count] hearted photos out of [available] (Express); null = nothing to show. */
+    private val payment: (count: Int, available: Int) -> PaymentInfo? = { _, _ -> null },
+    /** A PNG QR code of a text (the Pix code). */
+    private val qrPng: (String) -> ByteArray? = { null },
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     @Volatile private var socket: ServerSocket? = null
@@ -175,6 +189,8 @@ class LocalServer(
             seg.size == 3 && seg[0] == "api" && seg[1] == "s" -> sessionJson(seg[2], out)
             seg.size == 5 && seg[0] == "api" && seg[1] == "s" && seg[3] == "pick" && r.method == "POST" -> pick(seg[2], seg[4], r, out)
             seg.size == 4 && seg[0] == "api" && seg[1] == "s" && seg[3] == "name" && r.method == "POST" -> name(seg[2], r, out)
+            seg.size == 4 && seg[0] == "api" && seg[1] == "s" && seg[3] == "pay" && expressServer -> pay(seg[2], out)
+            seg.size == 4 && seg[0] == "api" && seg[1] == "s" && seg[3] == "pix.png" && expressServer -> pixPng(seg[2], out, head)
             seg.size == 3 && seg[0] == "f" -> file(seg[1], seg[2], r, out, head)
             seg.size == 3 && seg[0] == "t" -> thumbnail(seg[1], seg[2], out, head)
             seg.size == 3 && seg[0] == "p" -> view(seg[1], seg[2], out, head)
@@ -279,6 +295,32 @@ class LocalServer(
             onPick(item, on, session)
         }
         json(out, 200, """{"picked":$on}""")
+    }
+
+    private fun quoteFor(token: String): PaymentInfo? {
+        val session = validSession(token) ?: return null
+        val items = runBlocking { dao.items(session.id) }.filter { it.state in DeliveryState.served }
+        return payment(items.count { it.picked && !it.released }, items.size)
+    }
+
+    /** What to pay for the hearted photos not released yet, and how. */
+    private fun pay(token: String, out: OutputStream) {
+        validSession(token) ?: return json(out, 404, """{"error":"Acesso encerrado"}""")
+        val p = quoteFor(token) ?: return json(out, 200, """{"methods":[]}""")
+        json(
+            out, 200,
+            """{"total":${p.total?.let(::quote) ?: "null"},"detail":${p.detail?.let(::quote) ?: "null"},""" +
+                """"pix":${p.pix?.let(::quote) ?: "null"},"methods":[${p.methods.joinToString(",") { quote(it) }}],""" +
+                """"note":${quote(p.note)},"table":${p.table?.let(::quote) ?: "null"}}""",
+        )
+    }
+
+    private fun pixPng(token: String, out: OutputStream, head: Boolean) {
+        val pix = quoteFor(token)?.pix ?: return text(out, 404, "Sem Pix")
+        val png = qrPng(pix) ?: return text(out, 404, "Sem Pix")
+        writeHead(out, 200, listOf("Content-Type" to "image/png", "Content-Length" to png.size.toString(), "Cache-Control" to "no-store"))
+        if (!head) out.write(png)
+        out.flush()
     }
 
     /**

@@ -255,6 +255,21 @@ data class Settings(
     /** A notification "Ana gostou de uma foto" when a client hearts one. */
     val deliveryNotifyLikes: Boolean = true,
     val expressNotifyLikes: Boolean = true,
+    // Pagamentos (Ajustes → Pagamentos): the Pix key itself is pixKey, also used in the messages.
+    /** "cpf", "cnpj", "phone", "email" or "random": how the key is written in the Pix code. */
+    val pixKeyType: String = "email",
+    /** Receiver name and city as the bank shows them (Pix code). */
+    val pixName: String = "",
+    val pixCity: String = "",
+    /** Package: [payPackPhotos] photos for [payPackCents] (0 = no package). */
+    val payPackPhotos: Int = 0,
+    val payPackCents: Int = 0,
+    /** All of the client's photos for this price (0 = not offered). */
+    val payAllCents: Int = 0,
+    /** Accepted ways to pay: pix, cash, debit, credit (comma separated). */
+    val payMethods: String = "pix,cash",
+    /** A line for the client, e.g. "Pagamento no balcão". */
+    val payNote: String = "",
     /** A short vibration when a client hearts or downloads a photo. */
     val deliveryVibrate: Boolean = true,
     /** Tabs hidden from the bar (routes, comma separated). Sessão and Ajustes always stay. */
@@ -455,6 +470,14 @@ object SettingKeys {
     val expressShowPix = booleanPreferencesKey("express_show_pix")
     val expressAutoStart = booleanPreferencesKey("express_auto_start")
     val deliveryVibrate = booleanPreferencesKey("delivery_vibrate")
+    val pixKeyType = stringPreferencesKey("pix_key_type")
+    val pixName = stringPreferencesKey("pix_name")
+    val pixCity = stringPreferencesKey("pix_city")
+    val payPackPhotos = intPreferencesKey("pay_pack_photos")
+    val payPackCents = intPreferencesKey("pay_pack_cents")
+    val payAllCents = intPreferencesKey("pay_all_cents")
+    val payMethods = stringPreferencesKey("pay_methods")
+    val payNote = stringPreferencesKey("pay_note")
     val deliveryNotifyLikes = booleanPreferencesKey("delivery_notify_likes")
     val expressNotifyLikes = booleanPreferencesKey("express_notify_likes")
     val deliveryDomain = stringPreferencesKey("delivery_domain")
@@ -686,6 +709,14 @@ class SettingsRepository(private val context: Context) {
             expressShowPix = this[k.expressShowPix] ?: d.expressShowPix,
             expressAutoStart = this[k.expressAutoStart] ?: d.expressAutoStart,
             deliveryVibrate = this[k.deliveryVibrate] ?: d.deliveryVibrate,
+            pixKeyType = this[k.pixKeyType] ?: d.pixKeyType,
+            pixName = this[k.pixName] ?: d.pixName,
+            pixCity = this[k.pixCity] ?: d.pixCity,
+            payPackPhotos = this[k.payPackPhotos] ?: d.payPackPhotos,
+            payPackCents = this[k.payPackCents] ?: d.payPackCents,
+            payAllCents = this[k.payAllCents] ?: d.payAllCents,
+            payMethods = this[k.payMethods] ?: d.payMethods,
+            payNote = this[k.payNote] ?: d.payNote,
             deliveryNotifyLikes = this[k.deliveryNotifyLikes] ?: d.deliveryNotifyLikes,
             expressNotifyLikes = this[k.expressNotifyLikes] ?: d.expressNotifyLikes,
             deliveryDomain = this[k.deliveryDomain] ?: d.deliveryDomain,
