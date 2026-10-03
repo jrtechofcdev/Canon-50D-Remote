@@ -93,6 +93,10 @@ import androidx.compose.material.icons.outlined.ShutterSpeed
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.verticalScroll
 
 /**
  * Full-screen photos for the client to follow along. No settings, no delete.
@@ -167,17 +171,43 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
             },
     ) {
         val current = photos.getOrNull(pager.currentPage)
+        // The client's actions, used as a bottom row standing and as a side column lying down.
+        val actions: @Composable (com.example.core.data.Photo, Modifier) -> Unit = { photo, mod ->
+            if (settings.clientPicksEnabled) {
+                ClientAction(
+                    modifier = mod,
+                    icon = if (photo.clientPick) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    label = if (photo.clientPick) "Escolhida" else "Escolher",
+                    tint = if (photo.clientPick) Tone.Accent else Color.White,
+                ) { scope.launch { app.database.photoDao().setClientPick(photo.id, !photo.clientPick) } }
+            }
+            if (settings.clientWhatsApp) {
+                ClientAction(Icons.AutoMirrored.Outlined.Send, "WhatsApp", mod, tint = Tone.Accent) { whatsFor = photo }
+            }
+            if (settings.clientCropEnabled) {
+                ClientAction(Icons.Outlined.Crop, "Recortar", mod, locked = guarded) { requestCrop(photo.id) }
+            }
+            if (settings.clientPresetsEnabled && presets.isNotEmpty()) {
+                ClientAction(Icons.Outlined.Tune, "Calibrar", mod, locked = guarded) { requestCalibrate(photo.id) }
+            }
+        }
         // Vertical photos fill a standing screen, horizontal ones a lying screen.
         com.example.ui.components.FollowPhotoOrientation(app, current, settings.rotateWithPhoto, settings.screenOrientation)
 
-        // Top: leave on the left, position and brand on the right.
-        if (chrome) Row(
-            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp).heightIn(min = 48.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+        // Top: three balanced zones. Leave on the left, the brand in the true centre, position and the
+        // two screen buttons on the right, all the same height and the same quiet style.
+        if (chrome) Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp).heightIn(min = 48.dp)) {
             if (settings.clientExitButton) {
-                TextButton(onClick = requestExit) {
-                    Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null, tint = Muted, modifier = Modifier.size(20.dp))
+                androidx.compose.material3.OutlinedButton(
+                    onClick = requestExit,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp),
+                    modifier = Modifier.align(Alignment.CenterStart).heightIn(min = 40.dp),
+                ) {
+                    Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null, tint = Muted, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Sair", color = Muted, style = MaterialTheme.typography.labelLarge)
                     if (settings.clientPin.isNotEmpty()) {
@@ -186,25 +216,40 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
                     }
                 }
             }
-            Spacer(Modifier.weight(1f))
-            IconButton(onClick = { chrome = false }) {
-                Icon(Icons.Outlined.VisibilityOff, contentDescription = "Ocultar a interface", tint = Muted)
-            }
-            com.example.ui.components.RotateButton(app, settings.screenOrientation, tint = Muted)
-            if (photos.isNotEmpty()) {
-                Text("${pager.currentPage + 1} / ${photos.size}", style = MaterialTheme.typography.labelMedium, color = Muted)
-                Spacer(Modifier.width(12.dp))
-            }
             if (settings.clientShowBrand) {
-                Row(Modifier.padding(end = 12.dp).alpha(0.8f), verticalAlignment = Alignment.CenterVertically) {
-                    BrandSymbol(18.dp)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Jr_Tech_OFC", style = WordmarkStyle.copy(fontSize = 13.sp), color = Color.White)
+                // The name only where it fits between the two sides; the symbol alone on a narrow phone.
+                val wide = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 560
+                Row(Modifier.align(Alignment.Center).alpha(0.85f), verticalAlignment = Alignment.CenterVertically) {
+                    BrandSymbol(if (wide) 18.dp else 22.dp)
+                    if (wide) {
+                        Spacer(Modifier.width(8.dp))
+                        Text("Jr_Tech_OFC", style = WordmarkStyle.copy(fontSize = 13.sp), color = Color.White)
+                    }
+                }
+            }
+            Row(
+                Modifier.align(Alignment.CenterEnd),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (photos.isNotEmpty()) {
+                    Text(
+                        "${pager.currentPage + 1} / ${photos.size}",
+                        style = MaterialTheme.typography.labelLarge, color = Muted,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.08f)).padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                }
+                TopIcon { com.example.ui.components.RotateButton(app, settings.screenOrientation, tint = Muted) }
+                TopIcon {
+                    IconButton(onClick = { chrome = false }) {
+                        Icon(Icons.Outlined.VisibilityOff, contentDescription = "Ocultar a interface", tint = Muted)
+                    }
                 }
             }
         }
 
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+        Row(Modifier.weight(1f).fillMaxWidth()) {
+        Box(Modifier.weight(1f).fillMaxHeight()) {
             if (photos.isEmpty()) {
                 Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Outlined.PhotoCamera, contentDescription = null, tint = Muted, modifier = Modifier.size(40.dp))
@@ -216,9 +261,18 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
                 if (settings.clientWatermark) ClientWatermark(app, settings)
             }
         }
+        // Lying down the actions stand in a column on the side, so the photo keeps its height.
+        if (landscape && current != null && chrome) {
+            Column(
+                Modifier.fillMaxHeight().width(96.dp).background(Color.White.copy(alpha = 0.06f)).navigationBarsPadding()
+                    .verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+            ) { actions(current, Modifier.fillMaxWidth()) }
+        }
+        }
 
         if (current != null && chrome) {
-            if (settings.clientShowInfo) PhotoInfo(current)
+            if (settings.clientShowInfo && !landscape) PhotoInfo(current)
             if (settings.clientPresetsEnabled && presets.isNotEmpty()) {
                 PresetPicker(
                     app = app,
@@ -230,27 +284,9 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
                 )
             }
             // Big icons with a short name under each, all the same width so they line up.
-            Row(
+            if (!landscape) Row(
                 Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.06f)).navigationBarsPadding().padding(vertical = 4.dp),
-            ) {
-                if (settings.clientPicksEnabled) {
-                    ClientAction(
-                        modifier = Modifier.weight(1f),
-                        icon = if (current.clientPick) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        label = if (current.clientPick) "Escolhida" else "Escolher",
-                        tint = if (current.clientPick) Tone.Accent else Color.White,
-                    ) { scope.launch { app.database.photoDao().setClientPick(current.id, !current.clientPick) } }
-                }
-                if (settings.clientWhatsApp) {
-                    ClientAction(Icons.AutoMirrored.Outlined.Send, "WhatsApp", Modifier.weight(1f), tint = Tone.Accent) { whatsFor = current }
-                }
-                if (settings.clientCropEnabled) {
-                    ClientAction(Icons.Outlined.Crop, "Recortar", Modifier.weight(1f), locked = guarded) { requestCrop(current.id) }
-                }
-                if (settings.clientPresetsEnabled && presets.isNotEmpty()) {
-                    ClientAction(Icons.Outlined.Tune, "Calibrar", Modifier.weight(1f), locked = guarded) { requestCalibrate(current.id) }
-                }
-            }
+            ) { actions(current, Modifier.weight(1f)) }
         }
     }
 
@@ -284,6 +320,12 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
 }
 
 private val Muted = Color(0xFFBDBDBD)
+
+/** One round, equal-size slot for a top-bar button, so the icons line up whatever they are. */
+@Composable
+private fun TopIcon(content: @Composable () -> Unit) {
+    Box(Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) { content() }
+}
 
 /** How long one finger stays still on the screen to leave client mode. */
 const val HOLD_TO_EXIT_MS = 2_000L

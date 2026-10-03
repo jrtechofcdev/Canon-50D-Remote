@@ -263,6 +263,19 @@ class ScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun clientHeartLandscape() {
+        seedPhotos()
+        runBlocking {
+            app.database.photoDao().inSession("Geral").forEach { app.database.photoDao().setClientPick(it.id, true) }
+            app.settings.set(com.example.core.data.SettingKeys.clientShowInfo, true)
+            app.settings.set(com.example.core.data.SettingKeys.clientPin, "1234")
+        }
+        rule.setContent { JrLinkTheme { com.example.ui.client.ClientModeScreen(app, onExit = {}, onCalibrate = {}) } }
+        save("cliente_coracao_deitado", androidx.compose.ui.test.hasText("Escolhida"))
+    }
+
+    @Test
     fun settingsProfiles() {
         runBlocking { app.settings.applyProfile(com.example.core.data.SettingsProfiles.starters.first()) }
         rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Profiles, onBack = {}) } }
