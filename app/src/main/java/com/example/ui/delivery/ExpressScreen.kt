@@ -432,6 +432,13 @@ private fun ExpressTile(item: DeliveryItem, selected: Boolean, previewOn: Boolea
             Spacer(Modifier.width(3.dp))
             Text(label, style = MaterialTheme.typography.labelSmall, color = color)
         }
+        if (item.look != null) {
+            Text(
+                "V${item.variant + 1}",
+                style = MaterialTheme.typography.labelSmall, color = Tone.Text,
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).clip(RoundedCornerShape(999.dp)).background(Color(0x99000000)).padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+        }
         if (item.picked) Icon(Icons.Filled.Favorite, "Favorita do cliente", tint = Tone.Accent, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).size(18.dp))
         if (selected) {
             Box(Modifier.align(Alignment.BottomStart).padding(4.dp).size(20.dp).clip(CircleShape).background(Tone.Accent))

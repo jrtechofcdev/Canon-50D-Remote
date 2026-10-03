@@ -69,7 +69,7 @@ fun DeliverSheet(app: TetherApp, photoIds: List<Long>, onDismiss: () -> Unit, on
     fun send(session: DeliverySession) = scope.launch {
         val added = app.delivery.send(session.id, photoIds)
         val text = when {
-            added == 0 -> "${session.client} já tem ${if (count == 1) "essa foto" else "essas fotos"}"
+            added == 0 -> "${session.client} já tem ${if (count == 1) "essa foto. Para outra edição, use Versões" else "essas fotos"}"
             added == 1 -> "1 foto na fila de ${session.client}"
             else -> "$added fotos na fila de ${session.client}"
         }

@@ -220,6 +220,9 @@ class ExpressTest {
             val item = room.deliveryDao().items(1).single()
             assertFalse(item.released)
             assertEquals(2, item.downloads)
+            // Version 10: the photo already sent is version 1 and follows its edits.
+            assertEquals(0, item.variant)
+            assertEquals(null, item.look)
             assertEquals(1, room.photoDao().inSession("Evento").size)
         }
         room.close()

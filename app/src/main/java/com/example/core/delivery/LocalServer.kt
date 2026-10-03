@@ -241,7 +241,7 @@ class LocalServer(
         val waiting = items.count { it.state == DeliveryState.WAITING || it.state == DeliveryState.PREPARING }
         val portalInfo = info()
         val list = ready.joinToString(",") {
-            """{"id":${it.id},"name":${quote(it.name)},"size":${it.size},"picked":${it.picked},"locked":${locked(session, it)}}"""
+            """{"id":${it.id},"name":${quote(it.name)},"size":${it.size},"picked":${it.picked},"locked":${locked(session, it)},"version":${if (it.variant > 0) it.variant + 1 else 0},"label":${it.label?.let(::quote) ?: "null"}}"""
         }
         json(
             out, 200,

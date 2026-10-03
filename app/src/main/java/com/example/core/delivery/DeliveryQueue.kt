@@ -55,10 +55,33 @@ class DeliveryQueue(
         return added
     }
 
-    /** A photo's look changed: its prepared copies are made again with the new look. */
+    /**
+     * Adds one more version of [photoId] for a client, with its own [look] (a preset, a calibration, a crop).
+     * The photo can already be there: each version is a separate file. Returns the new item's id, or -1.
+     */
+    suspend fun enqueueVersion(sessionId: Long, photoId: Long, look: DeliveryLook, label: String?): Long {
+        val session = dao.session(sessionId)?.takeIf { it.isOpen && it.express == express } ?: return -1
+        val photo = photos.get(photoId) ?: return -1
+        // The first copy a client gets is version 1 even when it was sent with a chosen look.
+        val variant = dao.lastVariant(sessionId, photoId)?.plus(1) ?: 0
+        val id = dao.insertItem(
+            DeliveryItem(
+                sessionId = sessionId, photoId = photoId, variant = variant, look = look.encode(), label = label,
+                name = DeliveryRules.versionName(session.client, photo.savedBase, variant, label), queuedAt = clock(),
+            ),
+        )
+        if (id > 0) {
+            AppLog.i("ENTREGA", "Versão ${variant + 1} de ${photo.savedBase} na fila de ${session.client}" + (label?.let { " ($it)" } ?: ""))
+            events.emit(PhotoEvent.Queued(photoId, sessionId))
+            wake.trySend(Unit)
+        }
+        return id
+    }
+
+    /** A photo's look changed: its prepared copies are made again with the new look (extra versions keep theirs). */
     suspend fun refresh(photoId: Long) {
         var any = false
-        dao.itemsOfPhoto(photoId).filter { it.state != DeliveryState.WAITING && it.state != DeliveryState.PREPARING }.forEach {
+        dao.itemsOfPhoto(photoId).filter { it.look == null && it.state != DeliveryState.WAITING && it.state != DeliveryState.PREPARING }.forEach {
             dao.retry(it.id)
             any = true
         }
@@ -98,7 +121,10 @@ class DeliveryQueue(
             dao.nextWaiting(express)?.also { dao.setState(it.id, DeliveryState.PREPARING, null, 0, null, null) }
         } ?: return false
         val session = dao.session(item.sessionId)
-        val photo = photos.get(item.photoId)
+        // An extra version wears its own look; the file name keeps it apart from the photo's other copies.
+        val photo = photos.get(item.photoId)?.let { p ->
+            DeliveryLook.decode(item.look)?.applyTo(p)?.copy(savedBase = DeliveryRules.versionBase(p.savedBase, item.variant, item.label)) ?: p
+        }
         if (session == null || photo == null) {
             dao.setState(item.id, DeliveryState.ERROR, null, 0, "A foto ou o cliente foi apagado", null)
             return true

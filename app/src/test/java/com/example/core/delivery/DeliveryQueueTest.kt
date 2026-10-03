@@ -141,4 +141,50 @@ class DeliveryQueueTest {
         }
         room.close()
     }
+
+    @Test
+    fun theSamePhotoGoesAgainAsVersionsWithTheirOwnLook() = runBlocking {
+        val seen = java.util.Collections.synchronizedList(mutableListOf<Photo>())
+        val q = DeliveryQueue(
+            db.deliveryDao(), db.photoDao(),
+            DeliveryPreparer { photo, _, target -> seen += photo; target.writeText("jpg"); true },
+            root, DeliveryEvents(),
+        )
+        val ana = client("ana")
+        val p1 = photo(1)
+        assertEquals(1, q.enqueue(ana, listOf(p1)))
+        val bw = DeliveryLook(presetId = 7, crop = "c")
+        assertTrue(q.enqueueVersion(ana, p1, bw, "Preto e branco") > 0)
+        assertTrue(q.enqueueVersion(ana, p1, DeliveryLook(presetId = 8), null) > 0)
+        while (q.processNext()) Unit
+        val items = db.deliveryDao().items(ana).sortedBy { it.variant }
+        assertEquals(listOf(0, 1, 2), items.map { it.variant })
+        assertEquals(listOf("ana_IMG_1.jpg", "ana_IMG_1_v2_Preto-e-branco.jpg", "ana_IMG_1_v3.jpg"), items.map { it.name })
+        assertTrue(items.all { it.state == DeliveryState.READY })
+        // Each version is rendered with its own look, under its own file name.
+        val v2 = seen.first { it.savedBase == "IMG_1_v2_Preto-e-branco" }
+        assertEquals(7L, v2.presetId)
+        assertEquals("c", v2.crop)
+
+        // Editing the photo remakes only the copy that follows it; the versions keep their look.
+        q.refresh(p1)
+        val after = db.deliveryDao().items(ana).associateBy { it.variant }
+        assertEquals(DeliveryState.WAITING, after[0]!!.state)
+        assertEquals(DeliveryState.READY, after[1]!!.state)
+        assertEquals(DeliveryState.READY, after[2]!!.state)
+    }
+
+    @Test
+    fun aVersionSentFirstIsVersionOne() = runBlocking {
+        val q = queue()
+        val ana = client("ana")
+        val p1 = photo(1)
+        assertTrue(q.enqueueVersion(ana, p1, DeliveryLook(presetId = 3), "Quente") > 0)
+        val item = db.deliveryDao().items(ana).single()
+        assertEquals(0, item.variant)
+        assertEquals("ana_IMG_1_v1_Quente.jpg", item.name)
+        assertEquals(DeliveryLook(presetId = 3), DeliveryLook.decode(item.look))
+        // A plain send afterwards finds the photo already there.
+        assertEquals(0, q.enqueue(ana, listOf(p1)))
+    }
 }

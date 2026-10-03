@@ -132,7 +132,7 @@ fun sendToExpress(app: TetherApp, context: Context, scope: CoroutineScope, photo
         Toast.makeText(
             context,
             when {
-                added == 0 -> if (n == 1) "Essa foto já está no Express" else "Essas fotos já estão no Express"
+                added == 0 -> if (n == 1) "Essa foto já está no Express. Para outra edição, use Versões" else "Essas fotos já estão no Express"
                 added == 1 -> "1 foto mandada ao Express"
                 else -> "$added fotos mandadas ao Express"
             },

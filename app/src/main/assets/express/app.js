@@ -122,7 +122,7 @@
     shot.appendChild(img); shot.onclick = function () { open(index); };
     c.appendChild(shot);
     var foot = document.createElement("div"); foot.className = "card-foot";
-    var num = document.createElement("span"); num.className = "num"; num.textContent = "Foto " + (d.items.length - index);
+    var num = document.createElement("span"); num.className = "num"; num.textContent = "Foto " + (d.items.length - index) + (it.version ? " · " + (it.label || "versão " + it.version) : "");
     var pill = document.createElement("span"); pill.className = "pill" + (it.locked ? "" : " free"); pill.textContent = it.locked ? "Prévia" : "Liberada";
     var grow = document.createElement("span"); grow.className = "grow";
     foot.appendChild(num); foot.appendChild(pill); foot.appendChild(grow);

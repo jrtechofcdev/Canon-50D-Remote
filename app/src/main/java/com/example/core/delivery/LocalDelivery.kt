@@ -322,6 +322,15 @@ class LocalDelivery(
     /** Sends photos to a client. Returns how many were new for them. */
     suspend fun send(sessionId: Long, photoIds: List<Long>): Int = queue.enqueue(sessionId, photoIds)
 
+    /**
+     * Sends [photoId] once more with another look, as a separate file: the client gets every version.
+     * [sessionId] null = the Express client of the moment. Returns false when it could not be added.
+     */
+    suspend fun sendVersion(sessionId: Long?, photoId: Long, look: DeliveryLook, label: String?): Boolean {
+        val id = sessionId ?: expressSession().id
+        return queue.enqueueVersion(id, photoId, look, label) > 0
+    }
+
     suspend fun retry(itemId: Long) {
         dao.retry(itemId)
         queue.poke()

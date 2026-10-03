@@ -105,6 +105,7 @@
         b.appendChild(img);
         if (it.locked) { var l = document.createElement("span"); l.className = "lock"; l.textContent = "Prévia"; b.appendChild(l); }
         if (it.picked) { var s = document.createElement("span"); s.className = "badge"; s.textContent = "♥"; b.appendChild(s); }
+        if (it.version) { var v = document.createElement("span"); v.className = "ver"; v.textContent = it.label || ("Versão " + it.version); b.appendChild(v); }
         b.onclick = function () { open(index); };
         grid.appendChild(b);
       });

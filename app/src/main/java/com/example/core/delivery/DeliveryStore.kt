@@ -41,7 +41,7 @@ data class DeliverySession(
 /** One photo waiting, being prepared or ready for one client. */
 @Entity(
     tableName = "delivery_items",
-    indices = [Index(value = ["sessionId", "photoId"], unique = true)],
+    indices = [Index(value = ["sessionId", "photoId", "variant"], unique = true)],
 )
 data class DeliveryItem(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -61,6 +61,12 @@ data class DeliveryItem(
     val picked: Boolean = false,
     /** Fotografia Express: paid and released by the photographer, so it downloads without the preview mark. */
     @ColumnInfo(defaultValue = "0") val released: Boolean = false,
+    /** 0: the photo as it is (follows later edits). 1, 2…: extra versions of the same photo, each with its own [look]. */
+    @ColumnInfo(defaultValue = "0") val variant: Int = 0,
+    /** A version's own preset, calibration and crop ([DeliveryLook]); null follows the photo. */
+    val look: String? = null,
+    /** A version's name in the app and the portal, e.g. the preset's name. */
+    val label: String? = null,
 )
 
 /** Item states, in the order an item goes through them. */
@@ -126,7 +132,7 @@ interface DeliveryDao {
     @Query("DELETE FROM delivery_items WHERE sessionId = :sessionId")
     suspend fun deleteItemsOf(sessionId: Long)
 
-    /** Returns -1 when the photo is already in that session (a photo goes to a client once). */
+    /** Returns -1 when the photo (or that version of it) is already in that session. */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertItem(item: DeliveryItem): Long
 
@@ -135,6 +141,10 @@ interface DeliveryDao {
 
     @Query("SELECT * FROM delivery_items WHERE sessionId = :sessionId ORDER BY queuedAt DESC, id DESC")
     suspend fun items(sessionId: Long): List<DeliveryItem>
+
+    /** The highest version of the photo the client has; null when they don't have it yet. */
+    @Query("SELECT MAX(variant) FROM delivery_items WHERE sessionId = :sessionId AND photoId = :photoId")
+    suspend fun lastVariant(sessionId: Long, photoId: Long): Int?
 
     @Query("SELECT * FROM delivery_items WHERE photoId = :photoId")
     suspend fun itemsOfPhoto(photoId: Long): List<DeliveryItem>

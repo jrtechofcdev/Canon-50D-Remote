@@ -83,6 +83,16 @@ object DeliveryRules {
 
     fun itemName(client: String, savedBase: String): String = "${fileSafe(client)}_$savedBase.jpg"
 
+    /** An extra version's file: Ana_IMG_1234_v2_Preto-e-branco.jpg. The label is optional. */
+    fun versionName(client: String, savedBase: String, variant: Int, label: String?): String =
+        itemName(client, versionBase(savedBase, variant, label))
+
+    /** IMG_1234 → IMG_1234_v2_Preto-e-branco: the base of an extra version's files. */
+    fun versionBase(savedBase: String, variant: Int, label: String?): String {
+        val tail = label?.let { fileSafe(it).takeIf { s -> s != "Cliente" } }?.let { "_$it" } ?: ""
+        return "${savedBase}_v${variant + 1}$tail"
+    }
+
     /** End of a new session's validity (0 = none). */
     fun expiresAt(now: Long, hours: Int): Long = if (hours <= 0) 0 else now + hours * 3_600_000L
 

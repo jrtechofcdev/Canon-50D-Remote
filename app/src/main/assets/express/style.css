@@ -41,7 +41,7 @@ h1 { font-size: 30px; line-height: 1.15; margin: 0 0 6px; font-weight: 700; }
 .shot img { display: block; width: 100%; max-height: 78vh; object-fit: contain; }
 .locked img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .card-foot { display: flex; align-items: center; gap: 10px; padding: 12px; }
-.num { font-weight: 700; }
+.num { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pill { font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--high); color: var(--muted); }
 .pill.free { background: rgba(0,252,168,.16); color: var(--mint); }
 .grow { flex: 1; }

@@ -115,6 +115,7 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.material.icons.outlined.FilterNone
 
 @Composable
 fun ViewerScreen(
@@ -146,6 +147,7 @@ fun ViewerScreen(
     var noteFor by remember { mutableStateOf<Photo?>(null) }
     var whatsFor by remember { mutableStateOf<Photo?>(null) }
     var deliverFor by remember { mutableStateOf<Photo?>(null) }
+    var versionsFor by remember { mutableStateOf<Photo?>(null) }
 
     // Slide to a frame that just arrived. New photos are inserted at index 0; the pager keeps the
     // current photo in place by key, so "was on the latest" means we were on index 0 before it.
@@ -284,6 +286,10 @@ fun ViewerScreen(
                     if (settings.expressEnabled) ActionTile(Icons.Outlined.Collections, "Express") {
                         com.example.ui.delivery.sendToExpress(app, context, scope, listOf(current.id), onOpenExpress)
                     }
+                    // The same photo once more with another preset: each version is its own file for the client.
+                    if (settings.deliveryEnabled || settings.expressEnabled) {
+                        ActionTile(Icons.Outlined.FilterNone, "Versões") { versionsFor = current }
+                    }
                     SetMenuTile(
                         label = "Enviar",
                         sets = actions.availableSets(current, settings),
@@ -317,6 +323,9 @@ fun ViewerScreen(
     }
 
     noteFor?.let { photo -> NoteSheet(app, photo, onDismiss = { noteFor = null }) }
+    versionsFor?.let { photo ->
+        com.example.ui.delivery.VersionSheet(app, photo, onDismiss = { versionsFor = null }, onOpenDelivery = onOpenDelivery, onOpenExpress = onOpenExpress)
+    }
     deliverFor?.let { photo -> com.example.ui.delivery.DeliverSheet(app, listOf(photo.id), onDismiss = { deliverFor = null }, onOpenDelivery = onOpenDelivery) }
     whatsFor?.let { photo -> WhatsAppSheet(app, actions, settings, listOf(photo), onDismiss = { whatsFor = null }) }
 
