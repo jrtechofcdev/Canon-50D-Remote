@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.BrandingWatermark
@@ -101,6 +102,21 @@ fun DeliverySettings(app: TetherApp, s: Settings) {
                 }, enabled = s.deliveryEnabled) { Text("Gerar") }
             }
         }
+    }
+
+    SettingsGroup("Endereço com nome", Icons.Outlined.Language) {
+        var domain by remember { mutableStateOf(s.deliveryDomain) }
+        OutlinedTextField(
+            value = domain,
+            onValueChange = { domain = it.take(30); scope.launch { app.settings.set(SettingKeys.deliveryDomain, domain) } },
+            label = { Text("Nome do endereço") },
+            suffix = { Text(".local") },
+            supportingText = { Text(if (domain.isBlank()) "Vazio: só o endereço com números" else "O cliente também pode digitar http://${com.example.core.delivery.network.MdnsResponder.hostName(domain, "jrfotos")}.local") },
+            singleLine = true,
+            enabled = s.deliveryEnabled,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        )
+        InfoText("Funciona no iPhone e no computador. Alguns Android só abrem pelo número, por isso o QR continua com ele.")
     }
 
     SettingsGroup("O que o cliente recebe", Icons.Outlined.Image) {

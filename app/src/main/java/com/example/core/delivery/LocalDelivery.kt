@@ -48,8 +48,13 @@ sealed interface DeliveryStatus {
         val network: String,
         /** Developer test: a test page instead of the clients' photos. */
         val test: Boolean = false,
+        /** "jrexpress.local" when the phone answers that name on the Wi-Fi; null otherwise. */
+        val domain: String? = null,
     ) : DeliveryStatus {
         fun url(token: String? = null) = DeliveryRules.portalUrl(host, port, token)
+
+        /** The address with the name, easier to type (iPhone and computers); the QR keeps the number. */
+        val niceUrl: String? get() = domain?.let { DeliveryRules.portalUrl(it, port) }
         val wifiQr: String? get() = if (ssid != null && password != null) DeliveryRules.wifiQr(ssid, password) else null
     }
 
@@ -83,6 +88,7 @@ class LocalDelivery(
     private val expressLock = Mutex()
     private var network: DeliveryNetwork? = null
     private var devicesJob: Job? = null
+    private var mdns: com.example.core.delivery.network.MdnsResponder? = null
     private val tag = mode.tag
 
     /** The other tool: stopped before this one takes the Wi-Fi. */
@@ -200,7 +206,12 @@ class LocalDelivery(
         dao.closeExpired(System.currentTimeMillis())
         if (mode.express) expressSession()
         queue.poke()
-        val running = DeliveryStatus.Running(state.host, port, state.ssid, state.password, state.label, test != null)
+        val name = c.domain.takeIf { it.isNotBlank() && test == null }
+            ?.let { com.example.core.delivery.network.MdnsResponder.hostName(it, mode.dir) }
+            ?.let { com.example.core.delivery.network.MdnsResponder(context, it, state.host) }
+            ?.takeIf { withContext(Dispatchers.IO) { it.start() } }
+        mdns = name
+        val running = DeliveryStatus.Running(state.host, port, state.ssid, state.password, state.label, test != null, name?.fullName)
         _status.value = running
         devicesJob = scope.launch {
             while (isActive) {
@@ -228,6 +239,8 @@ class LocalDelivery(
         _devices.value = null
         server.testFile = null
         withContext(Dispatchers.IO) { server.stop() }
+        mdns?.stop()
+        mdns = null
         network?.let { runCatching { it.stop() } }
         network = null
         if (was is DeliveryStatus.Running && !was.test && config().clearOnStop) queue.clearFiles()

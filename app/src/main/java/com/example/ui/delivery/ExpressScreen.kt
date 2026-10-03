@@ -180,7 +180,7 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
                 DeliveryCard {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         r.wifiQr?.let { QrBlock("① Entrar no Wi-Fi", it, "${r.ssid}\nSenha: ${r.password}") }
-                        QrBlock(if (r.wifiQr != null) "② Ver as fotos" else "Ver as fotos", r.url(), "${r.url()}\nSem código")
+                        QrBlock(if (r.wifiQr != null) "② Ver as fotos" else "Ver as fotos", r.url(), listOfNotNull(r.niceUrl, r.url()).joinToString("\nou ") + "\nSem código")
                     }
                     OutlinedButton(
                         onClick = { runCatching { PlateExport.share(context, PlateExport.Plate(r.ssid, r.password, r.url(), s.expressPhotographer, express = true)) } },

@@ -23,6 +23,8 @@ data class DeliveryConfig(
     val skipBlurry: Boolean = true,
     /** Auto mode leaves out photos with someone blinking. */
     val skipEyes: Boolean = false,
+    /** The .local name (without .local); blank = no name. */
+    val domain: String = "",
 )
 
 /**
@@ -51,14 +53,14 @@ enum class DeliveryMode(
             size = s.deliverySize, watermark = s.deliveryWatermark, photographer = s.deliveryPhotographer, picks = s.deliveryPicks,
             clearOnStop = s.deliveryClearOnStop, folder = s.deliveryFolder, validityHours = s.deliveryValidityHours,
             auto = s.deliveryMode == "auto",
-            skipBlurry = s.deliveryAutoSkipBlurry, skipEyes = s.deliveryAutoSkipEyes,
+            skipBlurry = s.deliveryAutoSkipBlurry, skipEyes = s.deliveryAutoSkipEyes, domain = s.deliveryDomain,
         )
         // Express ends a client with "Finalizar e limpar", so its link has no clock of its own.
         Express -> DeliveryConfig(
             enabled = s.expressEnabled, network = s.expressNetwork, ssid = s.expressSsid, password = s.expressPassword,
             size = s.expressSize, watermark = s.expressWatermark, photographer = s.expressPhotographer, picks = s.expressPicks,
             clearOnStop = false, folder = s.expressFolder, validityHours = 0, auto = s.expressAuto,
-            skipBlurry = s.expressAutoSkipBlurry, skipEyes = s.expressAutoSkipEyes,
+            skipBlurry = s.expressAutoSkipBlurry, skipEyes = s.expressAutoSkipEyes, domain = s.expressDomain,
         )
     }
 }
