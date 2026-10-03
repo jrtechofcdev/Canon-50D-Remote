@@ -183,6 +183,15 @@ fun DeliveryScreen(app: TetherApp, actions: PhotoActions, onBack: (() -> Unit)?,
                 )
             }
 
+            // Auto mode sends to the client of the moment; what it left out can still go to them.
+            SkippedCard(app.delivery) { ids ->
+                scope.launch {
+                    val target = open.firstOrNull { it.id == s.deliveryActiveSession } ?: open.firstOrNull()
+                    if (target == null) Toast.makeText(context, "Crie um cliente primeiro", Toast.LENGTH_SHORT).show()
+                    else Toast.makeText(context, "${app.delivery.send(target.id, ids)} foto(s) para ${target.client}", Toast.LENGTH_SHORT).show()
+                }
+            }
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Clientes", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 Button(

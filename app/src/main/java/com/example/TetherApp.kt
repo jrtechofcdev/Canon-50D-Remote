@@ -112,8 +112,8 @@ class TetherApp : Application() {
         appBackup = AppBackup(settings, presets)
         shop = PresetShop(this, settings, presets)
         looks.onEdited = { id -> events.emit(PhotoEvent.Edited(id)) }
-        delivery = LocalDelivery(this, settings, database.deliveryDao(), database.photoDao(), looks, export, events, appScope, com.example.core.delivery.DeliveryMode.Normal)
-        express = LocalDelivery(this, settings, database.deliveryDao(), database.photoDao(), looks, export, events, appScope, com.example.core.delivery.DeliveryMode.Express)
+        delivery = LocalDelivery(this, settings, database.deliveryDao(), database.photoDao(), looks, export, events, appScope, com.example.core.delivery.DeliveryMode.Normal, analysis = { culler.awaitAnalysis(it) })
+        express = LocalDelivery(this, settings, database.deliveryDao(), database.photoDao(), looks, export, events, appScope, com.example.core.delivery.DeliveryMode.Express, analysis = { culler.awaitAnalysis(it) })
         // One Wi-Fi at a time: starting either tool stops the other.
         delivery.peer = express
         express.peer = delivery

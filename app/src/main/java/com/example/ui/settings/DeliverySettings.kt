@@ -15,6 +15,8 @@ import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material.icons.outlined.WifiTethering
+import androidx.compose.material.icons.outlined.BlurOn
+import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.Vibration
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -136,6 +138,16 @@ fun DeliverySettings(app: TetherApp, s: Settings) {
             enabled = s.deliveryEnabled,
             icon = Icons.Outlined.Bolt,
         ) { scope.launch { app.settings.set(SettingKeys.deliveryMode, it) } }
+        ToggleRow(
+            Icons.Outlined.BlurOn, "Deixar de fora fotos tremidas ou fora de foco",
+            "No automático, só vão as fotos nítidas. As outras você manda pela galeria se quiser. A sensibilidade fica em Ajustes → Revisão.",
+            s.deliveryAutoSkipBlurry, enabled = s.deliveryEnabled && s.deliveryMode == "auto",
+        ) { set(SettingKeys.deliveryAutoSkipBlurry, it) }
+        ToggleRow(
+            Icons.Outlined.Face, "Deixar de fora olhos fechados",
+            "Usa a detecção de rosto no celular (deixa a análise um pouco mais lenta)",
+            s.deliveryAutoSkipEyes, enabled = s.deliveryEnabled && s.deliveryMode == "auto",
+        ) { set(SettingKeys.deliveryAutoSkipEyes, it) }
         ToggleRow(
             Icons.Outlined.Collections, "Galeria do evento",
             "No automático, as fotos vão para uma galeria aberta a todos com o código do evento. Desligado, cada cliente vê só as dele.",

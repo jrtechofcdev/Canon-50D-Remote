@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoMode
+import androidx.compose.material.icons.outlined.BlurOn
+import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.BrandingWatermark
 import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.outlined.Favorite
@@ -58,6 +60,16 @@ fun ExpressSettings(app: TetherApp, s: Settings) {
             "Cada foto da câmera vai direto para o cliente. Desligado, você manda pelo botão Mandar fotos ou pela galeria.",
             s.expressAuto, enabled = on,
         ) { set(SettingKeys.expressAuto, it) }
+        ToggleRow(
+            Icons.Outlined.BlurOn, "Só fotos boas entram sozinhas",
+            "Fotos tremidas ou fora de foco ficam de fora do envio automático. Você pode mandar pelo Mandar fotos se quiser.",
+            s.expressAutoSkipBlurry, enabled = on && s.expressAuto,
+        ) { set(SettingKeys.expressAutoSkipBlurry, it) }
+        ToggleRow(
+            Icons.Outlined.Face, "Deixar de fora olhos fechados",
+            "Usa a detecção de rosto no celular",
+            s.expressAutoSkipEyes, enabled = on && s.expressAuto,
+        ) { set(SettingKeys.expressAutoSkipEyes, it) }
         ToggleRow(
             Icons.Outlined.PlayCircle, "Ligar o Wi-Fi ao abrir a aba",
             "A rede do Express sobe sozinha quando você abre a aba Express",

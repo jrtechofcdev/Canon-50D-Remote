@@ -193,6 +193,10 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
                 }
             }
 
+            SkippedCard(app.express) { ids ->
+                scope.launch { val n = app.express.sendToExpress(ids); toast("$n ${if (n == 1) "foto mandada" else "fotos mandadas"}") }
+            }
+
             // The switch that decides what the client can take.
             DeliveryCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {

@@ -57,6 +57,18 @@ object DeliveryRules {
     fun portalUrl(host: String, port: Int = PORT, token: String? = null): String =
         "http://$host" + (if (port == 80) "" else ":$port") + "/" + (token?.let { "?s=$it" } ?: "")
 
+    /**
+     * Whether auto mode may send [photo]: not when it came out shaken or out of focus ([skipBlurry]) or
+     * with someone blinking ([skipEyes]). Without an analysis (it failed or took too long) the photo goes,
+     * so a good frame is never lost. Returns the reason it stays out, or null when it goes.
+     */
+    fun autoQualityProblem(photo: com.example.core.data.Photo?, skipBlurry: Boolean, skipEyes: Boolean): String? {
+        if (photo == null || photo.score == null) return null
+        if (skipBlurry && photo.blurry) return "tremida ou fora de foco"
+        if (skipEyes && photo.eyesClosed > 0) return "olhos fechados"
+        return null
+    }
+
     /** "R$ 15,00" from cents; null for 0 (no price shown). */
     fun price(cents: Int): String? {
         if (cents <= 0) return null

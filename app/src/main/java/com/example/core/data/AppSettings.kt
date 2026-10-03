@@ -244,6 +244,11 @@ data class Settings(
     val expressShowPix: Boolean = false,
     /** Brings the Wi-Fi up as soon as the Express tab opens. */
     val expressAutoStart: Boolean = false,
+    /** What auto mode leaves out (the photographer can still send it by hand from the gallery). */
+    val deliveryAutoSkipBlurry: Boolean = true,
+    val deliveryAutoSkipEyes: Boolean = false,
+    val expressAutoSkipBlurry: Boolean = true,
+    val expressAutoSkipEyes: Boolean = false,
     /** A short vibration when a client hearts or downloads a photo. */
     val deliveryVibrate: Boolean = true,
     /** Tabs hidden from the bar (routes, comma separated). Sessão and Ajustes always stay. */
@@ -444,6 +449,10 @@ object SettingKeys {
     val expressShowPix = booleanPreferencesKey("express_show_pix")
     val expressAutoStart = booleanPreferencesKey("express_auto_start")
     val deliveryVibrate = booleanPreferencesKey("delivery_vibrate")
+    val deliveryAutoSkipBlurry = booleanPreferencesKey("delivery_auto_skip_blurry")
+    val deliveryAutoSkipEyes = booleanPreferencesKey("delivery_auto_skip_eyes")
+    val expressAutoSkipBlurry = booleanPreferencesKey("express_auto_skip_blurry")
+    val expressAutoSkipEyes = booleanPreferencesKey("express_auto_skip_eyes")
     val hiddenTabs = stringPreferencesKey("hidden_tabs")
     val liveViewEnabled = booleanPreferencesKey("live_view_enabled")
     val liveOnCamera = booleanPreferencesKey("live_on_camera")
@@ -667,6 +676,10 @@ class SettingsRepository(private val context: Context) {
             expressShowPix = this[k.expressShowPix] ?: d.expressShowPix,
             expressAutoStart = this[k.expressAutoStart] ?: d.expressAutoStart,
             deliveryVibrate = this[k.deliveryVibrate] ?: d.deliveryVibrate,
+            deliveryAutoSkipBlurry = this[k.deliveryAutoSkipBlurry] ?: d.deliveryAutoSkipBlurry,
+            deliveryAutoSkipEyes = this[k.deliveryAutoSkipEyes] ?: d.deliveryAutoSkipEyes,
+            expressAutoSkipBlurry = this[k.expressAutoSkipBlurry] ?: d.expressAutoSkipBlurry,
+            expressAutoSkipEyes = this[k.expressAutoSkipEyes] ?: d.expressAutoSkipEyes,
             hiddenTabs = this[k.hiddenTabs] ?: d.hiddenTabs,
             liveViewEnabled = this[k.liveViewEnabled] ?: d.liveViewEnabled,
             liveOnCamera = this[k.liveOnCamera] ?: d.liveOnCamera,

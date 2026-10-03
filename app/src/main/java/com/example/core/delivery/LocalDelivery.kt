@@ -32,6 +32,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/** A photo auto mode did not send, and why. */
+data class SkippedPhoto(val photoId: Long, val name: String, val reason: String)
+
 /** Where the local delivery is. */
 sealed interface DeliveryStatus {
     data object Off : DeliveryStatus
@@ -72,6 +75,8 @@ class LocalDelivery(
     val events: DeliveryEvents,
     private val scope: CoroutineScope,
     val mode: DeliveryMode = DeliveryMode.Normal,
+    /** The photo once its sharpness and eyes were checked (null when that could not be done in time). */
+    private val analysis: suspend (Long) -> Photo? = { null },
 ) {
     private val root = File(context.cacheDir, mode.dir)
     private val lock = Mutex()
@@ -110,6 +115,14 @@ class LocalDelivery(
     /** Phones that opened the page in the last 2 minutes. */
     val online: StateFlow<Int> = server.online
 
+    /** Photos auto mode left out (shaken, out of focus, eyes closed), newest first, for the screen to say so. */
+    private val _skipped = MutableStateFlow<List<SkippedPhoto>>(emptyList())
+    val skipped: StateFlow<List<SkippedPhoto>> = _skipped.asStateFlow()
+
+    fun clearSkipped() {
+        _skipped.value = emptyList()
+    }
+
     /** This tool's clients and photos only. */
     val sessions: Flow<List<DeliverySession>> = dao.observeSessions(mode.express)
     val items: Flow<List<DeliveryItem>> = dao.observeItems(mode.express)
@@ -135,7 +148,10 @@ class LocalDelivery(
         scope.launch {
             events.events.collect { event ->
                 when (event) {
-                    is PhotoEvent.Captured -> runCatching { autoSend(event.photoId) }.onFailure { AppLog.w(tag, "Envio automático falhou", it) }
+                    // Each photo waits for its own analysis, so a burst never queues behind one slow frame.
+                    is PhotoEvent.Captured -> scope.launch {
+                        runCatching { autoSend(event.photoId) }.onFailure { AppLog.w(tag, "Envio automático falhou", it) }
+                    }
                     is PhotoEvent.Edited -> queue.refresh(event.photoId)
                     else -> Unit
                 }
@@ -328,6 +344,15 @@ class LocalDelivery(
         val s = settings.current()
         val c = mode.config(s)
         if (!c.enabled || !c.auto) return
+        // Only good frames go by themselves; the rest can still be sent from the gallery.
+        if (c.skipBlurry || c.skipEyes) {
+            val photo = analysis(photoId)
+            DeliveryRules.autoQualityProblem(photo, c.skipBlurry, c.skipEyes)?.let { why ->
+                AppLog.i(tag, "${photo?.savedBase} ficou de fora do envio automático: $why")
+                _skipped.value = (listOf(SkippedPhoto(photoId, photo?.savedBase.orEmpty(), why)) + _skipped.value).take(50)
+                return
+            }
+        }
         if (mode.express) {
             queue.enqueue(expressSession().id, listOf(photoId))
             return

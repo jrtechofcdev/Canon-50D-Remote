@@ -61,4 +61,16 @@ class DeliveryRulesTest {
         now += 60_000
         assertFalse(limiter.blocked("1.2.3.4"))
     }
+
+    @Test
+    fun autoModeLeavesOutBadFramesButNeverOneItCouldNotCheck() {
+        val good = com.example.core.data.Photo(session = "S", baseName = "A", savedBase = "A", capturedAt = 1, score = 80f)
+        assertNull(DeliveryRules.autoQualityProblem(good, skipBlurry = true, skipEyes = true))
+        assertEquals("tremida ou fora de foco", DeliveryRules.autoQualityProblem(good.copy(blurry = true), true, false))
+        assertNull(DeliveryRules.autoQualityProblem(good.copy(blurry = true), skipBlurry = false, skipEyes = false))
+        assertEquals("olhos fechados", DeliveryRules.autoQualityProblem(good.copy(eyesClosed = 1), false, true))
+        // Not analysed (failed or too slow): it goes.
+        assertNull(DeliveryRules.autoQualityProblem(good.copy(score = null, blurry = true), true, true))
+        assertNull(DeliveryRules.autoQualityProblem(null, true, true))
+    }
 }
