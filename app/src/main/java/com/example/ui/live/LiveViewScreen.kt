@@ -99,6 +99,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.withContext
 import kotlin.math.min
+import androidx.compose.animation.togetherWith
+import com.example.ui.components.pressScale
+import androidx.compose.ui.draw.drawBehind
+import kotlinx.coroutines.launch
 
 /** Framing guides drawn over the live picture. */
 enum class LiveGrid(val id: String, val label: String) {
@@ -158,10 +162,14 @@ fun LiveViewScreen(
 
     // Start when the screen opens (and after a reconnect or a change of output); stop when it closes.
     val connected = connection is ConnectionState.Connected
-    LaunchedEffect(connected, settings.liveOnCamera, settings.liveSilentAf, settings.liveFps) {
+    // Started only with the real options: the defaults shown for a moment while they load would start
+    // it once and restart it right away, which the 50D answered with no picture at all.
+    val loaded by remember { app.settings.settings }.collectAsState(initial = null)
+    LaunchedEffect(connected, loaded?.liveOnCamera, loaded?.liveSilentAf, loaded?.liveFps) {
+        val real = loaded ?: return@LaunchedEffect
         if (connected) {
             app.camera.stopLiveView()
-            app.camera.startLiveView(alsoOnCamera = settings.liveOnCamera, silentAf = settings.liveSilentAf, fps = settings.liveFps)
+            app.camera.startLiveView(alsoOnCamera = real.liveOnCamera, silentAf = real.liveSilentAf, fps = real.liveFps)
         }
     }
     DisposableEffect(Unit) {
@@ -367,27 +375,65 @@ private fun TopActions(app: TetherApp, settings: Settings, vertical: Boolean, on
 /** The app's shutter: a ring that spins while the camera focuses, and flashes when it fires or fails. */
 @Composable
 fun ShutterButton(state: ShutterState, enabled: Boolean, size: androidx.compose.ui.unit.Dp, modifier: Modifier, onClick: () -> Unit) {
-    val ring = when {
-        !enabled -> Tone.Line
-        state is ShutterState.Failed -> Tone.Error
-        state == ShutterState.Fired -> Color.White
-        else -> Tone.Accent
+    val ring by androidx.compose.animation.animateColorAsState(
+        when {
+            !enabled -> Tone.Line
+            state is ShutterState.Failed -> Tone.Error
+            state == ShutterState.Fired -> Color.White
+            else -> Tone.Accent
+        },
+        androidx.compose.animation.core.tween(180),
+        label = "ring",
+    )
+    // On each shot: the disc closes like the shutter curtain and a ring spreads out from the button.
+    val burst = remember { androidx.compose.animation.core.Animatable(1f) }
+    val curtain = remember { androidx.compose.animation.core.Animatable(1f) }
+    LaunchedEffect(state) {
+        if (state == ShutterState.Fired) {
+            launch { burst.snapTo(0f); burst.animateTo(1f, androidx.compose.animation.core.tween(520, easing = androidx.compose.animation.core.LinearOutSlowInEasing)) }
+            curtain.snapTo(0.82f)
+            curtain.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 380f))
+        }
     }
-    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+    Box(
+        modifier.size(size).drawBehind {
+            if (burst.value < 1f) {
+                drawCircle(
+                    Color.White.copy(alpha = 0.6f * (1f - burst.value)),
+                    radius = this.size.minDimension / 2f * (1f + 0.45f * burst.value),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(3.dp.toPx() * (1f - burst.value) + 1f),
+                )
+            }
+        },
+        contentAlignment = Alignment.Center,
+    ) {
         if (state is ShutterState.Focusing) {
             CircularProgressIndicator(color = Tone.Accent, strokeWidth = 3.dp, modifier = Modifier.fillMaxSize())
         }
         Box(
-            Modifier.fillMaxSize().clip(CircleShape).border(3.dp, if (state is ShutterState.Focusing) Color.Transparent else ring, CircleShape).padding(7.dp).clip(CircleShape)
+            Modifier.fillMaxSize().graphicsLayer { scaleX = curtain.value; scaleY = curtain.value }
+                .then(if (enabled) Modifier.pressScale(0.9f) else Modifier)
+                .clip(CircleShape).border(3.dp, if (state is ShutterState.Focusing) Color.Transparent else ring, CircleShape).padding(7.dp).clip(CircleShape)
                 .background(if (enabled) BrandGradient else androidx.compose.ui.graphics.SolidColor(Color.Gray))
                 .clickable(enabled = enabled && state !is ShutterState.Focusing, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            when (state) {
-                is ShutterState.Focusing -> Icon(Icons.Outlined.CenterFocusWeak, contentDescription = "Focando", tint = Color.Black.copy(alpha = 0.7f))
-                ShutterState.Fired -> Icon(Icons.Outlined.Check, contentDescription = "Disparou", tint = Color.Black.copy(alpha = 0.7f))
-                is ShutterState.Failed -> Icon(Icons.Outlined.ErrorOutline, contentDescription = "Não disparou", tint = Color.Black.copy(alpha = 0.7f))
-                ShutterState.Idle -> Icon(Icons.Outlined.PhotoCamera, contentDescription = "Disparar", tint = Color.Black.copy(alpha = 0.55f))
+            androidx.compose.animation.AnimatedContent(
+                targetState = state,
+                contentKey = { it::class },
+                transitionSpec = {
+                    (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(160)) +
+                        androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(220), initialScale = 0.6f)) togetherWith
+                        androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(90))
+                },
+                label = "shutterIcon",
+            ) { st ->
+                when (st) {
+                    is ShutterState.Focusing -> Icon(Icons.Outlined.CenterFocusWeak, contentDescription = "Focando", tint = Color.Black.copy(alpha = 0.7f))
+                    ShutterState.Fired -> Icon(Icons.Outlined.Check, contentDescription = "Disparou", tint = Color.Black.copy(alpha = 0.7f))
+                    is ShutterState.Failed -> Icon(Icons.Outlined.ErrorOutline, contentDescription = "Não disparou", tint = Color.Black.copy(alpha = 0.7f))
+                    ShutterState.Idle -> Icon(Icons.Outlined.PhotoCamera, contentDescription = "Disparar", tint = Color.Black.copy(alpha = 0.55f))
+                }
             }
         }
     }

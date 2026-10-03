@@ -6,6 +6,7 @@ import com.example.core.data.Photo
 import com.example.core.data.PhotoDao
 import com.example.core.data.SettingsRepository
 import com.example.core.render.BitmapLoader
+import com.example.core.log.AppLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,6 +19,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
 import kotlin.math.abs
 
 /** What the analysis found worth telling the photographer right away. */
@@ -34,7 +37,7 @@ class Culler(
     private val settings: SettingsRepository,
     private val faces: FaceAnalyzer,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + AppLog.handler("CULLING"))
     private val queue = Channel<Long>(Channel.UNLIMITED)
 
     private val _warnings = MutableSharedFlow<CullWarning>(extraBufferCapacity = 8)
@@ -44,18 +47,43 @@ class Culler(
     private val _pending = MutableStateFlow(0)
     val pending: StateFlow<Int> = _pending.asStateFlow()
 
+    /** Each photo id once its analysis ended (also when it failed), for whoever is waiting on it. */
+    private val _analyzed = MutableSharedFlow<Long>(extraBufferCapacity = 64)
+    private val queued = java.util.concurrent.ConcurrentHashMap.newKeySet<Long>()
+
     init {
         scope.launch {
             for (id in queue) {
                 runCatching { dao.get(id)?.let { analyze(it, alert = true) } }
+                    .onFailure { AppLog.e("CULLING", "Análise da foto $id falhou · ${AppLog.memory()}", it) }
+                queued.remove(id)
                 _pending.update { (it - 1).coerceAtLeast(0) }
+                _analyzed.tryEmit(id)
             }
         }
     }
 
     fun enqueue(id: Long) {
+        // A photo already waiting is not analysed twice (the delivery may ask for one the alerts already queued).
+        if (!queued.add(id)) return
         _pending.update { it + 1 }
         queue.trySend(id)
+    }
+
+    /**
+     * The photo once analysed (sharpness, eyes), queuing it when nobody did. Null when the analysis took
+     * longer than [timeoutMs] or failed: the caller decides what to do without it.
+     */
+    suspend fun awaitAnalysis(id: Long, timeoutMs: Long = 30_000): Photo? {
+        dao.get(id)?.takeIf { it.score != null }?.let { return it }
+        val done = kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
+            kotlinx.coroutines.coroutineScope {
+                val waiter = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { _analyzed.first { it == id } }
+                enqueue(id)
+                waiter.await()
+            }
+        }
+        return if (done == null) null else dao.get(id)?.takeIf { it.score != null }
     }
 
     /** Older frames (from before 2.6, or received with the analysis off) that still have no score. */
@@ -70,7 +98,9 @@ class Culler(
         val w = bitmap.width
         val h = bitmap.height
         val pixels = IntArray(w * h).also { bitmap.getPixels(it, 0, w, 0, 0, w, h) }
-        val found = if (cfg.eyesCheck) faces.detect(bitmap) else null
+        // Faces also when a delivery leaves out closed eyes, even with the eyes alert off.
+        val wantFaces = cfg.eyesCheck || cfg.deliveryAutoSkipEyes || cfg.expressAutoSkipEyes
+        val found = if (wantFaces) faces.detect(bitmap) else null
         bitmap.recycle()
 
         val gray = CullMath.luma(pixels)

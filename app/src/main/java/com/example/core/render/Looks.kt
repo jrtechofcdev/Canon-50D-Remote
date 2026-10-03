@@ -13,6 +13,7 @@ import com.example.core.storage.ExifCopy
 import com.example.core.storage.FileKind
 import com.example.core.storage.PhotoStore
 import kotlinx.coroutines.Dispatchers
+import com.example.core.log.AppLog
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -32,6 +33,13 @@ class Looks(
     // Rendered previews, keyed by photo, settings and size. ~12 MB each at most; 6 of them fit a 4 GB phone well.
     private val cache = object : LruCache<String, Bitmap>(6) {}
     private val copyLock = Mutex()
+
+    /** Drops the cached renders (Android asked for memory back); they are rebuilt when shown again. */
+    fun trim() {
+        cache.evictAll()
+        baseCache.evictAll()
+        thumbs.evictAll()
+    }
 
     /** The settings that apply to [photo], or null when it has no look. */
     suspend fun settingsFor(photo: Photo): PresetSettings? {
@@ -102,7 +110,10 @@ class Looks(
         val crop = cropOf(photo)
         if (s == null && crop == null) return@withLock null
         val source = photo.displayUri ?: return@withLock null
-        val rendered = withContext(Dispatchers.IO) { finished(source, s, crop, 0) } ?: return@withLock null
+        val started = System.currentTimeMillis()
+        val edge = fullSizeEdge()
+        val rendered = withContext(Dispatchers.IO) { finished(source, s, crop, edge) } ?: return@withLock null
+        AppLog.i("EDITADA", "${photo.savedBase}: ${rendered.width}×${rendered.height} em ${System.currentTimeMillis() - started} ms · ${AppLog.memory()}")
         val suffix = presetName?.let { "_" + it.replace(Regex("[\\\\/:*?\"<>|]"), "-").replace(' ', '-') }
             ?: if (s == null) "_recorte" else "_editada"
         val uri = withContext(Dispatchers.IO) {
@@ -125,7 +136,7 @@ class Looks(
      * The photo as it should leave the phone (look applied), as a JPG in the cache, long edge [maxEdge]
      * (0 = full size). Null when the photo has no look: then the file itself is sent.
      */
-    suspend fun exportFile(photo: Photo, maxEdge: Int): java.io.File? {
+    suspend fun exportFile(photo: Photo, maxEdge: Int, tag: String? = null): java.io.File? {
         val s = settingsFor(photo)
         val crop = cropOf(photo)
         if (s == null && crop == null) return null
@@ -133,7 +144,8 @@ class Looks(
         val rendered = withContext(Dispatchers.IO) { finished(source, s, crop, maxEdge) } ?: return null
         return withContext(Dispatchers.IO) {
             val dir = java.io.File(context.cacheDir, "export").apply { mkdirs() }
-            val out = java.io.File(dir, "${photo.savedBase}_look.jpg")
+            // [tag] keeps two copies made at the same time (two clients, two tools) apart.
+            val out = java.io.File(dir, "${photo.savedBase}_look${tag?.let { "_$it" } ?: ""}.jpg")
             out.outputStream().use { rendered.compress(Bitmap.CompressFormat.JPEG, 95, it) }
             rendered.recycle()
             ExifCopy.apply(context, out, source, null, null)
@@ -168,8 +180,12 @@ class Looks(
         refreshEdited(photo.copy(crop = text))
     }
 
+    /** Told when a photo's look or crop changed (the delivery makes its copy again). */
+    var onEdited: (Long) -> Unit = {}
+
     /** Edited copy in step with the photo's look and crop: rewritten when it has either, removed when it has neither. */
     private suspend fun refreshEdited(photo: Photo) {
+        onEdited(photo.id)
         val hasEdit = photo.presetId != null || photo.adjust != null || cropOf(photo) != null
         if (settings.current().saveEditedCopy && hasEdit) {
             writeEditedCopy(photo, photo.presetId?.let { presets.get(it)?.name })
@@ -177,6 +193,27 @@ class Looks(
             withContext(Dispatchers.IO) { store.delete(photo.editedUri) }
             photos.setEdited(photo.id, null)
         }
+    }
+
+    /**
+     * Long edge for a "full size" render that fits the memory free right now: the whole frame when
+     * there is room (0), smaller when the phone is short, so a second photo never runs it out.
+     */
+    private fun fullSizeEdge(): Int {
+        val rt = Runtime.getRuntime()
+        val free = rt.maxMemory() - (rt.totalMemory() - rt.freeMemory())
+        // A 15 MP frame needs about 60 MB per copy and the pipeline holds three at once.
+        val edge = when {
+            free > 420L * MB -> 0
+            free > 260L * MB -> 4096
+            free > 160L * MB -> 3200
+            else -> 2400
+        }
+        if (edge != 0) {
+            trim()
+            AppLog.w("MEM", "Pouca memória livre (${free / MB} MB): cópia editada com ${edge}px · ${AppLog.memory()}")
+        }
+        return edge
     }
 
     /** Full pipeline on the file: decode, crop (at the preset's pixel size), then the look. */
@@ -192,5 +229,6 @@ class Looks(
         const val PREVIEW_EDGE = 2048
         const val EDITOR_EDGE = 1440
         const val THUMB_EDGE = 320
+        private const val MB = 1024L * 1024L
     }
 }

@@ -145,17 +145,137 @@ data class Settings(
     /** Gallery thumbnail size in dp. */
     val galleryThumb: Int = 112,
     /** Whole-app screen orientation: one of [ScreenTurn] ids. */
-    val screenOrientation: String = "auto",
+    val screenOrientation: String = "portrait",
+    /** In the viewer and client mode the screen turns with each photo: standing for vertical, lying for horizontal. */
+    val rotateWithPhoto: Boolean = true,
+    /** The brand opening when the app starts. */
+    val introEnabled: Boolean = true,
     /** Live view: a tap also runs AF. Off, a tap only moves the focus point and AF waits for the AF button. */
     val liveTapAf: Boolean = false,
     /** Live view: ask the 50D for its silent contrast AF ("Modo Live") instead of Quick mode (mirror flips). */
-    val liveSilentAf: Boolean = true,
+    val liveSilentAf: Boolean = false,
     /** Live view frames per second cap, to leave the cable free and keep the phone cool. */
     val liveFps: Int = 20,
     /** How long the shutter keeps trying while the camera focuses, in seconds. */
     val shutterWait: Int = 5,
     /** Focus first (AF) and only then fire, from the app's shutter. */
     val shutterFocusFirst: Boolean = true,
+    /** Full diary in a file on the phone; off keeps only errors and crashes. */
+    val logEnabled: Boolean = true,
+    /** SAF folder the log file is copied to; null = only inside the app (share from Diagnóstico). */
+    val logFolder: String? = null,
+    /** The "Loja" tab: presets from an online catalogue (the photographer's own API). */
+    val shopEnabled: Boolean = true,
+    /** Address of that catalogue: a JSON list of presets, each with a download link to its DNG. */
+    val shopUrl: String = DEFAULT_SHOP_URL,
+    /** Root "JR C50D Sync" folder the app created its structure in (Ajustes → Salvamento → Pastas do app). */
+    val appFolder: String? = null,
+    /** New photos download as soon as they are taken; off leaves them on the card for later. */
+    val autoDownload: Boolean = true,
+    /** Second copy of every original, like a camera with two cards. */
+    val mirrorEnabled: Boolean = false,
+    val mirrorFolder: String? = null,
+    /** Notes as files: one folder per photo with nota.txt and the voice notes. */
+    val notesFolder: String? = null,
+    /** Every WhatsApp template (JSON), each with a short code typed when sending. Empty = the defaults. */
+    val messageLibrary: String = "",
+    /** Filled into {pix} in the templates. */
+    val pixKey: String = "",
+    /** The watermark over the photo in client mode, so a phone photo of the screen carries the brand. */
+    val clientWatermark: Boolean = true,
+    val clientWatermarkOpacity: Int = 35,
+    /** Unlocked by tapping the brand at the bottom of Ajustes seven times. */
+    val developerMode: Boolean = false,
+    /** Every PTP operation and its answer goes to the log. */
+    val devVerboseLog: Boolean = false,
+    /** "auto" or "cpu": which engine renders the presets (cpu to compare when the GPU looks wrong). */
+    val devRender: String = "auto",
+
+    // Entrega local: the phone serves the photos on its own Wi-Fi, the client saves them on theirs.
+    /** Off by default: with it off nothing starts and no new permission is asked. */
+    val deliveryEnabled: Boolean = false,
+    /** "direct" (Wi-Fi Direct group made by the app), "hotspot" (the phone's own router) or "wifi" (the venue's Wi-Fi). */
+    val deliveryNetwork: String = "direct",
+    /** Wi-Fi Direct name; Android requires it to start with DIRECT- and two characters. */
+    val deliverySsid: String = "DIRECT-JR-Fotos",
+    /** Blank = one is made the first time the delivery starts, then kept so printed plates keep working. */
+    val deliveryPassword: String = "",
+    /** "manual" (the photographer sends) or "auto" (each new photo goes to the active client). */
+    val deliveryMode: String = "manual",
+    /** "light" (resized JPG), "edited" (full size with the look) or "original" (the camera JPG). */
+    val deliverySize: String = "light",
+    val deliveryWatermark: Boolean = true,
+    /** Auto mode sends to one open gallery that anyone with the event code sees. */
+    val deliveryEventGallery: Boolean = false,
+    /** Client sessions close by themselves after this many hours (0 = only when the photographer closes them). */
+    val deliveryValidityHours: Int = 24,
+    /** Delete the prepared files when the delivery stops; the history stays. */
+    val deliveryClearOnStop: Boolean = false,
+    /** Clients can heart photos in the portal; they arrive as client picks. */
+    val deliveryPicks: Boolean = true,
+    /** Copies of what was delivered go to <folder>/<client>/. */
+    val deliveryFolder: String? = null,
+    /** The client session that auto mode sends to (0 = none). */
+    val deliveryActiveSession: Long = 0L,
+    /** Name at the top of the portal and on the printed plate. */
+    val deliveryPhotographer: String = "Jr_Tech_OFC",
+
+    // Fotografia Express: the same delivery, one client at a time, no code, preview until paid.
+    val expressEnabled: Boolean = false,
+    /** The client sees only marked previews and downloads nothing until the photographer releases. */
+    val expressPreview: Boolean = true,
+    /** Every new photo goes straight to the Express client. */
+    val expressAuto: Boolean = true,
+    /** Strength of the preview mark, 20..80 %. */
+    val expressMarkOpacity: Int = 45,
+    // Its own network, files and page: Express never needs the Entrega local set up.
+    val expressNetwork: String = "direct",
+    val expressSsid: String = "DIRECT-JR-Express",
+    val expressPassword: String = "",
+    /** "light", "edited" or "original": what a released photo is. */
+    val expressSize: String = "edited",
+    /** The brand mark on released photos too (off: paid photos go clean). */
+    val expressWatermark: Boolean = false,
+    val expressPhotographer: String = "Jr_Tech_OFC",
+    val expressPicks: Boolean = true,
+    /** Copies of what each Express client received, one folder per client. */
+    val expressFolder: String? = null,
+    /** Price of one photo in cents, shown to the client and in the totals (0 = not shown). */
+    val expressPriceCents: Int = 0,
+    /** The Pix key from Ajustes → Mensagens, shown in the portal for payment. */
+    val expressShowPix: Boolean = false,
+    /** Brings the Wi-Fi up as soon as the Express tab opens. */
+    val expressAutoStart: Boolean = false,
+    /** What auto mode leaves out (the photographer can still send it by hand from the gallery). */
+    val deliveryAutoSkipBlurry: Boolean = true,
+    val deliveryAutoSkipEyes: Boolean = false,
+    val expressAutoSkipBlurry: Boolean = true,
+    val expressAutoSkipEyes: Boolean = false,
+    /** Name typed instead of the number (jrfotos.local), answered by the phone on the Wi-Fi. Blank = off. */
+    val deliveryDomain: String = "jrfotos",
+    val expressDomain: String = "jrexpress",
+    /** A notification "Ana gostou de uma foto" when a client hearts one. */
+    val deliveryNotifyLikes: Boolean = true,
+    val expressNotifyLikes: Boolean = true,
+    // Pagamentos (Ajustes → Pagamentos): the Pix key itself is pixKey, also used in the messages.
+    /** "cpf", "cnpj", "phone", "email" or "random": how the key is written in the Pix code. */
+    val pixKeyType: String = "email",
+    /** Receiver name and city as the bank shows them (Pix code). */
+    val pixName: String = "",
+    val pixCity: String = "",
+    /** Package: [payPackPhotos] photos for [payPackCents] (0 = no package). */
+    val payPackPhotos: Int = 0,
+    val payPackCents: Int = 0,
+    /** All of the client's photos for this price (0 = not offered). */
+    val payAllCents: Int = 0,
+    /** Accepted ways to pay: pix, cash, debit, credit (comma separated). */
+    val payMethods: String = "pix,cash",
+    /** A line for the client, e.g. "Pagamento no balcão". */
+    val payNote: String = "",
+    /** A short vibration when a client hearts or downloads a photo. */
+    val deliveryVibrate: Boolean = true,
+    /** Tabs hidden from the bar (routes, comma separated). Sessão and Ajustes always stay. */
+    val hiddenTabs: String = "",
 
     // Live view
     val liveViewEnabled: Boolean = true,
@@ -300,11 +420,76 @@ object SettingKeys {
     val whatsDefaultSet = stringPreferencesKey("whats_default_set")
     val galleryThumb = intPreferencesKey("gallery_thumb")
     val screenOrientation = stringPreferencesKey("screen_orientation")
+    val rotateWithPhoto = booleanPreferencesKey("rotate_with_photo")
+    val introEnabled = booleanPreferencesKey("intro_enabled")
     val liveTapAf = booleanPreferencesKey("live_tap_af")
     val liveSilentAf = booleanPreferencesKey("live_silent_af")
     val liveFps = intPreferencesKey("live_fps")
     val shutterWait = intPreferencesKey("shutter_wait")
     val shutterFocusFirst = booleanPreferencesKey("shutter_focus_first")
+    val logEnabled = booleanPreferencesKey("log_enabled")
+    val logFolder = stringPreferencesKey("log_folder")
+    val shopEnabled = booleanPreferencesKey("shop_enabled")
+    val shopUrl = stringPreferencesKey("shop_url")
+    val appFolder = stringPreferencesKey("app_folder")
+    val autoDownload = booleanPreferencesKey("auto_download")
+    val mirrorEnabled = booleanPreferencesKey("mirror_enabled")
+    val mirrorFolder = stringPreferencesKey("mirror_folder")
+    val notesFolder = stringPreferencesKey("notes_folder")
+    val messageLibrary = stringPreferencesKey("message_library")
+    val pixKey = stringPreferencesKey("pix_key")
+    val clientWatermark = booleanPreferencesKey("client_watermark")
+    val clientWatermarkOpacity = intPreferencesKey("client_watermark_opacity")
+    val developerMode = booleanPreferencesKey("developer_mode")
+    val devVerboseLog = booleanPreferencesKey("dev_verbose_log")
+    val devRender = stringPreferencesKey("dev_render")
+    val deliveryEnabled = booleanPreferencesKey("delivery_enabled")
+    val deliveryNetwork = stringPreferencesKey("delivery_network")
+    val deliverySsid = stringPreferencesKey("delivery_ssid")
+    val deliveryPassword = stringPreferencesKey("delivery_password")
+    val deliveryMode = stringPreferencesKey("delivery_mode")
+    val deliverySize = stringPreferencesKey("delivery_size")
+    val deliveryWatermark = booleanPreferencesKey("delivery_watermark")
+    val deliveryEventGallery = booleanPreferencesKey("delivery_event_gallery")
+    val deliveryValidityHours = intPreferencesKey("delivery_validity_hours")
+    val deliveryClearOnStop = booleanPreferencesKey("delivery_clear_on_stop")
+    val deliveryPicks = booleanPreferencesKey("delivery_picks")
+    val deliveryFolder = stringPreferencesKey("delivery_folder")
+    val deliveryActiveSession = longPreferencesKey("delivery_active_session")
+    val deliveryPhotographer = stringPreferencesKey("delivery_photographer")
+    val expressEnabled = booleanPreferencesKey("express_enabled")
+    val expressPreview = booleanPreferencesKey("express_preview")
+    val expressAuto = booleanPreferencesKey("express_auto")
+    val expressMarkOpacity = intPreferencesKey("express_mark_opacity")
+    val expressNetwork = stringPreferencesKey("express_network")
+    val expressSsid = stringPreferencesKey("express_ssid")
+    val expressPassword = stringPreferencesKey("express_password")
+    val expressSize = stringPreferencesKey("express_size")
+    val expressWatermark = booleanPreferencesKey("express_watermark")
+    val expressPhotographer = stringPreferencesKey("express_photographer")
+    val expressPicks = booleanPreferencesKey("express_picks")
+    val expressFolder = stringPreferencesKey("express_folder")
+    val expressPriceCents = intPreferencesKey("express_price_cents")
+    val expressShowPix = booleanPreferencesKey("express_show_pix")
+    val expressAutoStart = booleanPreferencesKey("express_auto_start")
+    val deliveryVibrate = booleanPreferencesKey("delivery_vibrate")
+    val pixKeyType = stringPreferencesKey("pix_key_type")
+    val pixName = stringPreferencesKey("pix_name")
+    val pixCity = stringPreferencesKey("pix_city")
+    val payPackPhotos = intPreferencesKey("pay_pack_photos")
+    val payPackCents = intPreferencesKey("pay_pack_cents")
+    val payAllCents = intPreferencesKey("pay_all_cents")
+    val payMethods = stringPreferencesKey("pay_methods")
+    val payNote = stringPreferencesKey("pay_note")
+    val deliveryNotifyLikes = booleanPreferencesKey("delivery_notify_likes")
+    val expressNotifyLikes = booleanPreferencesKey("express_notify_likes")
+    val deliveryDomain = stringPreferencesKey("delivery_domain")
+    val expressDomain = stringPreferencesKey("express_domain")
+    val deliveryAutoSkipBlurry = booleanPreferencesKey("delivery_auto_skip_blurry")
+    val deliveryAutoSkipEyes = booleanPreferencesKey("delivery_auto_skip_eyes")
+    val expressAutoSkipBlurry = booleanPreferencesKey("express_auto_skip_blurry")
+    val expressAutoSkipEyes = booleanPreferencesKey("express_auto_skip_eyes")
+    val hiddenTabs = stringPreferencesKey("hidden_tabs")
     val liveViewEnabled = booleanPreferencesKey("live_view_enabled")
     val liveOnCamera = booleanPreferencesKey("live_on_camera")
     val liveGrid = stringPreferencesKey("live_grid")
@@ -475,11 +660,76 @@ class SettingsRepository(private val context: Context) {
             whatsDefaultSet = this[k.whatsDefaultSet] ?: d.whatsDefaultSet,
             galleryThumb = this[k.galleryThumb] ?: d.galleryThumb,
             screenOrientation = this[k.screenOrientation] ?: d.screenOrientation,
+            rotateWithPhoto = this[k.rotateWithPhoto] ?: d.rotateWithPhoto,
+            introEnabled = this[k.introEnabled] ?: d.introEnabled,
             liveTapAf = this[k.liveTapAf] ?: d.liveTapAf,
             liveSilentAf = this[k.liveSilentAf] ?: d.liveSilentAf,
             liveFps = this[k.liveFps] ?: d.liveFps,
             shutterWait = this[k.shutterWait] ?: d.shutterWait,
             shutterFocusFirst = this[k.shutterFocusFirst] ?: d.shutterFocusFirst,
+            logEnabled = this[k.logEnabled] ?: d.logEnabled,
+            logFolder = this[k.logFolder],
+            shopEnabled = this[k.shopEnabled] ?: d.shopEnabled,
+            shopUrl = this[k.shopUrl]?.takeIf { it.isNotBlank() } ?: d.shopUrl,
+            appFolder = this[k.appFolder],
+            autoDownload = this[k.autoDownload] ?: d.autoDownload,
+            mirrorEnabled = this[k.mirrorEnabled] ?: d.mirrorEnabled,
+            mirrorFolder = this[k.mirrorFolder],
+            notesFolder = this[k.notesFolder],
+            messageLibrary = this[k.messageLibrary] ?: d.messageLibrary,
+            pixKey = this[k.pixKey] ?: d.pixKey,
+            clientWatermark = this[k.clientWatermark] ?: d.clientWatermark,
+            clientWatermarkOpacity = this[k.clientWatermarkOpacity] ?: d.clientWatermarkOpacity,
+            developerMode = this[k.developerMode] ?: d.developerMode,
+            devVerboseLog = this[k.devVerboseLog] ?: d.devVerboseLog,
+            devRender = this[k.devRender] ?: d.devRender,
+            deliveryEnabled = this[k.deliveryEnabled] ?: d.deliveryEnabled,
+            deliveryNetwork = this[k.deliveryNetwork] ?: d.deliveryNetwork,
+            deliverySsid = this[k.deliverySsid]?.takeIf { it.isNotBlank() } ?: d.deliverySsid,
+            deliveryPassword = this[k.deliveryPassword] ?: d.deliveryPassword,
+            deliveryMode = this[k.deliveryMode] ?: d.deliveryMode,
+            deliverySize = this[k.deliverySize] ?: d.deliverySize,
+            deliveryWatermark = this[k.deliveryWatermark] ?: d.deliveryWatermark,
+            deliveryEventGallery = this[k.deliveryEventGallery] ?: d.deliveryEventGallery,
+            deliveryValidityHours = this[k.deliveryValidityHours] ?: d.deliveryValidityHours,
+            deliveryClearOnStop = this[k.deliveryClearOnStop] ?: d.deliveryClearOnStop,
+            deliveryPicks = this[k.deliveryPicks] ?: d.deliveryPicks,
+            deliveryFolder = this[k.deliveryFolder],
+            deliveryActiveSession = this[k.deliveryActiveSession] ?: d.deliveryActiveSession,
+            deliveryPhotographer = this[k.deliveryPhotographer]?.takeIf { it.isNotBlank() } ?: d.deliveryPhotographer,
+            expressEnabled = this[k.expressEnabled] ?: d.expressEnabled,
+            expressPreview = this[k.expressPreview] ?: d.expressPreview,
+            expressAuto = this[k.expressAuto] ?: d.expressAuto,
+            expressMarkOpacity = this[k.expressMarkOpacity] ?: d.expressMarkOpacity,
+            expressNetwork = this[k.expressNetwork] ?: d.expressNetwork,
+            expressSsid = this[k.expressSsid]?.takeIf { it.isNotBlank() } ?: d.expressSsid,
+            expressPassword = this[k.expressPassword] ?: d.expressPassword,
+            expressSize = this[k.expressSize] ?: d.expressSize,
+            expressWatermark = this[k.expressWatermark] ?: d.expressWatermark,
+            expressPhotographer = this[k.expressPhotographer]?.takeIf { it.isNotBlank() } ?: d.expressPhotographer,
+            expressPicks = this[k.expressPicks] ?: d.expressPicks,
+            expressFolder = this[k.expressFolder],
+            expressPriceCents = this[k.expressPriceCents] ?: d.expressPriceCents,
+            expressShowPix = this[k.expressShowPix] ?: d.expressShowPix,
+            expressAutoStart = this[k.expressAutoStart] ?: d.expressAutoStart,
+            deliveryVibrate = this[k.deliveryVibrate] ?: d.deliveryVibrate,
+            pixKeyType = this[k.pixKeyType] ?: d.pixKeyType,
+            pixName = this[k.pixName] ?: d.pixName,
+            pixCity = this[k.pixCity] ?: d.pixCity,
+            payPackPhotos = this[k.payPackPhotos] ?: d.payPackPhotos,
+            payPackCents = this[k.payPackCents] ?: d.payPackCents,
+            payAllCents = this[k.payAllCents] ?: d.payAllCents,
+            payMethods = this[k.payMethods] ?: d.payMethods,
+            payNote = this[k.payNote] ?: d.payNote,
+            deliveryNotifyLikes = this[k.deliveryNotifyLikes] ?: d.deliveryNotifyLikes,
+            expressNotifyLikes = this[k.expressNotifyLikes] ?: d.expressNotifyLikes,
+            deliveryDomain = this[k.deliveryDomain] ?: d.deliveryDomain,
+            expressDomain = this[k.expressDomain] ?: d.expressDomain,
+            deliveryAutoSkipBlurry = this[k.deliveryAutoSkipBlurry] ?: d.deliveryAutoSkipBlurry,
+            deliveryAutoSkipEyes = this[k.deliveryAutoSkipEyes] ?: d.deliveryAutoSkipEyes,
+            expressAutoSkipBlurry = this[k.expressAutoSkipBlurry] ?: d.expressAutoSkipBlurry,
+            expressAutoSkipEyes = this[k.expressAutoSkipEyes] ?: d.expressAutoSkipEyes,
+            hiddenTabs = this[k.hiddenTabs] ?: d.hiddenTabs,
             liveViewEnabled = this[k.liveViewEnabled] ?: d.liveViewEnabled,
             liveOnCamera = this[k.liveOnCamera] ?: d.liveOnCamera,
             liveGrid = this[k.liveGrid] ?: d.liveGrid,
@@ -499,3 +749,5 @@ class SettingsRepository(private val context: Context) {
         )
     }
 }
+
+const val DEFAULT_SHOP_URL = "https://lightroompresets.kasunpremarathna.com/api/presets.php"

@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.core.camera.ConnectionState
 import com.example.ui.theme.Tone
+import androidx.compose.animation.togetherWith
 
 /**
  * Starts tethered capture from any tab: connects the 50D and opens the Session.
@@ -21,6 +22,24 @@ import com.example.ui.theme.Tone
  */
 @Composable
 fun CaptureFab(state: ConnectionState, onStart: () -> Unit, onOpenSession: () -> Unit) {
+    // Each step of connecting morphs into the next (start → connecting → camera button) instead of popping.
+    androidx.compose.animation.AnimatedContent(
+        targetState = state,
+        contentKey = { it::class },
+        transitionSpec = {
+            (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, 60)) +
+                androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(280, 60, Motion.Emphasized), initialScale = 0.8f)) togetherWith
+                (androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)) +
+                    androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(160), targetScale = 0.9f)) using
+                androidx.compose.animation.SizeTransform(clip = false)
+        },
+        label = "fab",
+        modifier = Modifier.pressScale(),
+    ) { state -> FabFor(state, onStart, onOpenSession) }
+}
+
+@Composable
+private fun FabFor(state: ConnectionState, onStart: () -> Unit, onOpenSession: () -> Unit) {
     when (state) {
         is ConnectionState.Connected -> FloatingActionButton(
             onClick = onOpenSession,

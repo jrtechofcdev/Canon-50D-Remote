@@ -9,6 +9,7 @@ import android.opengl.EGLSurface
 import android.opengl.GLES30
 import android.opengl.GLUtils
 import android.util.Log
+import com.example.core.log.AppLog
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -28,16 +29,18 @@ class PresetEngine {
     private val dispatcher = thread.asCoroutineDispatcher()
     private var gl: GlRenderer? = null
     private var glFailed = false
+    /** Modo desenvolvedor: render on the CPU only, to compare with the GPU. */
+    @Volatile var forceCpu = false
 
     /** Renders [src] with [params] at [src]'s size. Never returns [src] itself. */
     suspend fun render(src: Bitmap, params: RenderParams): Bitmap = withContext(dispatcher) {
         if (params.isIdentity) return@withContext src.copy(Bitmap.Config.ARGB_8888, false)
-        if (!glFailed) {
+        if (!glFailed && !forceCpu) {
             try {
                 val renderer = gl ?: GlRenderer().also { gl = it }
                 return@withContext renderer.render(src, params)
             } catch (t: Throwable) {
-                Log.w(TAG, "GPU render failed, using CPU", t)
+                AppLog.e("RENDER", "Processamento pela GPU falhou; passando para a CPU (${src.width}×${src.height}) · ${AppLog.memory()}", t)
                 glFailed = true
                 runCatching { gl?.release() }
                 gl = null
@@ -51,16 +54,25 @@ class PresetEngine {
         thread.shutdown()
     }
 
+    /**
+     * The CPU path needs several full-size buffers at once (about 5× the photo in memory). A 15 MP
+     * frame that way took 300 MB and closed the app on the second photo, so it works on at most
+     * [CPU_MAX_EDGE] px; the result is scaled from that.
+     */
     private fun cpu(src: Bitmap, params: RenderParams): Bitmap {
-        val w = src.width; val h = src.height
+        val scale = minOf(1f, CPU_MAX_EDGE.toFloat() / maxOf(src.width, src.height))
+        val input = if (scale < 1f) Bitmap.createScaledBitmap(src, (src.width * scale).toInt(), (src.height * scale).toInt(), true) else src
+        val w = input.width; val h = input.height
         val px = IntArray(w * h)
-        src.getPixels(px, 0, w, 0, 0, w, h)
+        input.getPixels(px, 0, w, 0, 0, w, h)
+        if (input !== src) input.recycle()
         val out = CpuRenderer.render(px, w, h, params)
         return Bitmap.createBitmap(out, w, h, Bitmap.Config.ARGB_8888)
     }
 
     companion object {
         private const val TAG = "PresetEngine"
+        const val CPU_MAX_EDGE = 2560
     }
 }
 

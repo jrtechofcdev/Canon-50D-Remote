@@ -71,6 +71,7 @@ import com.example.ui.components.SectionLabel
 import com.example.ui.components.ValuePickerSheet
 import com.example.core.data.SettingKeys
 import com.example.ui.PhotoActions
+import com.example.ui.ShareSet
 import com.example.ui.theme.Tone
 import com.example.ui.preset.LookImage
 import com.example.ui.preset.SessionLookSheet
@@ -82,6 +83,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import kotlinx.coroutines.launch
+import androidx.compose.animation.togetherWith
+import com.example.ui.components.shutterFlash
 
 @Composable
 fun SessionScreen(
@@ -94,7 +97,22 @@ fun SessionScreen(
     onOpenTools: () -> Unit = {},
     onOpenLive: () -> Unit = {},
     onOpenProfiles: () -> Unit = {},
+    onEditPhoto: (Long) -> Unit = {},
+    onCropPhoto: (Long) -> Unit = {},
+    onOpenShop: (() -> Unit)? = null,
+    onOpenPresets: () -> Unit = {},
+    onOpenCull: () -> Unit = {},
+    onOpenSection: (com.example.ui.settings.SettingsSection) -> Unit = {},
+    onOpenDelivery: () -> Unit = {},
+    onOpenExpress: () -> Unit = {},
 ) {
+    var deliverFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
+    val deliveryStatus by app.delivery.status.collectAsState()
+    val deliveryOnline by app.delivery.online.collectAsState()
+    val expressStatus by app.express.status.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var whatsFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
+    var noteFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
     val state by app.camera.state.collectAsState()
     val shutter by app.camera.shutter.collectAsState()
     val activeProfile by app.settings.activeProfile.collectAsState(initial = "")
@@ -178,6 +196,38 @@ fun SessionScreen(
                     onLive = onOpenLive,
                     profile = activeProfile,
                     onProfile = { showProfiles = true },
+                    hasLatest = photos.firstOrNull() != null,
+                    latestName = photos.firstOrNull()?.savedBase,
+                    onEditLatest = { photos.firstOrNull()?.let { onEditPhoto(it.id) } },
+                    onCropLatest = { photos.firstOrNull()?.let { onCropPhoto(it.id) } },
+                    onWhatsAppLatest = { whatsFor = photos.firstOrNull() },
+                    onLightroomLatest = {
+                        photos.firstOrNull()?.let { p ->
+                            val set = if (p.editedUri != null) ShareSet.EDITED else if (p.jpgUri != null) ShareSet.JPG else ShareSet.RAW
+                            scope.launch { actions.openInLightroom(listOf(p), set, settings) }
+                        }
+                    },
+                    onNoteLatest = { noteFor = photos.firstOrNull() },
+                    onShop = onOpenShop?.takeIf { settings.shopEnabled },
+                    onPresetsTab = onOpenPresets,
+                    onCull = onOpenCull,
+                    onFolders = { onOpenSection(com.example.ui.settings.SettingsSection.Save) },
+                    onMessages = { onOpenSection(com.example.ui.settings.SettingsSection.Messages) },
+                    onLog = { onOpenSection(com.example.ui.settings.SettingsSection.Diagnostics) },
+                    // Capturar → Selecionar → Editar → Entregar: the last step one tap away.
+                    onDelivery = onOpenDelivery,
+                    deliveryState = when (val d = deliveryStatus) {
+                        is com.example.core.delivery.DeliveryStatus.Running -> if (deliveryOnline > 0) "no ar · $deliveryOnline" else "no ar"
+                        else -> null
+                    },
+                    onDeliverLatest = if (settings.deliveryEnabled) ({ deliverFor = photos.firstOrNull() }) else null,
+                    onExpressLatest = if (settings.expressEnabled) ({
+                        photos.firstOrNull()?.let { com.example.ui.delivery.sendToExpress(app, context, scope, listOf(it.id), onOpenExpress) }
+                    }) else null,
+                    onExpress = onOpenExpress,
+                    expressState = if (settings.expressEnabled && expressStatus is com.example.core.delivery.DeliveryStatus.Running) {
+                        if (settings.expressPreview) "no ar · prévia" else "no ar · liberado"
+                    } else null,
                 )
             }
         }
@@ -256,6 +306,14 @@ fun SessionScreen(
         )
     }
 
+    deliverFor?.let { p -> com.example.ui.delivery.DeliverSheet(app, listOf(p.id), onDismiss = { deliverFor = null }, onOpenDelivery = onOpenDelivery) }
+    whatsFor?.let { p ->
+        com.example.ui.photos.WhatsAppSheet(app, actions, settings, listOf(p), onDismiss = { whatsFor = null })
+    }
+    noteFor?.let { p ->
+        com.example.ui.photos.NoteSheet(app, p, onDismiss = { noteFor = null })
+    }
+
     if (showInterval) {
         IntervalDialog(
             onStart = { seconds, shots ->
@@ -283,17 +341,29 @@ private fun ConnectionHeader(state: ConnectionState, received: Int, status: Came
     val live = state is ConnectionState.Connected
 
     Row(verticalAlignment = Alignment.CenterVertically) {
-        StateTile(
+        // The state block eases to its new colour, and the title slides to the new state, so connecting reads as a change.
+        val tile by androidx.compose.animation.animateColorAsState(
             when (state) {
                 is ConnectionState.Connected -> Tone.Accent
                 is ConnectionState.Failed -> Tone.Error
                 else -> Tone.Line
             },
+            androidx.compose.animation.core.tween(com.example.ui.components.Motion.LONG),
+            label = "state",
         )
+        StateTile(tile)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleLarge)
-            Text(detail, style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted)
+            androidx.compose.animation.AnimatedContent(
+                targetState = title,
+                transitionSpec = {
+                    (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, 80)) +
+                        androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(320, 80, com.example.ui.components.Motion.Emphasized)) { it / 2 }) togetherWith
+                        androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(100))
+                },
+                label = "title",
+            ) { Text(it, style = MaterialTheme.typography.titleLarge) }
+            com.example.ui.components.RollingText(detail, style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted)
         }
         if (!live && state != ConnectionState.Connecting) {
             OutlinedButton(onClick = onConnect) { Text("Conectar") }
@@ -383,7 +453,7 @@ private fun ShutterRow(
                         tint = if (interval.running) Tone.OnAccent else if (connected) Tone.Text else Tone.TextMuted,
                     )
                 }
-                Text(
+                com.example.ui.components.RollingText(
                     if (interval.running) "${interval.done}/${interval.total}" else "Intervalo",
                     style = MaterialTheme.typography.labelSmall,
                     color = if (connected) Tone.TextMuted else Tone.Line,
@@ -408,6 +478,7 @@ private fun ShutterRow(
                     .clip(MaterialTheme.shapes.small)
                     .background(Tone.Surface)
                     .border(1.dp, Tone.Line, MaterialTheme.shapes.small)
+                    .shutterFlash(latest?.id)
                     .clickable(enabled = latest != null) { latest?.let { onOpenLatest(it.id) } },
             ) {
                 latest?.lookUri?.let {
@@ -432,6 +503,8 @@ private fun LatestPhoto(
             .aspectRatio(3f / 2f)
             .clip(MaterialTheme.shapes.large)
             .background(Tone.Surface)
+            // Every new frame lands with a shutter blink: the photographer sees it arrived without reading.
+            .shutterFlash(photo?.id)
             .clickable(enabled = photo != null) { photo?.let { onOpen(it.id) } },
     ) {
         Crossfade(targetState = photo?.takeIf { it.displayUri != null }, label = "latest") { shown ->
@@ -495,6 +568,7 @@ private fun RecentStrip(photos: List<Photo>, onOpen: (Long) -> Unit) {
                 contentDescription = photo.savedBase,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
+                    .animateItem()
                     .size(width = 84.dp, height = 56.dp)
                     .clip(MaterialTheme.shapes.extraSmall)
                     .background(Tone.Surface)

@@ -24,12 +24,16 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.WifiTethering
+import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Style
+import androidx.compose.material.icons.outlined.FactCheck
+import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.BlurOn
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Close
@@ -82,6 +86,8 @@ import com.example.ui.theme.Tone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.ui.graphics.graphicsLayer
 
 enum class PhotoFilter(val label: String) {
     All("Todas"), Session("Sessão atual"), Favorites("Favoritas"), ClientPicks("Escolhidas pelo cliente"),
@@ -105,7 +111,10 @@ fun PhotosScreen(
     onOpenPhoto: (Long) -> Unit,
     onSelectingChange: (Boolean) -> Unit = {},
     onCrop: (Long) -> Unit = {},
+    onOpenDelivery: () -> Unit = {},
+    onOpenExpress: () -> Unit = {},
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = emptyList())
     val settings by app.settings.settings.collectAsState(initial = Settings())
     val presets by app.presets.presets.collectAsState(initial = emptyList())
@@ -190,8 +199,13 @@ fun PhotosScreen(
         ) {
             items(photos, key = { it.id }) { photo ->
                 val isSelected = photo.id in selected
+                // A chosen photo sinks a little inside its frame, like a print pressed into an album.
+                val inset by androidx.compose.animation.core.animateFloatAsState(
+                    if (isSelected) 0.9f else 1f, androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 500f), label = "pick",
+                )
                 Box(
                     Modifier
+                        .animateItem()
                         .aspectRatio(1f)
                         .clip(MaterialTheme.shapes.extraSmall)
                         .background(Tone.Surface)
@@ -211,13 +225,13 @@ fun PhotosScreen(
                         model = photo.lookUri,
                         contentDescription = photo.savedBase,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = inset; scaleY = inset },
                     )
                     FormatTag(photo.rawUri != null, photo.jpgUri != null, Modifier.align(Alignment.BottomStart).padding(4.dp))
                     Row(Modifier.align(Alignment.TopEnd).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                         if (photo.blurry) TileIcon(Icons.Outlined.BlurOn, "Tremida", Tone.Error)
                         if (settings.eyesCheck && photo.eyesClosed > 0) TileIcon(Icons.Outlined.VisibilityOff, "Olhos fechados", Tone.Error)
-                        if (settings.cullSuggestions && photo.suggested) TileIcon(Icons.Outlined.AutoAwesome, "Sugerida", Tone.Accent)
+                        if (settings.cullSuggestions && photo.suggested) TileIcon(Icons.Outlined.ThumbUp, "Sugerida", Tone.Accent)
                         if (photo.note != null || photo.audioNote != null) TileIcon(Icons.AutoMirrored.Outlined.StickyNote2, "Tem nota", Tone.Text)
                         if (photo.clientPick && settings.clientPicksEnabled) TileIcon(Icons.Filled.Favorite, "Escolhida pelo cliente", Tone.Accent)
                         else if (photo.favorite) TileIcon(Icons.Filled.Favorite, "Favorita", Tone.Text)
@@ -230,10 +244,15 @@ fun PhotosScreen(
                             modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp),
                         )
                     }
-                    if (isSelected) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        isSelected,
+                        enter = androidx.compose.animation.scaleIn(androidx.compose.animation.core.spring(dampingRatio = 0.5f, stiffness = 600f)) + androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut(),
+                        modifier = Modifier.align(Alignment.TopStart),
+                    ) {
                         Icon(
                             Icons.Filled.CheckCircle, contentDescription = "Selecionada", tint = Tone.Accent,
-                            modifier = Modifier.align(Alignment.TopStart).padding(4.dp).size(22.dp),
+                            modifier = Modifier.padding(4.dp).size(22.dp),
                         )
                     }
                 }
@@ -251,8 +270,11 @@ fun PhotosScreen(
                     scope.launch { app.database.photoDao().setFavorite(selection.map { it.id }, on); selected.clear() }
                 },
                 onMoment = { sheet = "moment" },
+                onNote = { sheet = "note" },
                 onMessage = { sheet = "message" },
                 onWhatsApp = { sheet = "whatsapp" },
+                onDeliver = { sheet = "deliver" },
+                onExpress = { com.example.ui.delivery.sendToExpress(app, context, scope, selection.map { it.id }, onOpenExpress) { selected.clear() } },
                 onCrop = { sheet = "crop" },
                 onDelete = { sheet = "delete" },
                 onShare = { set -> scope.launch { actions.share(selection, set, settings) } },
@@ -271,6 +293,7 @@ fun PhotosScreen(
             scope.launch { app.database.photoDao().setMoment(selection.map { it.id }, m.ifEmpty { null }); selected.clear() }
         }, onDismiss = { sheet = null })
         "message" -> MessageSheet(actions, settings, selection, onDismiss = { sheet = null })
+        "note" -> NoteSheet(app, selection, onDismiss = { sheet = null; selected.clear() })
         "crop" -> QuickCropSheet(
             count = selection.size,
             onDismiss = { sheet = null },
@@ -279,6 +302,11 @@ fun PhotosScreen(
             sheet = null
             runBatch(if (ratio == null) "Removendo recorte" else "Recortando ${ratio.label}", selection) { app.looks.quickCrop(it, ratio) }
         }
+        "deliver" -> com.example.ui.delivery.DeliverSheet(
+            app, selection.map { it.id },
+            onDismiss = { sheet = null; selected.clear() },
+            onOpenDelivery = onOpenDelivery,
+        )
         "whatsapp" -> WhatsAppSheet(app, actions, settings, selection, onDismiss = { sheet = null; selected.clear() })
         "delete" -> AlertDialog(
             onDismissRequest = { sheet = null },
@@ -332,8 +360,11 @@ private fun BatchBar(
     onPreset: () -> Unit,
     onFavorite: () -> Unit,
     onMoment: () -> Unit,
+    onNote: () -> Unit,
     onMessage: () -> Unit,
     onWhatsApp: () -> Unit,
+    onDeliver: () -> Unit,
+    onExpress: () -> Unit,
     onCrop: () -> Unit,
     onDelete: () -> Unit,
     onShare: (ShareSet) -> Unit,
@@ -347,13 +378,16 @@ private fun BatchBar(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         BarAction(Icons.AutoMirrored.Outlined.Send, "WhatsApp", onWhatsApp)
-        BarAction(Icons.Outlined.AutoAwesome, "Preset", onPreset)
+        BarAction(Icons.Outlined.WifiTethering, "Entregar", onDeliver)
+        BarAction(Icons.Outlined.Collections, "Express", onExpress)
+        BarAction(Icons.Outlined.Style, "Preset", onPreset)
         BarAction(Icons.Outlined.Crop, "Recorte", onCrop)
         BarMenu(Icons.Outlined.Share, "Enviar", sets, onShare)
         BarMenu(Icons.Outlined.PhotoLibrary, "Lightroom", lrSets, onLightroom)
         BarAction(Icons.AutoMirrored.Outlined.Chat, "Mensagem", onMessage)
         BarAction(if (selection.all { it.favorite }) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, "Favoritar", onFavorite)
         if (settings.momentsEnabled) BarAction(Icons.Outlined.Flag, "Momento", onMoment)
+        if (settings.notesEnabled) BarAction(Icons.Outlined.EditNote, "Nota", onNote)
         BarAction(Icons.Outlined.Delete, "Apagar", onDelete)
     }
 }

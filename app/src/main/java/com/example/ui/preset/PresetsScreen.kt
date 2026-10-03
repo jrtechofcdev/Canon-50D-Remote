@@ -498,7 +498,7 @@ private fun sourceLabel(source: String) = when (source) {
     "xmp" -> "Importado de XMP"
     "lrtemplate" -> "Importado de LRTemplate"
     "jr_link" -> "Pack JR C50D Sync"
-    else -> "Criado no app"
+    else -> if (source.startsWith(com.example.core.shop.ShopItem.SOURCE_PREFIX)) "Da Loja de presets" else "Criado no app"
 }
 
 private fun displayName(context: android.content.Context, uri: Uri): String =

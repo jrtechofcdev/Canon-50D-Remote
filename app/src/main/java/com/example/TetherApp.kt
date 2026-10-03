@@ -5,6 +5,7 @@ import com.example.core.alerts.Alerts
 import com.example.core.camera.CameraManager
 import com.example.core.camera.ConnectionState
 import com.example.core.data.AppBackup
+import com.example.core.log.AppLog
 import com.example.core.data.PhotoDatabase
 import com.example.core.data.SettingKeys
 import com.example.core.data.SettingsRepository
@@ -22,6 +23,10 @@ import com.example.core.location.LocationTracker
 import com.example.core.backup.SessionBackup
 import com.example.core.analysis.Culler
 import com.example.core.analysis.MlKitFaceAnalyzer
+import com.example.core.shop.PresetShop
+import com.example.core.delivery.DeliveryEvents
+import com.example.core.delivery.LocalDelivery
+import com.example.core.delivery.PhotoEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -62,8 +67,19 @@ class TetherApp : Application() {
         private set
     lateinit var appBackup: AppBackup
         private set
+    lateinit var shop: PresetShop
+        private set
+    /** Photo events (captured, edited, approved): the only link between capture and delivery. */
+    val events = DeliveryEvents()
+    /** Entrega local: clients with a code. */
+    lateinit var delivery: LocalDelivery
+        private set
+    /** Fotografia Express: its own tool, no code, preview until paid. Independent of [delivery]. */
+    lateinit var express: LocalDelivery
+        private set
 
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    // A failure in one of these collectors is written to the log instead of closing the app.
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main + AppLog.handler("APP"))
 
     // Each warning fires once per connection, not on every event.
     private var warnedCard = false
@@ -72,6 +88,8 @@ class TetherApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // First, so everything after it (and any crash) is written down.
+        AppLog.init(this)
         settings = SettingsRepository(this)
         database = PhotoDatabase.create(this)
         store = PhotoStore(this)
@@ -92,6 +110,34 @@ class TetherApp : Application() {
         backup = SessionBackup(this, database.photoDao(), store)
         culler = Culler(this, database.photoDao(), settings, MlKitFaceAnalyzer())
         appBackup = AppBackup(settings, presets)
+        shop = PresetShop(this, settings, presets)
+        looks.onEdited = { id -> events.emit(PhotoEvent.Edited(id)) }
+        delivery = LocalDelivery(this, settings, database.deliveryDao(), database.photoDao(), looks, export, events, appScope, com.example.core.delivery.DeliveryMode.Normal, analysis = { culler.awaitAnalysis(it) })
+        express = LocalDelivery(this, settings, database.deliveryDao(), database.photoDao(), looks, export, events, appScope, com.example.core.delivery.DeliveryMode.Express, analysis = { culler.awaitAnalysis(it) })
+        // One Wi-Fi at a time: starting either tool stops the other.
+        delivery.peer = express
+        express.peer = delivery
+        val likes = com.example.core.delivery.LikeNotifier(this)
+        delivery.onLike = { session, item -> if (settings.current().deliveryNotifyLikes) likes.liked(session, item) }
+        express.onLike = { session, item -> if (settings.current().expressNotifyLikes) likes.liked(session, item) }
+        delivery.init()
+        express.init()
+        appScope.launch {
+            events.events.collect { e ->
+                if ((e is PhotoEvent.Delivered || e is PhotoEvent.Approved) && settings.current().deliveryVibrate) alerts.photoReceived()
+            }
+        }
+
+        appScope.launch {
+            settings.settings.distinctUntilChangedBy { it.logEnabled to it.logFolder }.collect { AppLog.configure(it.logEnabled, it.logFolder) }
+        }
+        appScope.launch {
+            // Modo desenvolvedor: detailed log and the CPU-only render follow their switches.
+            settings.settings.collect {
+                AppLog.verbose = it.developerMode && it.devVerboseLog
+                engine.forceCpu = it.developerMode && it.devRender == "cpu"
+            }
+        }
 
         appScope.launch(Dispatchers.IO) {
             export.clearOldExports()
@@ -120,6 +166,8 @@ class TetherApp : Application() {
 
         appScope.launch {
             tether.saved.collect {
+                AppLog.i("FOTO", "${it.savedBase} salva · ${AppLog.memory()}")
+                events.emit(PhotoEvent.Captured(it.id))
                 val s = settings.current()
                 if (s.blurAlert || s.eyesCheck || s.cullSuggestions) culler.enqueue(it.id)
                 if (s.vibrateOnReceive) alerts.photoReceived()
@@ -152,5 +200,21 @@ class TetherApp : Application() {
                 }
             }
         }
+    }
+
+    /** Android asks for memory back: drop the preview caches (they are rebuilt when needed). */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_RUNNING_LOW) {
+            AppLog.w("MEM", "Android pediu memória (nível $level) · ${AppLog.memory()}")
+            if (::looks.isInitialized) looks.trim()
+            if (::shop.isInitialized) shop.trim()
+        }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        AppLog.w("MEM", "Memória baixa · ${AppLog.memory()}")
+        if (::looks.isInitialized) looks.trim()
     }
 }

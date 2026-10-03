@@ -28,6 +28,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.WifiTethering
+import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.StickyNote2
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.outlined.Crop
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.RotateRight
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.AlertDialog
@@ -112,6 +115,8 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.material.icons.outlined.FilterNone
+import com.example.ui.components.pressScale
 
 @Composable
 fun ViewerScreen(
@@ -121,6 +126,8 @@ fun ViewerScreen(
     onBack: () -> Unit,
     onCalibrate: (Long) -> Unit,
     onCrop: (Long) -> Unit = {},
+    onOpenDelivery: () -> Unit = {},
+    onOpenExpress: () -> Unit = {},
 ) {
     val photos by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
     val presets by app.presets.presets.collectAsState(initial = emptyList())
@@ -133,12 +140,15 @@ fun ViewerScreen(
     }
     val start = list.indexOfFirst { it.id == startId }.coerceAtLeast(0)
     val pager = rememberPagerState(initialPage = start) { list.size }
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var confirmDelete by remember { mutableStateOf<Photo?>(null) }
     val zoomed = remember { mutableStateMapOf<Long, Boolean>() }
     var showClipping by remember { mutableStateOf(settings.highlightAlert) }
     var noteFor by remember { mutableStateOf<Photo?>(null) }
     var whatsFor by remember { mutableStateOf<Photo?>(null) }
+    var deliverFor by remember { mutableStateOf<Photo?>(null) }
+    var versionsFor by remember { mutableStateOf<Photo?>(null) }
 
     // Slide to a frame that just arrived. New photos are inserted at index 0; the pager keeps the
     // current photo in place by key, so "was on the latest" means we were on index 0 before it.
@@ -173,11 +183,13 @@ fun ViewerScreen(
 
     // One tap hides everything but the photo; another brings it back.
     var chrome by remember { mutableStateOf(true) }
+    // A vertical photo gets a standing screen, a horizontal one a lying screen (Ajustes → Tela).
+    com.example.ui.components.FollowPhotoOrientation(app, viewing, settings.rotateWithPhoto, settings.screenOrientation)
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
         val landscape = maxWidth > maxHeight
-        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { list[it].id }) { page ->
-            val photo = list[page]
+        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { pagerKey(currentList, it) }) { page ->
+            val photo = currentList.getOrNull(page) ?: return@HorizontalPager
             val mask = if (showClipping && photo.id == viewing?.id && photo.crop == null) analysis?.clippedMask else null
             PhotoPage(app, photo, presets, mask, onTap = { chrome = !chrome }) { zoomed[photo.id] = it }
         }
@@ -271,12 +283,24 @@ fun ViewerScreen(
                         icon = { LightroomMark() },
                     ) { scope.launch { actions.openInLightroom(listOf(current), it, settings) } }
                     ActionTile(Icons.AutoMirrored.Outlined.Send, "WhatsApp", accent = true) { whatsFor = current }
+                    if (settings.deliveryEnabled) ActionTile(Icons.Outlined.WifiTethering, "Entregar") { deliverFor = current }
+                    if (settings.expressEnabled) ActionTile(Icons.Outlined.Collections, "Express") {
+                        com.example.ui.delivery.sendToExpress(app, context, scope, listOf(current.id), onOpenExpress)
+                    }
+                    // The same photo once more with another preset: each version is its own file for the client.
+                    if (settings.deliveryEnabled || settings.expressEnabled) {
+                        ActionTile(Icons.Outlined.FilterNone, "Versões") { versionsFor = current }
+                    }
                     SetMenuTile(
                         label = "Enviar",
                         sets = actions.availableSets(current, settings),
                         icon = { Icon(Icons.Outlined.Share, contentDescription = null, tint = Tone.Text) },
                     ) { scope.launch { actions.share(listOf(current), it, settings) } }
                     ActionTile(Icons.Outlined.Crop, "Recortar", selected = current.crop != null) { onCrop(current.id) }
+                    // A quarter turn of the photo itself (for frames the camera saved lying down).
+                    ActionTile(Icons.Outlined.RotateRight, "Girar") {
+                        scope.launch { app.looks.setCrop(current, com.example.core.render.PhotoShape.turnedClockwise(app.looks.cropOf(current))) }
+                    }
                     if (settings.notesEnabled) {
                         ActionTile(Icons.AutoMirrored.Outlined.StickyNote2, "Nota", selected = current.note != null || current.audioNote != null) { noteFor = current }
                     }
@@ -300,6 +324,10 @@ fun ViewerScreen(
     }
 
     noteFor?.let { photo -> NoteSheet(app, photo, onDismiss = { noteFor = null }) }
+    versionsFor?.let { photo ->
+        com.example.ui.delivery.VersionSheet(app, photo, onDismiss = { versionsFor = null }, onOpenDelivery = onOpenDelivery, onOpenExpress = onOpenExpress)
+    }
+    deliverFor?.let { photo -> com.example.ui.delivery.DeliverSheet(app, listOf(photo.id), onDismiss = { deliverFor = null }, onOpenDelivery = onOpenDelivery) }
     whatsFor?.let { photo -> WhatsAppSheet(app, actions, settings, listOf(photo), onDismiss = { whatsFor = null }) }
 
     confirmDelete?.let { photo ->
@@ -318,6 +346,14 @@ fun ViewerScreen(
         )
     }
 }
+
+/**
+ * Page key read from the newest list. The pager keeps the key function it was first given, so a
+ * list captured at that moment went stale: a photo arriving with the viewer open asked for index 12
+ * of a 12-item list and closed the app (IndexOutOfBoundsException in ViewerScreen, seen in the log).
+ * A page that is momentarily past the end gets a key of its own until the list catches up.
+ */
+fun pagerKey(list: List<com.example.core.data.Photo>, index: Int): Any = list.getOrNull(index)?.id ?: "fim-$index"
 
 @Composable
 fun RatingBar(rating: Int, onRate: (Int) -> Unit) {
@@ -358,15 +394,16 @@ private fun ActionTile(
     box: androidx.compose.ui.unit.Dp = 44.dp,
     onClick: () -> Unit,
 ) {
+    val tint by androidx.compose.animation.animateColorAsState(if (accent || selected) Tone.Accent else Tone.Text, label = "tile")
     ActionTileBase(label, modifier, enabled, onClick, box) {
-        Icon(icon, contentDescription = null, tint = if (accent || selected) Tone.Accent else Tone.Text)
+        Icon(icon, contentDescription = null, tint = tint)
     }
 }
 
 @Composable
 private fun ActionTileBase(label: String, modifier: Modifier, enabled: Boolean, onClick: () -> Unit, box: androidx.compose.ui.unit.Dp = 44.dp, icon: @Composable () -> Unit) {
     Column(
-        modifier.clip(MaterialTheme.shapes.small).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 4.dp, vertical = 4.dp)
+        modifier.pressScale().clip(MaterialTheme.shapes.small).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 4.dp, vertical = 4.dp)
             .alpha(if (enabled) 1f else 0.4f),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -377,7 +414,7 @@ private fun ActionTileBase(label: String, modifier: Modifier, enabled: Boolean, 
 
 /** The "Lr" square photographers know from the app, drawn in the app's own colours. */
 @Composable
-private fun LightroomMark() {
+internal fun LightroomMark() {
     Box(
         Modifier.size(24.dp).clip(MaterialTheme.shapes.extraSmall).border(1.5.dp, Tone.Info, MaterialTheme.shapes.extraSmall),
         contentAlignment = Alignment.Center,

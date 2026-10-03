@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#121212">
+<title>Fotografia Express</title>
+<link rel="icon" href="/icon.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="bar">
+  <img class="logo" src="/logo.png" alt="Jr_Tech_OFC">
+  <span class="chip">Fotografia Express</span>
+</header>
+
+<div id="welcome" class="welcome" hidden>
+  <div class="welcome-card">
+    <img src="/icon.png" alt="" class="welcome-icon">
+    <h2 id="welcomeTitle">Que bom ter você aqui</h2>
+    <p class="muted">Suas fotos vão aparecer nesta página. Como podemos te chamar?</p>
+    <form id="nameForm" autocomplete="off">
+      <input id="nameInput" maxlength="40" placeholder="Seu nome" aria-label="Seu nome" autocapitalize="words" enterkeyhint="go">
+      <button class="primary" type="submit">Ver minhas fotos</button>
+    </form>
+    <button id="skipName" class="link">Agora não</button>
+  </div>
+</div>
+
+<main>
+  <section class="intro">
+    <h1 id="title">Suas fotos de hoje</h1>
+    <p id="sub" class="muted">Conectando ao celular do fotógrafo…</p>
+  </section>
+
+  <p id="hint" class="hint" hidden><span class="dot" aria-hidden="true"></span><span id="hintText"></span></p>
+
+  <p id="waiting" class="waiting" hidden></p>
+
+  <section id="feed" class="feed" aria-live="polite"></section>
+
+  <div id="empty" class="empty" hidden>
+    <div class="pulse" aria-hidden="true"></div>
+    <p>As fotos aparecem aqui assim que o fotógrafo tirar.</p>
+    <p class="muted small">Deixe esta página aberta.</p>
+  </div>
+
+  <p id="closed" class="empty" hidden>Nenhum atendimento aberto agora. Fale com o fotógrafo.</p>
+</main>
+
+<footer id="dock" class="dock" hidden>
+  <p id="dockText"></p>
+  <button id="payBtn" class="ghost" hidden>Pagar</button>
+  <button id="saveAll" class="primary" hidden>Salvar liberadas</button>
+</footer>
+
+<div id="paySheet" class="sheet" hidden role="dialog" aria-label="Pagamento">
+  <div class="sheet-card">
+    <div class="sheet-head">
+      <p class="sheet-title">Pagamento</p>
+      <button id="payClose" class="link" aria-label="Fechar">Fechar</button>
+    </div>
+    <p id="payTotal" class="pay-total"></p>
+    <p id="payDetail" class="muted small"></p>
+    <div id="pixBox" class="pix-box" hidden>
+      <img id="pixQr" alt="QR do Pix">
+      <button id="copyPix" class="primary">Copiar Pix copia e cola</button>
+      <p class="muted small">Abra o app do banco, escolha Pix e leia o QR ou cole o código.</p>
+    </div>
+    <p id="payMethods" class="small"></p>
+    <p id="payNote" class="small"></p>
+    <p class="muted small">Depois de pagar, avise o fotógrafo: ele libera as fotos aqui mesmo, sem marca.</p>
+  </div>
+</div>
+
+<div id="viewer" class="viewer" hidden>
+  <div class="viewer-bar">
+    <button id="close" class="ghost">Fechar</button>
+    <span id="pos" class="muted"></span>
+  </div>
+  <img id="big" alt="">
+  <div class="viewer-actions">
+    <button id="prev" class="ghost nav" aria-label="Anterior">‹</button>
+    <a id="vSave" class="primary">Salvar foto</a>
+    <button id="vPick" class="ghost heart" aria-label="Favorita">♡</button>
+    <button id="next" class="ghost nav" aria-label="Próxima">›</button>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status"></div>
+<script src="/app.js"></script>
+</body>
+</html>

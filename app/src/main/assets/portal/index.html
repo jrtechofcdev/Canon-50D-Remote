@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f1f1f">
+<title>Suas fotos</title>
+<link rel="icon" href="/icon.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+  <img class="logo" src="/logo.png" alt="Jr_Tech_OFC">
+  <button id="leave" class="link" hidden>Sair</button>
+</header>
+
+<main id="login" class="panel" hidden>
+  <h1>Suas fotos estão aqui</h1>
+  <p class="muted">Digite o código de 4 números que o fotógrafo te passou.</p>
+  <form id="codeForm" autocomplete="off">
+    <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="0000" aria-label="Código">
+    <button class="primary" type="submit">Ver minhas fotos</button>
+  </form>
+  <p id="loginError" class="error" role="alert"></p>
+  <p class="hint">Se o celular avisar que este Wi-Fi não tem internet, toque em <b>Manter conectado</b>. As fotos vêm direto do celular do fotógrafo.</p>
+</main>
+
+<main id="gallery" hidden>
+  <section class="hello">
+    <h1 id="hello"></h1>
+    <p id="count" class="muted"></p>
+  </section>
+
+  <section id="hero" class="hero" hidden>
+    <p class="tag" id="heroTag">Sua foto está pronta!</p>
+    <button id="heroOpen" class="heroImg" aria-label="Abrir foto"><img id="heroImg" alt=""></button>
+    <div class="row">
+      <a id="heroSave" class="primary" download>Salvar foto</a>
+      <button id="heroPick" class="ghost pick" hidden aria-label="Favorita">♡</button>
+    </div>
+  </section>
+
+  <p id="waiting" class="waiting" hidden></p>
+  <p id="iosHint" class="hint" hidden>No iPhone: toque e segure a foto aberta e escolha <b>Adicionar às Fotos</b>.</p>
+
+  <section>
+    <div class="gridHead">
+      <h2>Todas as fotos</h2>
+      <button id="saveAll" class="ghost small" hidden>Salvar todas</button>
+    </div>
+    <div id="grid" class="grid"></div>
+    <p id="empty" class="muted center" hidden>As fotos aparecem aqui assim que o fotógrafo enviar.</p>
+  </section>
+</main>
+
+<div id="viewer" class="viewer" hidden>
+  <div class="viewerBar">
+    <button id="close" class="ghost" aria-label="Fechar">Fechar</button>
+    <span id="position" class="muted"></span>
+  </div>
+  <img id="big" alt="">
+  <div class="viewerActions">
+    <button id="prev" class="ghost" aria-label="Anterior">‹</button>
+    <a id="save" class="primary" download>Salvar foto</a>
+    <button id="pick" class="ghost pick" hidden aria-label="Favorita">♡</button>
+    <button id="next" class="ghost" aria-label="Próxima">›</button>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status"></div>
+<footer class="foot muted" id="foot"></footer>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -35,14 +35,23 @@ import com.example.ui.PhotoActions
 import com.example.ui.ShareSet
 import com.example.ui.theme.Tone
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.outlined.Search
 
-fun Settings.template(kind: MessageKind) = when (kind) {
+/** The text an older, fixed message kind had in Ajustes (before the message library). */
+fun Settings.legacyTemplate(kind: MessageKind) = when (kind) {
     MessageKind.WhatsApp -> msgWhatsApp
     MessageKind.Preview -> msgPreview
     MessageKind.Delivered -> msgDelivered
     MessageKind.Payment -> msgPayment
     MessageKind.Selection -> msgSelection
 }
+
+/** Every message the photographer keeps (Ajustes → Mensagens). */
+fun Settings.messages(): List<com.example.core.messages.MessageTemplate> =
+    com.example.core.messages.MessageLibrary.all(messageLibrary) { legacyTemplate(it) }
+
+fun Settings.template(kind: MessageKind): String =
+    messages().firstOrNull { it.id == com.example.core.messages.MessageLibrary.kindIds[kind] }?.text ?: legacyTemplate(kind)
 
 /**
  * Ready-made WhatsApp message for [photos]: pick the template, adjust the text, optionally attach
@@ -64,10 +73,12 @@ fun MessageSheet(
             count = photos.size,
             date = photos.minOfOrNull { it.capturedAt } ?: System.currentTimeMillis(),
             names = photos.map { it.savedBase },
+            pix = settings.pixKey,
         )
     }
-    var kind by remember { mutableStateOf(initial) }
-    var text by remember(kind) { mutableStateOf(MessageTemplates.fill(settings.template(kind), data)) }
+    val library = remember(settings) { settings.messages() }
+    var templateId by remember { mutableStateOf(com.example.core.messages.MessageLibrary.kindIds[initial]) }
+    var text by remember(templateId) { mutableStateOf(MessageTemplates.fill(library.firstOrNull { it.id == templateId }?.text.orEmpty(), data)) }
     val attachOptions = buildList {
         add(null)
         if (settings.lightShareEnabled) add(ShareSet.LIGHT)
@@ -78,9 +89,7 @@ fun MessageSheet(
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Tone.Surface) {
         Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding().padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Mensagem", style = MaterialTheme.typography.titleMedium)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MessageKind.entries.forEach { k -> SheetChip(k.label, kind == k) { kind = k } }
-            }
+            TemplatePicker(library, templateId) { templateId = it?.id }
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
@@ -101,6 +110,39 @@ fun MessageSheet(
                 colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
             ) { Text("Abrir no WhatsApp") }
         }
+    }
+}
+
+/**
+ * Pick a message by its short code: type "ent" and "Fotos entregues" comes up; tap it and the full
+ * text (from Ajustes → Mensagens, with the client's name and date) goes into the message.
+ */
+@Composable
+fun TemplatePicker(
+    library: List<com.example.core.messages.MessageTemplate>,
+    selectedId: String?,
+    allowNone: Boolean = false,
+    onPick: (com.example.core.messages.MessageTemplate?) -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    val found = remember(library, query) { com.example.core.messages.MessageLibrary.search(library, query) }
+    OutlinedTextField(
+        value = query,
+        onValueChange = { q ->
+            query = q.take(20)
+            // An exact code picks its message straight away.
+            library.firstOrNull { it.code.equals(q.trim(), ignoreCase = true) }?.let(onPick)
+        },
+        label = { Text("Atalho da mensagem") },
+        placeholder = { Text("Ex.: fotos, ent, pix, agenda") },
+        leadingIcon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Search, contentDescription = null) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (allowNone) SheetChip("Sem texto", selectedId == null) { onPick(null) }
+        found.forEach { t -> SheetChip("${t.name} · ${t.code}", t.id == selectedId) { onPick(t) } }
+        if (found.isEmpty()) Text("Nenhuma mensagem com \"$query\". Crie em Ajustes → Mensagens.", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
     }
 }
 

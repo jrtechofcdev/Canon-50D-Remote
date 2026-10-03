@@ -2,6 +2,254 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [4.4] · 2026-10-03
+
+- **Versões da mesma foto:**
+  - no visualizador, **Versões** manda a mesma foto de novo para o cliente (Entrega ou Express), cada vez com outro preset ou edição;
+  - escolha um ou mais visuais ("Como está", "Sem preset" ou qualquer preset) e o cliente recebe todos, como arquivos separados (`Ana_IMG_1234_v2_Preto-e-branco.jpg`);
+  - mudar a edição da foto depois não altera uma versão já enviada;
+  - na página do cliente, cada versão aparece com o nome do visual.
+- **Girar a tela corrigido:**
+  - escolher uma posição no botão de girar não mudava nada: a escolha era cancelada no mesmo instante em que o menu fechava;
+  - agora ela vale na hora e fica salva para o app todo, sem mexer na rotação do Android;
+  - no visualizador e no modo cliente, a posição escolhida vale até a próxima foto, mesmo com **Girar com a foto** ligado.
+- **Dial de posição novo:**
+  - um seletor redondo no estilo do dial de modos da câmera, com o celular no centro girando com efeito de mola até a posição escolhida;
+  - dá para tocar numa posição ou arrastar em volta, e ele encaixa a cada quarto de volta com uma vibração leve;
+  - deitado, o dial fica à esquerda e os textos à direita.
+- **Animações pelo app todo**, cada uma ligada a uma função:
+  - as telas entram pelo lado e as abas trocam com um fade, e a foto aberta cresce a partir da grade;
+  - o ícone da aba escolhida dá um pulinho;
+  - o botão **Iniciar captura** muda de forma a cada etapa da conexão;
+  - o disparador fecha como a cortina e solta um anel a cada foto, e a foto nova chega na Sessão com um flash de obturador;
+  - contadores rolam ao mudar, a seleção na galeria afunda a foto e o coração do modo cliente pulsa ao ser marcado;
+  - no Express, cada foto passa de "preparando" para a imagem com um fade, e os grupos de Ajustes abrem suaves.
+- **Abertura com a marca:**
+  - os quatro blocos do símbolo Jr_Tech_OFC entram e se encaixam;
+  - o quadro de foco procura e trava em menta, como na 50D;
+  - o diafragma de seis lâminas fecha e abre como um disparo;
+  - "JR C50D Sync" entra letra por letra, sobre a exposição da 50 mm f/1.8.
+- **Controle da abertura:**
+  - dura menos de 3 segundos e **um toque pula**;
+  - liga e desliga em **Ajustes → Tela → Abertura**, onde **Ver agora** mostra de novo;
+  - não aparece quando as animações do Android estão desligadas nem quando a tela gira;
+  - o vídeo dela em 1080 × 1920, pronto para story, fica em `docs/intro/`.
+
+## [4.3] · 2026-10-03
+
+- **Envio automático só com fotos boas** (Entrega e Express):
+  - o automático espera a análise de cada foto e deixa de fora as tremidas ou fora de foco e, se você ligar, as com olhos fechados;
+  - a tela avisa quais ficaram de fora, com **Mandar mesmo assim**;
+  - as opções ficam nos ajustes de cada ferramenta.
+- **Fotos entrando mais rápido:**
+  - duas fotos preparadas ao mesmo tempo;
+  - cada arquivo codificado uma vez só;
+  - miniaturas da página prontas antes do cliente pedir;
+  - páginas atualizando a cada 2 s.
+- **Endereço com nome:** além do número, o cliente pode digitar `http://jrexpress.local:8090` (ou `jrfotos.local:8080` na Entrega). Funciona no iPhone e no computador; alguns Android só abrem pelo número, por isso o QR continua com ele. Os nomes podem ser mudados nos ajustes.
+- **Nome do cliente no Express:**
+  - ao entrar, a página pergunta "Como podemos te chamar?";
+  - depois cumprimenta pela hora do dia ("Boa tarde, Ana!") e agradece pelo nome quando ele curte uma foto;
+  - na Entrega local, vale o nome que você cadastrou.
+- **Aviso de curtida:** a notificação "Ana gostou de uma foto ♥" vem com a miniatura e abre a ferramenta certa. Liga e desliga na Entrega e no Express.
+- **Pagamentos:**
+  - **seção própria em Ajustes:** chave e tipo do Pix, recebedor, cidade, valor por foto, pacote (ex.: 5 por R$ 60), "todas as fotos", formas aceitas e uma observação;
+  - **Pix Copia e Cola com o valor exato**, gerado no celular, sem internet, com botão de teste;
+  - **o app sempre cobra o mais barato para o cliente.**
+- **Express mais discreto:**
+  - uma linha simples com os valores;
+  - o botão **Pagar R$ X** na barra abre o QR do Pix e o copia e cola;
+  - na sua tela, **Cobrar** mostra o QR para o cliente ler direto do seu celular.
+- **Modo cliente:**
+  - topo alinhado: Sair à esquerda, a marca no centro, contador e botões do mesmo tamanho à direita;
+  - deitado, as ações ficam numa coluna lateral e a foto mantém a altura.
+- **Live view corrigido:**
+  - ao abrir, ele começava com os ajustes padrão e reiniciava, e o desligar antigo chegava à 50D depois do ligar novo: nenhuma imagem vinha;
+  - agora a ordem é garantida e a tela não mostra mais o último quadro antigo como se estivesse congelada;
+  - o log registra ligado, primeira imagem e desligado.
+- **Deitado em tudo:**
+  - o Recorte mostra a foto grande com as ferramentas na lateral;
+  - Entrega e Express usam a largura toda, com status e QR lado a lado.
+
+## [4.2] · 2026-10-03
+
+**Entrega local e Fotografia Express agora são duas ferramentas separadas.** Uma não depende da outra para funcionar.
+
+- **Abas próprias:** **Entrega** e **Express** ganharam abas na barra. Com mais de 5 abas, a barra rola para o lado. Em Ajustes → Tela → **Abas da barra** dá para esconder as que você não usa (Sessão e Ajustes ficam sempre).
+- **Separação completa:**
+  - cada ferramenta tem a sua rede, senha, página, porta (Entrega 8080, Express 8090), fila, pasta de cópias e clientes;
+  - um acesso da Entrega não abre o Express, e o Express não aceita código;
+  - só uma usa o Wi-Fi por vez: ligar uma desliga a outra.
+- **Correção:** ao ler o QR do Express, o celular do cliente podia abrir a página da Entrega, com fotos sem prévia. Agora o Express tem página e endereço próprios e não guarda acesso no celular do cliente.
+- **Página nova do Express**, diferente da Entrega:
+  - lista de fotos grandes, cada uma com o selo "Prévia" ou "Liberada";
+  - valor por foto e total das favoritas;
+  - chave Pix com botão de copiar;
+  - barra fixa com as favoritas e **Salvar liberadas**.
+- **Mandar fotos ao Express:**
+  - botão **Mandar fotos** dentro da aba Express, com uma grade das fotos recentes;
+  - botão **Express** na seleção da galeria, no visualizador e na Sessão (Última foto), separado do **Entregar**.
+- **Ajustes novos:**
+  - **Fotografia Express:**
+    - rede e senha próprias (`DIRECT-JR-Express`);
+    - o que a foto liberada é (editada inteira por padrão) e se leva marca;
+    - valor de cada foto;
+    - mostrar a chave Pix;
+    - ligar o Wi-Fi ao abrir a aba;
+    - pasta `08 Express`.
+  - **Entrega local e Express:** vibrar quando o cliente baixa ou marca uma favorita.
+  - **Tela:** abas da barra.
+- A prévia do Express precisa existir antes de a foto aparecer. Se ela não puder ser feita, a foto fica com erro, e nunca aparece sem marca.
+
+## [4.1] · 2026-10-02
+
+- **Código do cliente com 4 números** (antes eram 6). Mais rápido de falar e digitar, e o portal entra sozinho ao completar os 4 números. Os códigos de 6 da 4.0 continuam valendo até expirar. O limite de 5 tentativas erradas por minuto continua.
+- **Fotografia Express**, um módulo novo, com as mesmas funções da Entrega local (Wi-Fi, portal, fila, QR e placa):
+  - **Sem código:** o cliente entra no Wi-Fi, abre o portal e as fotos já aparecem.
+  - **Modo prévia**, ligado no seu celular: o cliente vê as fotos menores, com o seu logo e "PRÉVIA" repetido por cima, e não consegue baixar. A foto sem marca não sai do celular antes de você liberar.
+  - **Liberar depois do pagamento:** marque as fotos pagas e toque em **Liberar**, ou use **Liberar favoritas** (as que o cliente marcou com o coração) e **Liberar todas**. No portal, a foto troca sozinha para a versão limpa, com o aviso "Foto liberada".
+  - **Finalizar e limpar:** encerra o cliente, apaga as cópias da entrega e deixa o portal pronto para o próximo. O nome vai para o histórico, com o número de fotos liberadas.
+  - **Fotos novas entram sozinhas** (padrão) ou são escolhidas na galeria em **Entregar → Fotografia Express**.
+  - **Força da marca da prévia** ajustável em Ajustes → Fotografia Express.
+  - Atalho **Express** na tela inicial.
+
+## [4.0] · 2026-10-02
+
+**Entrega local:** o celular vira o Wi-Fi e a galeria do cliente. O cliente aponta a câmera para o QR, entra e salva as fotos no próprio celular. Sem internet e sem instalar nada.
+
+- **Rede:** o app cria um Wi-Fi Direct com nome e senha fixos (`DIRECT-JR-Fotos`, Android 10+). Alternativas: o roteador do celular ou o Wi-Fi do local, em Ajustes → Entrega local.
+- **Portal do cliente:**
+  - abre em `http://192.168.49.1:8080`, no visual do app (grafite, menta, Exo 2), no celular e no computador;
+  - mostra a foto mais recente, **Salvar foto**, a grade das outras e **Salvar todas**;
+  - atualiza sozinho a cada 3 s e avisa quando chega foto nova;
+  - no iPhone, explica como adicionar às Fotos.
+- **Um código por cliente:**
+  - cada cliente tem um código de 6 números e um QR só dele, e ninguém vê as fotos de outra pessoa;
+  - depois de 5 códigos errados, o aparelho espera 1 minuto;
+  - o acesso vale 6 h, 24 h, 3 dias ou até você encerrar.
+- **Entregar:**
+  - na galeria (seleção), no visualizador e na Sessão (Última foto → **Entregar**);
+  - escolha um cliente ou crie na hora;
+  - a mesma foto vai uma vez só para cada cliente.
+- **Modo automático:** cada foto nova vai para o **cliente da vez**, já com o look da sessão. A opção **Galeria do evento** manda para uma galeria aberta a quem tem o código do evento.
+- **Fila visível** com o estado de cada foto: aguardando, preparando, pronta, baixada ou erro, com **Tentar de novo**. Os downloads continuam de onde pararam (Range), e a foto só conta como baixada quando chega inteira.
+- **Favoritas pelo portal:** o coração do cliente chega como escolha do cliente na galeria e no culling.
+- **Placa para imprimir:** PNG e PDF A6 com o QR do Wi-Fi, o QR das fotos e a marca, pronta para a gráfica.
+- **Mensagem "Fotos no Wi-Fi"** com `{codigo}`, `{wifi}`, `{senha}` e `{link}`, enviada ao WhatsApp do cliente pela tela dele.
+- **Notificação "Entrega ativa"** com o botão Parar. A entrega segue com a tela apagada.
+- **Pasta `07 Entregas`:** cópia do que foi entregue, uma pasta por cliente. Entra no botão de criar as pastas do app.
+- **Desenvolvedor → Teste de entrega local:** cria a rede `DIRECT-JR-Teste` com uma página de teste. Serve para conferir no seu celular e num iPhone antes do primeiro evento.
+- **Ajustes agrupados** pela cadeia do app: Câmera, Captura e salvamento, Fotografia, Edição, Entrega e Sistema.
+- Desligada (o padrão), a entrega não roda nada e não pede permissão nova.
+
+## [3.8] · 2026-09-29
+
+- **Pastas do app com um toque:** em Ajustes → Salvamento → **Criar e ligar todas as pastas**, o app cria a estrutura "JR C50D Sync" e liga cada ajuste à pasta certa.
+  - Pastas criadas: Fotos (JPG, RAW, Editadas), Presets, Marca d'água, Notas, Backup (2º cartão, sessões, ajustes) e Logs.
+  - O seletor abre na raiz do celular. Se a pasta já existir (do zip), o app só liga.
+- **Salvar fotos automaticamente:** novo liga/desliga. Desligado, as fotos ficam no cartão e aparecem no aviso da Sessão para baixar depois.
+- **2º cartão:** cada foto salva ganha uma cópia conferida, por tamanho, numa segunda pasta, separada por sessão e formato. Liga sozinho ao criar as pastas do app.
+- **Notas em pasta:** uma pasta por foto, com `nota.txt` e os áudios (`audio_1.m4a`, `audio_2.m4a`…). A mesma nota pode ir para várias fotos de uma vez, pela seleção da galeria (botão **Nota**).
+- **Mensagens com atalho:**
+  - **13 mensagens prontas**, 8 delas novas: confirmação do ensaio, local, reserva com Pix, Pix, orçamento, edição em andamento, impressos prontos e agradecimento.
+  - **Chave Pix** em Ajustes, que entra no lugar de `{pix}`.
+  - **Na hora de enviar ao cliente**, inclusive no modo cliente: digite o atalho ("ent", "pix"…), o app mostra o texto pronto e você só envia.
+  - **Em Ajustes → Mensagens**, dá para criar, editar e apagar mensagens.
+- **Modo cliente:**
+  - **Segurar para sair** foi corrigido: agora são 2 s, com um anel mostrando o tempo.
+  - **Marca d'água** na tela, sobre a foto (só na tela, o arquivo não muda).
+  - **Botão para ocultar a interface:** um toque na foto traz de volta.
+  - **Botões com a mesma largura.** O cadeado do recorte e do calibrar não desalinha mais o ícone.
+- **Live view:**
+  - Foco e disparo passam a fechar a operação de AF da 50D. Sem isso, a câmera às vezes recusava e às vezes ignorava o próximo comando.
+  - As esperas se ajustam ao modo de AF.
+  - O padrão agora é o **AF rápido**, o mais certeiro. O silencioso segue como opção.
+  - Cada passo vai para o log com o código da câmera.
+- **Navegação:**
+  - O botão **Iniciar captura** aparece só na Sessão e some ao rolar a tela.
+  - Com o celular deitado, a barra lateral rola, e **Ajustes** não some mais.
+- **Vibração leve** a cada passo dos sliders de Ajustes.
+- **Modo desenvolvedor:** 7 toques na marca, no fim de Ajustes. Traz:
+  - teste de foco e disparo com os códigos da câmera, propriedades lidas da 50D e reconexão da USB;
+  - log de cada comando USB;
+  - foto simulada, para testar tudo sem a câmera;
+  - processamento só pela CPU;
+  - exportar o banco e limpar caches;
+  - teste de fechamento.
+
+## [3.7] · 2026-09-29
+
+- **Antes e depois na Loja, como no Lightroom:** com o preset aberto, segure o dedo na foto para ver a imagem **sem o preset**; solte para ver com ele. Um toque deixa a foto em tela cheia.
+  - O "antes" é a foto original guardada dentro do próprio DNG. Aparece primeiro uma versão menor, em cerca de 0,2 s, e logo depois a de resolução cheia.
+  - Funciona nos dois tipos de DNG da API: JPEG comum e JPEG sem perdas (lossless), que o app agora sabe ler.
+- **Marcar vários presets:** na grade da Loja, segure um preset para entrar na seleção. Depois toque nos outros ou em **Todos da lista**, e use **Salvar** ou **Baixar** para todos de uma vez, com barra de progresso.
+- **Abrir no Lightroom:** botão novo em cada preset. O DNG abre no Lightroom do celular; lá, em ⋮ → **Criar predefinição**, o preset fica salvo no Lightroom também.
+- **Loja mais rápida:**
+  - A maioria das prévias chega agora numa única requisição, em vez de duas.
+  - As próximas prévias são baixadas enquanto você ainda olha as de cima, então a rolagem já encontra as imagens prontas.
+  - O app guarda até 4× mais prévias na memória, então voltar na lista é instantâneo.
+  - A tela cheia abre na hora com a imagem que já estava na grade.
+- **Tela inicial com mais ferramentas:**
+  - Grupo **Última foto**: Editar, Recortar, WhatsApp, Lightroom e Nota, sem precisar abrir a galeria.
+  - Grupo **Presets**: atalhos para a Loja e para os seus presets.
+  - Em **Sessão**, entram Culling e Pastas. Em **Cliente e extras**, entram Mensagens e Log.
+- **Visual realinhado:**
+  - Ícones que dizem o que fazem: presets com o ícone de estilo, sugestão do culling com o polegar, fotos novas com a câmera.
+  - Títulos dos grupos em caixa normal.
+  - Botões e chips com pelo menos 48 dp de altura para o dedo.
+
+## [3.6] · 2026-09-29
+
+- **Loja de presets** (aba nova **Loja**): os presets grátis da sua API, com 1.225 DNGs em 13 categorias.
+  - Cada preset aparece pelo resultado final, a prévia que vem dentro do próprio DNG. Busca por nome e filtro por categoria.
+  - **Na minha foto:** mostra o preset aplicado numa foto sua. Segure para ver o original.
+  - **Usar numa foto:** escolhe uma foto da galeria do app e aplica o preset. Depois abre a foto no visualizador ou no editor.
+  - **Salvar:** o preset entra em **Meus presets**, na categoria dele, e passa a funcionar **sem internet** em todo o app: live view, modo cliente, visualizador, Sessão, cópias editadas.
+  - **Fotos novas:** salva e já aplica nas próximas fotos da câmera.
+  - **Baixar DNG + XMP:** grava na pasta de presets, em `JR_LR_Presets/JR_LR_Presets_DNG` e `JR_LR_Presets/JR_LR_Presets_XMP`. O `.xmp` abre no Lightroom do celular e do PC.
+- **Leve na internet:** para mostrar um preset, o app baixa só o começo do DNG e a prévia (cerca de 100 KB), não o arquivo inteiro. O DNG completo só vem ao tocar em Baixar.
+- **Sem internet**, a Loja mostra a lista salva da última vez; os presets salvos continuam funcionando normalmente.
+- **Ajustes → Presets → Loja de presets:** liga/desliga da aba e o endereço da API. Com isso, dá para apontar para outra API no mesmo formato.
+- Só a Loja usa a internet. A captura e o resto do app continuam 100% offline.
+
+## [3.5] · 2026-09-29
+
+- **Rotação que funciona sempre:**
+  - Nas posições fixas (em pé, deitado para cada lado, de cabeça para baixo) a tela não gira mais sozinha.
+  - Ao abrir, o app já entra na posição escolhida. Antes começava em Automático até carregar os ajustes, e girava sozinho por um instante.
+  - **Automático** agora segue o sensor do celular mesmo com a rotação do Android travada. Antes dependia dessa trava: às vezes girava, às vezes não.
+  - A posição padrão passou a ser **Em pé**.
+- **Girar com a foto** (Ajustes → Tela, ligado por padrão): no visualizador e no modo cliente, a tela se ajusta a cada foto.
+  - Foto em pé → tela em pé, em tela cheia. Foto deitada → tela deitada, do lado que você escolheu.
+  - Dá para fotografar em retrato e em paisagem na mesma sessão e mostrar cada uma inteira ao cliente.
+- **Botão de girar no modo cliente**, além da Sessão, do visualizador e do live view.
+- **Girar foto (90°)** no visualizador: para fotos que a câmera salvou deitadas. Funciona como um recorte e não altera o arquivo original.
+- **Prévia do RAW na posição certa:** a prévia tirada de dentro do CR2 agora guarda a rotação da câmera. Antes, fotos verticais feitas só em RAW apareciam deitadas.
+
+## [3.4] · 2026-09-29
+
+- **Corrigido o fechamento com o visualizador aberto:** o log da 3.3 mostrou a causa.
+  - Com uma foto aberta em tela cheia, a chegada de uma foto nova fazia o app procurar a foto 13 numa lista que ainda tinha 12, e ele fechava (`IndexOutOfBoundsException` no visualizador).
+  - A mesma falha foi corrigida no modo cliente e no Culling.
+  - Um teste automático agora simula fotos chegando com cada uma dessas telas abertas.
+
+## [3.3] · 2026-09-28
+
+- **Correções do fechamento depois de várias fotos:**
+  - *Processamento pela CPU:* quando o processamento de preset pela GPU falha, o app passa para a CPU. Nesse caminho, uma foto de 15 MP em tamanho cheio ocupava mais de 300 MB, e a segunda foto esgotava a memória. Agora esse caminho trabalha com no máximo 2560 px. Pela GPU nada muda.
+  - *Cópia editada:* o tamanho da cópia editada se ajusta à memória livre no momento. Com pouca memória, os previews guardados são liberados antes.
+  - *Memória do app:* o app pede ao Android mais memória para imagens (`largeHeap`) e libera o cache quando o sistema pede.
+  - *Notificação e barra de progresso:* antes eram atualizadas a cada pedaço baixado (centenas de vezes por segundo), o que podia travar a tela até o Android fechar o app. Agora mudam a cada 1 % na tela e a cada 20 % na notificação.
+  - *Erros em segundo plano:* downloads, análise, câmera e avisos não derrubam mais o app. O erro vai para o log e o app continua. A fila de downloads também não para mais por falta de memória.
+- **Log do app salvo no celular** (Ajustes → Diagnóstico):
+  - Um arquivo por dia, guardado por 10 dias, que não se perde ao fechar o app nem ao reiniciar o celular.
+  - Registra conexão USB, cada download com tempo e tamanho, a memória a cada foto, as telas abertas, os avisos, os disparos e os erros com o detalhe técnico.
+  - Se o app fechar por erro, o erro é gravado antes de ele sair.
+  - Na próxima abertura, o app lê do Android por que a execução anterior terminou (erro, erro nativo de gráficos, travamento, falta de memória, fechado pelo sistema) e avisa no topo do Diagnóstico.
+  - **Liga/desliga:** desligado, grava só erros e fechamentos inesperados, para o máximo de desempenho.
+  - **Pasta dos logs:** escolha onde salvar (Downloads, cartão SD, pendrive). O arquivo é copiado para lá a cada 15 s.
+  - **Compartilhar:** junta os últimos 3 dias em um arquivo e abre o menu de envio (WhatsApp, Drive, e-mail). Também dá para copiar e apagar os logs, e ver os registros recentes com o filtro "Só erros".
+
 ## [3.2] · 2026-09-28
 
 - **Girar a tela do app todo:** o botão de girar (Sessão, visualizador e live view) abre um menu em círculo com as posições em pé, deitado para a esquerda, deitado para a direita e de cabeça para baixo, e Auto no meio. A escolha vale para todas as telas e fica guardada.

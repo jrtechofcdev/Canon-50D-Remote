@@ -37,8 +37,25 @@ class MainScreenshotTest {
 
     @Test
     fun cullingTab() {
-        rule.onNode(hasText("Culling")).performClick()
+        // The tab, not the Culling tile of the Session's tools.
+        val tab = androidx.compose.ui.test.SemanticsMatcher.expectValue(
+            androidx.compose.ui.semantics.SemanticsProperties.Role,
+            androidx.compose.ui.semantics.Role.Tab,
+        )
+        rule.onNode(hasText("Culling") and tab).performClick()
         save("app_culling")
+    }
+
+    /** Entrega and Express have tabs of their own; with eight tabs the bar scrolls sideways. */
+    @Test
+    fun expressTab() {
+        val tab = androidx.compose.ui.test.SemanticsMatcher.expectValue(
+            androidx.compose.ui.semantics.SemanticsProperties.Role,
+            androidx.compose.ui.semantics.Role.Tab,
+        )
+        rule.onNode(hasText("Express") and tab).performClick()
+        rule.waitUntil(8_000) { rule.onAllNodes(hasText("Fotografia Express")).fetchSemanticsNodes().isNotEmpty() }
+        save("app_express")
     }
 
     @Test

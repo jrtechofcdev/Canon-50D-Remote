@@ -16,6 +16,7 @@ import com.example.core.storage.Cr2Preview
 import com.example.core.storage.FileKind
 import com.example.core.storage.PhotoStore
 import com.example.core.render.Looks
+import com.example.core.log.AppLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -51,7 +52,8 @@ class TetherController(
     private val presetName: suspend (Long) -> String?,
     private val location: () -> Pair<Double, Double>? = { null },
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + AppLog.handler("DOWNLOAD"))
+    private val mirror = com.example.core.storage.MirrorCopy(context)
     private class Job(val obj: EosEventRecord.ObjectAdded, val force: Boolean, val attempt: Int = 0)
 
     private val queue = Channel<Job>(Channel.UNLIMITED)
@@ -75,7 +77,14 @@ class TetherController(
 
     init {
         scope.launch {
-            camera.newObjects.collect { enqueue(it, force = false) }
+            camera.newObjects.collect { obj ->
+                // "Salvar fotos automaticamente" off: the frame stays on the card, listed in the Session's banner.
+                if (settingsRepository.current().autoDownload) enqueue(obj, force = false)
+                else if ((obj.isRaw || obj.isJpeg) && _pendingOnCard.value.none { it.handle == obj.handle }) {
+                    _pendingOnCard.value = _pendingOnCard.value + ObjectInfo(obj.handle, obj.storageId, obj.format, obj.size, obj.parent, obj.filename, "")
+                    AppLog.i("DOWNLOAD", "${obj.filename} ficou no cartão (salvamento automático desligado)")
+                }
+            }
         }
         scope.launch {
             camera.state.collect { if (it is ConnectionState.Connected) checkForMissedFrames() }
@@ -84,8 +93,11 @@ class TetherController(
             for (job in queue) {
                 try {
                     process(job.obj, job.force)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Download failed", e)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    // Throwable, not Exception: an OutOfMemoryError here used to end this loop (and the app).
+                    AppLog.e("DOWNLOAD", "Falha ao salvar ${job.obj.filename} (tentativa ${job.attempt + 1}) · ${AppLog.memory()}", e)
                     if (job.attempt < MAX_RETRIES && camera.state.value is ConnectionState.Connected) {
                         // Usually a busy camera or a brief USB hiccup: try again after the queue drains a bit.
                         delay(1_000L * (job.attempt + 1))
@@ -170,10 +182,19 @@ class TetherController(
         // RAW and JPG of one frame stay in the same moment even if it changed between the two files.
         val moment = existing?.moment ?: settings.currentMoment.takeIf { settings.momentsEnabled && it.isNotBlank() }
         val target = store.create(kind, fileName, settings, moment)
+        val started = System.currentTimeMillis()
+        AppLog.i("DOWNLOAD", "Baixando ${obj.filename} (${obj.size / 1024} KB) como $fileName")
         try {
             BufferedOutputStream(target.stream, 256 * 1024).use { out ->
+                var lastPercent = -1
                 camera.download(obj.handle, StreamSink(out) { received, total ->
-                    _transfer.value = Transfer(fileName, received, if (total > 0) total else obj.size, queued.get() - 1)
+                    // Progress changes only once per percent: every USB chunk used to redraw the screen and the notification.
+                    val size = if (total > 0) total else obj.size
+                    val percent = if (size > 0) (received * 100 / size).toInt() else 0
+                    if (percent != lastPercent) {
+                        lastPercent = percent
+                        _transfer.value = Transfer(fileName, received, size, queued.get() - 1)
+                    }
                 })
             }
         } catch (e: Exception) {
@@ -182,6 +203,18 @@ class TetherController(
         }
 
         val uri = target.uri.toString()
+        AppLog.i("DOWNLOAD", "$fileName salvo em ${System.currentTimeMillis() - started} ms")
+        // Second card: the same original, checked, in the mirror folder. A failure warns but never stops shooting.
+        if (settings.mirrorEnabled && settings.mirrorFolder != null) {
+            scope.launch {
+                runCatching { mirror.copy(uri, settings.mirrorFolder, listOf(settings.sessionName.trim().ifBlank { session }, kind.folderName), fileName) }
+                    .onSuccess { AppLog.i("ESPELHO", "$fileName copiado para o 2º cartão") }
+                    .onFailure {
+                        AppLog.e("ESPELHO", "Cópia de $fileName no 2º cartão falhou", it)
+                        _errors.tryEmit("A cópia de $fileName no 2º cartão falhou: ${it.message}")
+                    }
+            }
+        }
         val exif = readExif(target.uri)
         var photo = existing ?: Photo(
             session = session, baseName = cameraBase, savedBase = savedBase, capturedAt = System.currentTimeMillis(), moment = moment,
@@ -217,9 +250,48 @@ class TetherController(
                 runCatching {
                     val name = photo.presetId?.let { presetName(it) }
                     looks.writeEditedCopy(photo.copy(id = id), name)
-                }.onFailure { _errors.tryEmit("Não foi possível salvar a cópia editada de ${photo.savedBase}: ${it.message}") }
+                }.onFailure {
+                    AppLog.e("EDITADA", "Cópia editada de ${photo.savedBase} falhou · ${AppLog.memory()}", it)
+                    _errors.tryEmit("Não foi possível salvar a cópia editada de ${photo.savedBase}: ${it.message}")
+                }
             }
         }
+    }
+
+    /**
+     * Modo desenvolvedor: a test frame saved exactly like one from the camera (folders, 2nd card, session
+     * look, gallery, client mode), to try the whole path without the 50D connected.
+     */
+    suspend fun simulatePhoto(): Photo = withContext(Dispatchers.IO) {
+        val settings = settingsRepository.current()
+        val session = settings.sessionKey
+        val n = dao.countInSession(session) + 1
+        val base = "TESTE_%04d".format(n)
+        val bmp = android.graphics.Bitmap.createBitmap(1800, 1200, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bmp)
+        canvas.drawColor(0xFF2A3440.toInt())
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        val rnd = java.util.Random(n.toLong())
+        repeat(30) {
+            paint.color = (0x60 shl 24) or (rnd.nextInt(0xFFFFFF))
+            canvas.drawCircle(rnd.nextFloat() * 1800, rnd.nextFloat() * 1200, 60f + rnd.nextFloat() * 200, paint)
+        }
+        paint.color = android.graphics.Color.WHITE
+        paint.textSize = 90f
+        canvas.drawText("Foto de teste $n", 120f, 600f, paint)
+        val target = store.create(FileKind.JPG, "$base.JPG", settings, settings.currentMoment.takeIf { settings.momentsEnabled && it.isNotBlank() })
+        target.stream.use { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
+        bmp.recycle()
+        val uri = target.uri.toString()
+        if (settings.mirrorEnabled && settings.mirrorFolder != null) {
+            runCatching { mirror.copy(uri, settings.mirrorFolder, listOf(settings.sessionName.trim().ifBlank { session }, FileKind.JPG.folderName), "$base.JPG") }
+                .onFailure { AppLog.e("ESPELHO", "Cópia do teste no 2º cartão falhou", it) }
+        }
+        var photo = Photo(session = session, baseName = base, savedBase = base, capturedAt = System.currentTimeMillis(), jpgUri = uri, jpgCameraName = "$base.JPG")
+        if (settings.applyPresetToNew && settings.sessionPresetId > 0) photo = photo.copy(presetId = settings.sessionPresetId, adjust = settings.sessionAdjust.ifBlank { null })
+        val id = dao.insert(photo)
+        AppLog.i("DEV", "Foto de teste $base salva")
+        photo.copy(id = id).also { _received.update { c -> c + 1 }; _saved.tryEmit(it) }
     }
 
     private suspend fun extractPreview(uri: Uri, session: String, base: String): String? = withContext(Dispatchers.IO) {
@@ -227,6 +299,19 @@ class TetherController(
             val jpeg = context.contentResolver.openInputStream(uri)?.use { Cr2Preview.extract(it) } ?: return@runCatching null
             val file = store.previewFile(session, base)
             file.writeBytes(jpeg)
+            // The JPEG inside the CR2 has no orientation of its own: the camera's (vertical photo or not)
+            // lives in the CR2 header. Without copying it, vertical frames showed lying down.
+            val orientation = context.contentResolver.openInputStream(uri)?.use {
+                ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+            } ?: ExifInterface.ORIENTATION_NORMAL
+            if (orientation != ExifInterface.ORIENTATION_NORMAL && orientation != ExifInterface.ORIENTATION_UNDEFINED) {
+                runCatching {
+                    ExifInterface(file.absolutePath).apply {
+                        setAttribute(ExifInterface.TAG_ORIENTATION, orientation.toString())
+                        saveAttributes()
+                    }
+                }.onFailure { AppLog.w("DOWNLOAD", "Rotação da prévia do RAW não gravada", it) }
+            }
             file.absolutePath
         }.getOrNull()
     }

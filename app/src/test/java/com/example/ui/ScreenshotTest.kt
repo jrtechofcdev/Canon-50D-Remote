@@ -144,11 +144,22 @@ class ScreenshotTest {
         save("ajustes_envio", logo)
     }
 
+    /**
+     * A starter preset by name. Other tests in the same run can leave presets behind (so the pack is
+     * not seeded again); the one needed is added back when missing, whatever ran before.
+     */
+    private suspend fun starter(name: String): com.example.core.preset.Preset {
+        app.presets.seedIfEmpty()
+        app.presets.all().firstOrNull { it.name.contains(name) }?.let { return it }
+        val template = com.example.core.preset.StarterPresets.all.first { it.name.contains(name) }
+        val id = app.presets.save(template.copy(id = 0))
+        return app.presets.get(id)!!
+    }
+
     /** Seeds the starter pack and gives the newest sample photo a preset, as a session with a look would. */
     private fun seedLooks(): Long = runBlocking {
         seedPhotos()
-        app.presets.seedIfEmpty()
-        val preset = app.presets.all().first { it.name.contains("Golden") || it.name.contains("Outdoor") }
+        val preset = starter("Outdoor")
         val photo = app.database.photoDao().inSession("Geral").last()
         app.database.photoDao().setLook(photo.id, preset.id, null)
         app.settings.set(com.example.core.data.SettingKeys.sessionPresetId, preset.id)
@@ -252,10 +263,32 @@ class ScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun clientHeartLandscape() {
+        seedPhotos()
+        runBlocking {
+            app.database.photoDao().inSession("Geral").forEach { app.database.photoDao().setClientPick(it.id, true) }
+            app.settings.set(com.example.core.data.SettingKeys.clientShowInfo, true)
+            app.settings.set(com.example.core.data.SettingKeys.clientPin, "1234")
+        }
+        rule.setContent { JrLinkTheme { com.example.ui.client.ClientModeScreen(app, onExit = {}, onCalibrate = {}) } }
+        save("cliente_coracao_deitado", androidx.compose.ui.test.hasText("Escolhida"))
+    }
+
+    @Test
     fun settingsProfiles() {
         runBlocking { app.settings.applyProfile(com.example.core.data.SettingsProfiles.starters.first()) }
         rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Profiles, onBack = {}) } }
         save("ajustes_perfis", androidx.compose.ui.test.hasText("Ensaio externo"))
+    }
+
+    @Test
+    fun settingsDiagnostics() {
+        com.example.core.log.AppLog.i("USB", "Câmera: Canon EOS 50D (firmware 1.0.9)")
+        com.example.core.log.AppLog.i("DOWNLOAD", "IMG_1045.JPG salvo em 812 ms")
+        com.example.core.log.AppLog.e("EDITADA", "Cópia editada de IMG_1046 falhou · memória 240/256 MB")
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Diagnostics, onBack = {}) } }
+        save("ajustes_diagnostico", androidx.compose.ui.test.hasText("Salvar log completo"))
     }
 
     @Test
@@ -315,6 +348,369 @@ class ScreenshotTest {
         save("recorte", androidx.compose.ui.test.hasText("Instagram retrato"))
     }
 
+    /** A small catalogue served from memory, with made-up "finished look" scenes as the DNG previews. */
+    private fun seedShop() {
+        val api = "https://example.test/api/presets.php"
+        val looks = listOf(
+            Triple("Moody", 0xFF1D2426.toInt(), 0xFFD9A066.toInt()), Triple("Wedding", 0xFFE9E1D6.toInt(), 0xFFB9A48C.toInt()),
+            Triple("Cinematic", 0xFF0F2A33.toInt(), 0xFFFF9A4D.toInt()), Triple("Black & White", 0xFF161616.toInt(), 0xFFD8D8D8.toInt()),
+            Triple("Bright & Airy", 0xFFF3EEE6.toInt(), 0xFF9CC7D9.toInt()), Triple("Autumn", 0xFF2A1A10.toInt(), 0xFFE08A3C.toInt()),
+            Triple("Orange & Teal", 0xFF0E3B44.toInt(), 0xFFFFA25A.toInt()), Triple("Portrait", 0xFF3A2A26.toInt(), 0xFFF2C6A8.toInt()),
+        )
+        val files = HashMap<String, ByteArray>()
+        val list = StringBuilder("[")
+        looks.forEachIndexed { i, (category, bg, light) ->
+            val w = if (i % 3 == 0) 1024 else 682
+            val h = if (i % 3 == 0) 682 else 1024
+            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bmp)
+            canvas.drawColor(bg)
+            val rnd = java.util.Random(i * 17L + 3)
+            repeat(18) {
+                val x = rnd.nextFloat() * w
+                val y = rnd.nextFloat() * h
+                val r = 60f + rnd.nextFloat() * 180f
+                val c = ((50 + rnd.nextInt(120)) shl 24) or (light and 0x00FFFFFF)
+                canvas.drawCircle(x, y, r, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    shader = android.graphics.RadialGradient(x, y, r, intArrayOf(c, c and 0x00FFFFFF), null, android.graphics.Shader.TileMode.CLAMP)
+                })
+            }
+            val url = "https://example.test/uploads/$i.dng"
+            // The "before": the same scene flatter and less saturated, as a photo looks before a preset.
+            val flat = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            Canvas(flat).drawBitmap(bmp, 0f, 0f, Paint().apply {
+                colorFilter = android.graphics.ColorMatrixColorFilter(android.graphics.ColorMatrix().apply { setSaturation(0.35f) })
+                alpha = 255
+            })
+            Canvas(flat).drawColor(0x33808080)
+            files[url] = com.example.core.shop.TestDng.build(
+                com.example.core.shop.TestDng.jpeg(bmp), w, h, com.example.core.shop.TestDng.xmp(exposure = "+0.${i + 1}0"),
+                original = Triple(com.example.core.shop.TestDng.jpeg(flat), w, h),
+            )
+            if (i > 0) list.append(',')
+            list.append("""{"id":${900 + i},"filename":"presets_id_${690 + i}.dng","category":"$category","downloadUrl":"$url"}""")
+        }
+        files[api] = list.append(']').toString().toByteArray()
+        runBlocking { app.settings.set(com.example.core.data.SettingKeys.shopUrl, api) }
+        app.shop.fetcher = com.example.core.shop.TestDng.Server(files)
+    }
+
+    @Test
+    fun shop() {
+        seedShop()
+        rule.setContent { JrLinkTheme { com.example.ui.shop.ShopScreen(app, onOpen = {}) } }
+        save("loja", androidx.compose.ui.test.hasText("Moody 690"))
+    }
+
+    @Test
+    fun shopSelecting() {
+        seedShop()
+        rule.setContent { JrLinkTheme { com.example.ui.shop.ShopScreen(app, onOpen = {}) } }
+        runCatching { rule.waitUntil(15_000) { rule.onAllNodes(androidx.compose.ui.test.hasText("Moody 690")).fetchSemanticsNodes().isNotEmpty() } }
+        rule.onNode(androidx.compose.ui.test.hasText("Moody 690")).performTouchInput { longClick() }
+        rule.onNode(androidx.compose.ui.test.hasText("Cinematográfico 692")).performClick()
+        save("loja_selecao", androidx.compose.ui.test.hasText("Salvar 2"))
+    }
+
+    @Test
+    fun shopBefore() {
+        seedShop()
+        rule.setContent {
+            JrLinkTheme { com.example.ui.shop.ShopDetailScreen(app, 900L, onBack = {}, onOpenPhoto = {}, onEditPhoto = {}) }
+        }
+        runCatching { rule.waitUntil(15_000) { rule.onAllNodes(androidx.compose.ui.test.hasText("Usar numa foto")).fetchSemanticsNodes().isNotEmpty() } }
+        runCatching { rule.waitUntil(8_000) { false } }
+        // Finger held on the picture: the photo without the preset, with the "Antes" label.
+        rule.onNode(androidx.compose.ui.test.hasContentDescription("Moody 690")).performTouchInput {
+            down(center)
+            advanceEventTime(600)
+        }
+        rule.mainClock.advanceTimeBy(600)
+        save("loja_antes", androidx.compose.ui.test.hasText("Antes"))
+    }
+
+    @Test
+    fun shopDetail() {
+        seedShop()
+        seedPhotos()
+        rule.setContent {
+            JrLinkTheme { com.example.ui.shop.ShopDetailScreen(app, 901L, onBack = {}, onOpenPhoto = {}, onEditPhoto = {}) }
+        }
+        save("loja_preset", androidx.compose.ui.test.hasText("Usar numa foto"))
+        rule.onNode(androidx.compose.ui.test.hasText("Na minha foto")).performClick()
+        save("loja_na_minha_foto")
+    }
+
+    @Test
+    fun settingsSave() {
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Save, onBack = {}) } }
+        save("ajustes_salvamento", androidx.compose.ui.test.hasText("Criar e ligar todas as pastas"))
+    }
+
+    @Test
+    fun clientWatermark() {
+        seedPhotos()
+        runBlocking {
+            app.settings.set(com.example.core.data.SettingKeys.clientWatermark, true)
+            app.settings.set(com.example.core.data.SettingKeys.sessionName, "")
+        }
+        rule.setContent { JrLinkTheme { com.example.ui.client.ClientModeScreen(app, onExit = {}, onCalibrate = {}) } }
+        save("cliente_marca_dagua", androidx.compose.ui.test.hasText("Recortar"))
+    }
+
+    @Test
+    fun developer() {
+        runBlocking { app.settings.set(com.example.core.data.SettingKeys.developerMode, true) }
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Developer, onBack = {}) } }
+        save("ajustes_desenvolvedor", androidx.compose.ui.test.hasText("Simular foto recebida"))
+    }
+
+    /** Three clients with photos in every state, for the delivery screens. */
+    private fun seedDelivery(): com.example.core.delivery.DeliverySession = runBlocking {
+        seedPhotos()
+        app.settings.set(com.example.core.data.SettingKeys.deliveryEnabled, true)
+        app.settings.set(com.example.core.data.SettingKeys.deliveryPassword, "jrfotos2026")
+        val dao = app.database.deliveryDao()
+        val photos = app.database.photoDao().inSession("Geral")
+        val existing = dao.openSessions()
+        if (existing.isNotEmpty()) return@runBlocking existing.last()
+        val ana = app.delivery.newClient("Ana e Pedro", "11999990000")
+        val bia = app.delivery.newClient("Bia Martins")
+        val states = listOf(com.example.core.delivery.DeliveryState.DOWNLOADED, com.example.core.delivery.DeliveryState.READY, com.example.core.delivery.DeliveryState.READY,
+            com.example.core.delivery.DeliveryState.PREPARING, com.example.core.delivery.DeliveryState.WAITING, com.example.core.delivery.DeliveryState.ERROR)
+        photos.take(6).forEachIndexed { i, p ->
+            val id = dao.insertItem(com.example.core.delivery.DeliveryItem(sessionId = ana.id, photoId = p.id, name = "Ana-e-Pedro_${p.savedBase}.jpg", queuedAt = i.toLong(), picked = i == 1))
+            dao.setState(id, states[i], if (i < 3) "/x/$id.jpg" else null, 2_400_000L, if (i == 5) "Não deu para preparar a foto" else null, 1)
+            if (i == 0) dao.countDownload(id)
+        }
+        photos.drop(6).take(2).forEach { p -> dao.insertItem(com.example.core.delivery.DeliveryItem(sessionId = bia.id, photoId = p.id, name = "Bia-Martins_${p.savedBase}.jpg", queuedAt = 9)) }
+        app.settings.set(com.example.core.data.SettingKeys.deliveryActiveSession, ana.id)
+        ana
+    }
+
+    private fun running() = com.example.core.delivery.DeliveryStatus.Running("192.168.49.1", 8080, "DIRECT-JR-Fotos", "jrfotos2026", "Wi-Fi Direct")
+
+    @Test
+    fun deliveryIntro() {
+        runBlocking { app.settings.set(com.example.core.data.SettingKeys.deliveryEnabled, false) }
+        val actions = com.example.ui.PhotoActions(rule.activity, app.store, app.export, app.looks)
+        rule.setContent { JrLinkTheme { com.example.ui.delivery.DeliveryScreen(app, actions, onBack = {}, onSettings = {}) } }
+        save("entrega_inicio", androidx.compose.ui.test.hasText("Ligar a entrega local"))
+    }
+
+    @Test
+    fun delivery() {
+        seedDelivery()
+        app.delivery.showStatusForPreview(running())
+        val actions = com.example.ui.PhotoActions(rule.activity, app.store, app.export, app.looks)
+        rule.setContent { JrLinkTheme { com.example.ui.delivery.DeliveryScreen(app, actions, onBack = {}, onSettings = {}) } }
+        save("entrega", androidx.compose.ui.test.hasText("Bia Martins"))
+        app.delivery.showStatusForPreview(com.example.core.delivery.DeliveryStatus.Off)
+    }
+
+    @Test
+    fun deliveryClient() {
+        val ana = seedDelivery()
+        app.delivery.showStatusForPreview(running())
+        val actions = com.example.ui.PhotoActions(rule.activity, app.store, app.export, app.looks)
+        rule.setContent { JrLinkTheme { com.example.ui.delivery.ClientSessionSheet(app, actions, ana, onDismiss = {}) } }
+        save("entrega_cliente", androidx.compose.ui.test.hasText("Encerrar acesso"))
+        app.delivery.showStatusForPreview(com.example.core.delivery.DeliveryStatus.Off)
+    }
+
+    @Test
+    fun deliverSheet() {
+        seedDelivery()
+        val ids = runBlocking { app.database.photoDao().inSession("Geral").take(3).map { it.id } }
+        rule.setContent { JrLinkTheme { com.example.ui.delivery.DeliverSheet(app, ids, onDismiss = {}, onOpenDelivery = {}) } }
+        save("entrega_entregar", androidx.compose.ui.test.hasText("Criar e entregar"))
+    }
+
+    @Test
+    fun settingsDelivery() {
+        runBlocking { app.settings.set(com.example.core.data.SettingKeys.deliveryEnabled, true) }
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Delivery, onBack = {}) } }
+        save("ajustes_entrega", androidx.compose.ui.test.hasText("Como o cliente se conecta"))
+    }
+
+    @Test
+    fun express() {
+        seedPhotos()
+        runBlocking {
+            app.settings.set(com.example.core.data.SettingKeys.expressEnabled, true)
+            app.settings.set(com.example.core.data.SettingKeys.deliveryPassword, "jrfotos2026")
+            val session = app.express.expressSession()
+            val dao = app.database.deliveryDao()
+            val photos = app.database.photoDao().inSession("Geral").take(6)
+            // The tiles show the prepared file: the gallery photos stand in for it.
+            photos.forEachIndexed { i, p ->
+                val id = dao.insertItem(com.example.core.delivery.DeliveryItem(sessionId = session.id, photoId = p.id, name = "${p.savedBase}.jpg", queuedAt = i.toLong(), picked = i == 1 || i == 4))
+                val path = android.net.Uri.parse(p.displayUri).path
+                dao.setState(id, com.example.core.delivery.DeliveryState.READY, path, 2_000_000L, null, 1)
+                if (i < 2) dao.setReleased(listOf(id), true)
+            }
+        }
+        app.express.showStatusForPreview(running().copy(port = 8090, ssid = "DIRECT-JR-Express"))
+        rule.setContent { JrLinkTheme { com.example.ui.delivery.ExpressScreen(app, onBack = null, onSettings = {}) } }
+        save("express", androidx.compose.ui.test.hasText("Liberar todas"))
+        app.express.showStatusForPreview(com.example.core.delivery.DeliveryStatus.Off)
+    }
+
+    @Test
+    fun settingsExpress() {
+        runBlocking { app.settings.set(com.example.core.data.SettingKeys.expressEnabled, true) }
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Express, onBack = {}) } }
+        save("ajustes_express", androidx.compose.ui.test.hasText("Modo prévia"))
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun sessionLandscape() {
+        seedPhotos()
+        val actions = PhotoActions(app, app.store, app.export)
+        rule.setContent { JrLinkTheme { SessionScreen(app, actions, {}, {}, {}, {}) } }
+        save("sessao_deitado", androidx.compose.ui.test.hasText("Finalizar sessão"))
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun photosLandscape() {
+        seedPhotos()
+        rule.setContent { JrLinkTheme { PhotosScreen(app, PhotoActions(app, app.store, app.export), onOpenPhoto = {}) } }
+        rule.mainClock.advanceTimeBy(1_000)
+        save("fotos_deitado", androidx.compose.ui.test.hasText("RAW+JPG"))
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun viewerLandscape() {
+        seedPhotos()
+        val actions = PhotoActions(app, app.store, app.export)
+        val id = runBlocking { app.database.photoDao().inSession("Geral").last().id }
+        rule.setContent { JrLinkTheme { ViewerScreen(app, actions, id, onBack = {}, onCalibrate = {}) } }
+        rule.mainClock.advanceTimeBy(1_000)
+        save("visualizador_deitado")
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun settingsLandscape() {
+        rule.setContent { JrLinkTheme { SettingsScreen(onOpen = {}) } }
+        save("ajustes_deitado")
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun editorLightLandscape() {
+        val id = seedLooks()
+        editor(com.example.ui.preset.EditTarget.PhotoTarget(id), null, "editor_luz")
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun toolsLandscape() {
+        rule.setContent { JrLinkTheme { com.example.ui.tools.ToolsScreen(onBack = {}) } }
+        save("ferramentas_deitado", androidx.compose.ui.test.hasText("Flash direto"))
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun cullLandscape() {
+        seedPhotos()
+        runBlocking {
+            val dao = app.database.photoDao()
+            val list = dao.inSession("Geral")
+            list.forEachIndexed { i, p ->
+                dao.setAnalysis(p.id, 80f - i * 9, i == 4, 2, if (i == 2) 1 else 0, 88f - i * 8, 0L)
+                dao.setBurst(p.id, if (i < 2) list.first().id else null, i == 0)
+            }
+        }
+        rule.setContent { JrLinkTheme { com.example.ui.cull.CullScreen(app, onBack = {}, onOpenPhoto = {}) } }
+        save("selecao_rapida_deitado", androidx.compose.ui.test.hasText("Sugerida"))
+        // Finger held part-way down: the card follows it and the "MARCAR" stamp locks in.
+        rule.onNode(androidx.compose.ui.test.hasContentDescription("IMG_1040")).performTouchInput {
+            down(center)
+            repeat(10) { moveBy(androidx.compose.ui.geometry.Offset(0f, 40f)) }
+        }
+        rule.mainClock.advanceTimeBy(100)
+        rule.waitForIdle()
+        val view = rule.activity.window.decorView
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bitmap))
+        File("build/screens/culling_arrastando.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun cropLandscape() {
+        seedPhotos()
+        val id = runBlocking {
+            val p = app.database.photoDao().inSession("Geral").last()
+            val spec = com.example.core.render.CropRatio.IG_PORTRAIT.centred(900f, 600f).copy(angle = -4f)
+            app.database.photoDao().setCrop(listOf(p.id), com.example.core.render.CropGeometry.fitAfterRotation(spec, 900f, 600f).encode())
+            p.id
+        }
+        rule.setContent { JrLinkTheme { com.example.ui.crop.CropScreen(app, id, onDone = {}) } }
+        save("recorte_deitado", androidx.compose.ui.test.hasText("Instagram retrato"))
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun shopLandscape() {
+        seedShop()
+        rule.setContent { JrLinkTheme { com.example.ui.shop.ShopScreen(app, onOpen = {}) } }
+        save("loja_deitado", androidx.compose.ui.test.hasText("Moody 690"))
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun deliveryLandscape() {
+        seedDelivery()
+        app.delivery.showStatusForPreview(running())
+        val actions = com.example.ui.PhotoActions(rule.activity, app.store, app.export, app.looks)
+        rule.setContent { JrLinkTheme { com.example.ui.delivery.DeliveryScreen(app, actions, onBack = {}, onSettings = {}) } }
+        save("entrega_deitado", androidx.compose.ui.test.hasText("Bia Martins"))
+        app.delivery.showStatusForPreview(com.example.core.delivery.DeliveryStatus.Off)
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun expressLandscape() {
+        seedPhotos()
+        runBlocking {
+            app.settings.set(com.example.core.data.SettingKeys.expressEnabled, true)
+            app.settings.set(com.example.core.data.SettingKeys.deliveryPassword, "jrfotos2026")
+            val session = app.express.expressSession()
+            val dao = app.database.deliveryDao()
+            val photos = app.database.photoDao().inSession("Geral").take(6)
+            // The tiles show the prepared file: the gallery photos stand in for it.
+            photos.forEachIndexed { i, p ->
+                val id = dao.insertItem(com.example.core.delivery.DeliveryItem(sessionId = session.id, photoId = p.id, name = "${p.savedBase}.jpg", queuedAt = i.toLong(), picked = i == 1 || i == 4))
+                val path = android.net.Uri.parse(p.displayUri).path
+                dao.setState(id, com.example.core.delivery.DeliveryState.READY, path, 2_000_000L, null, 1)
+                if (i < 2) dao.setReleased(listOf(id), true)
+            }
+        }
+        app.express.showStatusForPreview(running().copy(port = 8090, ssid = "DIRECT-JR-Express"))
+        rule.setContent { JrLinkTheme { com.example.ui.delivery.ExpressScreen(app, onBack = null, onSettings = {}) } }
+        save("express_deitado", androidx.compose.ui.test.hasText("Liberar todas"))
+        app.express.showStatusForPreview(com.example.core.delivery.DeliveryStatus.Off)
+    }
+
+
+    @Test
+    fun settingsPayments() {
+        runBlocking {
+            app.settings.set(com.example.core.data.SettingKeys.pixKey, "jr.tech.ofc@gmail.com")
+            app.settings.set(com.example.core.data.SettingKeys.pixName, "Jose Renato")
+            app.settings.set(com.example.core.data.SettingKeys.expressPriceCents, 1500)
+            app.settings.set(com.example.core.data.SettingKeys.payPackPhotos, 5)
+            app.settings.set(com.example.core.data.SettingKeys.payPackCents, 6000)
+        }
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Payments, onBack = {}) } }
+        save("ajustes_pagamentos", androidx.compose.ui.test.hasText("Chave Pix"))
+    }
+
     @Test
     fun liveView() = live("live_view")
 
@@ -324,8 +720,7 @@ class ScreenshotTest {
 
     private fun live(name: String) {
         runBlocking {
-            app.presets.seedIfEmpty()
-            val preset = app.presets.all().first { it.name.contains("Golden") }
+            val preset = starter("Golden")
             app.settings.set(com.example.core.data.SettingKeys.livePresetId, preset.id)
             app.settings.set(com.example.core.data.SettingKeys.livePeaking, true)
             app.settings.set(com.example.core.data.SettingKeys.liveGrid, "ig45")
@@ -344,5 +739,30 @@ class ScreenshotTest {
         val frames = kotlinx.coroutines.flow.flow { while (true) { emit(jpeg); kotlinx.coroutines.delay(200) } }
         rule.setContent { JrLinkTheme { com.example.ui.live.LiveViewScreen(app, onBack = {}, frames = frames) } }
         save(name, androidx.compose.ui.test.hasContentDescription("Imagem ao vivo"))
+    }
+
+    @Test
+    fun rotationDial() {
+        val actions = PhotoActions(rule.activity, app.store, app.export, app.looks)
+        rule.setContent {
+            JrLinkTheme {
+                androidx.compose.foundation.layout.Box {
+                    SessionScreen(app, actions, {}, {}, {}, {})
+                    com.example.ui.components.RotationMenu(com.example.ui.components.ScreenTurn.Right, onPick = {}, onDismiss = {}, inline = true)
+                }
+            }
+        }
+        save("rotation_dial")
+    }
+
+    @Test
+    @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun rotationDialLandscape() {
+        rule.setContent {
+            JrLinkTheme {
+                com.example.ui.components.RotationMenu(com.example.ui.components.ScreenTurn.Auto, onPick = {}, onDismiss = {}, inline = true)
+            }
+        }
+        save("rotation_dial_landscape")
     }
 }

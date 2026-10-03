@@ -31,9 +31,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.WifiTethering
+import androidx.compose.material.icons.outlined.Collections
+import androidx.compose.material.icons.outlined.Tab
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Style
+import androidx.compose.material.icons.outlined.FactCheck
+import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.SettingsSuggest
 import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.material.icons.automirrored.outlined.Logout
@@ -83,10 +88,8 @@ import androidx.compose.material.icons.outlined.Slideshow
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.Storage
-import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Summarize
 import androidx.compose.material.icons.outlined.Sync
-import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Usb
 import androidx.compose.material.icons.outlined.UsbOff
@@ -134,12 +137,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.TetherApp
 import com.example.core.camera.ConnectionState
+import com.example.core.data.DEFAULT_SHOP_URL
 import com.example.core.data.DownloadMode
+import androidx.compose.material.icons.outlined.Storefront
 import com.example.core.data.Settings
 import com.example.core.data.SettingKeys
 import com.example.core.data.WatermarkSource
 import com.example.core.messages.MessageDefaults
 import com.example.core.messages.MessageKind
+import com.example.ui.photos.legacyTemplate
+import com.example.ui.photos.messages
 import com.example.ui.photos.template
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.foundation.Image
@@ -153,27 +160,69 @@ import com.example.ui.theme.Tone
 import com.example.ui.theme.WordmarkStyle
 import com.example.ui.components.BrandSymbol
 import com.example.BuildConfig
+import com.example.core.log.AppLog
+import androidx.compose.material.icons.outlined.ReportProblem
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilterChip
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Animation
 
-enum class SettingsSection(val route: String, val title: String, val summary: String, val icon: ImageVector) {
-    Profiles("profiles", "Perfis e backup", "Sets prontos por evento, salvar e restaurar tudo", Icons.Outlined.SettingsSuggest),
-    Save("save", "Salvamento", "Formato, pastas RAW e JPG, sessão e nomes", Icons.Outlined.Folder),
-    Review("review", "Revisão", "Slide automático, galeria, culling, histograma", Icons.Outlined.PhotoLibrary),
-    Camera("camera", "Câmera", "Bateria, cartão, exposições salvas, bracketing", Icons.Outlined.CameraAlt),
-    Share("share", "Envio e cliente", "WhatsApp, marca d'água, modo cliente", Icons.Outlined.Send),
-    Presets("presets", "Presets", "Look das fotos novas, cópia editada, pastas", Icons.Outlined.AutoAwesome),
-    Messages("messages", "Mensagens", "Textos prontos para o WhatsApp do cliente", Icons.AutoMirrored.Outlined.Chat),
-    Alerts("alerts", "Alertas", "Vibração, desconexão, reenvio, resumo", Icons.Outlined.NotificationsActive),
-    Display("display", "Tela", "Modo escuro total, brilho, tela ligada", Icons.Outlined.DarkMode),
-    Diagnostics("diagnostics", "Diagnóstico", "Log da conexão USB", Icons.Outlined.BugReport),
+/** The app's chain, Capturar → Controlar → Melhorar → Entregar, plus the system: how Ajustes is grouped. */
+enum class SettingsModule(val title: String) {
+    Camera("Câmera"),
+    Capture("Captura e salvamento"),
+    Photography("Fotografia"),
+    Editing("Edição"),
+    Delivery("Entrega"),
+    System("Sistema"),
+}
+
+enum class SettingsSection(val route: String, val title: String, val summary: String, val icon: ImageVector, val module: SettingsModule) {
+    Profiles("profiles", "Perfis e backup", "Sets prontos por evento, salvar e restaurar tudo", Icons.Outlined.SettingsSuggest, SettingsModule.System),
+    Save("save", "Salvamento", "Formato, pastas RAW e JPG, sessão e nomes", Icons.Outlined.Folder, SettingsModule.Capture),
+    Review("review", "Revisão", "Slide automático, galeria, culling, histograma", Icons.Outlined.PhotoLibrary, SettingsModule.Photography),
+    Camera("camera", "Câmera", "Bateria, cartão, exposições salvas, bracketing", Icons.Outlined.CameraAlt, SettingsModule.Camera),
+    Share("share", "Envio e cliente", "WhatsApp, marca d'água, modo cliente", Icons.Outlined.Send, SettingsModule.Delivery),
+    Delivery("delivery", "Entrega local", "Wi-Fi do fotógrafo, portal, códigos e QR", Icons.Outlined.WifiTethering, SettingsModule.Delivery),
+    Payments("payments", "Pagamentos", "Pix copia e cola, valores, pacotes e formas de pagamento", Icons.Outlined.Payments, SettingsModule.Delivery),
+    Express("express", "Fotografia Express", "Sem código, prévia com marca e liberar após o pagamento", Icons.Outlined.Collections, SettingsModule.Delivery),
+    Presets("presets", "Presets", "Look das fotos novas, cópia editada, pastas", Icons.Outlined.Style, SettingsModule.Editing),
+    Messages("messages", "Mensagens", "Textos prontos para o WhatsApp do cliente", Icons.AutoMirrored.Outlined.Chat, SettingsModule.Delivery),
+    Alerts("alerts", "Alertas", "Vibração, desconexão, reenvio, resumo", Icons.Outlined.NotificationsActive, SettingsModule.System),
+    Display("display", "Tela", "Modo escuro total, brilho, tela ligada", Icons.Outlined.DarkMode, SettingsModule.System),
+    Diagnostics("diagnostics", "Diagnóstico", "Log do app salvo no celular, pasta e envio", Icons.Outlined.BugReport, SettingsModule.System),
+    Developer("developer", "Desenvolvedor", "Testes da câmera, foto simulada, teste de entrega", Icons.Outlined.Code, SettingsModule.System),
 }
 
 /** Category list. Each category opens its own page so no page gets too long to scan. */
 @Composable
 fun SettingsScreen(onOpen: (SettingsSection) -> Unit) {
+    val app = LocalContext.current.applicationContext as? TetherApp
+    val developer by (app?.settings?.settings?.collectAsState(initial = null) ?: remember { mutableStateOf(null) })
     SettingsPage(title = "Ajustes", onBack = null) {
         Spacer(Modifier.height(8.dp))
-        SettingsSection.entries.forEach { section ->
+        val shown = SettingsSection.entries.filter { it != SettingsSection.Developer || developer?.developerMode == true }
+        SettingsModule.entries.forEach { module ->
+          val sections = shown.filter { it.module == module }
+          if (sections.isNotEmpty()) Text(
+              module.title,
+              style = MaterialTheme.typography.labelLarge,
+              color = Tone.TextMuted,
+              modifier = Modifier.padding(start = 4.dp, top = 14.dp, bottom = 2.dp),
+          )
+          sections.forEach { section ->
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -192,14 +241,41 @@ fun SettingsScreen(onOpen: (SettingsSection) -> Unit) {
                 Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = Tone.TextMuted)
             }
         }
+        }
         Spacer(Modifier.height(40.dp))
-        AboutFooter()
+        AboutFooter(app, developer?.developerMode == true)
     }
 }
 
 @Composable
-private fun AboutFooter() {
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+private fun AboutFooter(app: TetherApp?, unlocked: Boolean) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    // Seven taps on the brand unlock Desenvolvedor, like Android's build number.
+    var taps by remember { mutableStateOf(0) }
+    var toast by remember { mutableStateOf<android.widget.Toast?>(null) }
+    fun say(text: String) {
+        toast?.cancel()
+        toast = android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).also { it.show() }
+    }
+    Column(
+        Modifier.fillMaxWidth().clickable(
+            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+            indication = null,
+        ) {
+            if (unlocked) { say("O modo desenvolvedor já está ligado"); return@clickable }
+            taps++
+            when {
+                taps >= DEV_TAPS -> {
+                    taps = 0
+                    scope.launch { app?.settings?.set(SettingKeys.developerMode, true) }
+                    say("Modo desenvolvedor ligado. Veja Ajustes → Desenvolvedor.")
+                }
+                taps >= DEV_TAPS - 4 -> say("Faltam ${DEV_TAPS - taps} toques para o modo desenvolvedor")
+            }
+        },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         BrandSymbol(36.dp)
         Spacer(Modifier.height(10.dp))
         Text("JR C50D Sync ${BuildConfig.VERSION_NAME}", style = WordmarkStyle.copy(fontSize = 16.sp), color = Tone.Text)
@@ -223,7 +299,11 @@ fun SettingsSectionScreen(app: TetherApp, section: SettingsSection, onBack: () -
             SettingsSection.Messages -> MessageSettings(app, settings)
             SettingsSection.Alerts -> AlertSettings(app, settings)
             SettingsSection.Display -> DisplaySettings(app, settings)
-            SettingsSection.Diagnostics -> DiagnosticsSettings(app)
+            SettingsSection.Diagnostics -> DiagnosticsSettings(app, settings)
+            SettingsSection.Developer -> DeveloperSettings(app, settings)
+            SettingsSection.Delivery -> DeliverySettings(app, settings)
+            SettingsSection.Express -> ExpressSettings(app, settings)
+            SettingsSection.Payments -> PaymentSettings(app, settings)
         }
         Spacer(Modifier.height(88.dp))
     }
@@ -249,6 +329,8 @@ private fun SettingsPage(title: String, onBack: (() -> Unit)?, content: @Composa
     }
 }
 
+private const val DEV_TAPS = 7
+
 // ---- Salvamento ---------------------------------------------------------------------------------
 
 @Composable
@@ -257,6 +339,8 @@ private fun SaveSettings(app: TetherApp, s: Settings) {
     val pickJpg = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.jpgFolder, it) } }
     val pickRaw = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.rawFolder, it) } }
     val pickBackup = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.backupFolder, it) } }
+    val pickMirror = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.mirrorFolder, it) } }
+    val pickNotes = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.notesFolder, it) } }
     val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         if (result.values.any { it }) scope.launch {
             app.settings.set(SettingKeys.gpsEnabled, true)
@@ -264,11 +348,49 @@ private fun SaveSettings(app: TetherApp, s: Settings) {
         }
     }
 
+    AppFoldersCard(app, s)
+
     SettingsGroup("O que vem para o celular", Icons.Outlined.PhoneAndroid) {
+        ToggleRow(
+            Icons.Outlined.Download,
+            "Salvar fotos automaticamente",
+            if (s.autoDownload) "Cada foto feita vem para o celular na hora e aparece na galeria"
+            else "As fotos ficam só no cartão; baixe pelo aviso na Sessão ou pela tela Cartão",
+            s.autoDownload,
+        ) { scope.launch { app.settings.set(SettingKeys.autoDownload, it) } }
         ChoiceRow("Formato", DownloadMode.entries.map { it to it.label }, s.downloadMode) {
             scope.launch { app.settings.setDownloadMode(it) }
         }
         InfoText("A câmera grava tudo no cartão. Aqui você escolhe o que também é salvo no celular.")
+    }
+
+    SettingsGroup("2º cartão: cópia de cada foto", Icons.Outlined.SdCard) {
+        ToggleRow(
+            Icons.Outlined.ContentCopy,
+            "Copiar cada foto para uma segunda pasta",
+            "Como uma câmera de 2 cartões: o original vai para a pasta principal e uma cópia conferida para esta",
+            s.mirrorEnabled,
+            enabled = s.mirrorFolder != null,
+        ) { scope.launch { app.settings.set(SettingKeys.mirrorEnabled, it) } }
+        FolderRow(
+            "Pasta do 2º cartão",
+            s.mirrorFolder?.let { app.store.describeTree(it) } ?: "Nenhuma (escolha uma pasta, de preferência no cartão SD)",
+            true,
+            onPick = { pickMirror.launch(null) },
+            onReset = s.mirrorFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.mirrorFolder, null); app.settings.set(SettingKeys.mirrorEnabled, false) } } },
+        )
+        InfoText("Separa por sessão e por formato (…/Sessão/JPG e …/Sessão/RAW). Se a cópia falhar, o app avisa e continua fotografando.")
+    }
+
+    SettingsGroup("Notas das fotos", Icons.Outlined.EditNote) {
+        FolderRow(
+            "Pasta das notas",
+            s.notesFolder?.let { app.store.describeTree(it) } ?: "Só dentro do app",
+            true,
+            onPick = { pickNotes.launch(null) },
+            onReset = s.notesFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.notesFolder, null) } } },
+        )
+        InfoText("Uma pasta por foto, com nota.txt e os áudios (audio_1.m4a, audio_2.m4a…).")
     }
 
     SettingsGroup("Pastas", Icons.Outlined.Folder) {
@@ -346,8 +468,71 @@ private fun SaveSettings(app: TetherApp, s: Settings) {
     }
 }
 
+/**
+ * "Pastas do app": one tap creates the whole JR C50D Sync structure in the folder picked (the phone's
+ * root opens first) and links every setting that saves something. Each folder shows whether it is linked.
+ */
 @Composable
-private fun rememberFolderPicker(app: TetherApp, onPicked: (String) -> Unit) =
+private fun AppFoldersCard(app: TetherApp, s: Settings) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var busy by remember { mutableStateOf(false) }
+    val create = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        app.store.takePersistablePermission(uri)
+        busy = true
+        scope.launch {
+            val msg = runCatching {
+                val r = com.example.core.storage.AppFolders.createAndLink(context, app.settings, uri)
+                runCatching { app.presets.attachFolder() }
+                if (r.created > 0) "${r.created} pastas criadas e ${r.linked} ligadas" else "Pastas já existiam: ${r.linked} ligadas"
+            }.getOrElse { it.message ?: "Não deu para criar as pastas" }
+            busy = false
+            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+    SettingsGroup("Pastas do app", Icons.Outlined.FolderSpecial) {
+        val values = mapOf(
+            SettingKeys.jpgFolder to s.jpgFolder, SettingKeys.rawFolder to s.rawFolder, SettingKeys.editedFolder to s.editedFolder,
+            SettingKeys.presetsFolder to s.presetsFolder, SettingKeys.notesFolder to s.notesFolder, SettingKeys.mirrorFolder to s.mirrorFolder,
+            SettingKeys.backupFolder to s.backupFolder, SettingKeys.logFolder to s.logFolder,
+        )
+        Text(
+            s.appFolder?.let { "Estrutura em ${app.store.describeTree(it)}" } ?: "Crie de uma vez todas as pastas que o app usa, já ligadas.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Tone.Text,
+        )
+        Button(
+            onClick = { create.launch(com.example.core.storage.AppFolders.phoneRoot) },
+            enabled = !busy,
+            colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).heightIn(min = 48.dp),
+        ) {
+            Icon(Icons.Outlined.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(if (busy) "  Criando…" else if (s.appFolder == null) "  Criar e ligar todas as pastas" else "  Criar de novo / religar")
+        }
+        InfoText(
+            "No seletor, crie ou abra a pasta \"${com.example.core.storage.AppFolders.ROOT_NAME}\" na raiz do celular e toque em Usar esta pasta. " +
+                "Se escolher outra pasta, o app cria \"${com.example.core.storage.AppFolders.ROOT_NAME}\" dentro dela.",
+        )
+        com.example.core.storage.AppFolders.linked.forEach { f ->
+            val on = values[f.key] != null
+            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    if (on) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+                    contentDescription = if (on) "Ligada" else "Não ligada",
+                    tint = if (on) Tone.Accent else Tone.TextMuted,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text("  ${f.label}", style = MaterialTheme.typography.bodyMedium, color = Tone.Text, modifier = Modifier.weight(1f))
+                Text(f.path.joinToString("/"), style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+            }
+        }
+    }
+}
+
+@Composable
+internal fun rememberFolderPicker(app: TetherApp, onPicked: (String) -> Unit) =
     rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
         if (uri != null) {
             app.store.takePersistablePermission(uri)
@@ -356,7 +541,7 @@ private fun rememberFolderPicker(app: TetherApp, onPicked: (String) -> Unit) =
     }
 
 @Composable
-private fun FolderRow(title: String, path: String, active: Boolean, onPick: () -> Unit, onReset: (() -> Unit)?) {
+internal fun FolderRow(title: String, path: String, active: Boolean, onPick: () -> Unit, onReset: (() -> Unit)?) {
     Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
         Text(title, style = MaterialTheme.typography.bodyLarge, color = if (active) Tone.Text else Tone.TextMuted)
         Text(path, style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
@@ -378,25 +563,75 @@ private fun MessageSettings(app: TetherApp, s: Settings) {
             scope.launch { app.settings.set(SettingKeys.whatsAutoMessage, it) }
         }
     }
-    InfoText("Campos preenchidos sozinhos: {cliente} (nome digitado ou da sessão), {quantidade}, {data} e {lista} (nomes das fotos). Use *asteriscos* para negrito no WhatsApp.")
-    listOf(
-        Triple(MessageKind.WhatsApp, SettingKeys.msgWhatsApp, MessageDefaults.WHATSAPP),
-        Triple(MessageKind.Preview, SettingKeys.msgPreview, MessageDefaults.PREVIEW),
-        Triple(MessageKind.Delivered, SettingKeys.msgDelivered, MessageDefaults.DELIVERED),
-        Triple(MessageKind.Payment, SettingKeys.msgPayment, MessageDefaults.PAYMENT),
-        Triple(MessageKind.Selection, SettingKeys.msgSelection, MessageDefaults.SELECTION),
-    ).forEach { (kind, key, default) ->
-        SettingsGroup(kind.label, Icons.AutoMirrored.Outlined.Chat) {
-            var text by remember(kind) { mutableStateOf(s.template(kind)) }
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it; scope.launch { app.settings.set(key, it) } },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                minLines = 4,
-            )
-            if (text != default) {
-                TextButton(onClick = { text = default; scope.launch { app.settings.set(key, default) } }) { Text("Voltar ao texto padrão") }
+    InfoText("Campos preenchidos sozinhos: {cliente} (nome digitado ou da sessão), {quantidade}, {data}, {lista} (nomes das fotos) e {pix}. Use *asteriscos* para negrito no WhatsApp.")
+    SettingsGroup("Pix", Icons.Outlined.Payments) {
+        var pix by remember { mutableStateOf(s.pixKey) }
+        OutlinedTextField(
+            value = pix,
+            onValueChange = { pix = it.take(80); scope.launch { app.settings.set(SettingKeys.pixKey, pix) } },
+            label = { Text("Chave Pix (entra no lugar de {pix})") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        )
+    }
+    MessageLibraryEditor(app, s)
+}
+
+/**
+ * Every message, each with its short code: tap one to edit name, code and text; add new ones for
+ * any step of the job. When sending, typing the code brings the message.
+ */
+@Composable
+private fun MessageLibraryEditor(app: TetherApp, s: Settings) {
+    val scope = rememberCoroutineScope()
+    val defaults = remember(s) { com.example.core.messages.MessageLibrary.defaults { s.legacyTemplate(it) } }
+    var list by remember { mutableStateOf(s.messages()) }
+    var open by remember { mutableStateOf<String?>(null) }
+    fun save(next: List<com.example.core.messages.MessageTemplate>) {
+        list = next
+        scope.launch { app.settings.set(SettingKeys.messageLibrary, com.example.core.messages.MessageLibrary.encode(next)) }
+    }
+    SettingsGroup("Mensagens (${list.size})", Icons.AutoMirrored.Outlined.Chat) {
+        list.forEach { t ->
+            val expanded = open == t.id
+            Row(
+                Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable { open = if (expanded) null else t.id }
+                    .heightIn(min = 52.dp).padding(horizontal = 4.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(t.name, style = MaterialTheme.typography.bodyLarge, color = Tone.Text)
+                    Text("Atalho: ${t.code}", style = MaterialTheme.typography.bodySmall, color = Tone.Accent)
+                }
+                Icon(if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, contentDescription = null, tint = Tone.TextMuted)
             }
+            if (expanded) {
+                var name by remember(t.id) { mutableStateOf(t.name) }
+                var code by remember(t.id) { mutableStateOf(t.code) }
+                var text by remember(t.id) { mutableStateOf(t.text) }
+                fun update() = save(list.map { if (it.id == t.id) it.copy(name = name.trim().ifBlank { t.name }, code = code.trim().lowercase().ifBlank { t.code }, text = text) else it })
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(name, { name = it.take(40); update() }, label = { Text("Nome") }, singleLine = true, modifier = Modifier.weight(1.4f))
+                    OutlinedTextField(code, { code = it.filter { c -> !c.isWhitespace() }.take(12); update() }, label = { Text("Atalho") }, singleLine = true, modifier = Modifier.weight(1f))
+                }
+                OutlinedTextField(text, { text = it; update() }, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), minLines = 4)
+                Row {
+                    defaults.firstOrNull { it.id == t.id }?.takeIf { it.text != text || it.name != name || it.code != code }?.let { d ->
+                        TextButton(onClick = { name = d.name; code = d.code; text = d.text; update() }) { Text("Voltar ao padrão") }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = { open = null; save(list.filter { it.id != t.id }) }) { Text("Apagar", color = Tone.Error) }
+                }
+            }
+        }
+        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = {
+                val taken = list.map { it.code }.toSet()
+                val t = com.example.core.messages.MessageTemplate("m${System.currentTimeMillis()}", "Nova mensagem", com.example.core.messages.MessageLibrary.codeFor("nova", taken), "Olá, {cliente}!\n\n")
+                save(list + t)
+                open = t.id
+            }) { Text("Nova mensagem") }
+            TextButton(onClick = { open = null; save(defaults) }) { Text("Restaurar as padrão") }
         }
     }
 }
@@ -422,7 +657,7 @@ private fun PresetSettingsSection(app: TetherApp, s: Settings) {
     SettingsGroup("Fotos novas", Icons.Outlined.AddAPhoto) {
         val current = presets.firstOrNull { it.id == s.sessionPresetId }
         ToggleRow(
-            Icons.Outlined.AutoAwesome,
+            Icons.Outlined.Style,
             "Aplicar o look da sessão",
             current?.let { "Preset atual: ${it.name}. Troque na Sessão (Look) ou na aba Presets." }
                 ?: "Nenhum preset escolhido. Escolha na Sessão (Look) ou na aba Presets.",
@@ -454,6 +689,31 @@ private fun PresetSettingsSection(app: TetherApp, s: Settings) {
             onReset = s.presetsFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.presetsFolder, null) } } },
         )
         InfoText("Cada preset é salvo nela como .xmp. Arquivos .xmp, .dng e .lrtemplate colocados nela entram no app quando ele abre.")
+        InfoText("Baixar, na Loja, grava em JR_LR_Presets/JR_LR_Presets_DNG e JR_LR_Presets/JR_LR_Presets_XMP dentro dela.")
+    }
+
+    SettingsGroup("Loja de presets", Icons.Outlined.Storefront) {
+        ToggleRow(Icons.Outlined.Storefront, "Aba Loja", "Presets grátis da sua API, com prévia, usar, salvar e baixar", s.shopEnabled) {
+            set(SettingKeys.shopEnabled, it)
+        }
+        var url by remember(s.shopUrl) { mutableStateOf(s.shopUrl) }
+        OutlinedTextField(
+            value = url,
+            onValueChange = { url = it.trim() },
+            label = { Text("Endereço da API") },
+            singleLine = true,
+            enabled = s.shopEnabled,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (url != s.shopUrl && url.startsWith("http")) {
+                TextButton(onClick = { scope.launch { app.settings.set(SettingKeys.shopUrl, url); app.shop.refresh() } }) { Text("Salvar endereço") }
+            }
+            if (s.shopUrl != DEFAULT_SHOP_URL) {
+                TextButton(onClick = { scope.launch { app.settings.set(SettingKeys.shopUrl, DEFAULT_SHOP_URL); app.shop.refresh() } }) { Text("Voltar ao padrão") }
+            }
+        }
+        InfoText("Só a Loja usa a internet. Um preset salvo fica no celular e funciona sem sinal em todo o app.")
     }
 
     SettingsGroup("Visualizador e modo cliente", Icons.Outlined.Visibility) {
@@ -499,7 +759,7 @@ private fun ReviewSettings(app: TetherApp, s: Settings) {
     SettingsGroup("Avaliação", Icons.Outlined.StarOutline) {
         ToggleRow(Icons.Outlined.StarOutline, "Estrelas (1 a 5)", "Mostra as estrelas no visualizador e o filtro na galeria", s.ratingEnabled) { set(SettingKeys.ratingEnabled, it) }
     }
-    SettingsGroup("Seleção com análise local", Icons.Outlined.AutoAwesome) {
+    SettingsGroup("Seleção com análise local", Icons.Outlined.FactCheck) {
         InfoText("Cada foto é analisada no próprio celular, sem internet: nitidez, rostos e olhos, exposição e fotos parecidas.")
         ToggleRow(Icons.Outlined.BlurOn, "Alerta de foto tremida", "Selo \"Tremida\" e aviso quando a foto sai tremida ou fora de foco", s.blurAlert) { set(SettingKeys.blurAlert, it) }
         SliderRow("Sensibilidade do alerta", s.blurThreshold, 30..70, enabled = s.blurAlert, format = { v -> when { v < 44 -> "baixa ($v)"; v < 57 -> "média ($v)"; else -> "alta ($v)" } }) {
@@ -672,6 +932,16 @@ private fun ShareSettings(app: TetherApp, s: Settings) {
         ToggleRow(Icons.Outlined.FavoriteBorder, "Cliente escolhe as fotos", "Coração em cada foto; a seleção aparece na galeria e no resumo da sessão", s.clientPicksEnabled, enabled = s.clientModeEnabled) { set(SettingKeys.clientPicksEnabled, it) }
         ToggleRow(Icons.Outlined.Info, "Mostrar nome e exposição", null, s.clientShowInfo, enabled = s.clientModeEnabled) { set(SettingKeys.clientShowInfo, it) }
         ToggleRow(Icons.Outlined.Verified, "Assinatura Jr_Tech_OFC", "Símbolo e nome discretos no canto da tela", s.clientShowBrand, enabled = s.clientModeEnabled) { set(SettingKeys.clientShowBrand, it) }
+        ToggleRow(
+            Icons.Outlined.BrandingWatermark,
+            "Marca d'água sobre a foto",
+            "A marca escolhida em Marca d'água aparece na foto, só na tela: quem fotografar o celular leva a sua marca junto",
+            s.clientWatermark,
+            enabled = s.clientModeEnabled,
+        ) { set(SettingKeys.clientWatermark, it) }
+        SliderRow("Opacidade da marca na tela", s.clientWatermarkOpacity, 10..90, step = 5, enabled = s.clientModeEnabled && s.clientWatermark, format = { "$it%" }) {
+            scope.launch { app.settings.set(SettingKeys.clientWatermarkOpacity, it) }
+        }
         ToggleRow(Icons.Outlined.Favorite, "Só favoritas", "Mostra apenas as fotos marcadas com estrela de favorita", s.clientOnlyFavorites, enabled = s.clientModeEnabled) { set(SettingKeys.clientOnlyFavorites, it) }
         ToggleRow(Icons.Outlined.Crop, "Botão Recortar", "Recorte rápido no modo cliente (pede o PIN, se houver)", s.clientCropEnabled, enabled = s.clientModeEnabled) { set(SettingKeys.clientCropEnabled, it) }
         ToggleRow(Icons.AutoMirrored.Outlined.Logout, "Botão Sair", "No canto de cima. Com PIN, ele é pedido para sair", s.clientExitButton, enabled = s.clientModeEnabled) { on ->
@@ -681,7 +951,7 @@ private fun ShareSettings(app: TetherApp, s: Settings) {
                 if (!on) app.settings.set(SettingKeys.clientExitHold, true)
             }
         }
-        ToggleRow(Icons.Outlined.TouchApp, "Sair segurando o dedo 3 s", "Um dedo parado na tela por 3 segundos", s.clientExitHold, enabled = s.clientModeEnabled && s.clientExitButton) { set(SettingKeys.clientExitHold, it) }
+        ToggleRow(Icons.Outlined.TouchApp, "Sair segurando o dedo 2 s", "Um dedo parado na tela por 2 segundos; um anel mostra o tempo", s.clientExitHold, enabled = s.clientModeEnabled && s.clientExitButton) { set(SettingKeys.clientExitHold, it) }
         ChoiceRow(
             "Passar as fotos",
             listOf(0 to "Só quando chega foto", 3 to "A cada 3 s", 5 to "5 s", 10 to "10 s"),
@@ -705,9 +975,9 @@ private fun ShareSettings(app: TetherApp, s: Settings) {
         )
         InfoText(
             when {
-                s.clientExitButton && s.clientExitHold -> "Para sair: botão Sair no canto de cima, ou segure o dedo na tela por 3 segundos."
+                s.clientExitButton && s.clientExitHold -> "Para sair: botão Sair no canto de cima, ou segure o dedo na tela por 2 segundos."
                 s.clientExitButton -> "Para sair: botão Sair no canto de cima."
-                else -> "Para sair: segure o dedo na tela por 3 segundos."
+                else -> "Para sair: segure o dedo na tela por 2 segundos."
             },
         )
     }
@@ -810,11 +1080,39 @@ private fun DisplaySettings(app: TetherApp, s: Settings) {
             com.example.ui.components.ScreenTurn.of(s.screenOrientation).id,
             icon = Icons.Outlined.ScreenRotation,
         ) { scope.launch { app.settings.set(SettingKeys.screenOrientation, it) } }
-        InfoText("Também pelo botão de girar na Sessão, no visualizador e no live view, que abre um menu com as quatro posições.")
+        ToggleRow(
+            Icons.Outlined.ScreenRotation,
+            "Girar com a foto",
+            "No visualizador e no modo cliente: foto em pé deixa a tela em pé, foto deitada deixa a tela deitada, sempre em tela cheia",
+            s.rotateWithPhoto,
+        ) { scope.launch { app.settings.set(SettingKeys.rotateWithPhoto, it) } }
+        InfoText("Automático segue o sensor do celular mesmo com a rotação do Android travada. Nas posições fixas a tela não gira sozinha. O botão de girar fica na Sessão, no visualizador, no modo cliente e no live view.")
+    }
+    SettingsGroup("Abertura", Icons.Outlined.Animation) {
+        ToggleRow(
+            Icons.Outlined.Animation,
+            "Animação de abertura",
+            "A marca entra como uma foto sendo feita: foco, diafragma e o nome. Um toque pula.",
+            s.introEnabled,
+        ) { scope.launch { app.settings.set(SettingKeys.introEnabled, it) } }
+        androidx.compose.material3.TextButton(
+            onClick = { com.example.ui.intro.IntroRequests.replay.value += 1 },
+            modifier = Modifier.heightIn(min = 48.dp),
+        ) { Text("Ver agora") }
     }
     SettingsGroup("Tela", Icons.Outlined.Smartphone) {
         ToggleRow(Icons.Outlined.LightMode, "Manter a tela ligada", "Enquanto a câmera estiver conectada", s.keepScreenOn) {
             scope.launch { app.settings.set(SettingKeys.keepScreenOn, it) }
+        }
+    }
+    SettingsGroup("Abas da barra", Icons.Outlined.Tab) {
+        InfoText("Esconda as abas que não usa. Sessão e Ajustes ficam sempre. Com mais de 5 abas, a barra rola para o lado.")
+        val hidden = s.hiddenTabs.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        com.example.Tab.entries.filter { it.hideable }.forEach { tab ->
+            ToggleRow(tab.icon, tab.label, null, tab.route !in hidden) { show ->
+                val next = if (show) hidden - tab.route else hidden + tab.route
+                scope.launch { app.settings.set(SettingKeys.hiddenTabs, next.joinToString(",")) }
+            }
         }
     }
 }
@@ -822,13 +1120,79 @@ private fun DisplaySettings(app: TetherApp, s: Settings) {
 // ---- Diagnóstico -------------------------------------------------------------------------------
 
 @Composable
-private fun DiagnosticsSettings(app: TetherApp) {
-    val log by app.camera.log.collectAsState()
+private fun DiagnosticsSettings(app: TetherApp, s: Settings) {
     val context = LocalContext.current
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp)) {
-        Text("Últimos eventos da conexão", style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted, modifier = Modifier.weight(1f))
-        TextButton(onClick = { copyLog(context, log) }) { Text("Copiar log") }
+    val scope = rememberCoroutineScope()
+    val recent by AppLog.recent.collectAsState()
+    val lastExit by AppLog.lastExit.collectAsState()
+    var onlyErrors by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
+    val pickFolder = rememberFolderPicker(app) { scope.launch { app.settings.setOrClear(SettingKeys.logFolder, it) } }
+    val today = remember(recent.size) { AppLog.todayFile() }
+
+    lastExit?.let { exit ->
+        Spacer(Modifier.height(12.dp))
+        Row(
+            Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(Tone.Error.copy(alpha = 0.12f)).padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.ReportProblem, contentDescription = null, tint = Tone.Error)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text("Da última vez o app fechou sozinho", style = MaterialTheme.typography.bodyLarge)
+                Text(exit, style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+                Text("Está registrado no log. Toque em Compartilhar e mande o arquivo.", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+            }
+        }
     }
+
+    SettingsGroup("Log do app", Icons.Outlined.Description) {
+        ToggleRow(
+            Icons.Outlined.EditNote,
+            "Salvar log completo",
+            "Conexão, downloads, memória a cada foto, telas e avisos, num arquivo por dia. Desligado: só erros e fechamentos inesperados, para ter o máximo de desempenho",
+            s.logEnabled,
+        ) { scope.launch { app.settings.set(SettingKeys.logEnabled, it) } }
+        FolderRow(
+            "Pasta dos logs",
+            s.logFolder?.let { app.store.describeTree(it) } ?: "Só dentro do app (use Compartilhar para mandar)",
+            true,
+            onPick = { pickFolder.launch(null) },
+            onReset = s.logFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.logFolder, null) } } },
+        )
+        InfoText(
+            "Hoje: ${today.name}" + (if (today.exists()) " · ${today.length() / 1024} KB" else "") +
+                ". Os últimos 10 dias ficam guardados e o arquivo é copiado para a pasta a cada 15 s.",
+        )
+        Row(Modifier.padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { scope.launch { shareLog(context) } },
+                colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Compartilhar", maxLines = 1)
+            }
+            OutlinedButton(onClick = { copyLog(context, recent) }) {
+                Icon(Icons.Outlined.ContentCopy, contentDescription = "Copiar", modifier = Modifier.size(18.dp))
+            }
+            OutlinedButton(onClick = { confirmClear = true }) {
+                Icon(Icons.Outlined.Delete, contentDescription = "Apagar logs", modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 16.dp)) {
+        Text("Últimos registros", style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted, modifier = Modifier.weight(1f))
+        FilterChip(
+            selected = onlyErrors,
+            onClick = { onlyErrors = !onlyErrors },
+            label = { Text("Só erros") },
+            leadingIcon = { Icon(Icons.Outlined.ErrorOutline, contentDescription = null, modifier = Modifier.size(16.dp)) },
+        )
+    }
+    val shown = recent.filter { !onlyErrors || it.contains(" E/") }.takeLast(150)
     Column(
         Modifier
             .fillMaxWidth()
@@ -838,11 +1202,34 @@ private fun DiagnosticsSettings(app: TetherApp) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        if (log.isEmpty()) Text("Sem eventos ainda.", color = Tone.TextMuted, style = MaterialTheme.typography.bodySmall)
-        log.takeLast(80).forEach {
-            Text(it, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = Tone.TextMuted)
+        if (shown.isEmpty()) Text("Sem registros ainda.", color = Tone.TextMuted, style = MaterialTheme.typography.bodySmall)
+        shown.forEach {
+            Text(it, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = if (it.contains(" E/")) Tone.Error else Tone.TextMuted)
         }
     }
+
+    if (confirmClear) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            containerColor = Tone.Surface,
+            title = { Text("Apagar os logs?") },
+            text = { Text("Os arquivos de log guardados no app são apagados. Cópias na pasta escolhida continuam lá.") },
+            confirmButton = { TextButton(onClick = { AppLog.clear(); confirmClear = false }) { Text("Apagar", color = Tone.Error) } },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancelar") } },
+        )
+    }
+}
+
+/** Joins the last days of log into one file and opens the share sheet (WhatsApp, Drive, e-mail…). */
+private suspend fun shareLog(context: Context) {
+    val file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { AppLog.bundle() }
+    val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND)
+        .setType("text/plain")
+        .putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        .putExtra(android.content.Intent.EXTRA_SUBJECT, "Log do JR C50D Sync")
+        .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    context.startActivity(android.content.Intent.createChooser(send, "Enviar log"))
 }
 
 private fun copyLog(context: Context, lines: List<String>) {

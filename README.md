@@ -22,7 +22,7 @@
 
 Você fotografa pela **Canon EOS 50D** como sempre, com botão, dials e menus funcionando. Cada foto vai para o cartão CF e **uma cópia chega sozinha no celular** pelo cabo USB OTG, salva em RAW, JPG ou nos dois, cada formato na pasta que você escolher.
 
-Sem Wi-Fi, sem FTP, sem internet. Só a USB, só a 50D.
+A captura usa só a USB, sem FTP e sem internet. Na hora de entregar, o celular cria o próprio Wi-Fi e o cliente baixa as fotos pelo QR, também sem internet. (A única parte que usa internet é a Loja de presets, e só para pegar presets novos.)
 
 <table>
   <tr>
@@ -49,6 +49,12 @@ Sem Wi-Fi, sem FTP, sem internet. Só a USB, só a 50D.
     <td align="center"><img src="docs/images/tela-botao-captura.png" width="200" alt="Iniciar captura"><br><sub><b>Iniciar captura</b><br>em qualquer aba</sub></td>
     <td align="center"><img src="docs/images/tela-perfis.png" width="200" alt="Perfis e backup"><br><sub><b>Perfis</b><br>ajustes prontos por evento</sub></td>
   </tr>
+  <tr>
+    <td align="center"><img src="docs/images/entrega.png" width="200" alt="Entrega local"><br><sub><b>Entrega local</b><br>Wi-Fi e QR do cliente</sub></td>
+    <td align="center"><img src="docs/images/portal_celular.png" width="200" alt="Portal no celular do cliente"><br><sub><b>Portal</b><br>o cliente salva no celular dele</sub></td>
+    <td align="center"><img src="docs/images/portal_express.png" width="200" alt="Fotografia Express em prévia"><br><sub><b>Express</b><br>prévia até o pagamento</sub></td>
+    <td align="center"><img src="docs/images/ajustes.png" width="200" alt="Ajustes por módulo"><br><sub><b>Ajustes</b><br>agrupados por etapa</sub></td>
+  </tr>
 </table>
 
 <sub>Telas renderizadas a partir do código, com fotos de exemplo.</sub>
@@ -64,10 +70,12 @@ Sem Wi-Fi, sem FTP, sem internet. Só a USB, só a 50D.
 | **Revisão** | Slide automático para a foto nova, zoom para conferir foco, histograma RGB, alerta de estouro piscando, estrelas de 1 a 5 e favoritas. |
 | **Controle da câmera** | ISO, abertura, velocidade, ±EV e balanço de branco lidos da própria 50D. Exposições salvas, bracketing (AEB) e intervalômetro. |
 | **Presets** | Importa presets do Lightroom em DNG, XMP, LRTemplate ou ZIP. Edita e cria do zero num editor com os painéis do Lightroom. A foto aparece já com o preset, como um perfil de cor, e uma cópia JPG editada fica salva ao lado do original. |
+| **Loja de presets** | Aba com os presets grátis da sua API: prévia de cada DNG, antes e depois segurando o dedo, seleção de vários, abrir no Lightroom, prévia na sua foto, **Usar** numa foto da galeria ou no editor, **Salvar** em Meus presets (funciona offline em todo o app) e **Baixar** o DNG e o XMP para a pasta `JR_LR_Presets`. |
 | **Cartão** | Navegar pelas fotos que já estão no CF e baixar só as escolhidas. Reenvio automático do que foi feito com o cabo solto. |
 | **Envio** | Lightroom com um toque, "JPG leve" com marca d'água Jr_Tech_OFC e **WhatsApp direto para o número do cliente**: digita o número e a conversa abre com a foto pronta (preset, recorte e marca d'água) já anexada. |
 | **Cliente** | Modo cliente em tela cheia com zoom (pinça e duplo toque), PIN para sair e resumo ao fim da sessão. O cliente pode receber a foto no WhatsApp dele. O cliente escolhe o preset da foto; o botão Calibrar (com PIN) abre os ajustes daquela foto. |
-| **Entrega** | O cliente marca as fotos no modo cliente; a lista vai para o filtro do Lightroom ou para a pasta Escolhidas. Galeria em lote e mensagens prontas no WhatsApp. |
+| **Entrega local** | O celular cria o Wi-Fi e um portal com as fotos de cada cliente. O cliente entra pelo QR, digita o código dele e salva no próprio celular. Modo manual ou automático (cada foto nova vai para o cliente da vez), fila com estado de cada foto, favoritas pelo portal, placa para imprimir. Sem internet. |
+| **Seleção do cliente** | O cliente marca as fotos no modo cliente; a lista vai para o filtro do Lightroom ou para a pasta Escolhidas. Galeria em lote e mensagens prontas no WhatsApp. |
 | **Evento** | Momentos (Cerimônia, Festa…) com subpasta, notas de texto e voz por foto, backup da sessão para cartão SD ou pendrive. |
 | **Seleção com análise local** | Avisa na hora se a foto saiu tremida ou se alguém piscou, agrupa fotos parecidas e sugere a melhor. Aba **Culling** com gestos. Roda no celular, sem internet (Google ML Kit embutido). |
 | **Ferramentas** | Calculadora de flash Yongnuo e de profundidade de campo, GPS nas cópias e acerto do relógio da câmera. Tudo offline. |
@@ -103,6 +111,101 @@ O disparador do app funciona como apertar o botão até o fim: com AF ligado, a 
 
 **Limites:** o processamento da Adobe é fechado, então a prévia do app é uma aproximação. O `.xmp` exportado dá o resultado exato no Lightroom. Máscaras, remoção de manchas, correção de lente e perfis de câmera da Adobe não são aplicados; o corte também não, porque não faz parte de um preset.
 
+### Pastas do app
+
+Em **Ajustes → Salvamento → Pastas do app**, toque em **Criar e ligar todas as pastas**, crie ou abra a pasta "JR C50D Sync" na raiz do celular e toque em **Usar esta pasta**. O app cria e liga tudo:
+
+```
+JR C50D Sync/
+  01 Fotos/      JPG, RAW, Editadas
+  02 Presets/    JR_LR_Presets/JR_LR_Presets_DNG e _XMP
+  03 Marca dagua/
+  04 Notas/      uma pasta por foto (nota.txt, audio_1.m4a…)
+  05 Backup/     Espelho (2º cartão), Sessoes, Ajustes do app
+  06 Logs/
+  07 Entregas/   uma pasta por cliente da entrega local
+  08 Express/    uma pasta por cliente da Fotografia Express
+```
+
+O **2º cartão** guarda uma cópia conferida de cada foto, como numa câmera de dois cartões. **Salvar fotos automaticamente** (mesma tela) liga e desliga o download de cada foto nova.
+
+### Mensagens
+
+Em **Ajustes → Mensagens** ficam as mensagens, cada uma com um atalho (ex.: `fotos`, `ent`, `pix`, `agenda`), e a chave Pix. Na hora de enviar pelo WhatsApp, digite o atalho: o app mostra o texto pronto com o nome do cliente e a data, e é só enviar.
+
+### Modo desenvolvedor
+
+Toque 7 vezes na marca no fim de **Ajustes**. Aparece **Ajustes → Desenvolvedor**, com:
+- teste de foco e disparo;
+- propriedades da câmera;
+- log de cada comando USB;
+- foto simulada, para testar sem a câmera;
+- render pela CPU;
+- exportar o banco;
+- teste de fechamento.
+
+### Entrega local
+
+<p><img src="docs/images/portal_computador.png" width="100%" alt="Portal da entrega local no computador"></p>
+
+1. **Ajustes → Entrega local:** ligue e escolha a rede.
+   - **Wi-Fi Direct:** o app cria a rede `DIRECT-JR-Fotos`, com senha fixa. É o padrão.
+   - **Roteador do celular:** você liga o roteador nas configurações do Android, com o mesmo nome e senha.
+   - **Wi-Fi do local:** o celular e os clientes ficam no mesmo Wi-Fi.
+2. Abra a aba **Entrega** e toque em **Iniciar entrega**. Aparecem dois QR: **① Entrar no Wi-Fi** e **② Abrir as fotos**. Em **Placa para imprimir**, você gera o PNG e o PDF A6 para deixar na mesa.
+3. **Novo cliente:** cada um ganha um código de 4 números e um QR só dele. No modo automático, as fotos novas vão para o **cliente da vez**.
+4. **Entregar:** selecione as fotos na galeria (ou use o visualizador) e escolha o cliente. Elas ficam prontas uma por uma na fila.
+5. O cliente salva cada foto (ou todas) e pode marcar favoritas, que aparecem na galeria e no culling.
+6. **Encerrar acesso** invalida o código. **Parar** desliga a rede e o servidor.
+
+Se o celular do cliente avisar que o Wi-Fi não tem internet, ele toca em **Manter conectado**. Antes do primeiro evento, faça o **Teste de entrega local** (modo desenvolvedor) com o seu celular e um iPhone.
+
+### Fotografia Express
+
+<p><img src="docs/images/express.png" width="250" alt="Aba da Fotografia Express"> <img src="docs/images/portal_express_nome.png" width="230" alt="O cliente diz o nome ao entrar"> <img src="docs/images/portal_express.png" width="230" alt="Página do cliente em prévia"> <img src="docs/images/portal_express_pagar.png" width="230" alt="Pagamento com Pix"></p>
+
+Uma ferramenta separada da Entrega local, com aba, rede, senha, página e ajustes próprios. Ela não precisa da Entrega para funcionar. Serve para fotografar e entregar na hora, um cliente por vez:
+1. Abra a aba **Express**, toque em **Ligar a Fotografia Express** e depois em **Iniciar entrega**.
+2. O cliente entra no Wi-Fi pelo QR ① e abre as fotos pelo QR ②, **sem código**.
+3. Com o **Modo prévia** ligado, ele vê as fotos com marca d'água e não consegue baixar. Pode marcar as favoritas com o coração.
+   Ao entrar, a página pergunta o nome do cliente e passa a tratá-lo pelo nome. Quando ele curte uma foto, você recebe a notificação "Ana gostou de uma foto". Com **Ajustes → Pagamentos** preenchido, a página mostra os valores numa linha discreta e o botão **Pagar**, que abre o QR do Pix com o total exato.
+4. Depois do pagamento, marque as fotos e toque em **Liberar**, ou em **Liberar favoritas** ou **Liberar todas**. No celular do cliente, elas viram a versão limpa e o botão **Salvar foto** aparece.
+5. **Finalizar e limpar para o próximo cliente** encerra o atendimento, apaga as cópias e deixa o portal vazio para o próximo.
+
+Para mandar fotos ao cliente, use o botão **Mandar fotos** na aba, ou **Express** na galeria, no visualizador e na Sessão. Para mandar a mesma foto com outro preset, veja [Versões da mesma foto](#versões-da-mesma-foto). Com **Fotos novas entram sozinhas** ligado, cada foto da câmera já vai direto. O pagamento é com você: o app só guarda a decisão de liberar.
+
+### Versões da mesma foto
+
+No visualizador, toque em **Versões**:
+1. Em **Para quem**, escolha um cliente da Entrega local ou a Fotografia Express.
+2. Toque nos visuais que quer mandar: **Como está** (a edição atual), **Sem preset** ou qualquer preset. O número em cada um é a ordem das versões.
+3. Toque em **Mandar**. Cada versão vira um arquivo próprio, como `Ana_IMG_1234_v2_Preto-e-branco.jpg`, e aparece na página do cliente com o nome do visual.
+
+O recorte da foto vale para todas as versões. Uma versão guarda o visual do momento em que foi mandada, então editar a foto depois não muda o que o cliente já tem. Só a cópia comum (mandada por **Entregar** ou **Express**) acompanha as edições.
+
+### Pagamentos
+
+Em **Ajustes → Pagamentos** ficam:
+- **Pix:** a chave e o tipo, o nome de quem recebe e a cidade;
+- **Valores:** por foto, pacote e "todas as fotos";
+- **Formas de pagamento** aceitas e uma observação para o cliente.
+
+Com isso, o app monta o **Pix Copia e Cola com o valor exato** das fotos escolhidas, no próprio celular e sem internet, e sempre cobra o preço mais barato para o cliente. Use **Testar** para conferir o QR no app do seu banco. Na aba Express, **Cobrar** mostra o QR na sua tela.
+
+<p><img src="docs/images/ajustes_pagamentos.png" width="270" alt="Ajustes de pagamentos"></p>
+
+### Loja de presets
+
+1. Abra a aba **Loja**. A lista vem da sua API (endereço em **Ajustes → Presets → Loja de presets**).
+2. Filtre por categoria ou busque pelo nome. Toque num preset para ver a prévia grande. **Segure o dedo na foto para ver sem o preset** (a foto original que vem dentro do DNG), como no Lightroom; um toque deixa em tela cheia. **Na minha foto** mostra o preset aplicado numa foto sua.
+   Para vários de uma vez: na grade, **segure um preset**, marque os outros e toque em **Salvar** ou **Baixar**.
+3. **Usar numa foto:** escolha a foto e toque em **Aplicar e ver** ou **No editor**.
+4. **Salvar:** o preset vai para **Meus presets** e funciona sem internet no live view, no modo cliente, no visualizador e nas fotos novas. **Fotos novas** salva e já aplica nas próximas fotos.
+5. **Abrir no Lightroom:** o DNG abre no Lightroom do celular. Lá, toque em ⋮ → **Criar predefinição** para guardar o preset no Lightroom.
+6. **Baixar DNG e XMP:** grava na pasta de presets, dentro de `JR_LR_Presets/JR_LR_Presets_DNG` e `JR_LR_Presets/JR_LR_Presets_XMP`. Se a pasta ainda não foi escolhida, o app pede na hora.
+
+A Loja precisa de internet só para ver e pegar presets novos. Sem sinal, ela mostra a lista salva da última vez.
+
 ### Live view
 
 1. Na 50D, ative uma vez: **Menu → Configurações de Live View → Disparo com Live View: Ativar**. Deixe o dial em P, Tv, Av ou M.
@@ -127,6 +230,44 @@ Live view gasta mais bateria da câmera. Com a imagem só no celular, a tela da 
 
   O WhatsApp só pula a tela "Enviar para" quando a conversa já existe; por isso a mensagem vai antes. Os números usados ficam em Recentes (no modo cliente eles não aparecem).
 
+### Posição da tela
+
+- O botão de girar (Sessão, visualizador, modo cliente e live view) abre o dial de posição: toque em **Em pé**, **Direita**, **Invertido** ou **Esquerda**, ou arraste em volta do anel, e o celular desenhado no centro gira até lá. **Automático** segue o sensor do celular, mesmo com a rotação do Android travada. Nas posições fixas a tela não gira sozinha.
+- Escolher no dial vale até a próxima foto, mesmo no visualizador com **Girar com a foto** ligado.
+
+<p><img src="docs/images/dial_posicao.png" width="250" alt="Dial de posição da tela"></p>
+- **Girar com a foto** (Ajustes → Tela): no visualizador e no modo cliente, foto em pé deixa a tela em pé e foto deitada deixa a tela deitada, sempre em tela cheia.
+- Se a 50D salvar fotos verticais deitadas, ligue na câmera **Menu → Girar automático: Ligado**, ou use **Girar** no visualizador.
+
+### Abertura e animações
+
+<p><img src="docs/intro/abertura.gif" width="220" alt="Animação de abertura do JR C50D Sync"></p>
+
+Ao abrir, o app mostra a abertura da marca, em menos de 3 segundos:
+1. os blocos do símbolo se encaixam;
+2. o foco trava;
+3. o diafragma dispara;
+4. o nome entra.
+
+- **Um toque pula.**
+- Em **Ajustes → Tela → Abertura** dá para desligar ou tocar em **Ver agora**.
+- Ela não aparece com as animações do Android desligadas.
+- O vídeo em 1080 × 1920 está em [`docs/intro/abertura_jr_c50d_sync.mp4`](docs/intro/abertura_jr_c50d_sync.mp4).
+
+As outras animações mostram o que aconteceu, e nenhuma fica repetindo:
+- o disparador fecha e solta um anel quando fotografa, e a foto nova chega com um flash;
+- as telas entram pelo lado;
+- a seleção afunda a foto;
+- os números rolam.
+
+### Log do app
+
+O app escreve um diário em arquivo no celular (um por dia, os últimos 10 dias): conexão, downloads, memória, telas, avisos e erros. Se ele fechar sozinho, o erro fica gravado, e na próxima abertura **Ajustes → Diagnóstico** mostra como ele fechou.
+
+- **Salvar log completo:** desligado, só erros e fechamentos são gravados, para o máximo de desempenho.
+- **Pasta dos logs:** escolha uma pasta (Downloads, cartão SD) e o arquivo é copiado para lá a cada 15 s.
+- **Compartilhar:** junta os últimos dias em um arquivo para mandar pelo WhatsApp, Drive ou e-mail.
+
 ### Perfis e backup
 
 - **Ajustes → Perfis e backup** tem sets prontos (Casamento / igreja, Ensaio externo, Evento / festa, Estúdio / produto). Deixe o app do seu jeito e salve como perfil. Na Sessão, o chip **Perfil** troca tudo em um toque.
@@ -147,7 +288,8 @@ Live view gasta mais bateria da câmera. Com a imagem só no celular, a tela da 
 | WhatsApp abre "Enviar para" | Use o botão **1 · Abrir conversa** primeiro e mande a mensagem; depois o **2 · Enviar fotos** vai direto para o cliente. |
 | WhatsApp abre sem a foto | Atualize o WhatsApp. Sem ele instalado, o app abre o link wa.me do número só com o texto. |
 | Preset não importa | O arquivo precisa ter ajustes do Lightroom dentro. DNG de preset sim; DNG de foto comum sem ajustes, não. |
-| Qualquer outro erro | **Ajustes → Diagnóstico → Copiar log** e abra um [relato de problema](https://github.com/jrtechofcdev/Canon-50D-Remote/issues/new/choose) com o log. |
+| App fechou sozinho | Abra de novo e vá em **Ajustes → Diagnóstico**: o aviso no topo diz como ele fechou. Toque em **Compartilhar** e mande o arquivo de log. |
+| Qualquer outro erro | **Ajustes → Diagnóstico → Compartilhar** e abra um [relato de problema](https://github.com/jrtechofcdev/Canon-50D-Remote/issues/new/choose) com o arquivo de log. |
 
 Ao tocar em **Encerrar conexão**, a câmera sai do modo PC e volta ao normal.
 </details>
@@ -213,6 +355,10 @@ app/src/main/java/com/example/
 | Proporções do recorte | `core/render/Crop.kt` → `CropRatio` |
 | Textos das telas | `ui/session`, `ui/photos`, `ui/preset`, `ui/settings` |
 </details>
+
+## Origem: Fotografia Express
+
+A Entrega local nasceu da ideia da **Fotografia Express**: fotografar e entregar na hora, no evento, sem internet. O app segue com a identidade JR C50D Sync e serve a qualquer trabalho. Cada função nova responde a uma etapa da cadeia **Capturar → Controlar → Melhorar → Entregar**. O plano completo está em [`docs/PLANO_EVOLUCAO.md`](docs/PLANO_EVOLUCAO.md).
 
 ## Documentação
 

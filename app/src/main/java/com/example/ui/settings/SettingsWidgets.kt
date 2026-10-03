@@ -38,6 +38,7 @@ import com.example.ui.components.SectionLabel
 import com.example.ui.theme.ReadoutStyle
 import com.example.ui.theme.Tone
 import kotlin.math.roundToInt
+import androidx.compose.animation.animateContentSize
 
 /** A titled block of related options, with an icon so each block is found at a glance. */
 @Composable
@@ -57,6 +58,8 @@ fun SettingsGroup(title: String, icon: ImageVector? = null, content: @Composable
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
             .background(Tone.Surface)
+            // Options that appear when a switch turns on slide the group open instead of jumping.
+            .animateContentSize(androidx.compose.animation.core.spring(dampingRatio = 0.9f, stiffness = 400f))
             .padding(horizontal = 12.dp, vertical = 4.dp),
         content = content,
     )
@@ -107,6 +110,9 @@ fun SliderRow(
 ) {
     var dragging by remember(value) { mutableFloatStateOf(value.toFloat()) }
     val shown = (dragging / step).roundToInt() * step
+    // A light tick on every step while dragging, so the value is felt as well as seen.
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    var lastStep by remember(value) { androidx.compose.runtime.mutableIntStateOf(value) }
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             icon?.let { RowIcon(it, enabled) }
@@ -115,7 +121,14 @@ fun SliderRow(
         }
         Slider(
             value = dragging,
-            onValueChange = { dragging = it },
+            onValueChange = {
+                dragging = it
+                val now = (it / step).roundToInt() * step
+                if (now != lastStep) {
+                    lastStep = now
+                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                }
+            },
             onValueChangeFinished = { onChange(shown.coerceIn(range)) },
             valueRange = range.first.toFloat()..range.last.toFloat(),
             steps = ((range.last - range.first) / step - 1).coerceAtLeast(0),

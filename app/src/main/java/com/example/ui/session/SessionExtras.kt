@@ -16,13 +16,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.WifiTethering
+import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Alignment
-import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Style
+import androidx.compose.material.icons.outlined.FactCheck
+import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.Calculate
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Flag
@@ -88,6 +92,18 @@ import com.example.ui.PhotoActions
 import com.example.ui.ShareSet
 import com.example.ui.theme.Tone
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.outlined.Swipe
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Crop
+import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.ui.graphics.graphicsLayer
+import com.example.ui.components.pressScale
 
 /** Shown when the card has frames shot while the cable was out and "perguntar antes" is on. */
 @Composable
@@ -112,7 +128,15 @@ fun PendingBanner(count: Int, onDownload: () -> Unit, onDismiss: () -> Unit) {
 }
 
 /** One tool: an icon in a tile with its name under it, and what it is set to (in mint) when that matters. */
-private data class ToolItem(val icon: ImageVector, val label: String, val value: String? = null, val enabled: Boolean = true, val onClick: () -> Unit)
+private data class ToolItem(
+    val icon: ImageVector,
+    val label: String,
+    val value: String? = null,
+    val enabled: Boolean = true,
+    /** Drawn instead of [icon], for marks that are not icons (the Lightroom "Lr"). */
+    val mark: (@Composable () -> Unit)? = null,
+    val onClick: () -> Unit,
+)
 
 /**
  * The Session's tools in three groups, so each one is found by where it lives, not by reading a
@@ -138,27 +162,68 @@ fun ToolsRow(
     onLive: () -> Unit = {},
     profile: String = "",
     onProfile: () -> Unit = {},
+    hasLatest: Boolean = false,
+    latestName: String? = null,
+    onEditLatest: () -> Unit = {},
+    onCropLatest: () -> Unit = {},
+    onWhatsAppLatest: () -> Unit = {},
+    onLightroomLatest: () -> Unit = {},
+    onNoteLatest: () -> Unit = {},
+    onShop: (() -> Unit)? = null,
+    onPresetsTab: () -> Unit = {},
+    onCull: () -> Unit = {},
+    onFolders: () -> Unit = {},
+    onMessages: () -> Unit = {},
+    onLog: () -> Unit = {},
+    onDelivery: (() -> Unit)? = null,
+    deliveryState: String? = null,
+    onDeliverLatest: (() -> Unit)? = null,
+    onExpress: (() -> Unit)? = null,
+    expressState: String? = null,
+    onExpressLatest: (() -> Unit)? = null,
 ) {
     val camera = buildList {
         if (settings.liveViewEnabled) add(ToolItem(Icons.Outlined.Videocam, "Live view", enabled = connected, onClick = onLive))
         if (settings.presetsEnabled) add(ToolItem(Icons.Outlined.Tune, "Exposições", enabled = connected, onClick = onPresets))
-        if (settings.aebEnabled) add(ToolItem(Icons.Outlined.Exposure, "Bracketing", bracket?.let { "${it.shot}/${it.total}" } ?: "${settings.aebShots}×", connected && bracket == null, onBracket))
+        if (settings.aebEnabled) add(ToolItem(Icons.Outlined.Exposure, "Bracketing", bracket?.let { "${it.shot}/${it.total}" } ?: "${settings.aebShots}×", connected && bracket == null, onClick = onBracket))
         if (settings.cardBrowserEnabled) add(ToolItem(Icons.Outlined.SdCard, "Cartão", enabled = connected, onClick = onCard))
     }
     val session = buildList {
-        add(ToolItem(Icons.Outlined.AutoAwesome, "Look", sessionLook ?: "nenhum", onClick = onLook))
+        add(ToolItem(Icons.Outlined.Style, "Look", sessionLook ?: "nenhum", onClick = onLook))
         if (settings.momentsEnabled) add(ToolItem(Icons.Outlined.Flag, "Momento", settings.currentMoment.ifBlank { null }, onClick = onMoment))
         add(ToolItem(Icons.Outlined.SettingsSuggest, "Perfil", profile.ifBlank { null }, onClick = onProfile))
+        add(ToolItem(Icons.Outlined.Swipe, "Culling", onClick = onCull))
+        add(ToolItem(Icons.Outlined.FolderOpen, "Pastas", onClick = onFolders))
         if (settings.sessionSummary && hasSessionPhotos) add(ToolItem(Icons.Outlined.Summarize, "Finalizar", onClick = onSummary))
     }
+    // The last photo that arrived, one tap from each thing done to it between shots.
+    val latest = buildList {
+        add(ToolItem(Icons.Outlined.Tune, "Editar", enabled = hasLatest, onClick = onEditLatest))
+        add(ToolItem(Icons.Outlined.Crop, "Recortar", enabled = hasLatest, onClick = onCropLatest))
+        add(ToolItem(Icons.AutoMirrored.Outlined.Send, "WhatsApp", enabled = hasLatest, onClick = onWhatsAppLatest))
+        add(ToolItem(Icons.Outlined.PhotoLibrary, "Lightroom", enabled = hasLatest, mark = @Composable { com.example.ui.photos.LightroomMark() }, onClick = onLightroomLatest))
+        if (settings.notesEnabled) add(ToolItem(Icons.Outlined.EditNote, "Nota", enabled = hasLatest, onClick = onNoteLatest))
+        onDeliverLatest?.let { add(ToolItem(Icons.Outlined.WifiTethering, "Entregar", enabled = hasLatest, onClick = it)) }
+        onExpressLatest?.let { add(ToolItem(Icons.Outlined.Collections, "Express", enabled = hasLatest, onClick = it)) }
+    }
+    val looks = buildList {
+        onShop?.let { add(ToolItem(Icons.Outlined.Storefront, "Loja", onClick = it)) }
+        add(ToolItem(Icons.Outlined.Style, "Presets", onClick = onPresetsTab))
+    }
     val extras = buildList {
+        onDelivery?.let { add(ToolItem(Icons.Outlined.WifiTethering, "Entrega", deliveryState, onClick = it)) }
+        onExpress?.let { add(ToolItem(Icons.Outlined.Collections, "Express", expressState, onClick = it)) }
         if (settings.clientModeEnabled) add(ToolItem(Icons.Outlined.Slideshow, "Modo cliente", onClick = onClient))
         if (settings.toolsEnabled) add(ToolItem(Icons.Outlined.Calculate, "Flash e foco", onClick = onTools))
         add(ToolItem(Icons.Outlined.Bedtime, if (settings.nightMode) "Modo normal" else "Modo noite", onClick = onNight))
+        add(ToolItem(Icons.AutoMirrored.Outlined.Chat, "Mensagens", onClick = onMessages))
+        add(ToolItem(Icons.Outlined.BugReport, "Log", onClick = onLog))
     }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         ToolGroup(Icons.Outlined.CameraAlt, "Câmera", camera)
+        ToolGroup(Icons.Outlined.Image, latestName?.let { "Última foto · $it" } ?: "Última foto", latest)
         ToolGroup(Icons.Outlined.Folder, "Sessão", session)
+        ToolGroup(Icons.Outlined.Style, "Presets", looks)
         ToolGroup(Icons.Outlined.Person, "Cliente e extras", extras)
     }
 }
@@ -172,7 +237,7 @@ private fun ToolGroup(icon: ImageVector, title: String, items: List<ToolItem>) {
         Row(Modifier.padding(start = 6.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, contentDescription = null, tint = Tone.Accent, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(6.dp))
-            Text(title.uppercase(), style = MaterialTheme.typography.labelSmall, color = Tone.TextMuted)
+            Text(title, style = MaterialTheme.typography.labelMedium, color = Tone.TextMuted)
         }
         // Four per row, always the same width, so the grid lines up from group to group.
         items.chunked(4).forEach { row ->
@@ -188,14 +253,17 @@ private fun ToolGroup(icon: ImageVector, title: String, items: List<ToolItem>) {
 private fun ToolTile(item: ToolItem, modifier: Modifier) {
     val alpha = if (item.enabled) 1f else 0.38f
     Column(
-        modifier.clip(MaterialTheme.shapes.small).clickable(enabled = item.enabled, onClick = item.onClick).padding(vertical = 6.dp, horizontal = 2.dp),
+        modifier.then(if (item.enabled) Modifier.pressScale() else Modifier).clip(MaterialTheme.shapes.small)
+            .clickable(enabled = item.enabled, onClick = item.onClick).padding(vertical = 6.dp, horizontal = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
             Modifier.size(48.dp).clip(MaterialTheme.shapes.medium).background(Tone.SurfaceHigh),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(item.icon, contentDescription = null, tint = Tone.Text.copy(alpha = alpha), modifier = Modifier.size(24.dp))
+            val mark = item.mark
+            if (mark != null) Box(Modifier.graphicsLayer { this.alpha = alpha }) { mark() }
+            else Icon(item.icon, contentDescription = null, tint = Tone.Text.copy(alpha = alpha), modifier = Modifier.size(24.dp))
         }
         Spacer(Modifier.height(6.dp))
         Text(
