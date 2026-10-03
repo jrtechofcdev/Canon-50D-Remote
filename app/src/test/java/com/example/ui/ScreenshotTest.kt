@@ -564,6 +564,154 @@ class ScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun sessionLandscape() {
+        seedPhotos()
+        val actions = PhotoActions(app, app.store, app.export)
+        rule.setContent { JrLinkTheme { SessionScreen(app, actions, {}, {}, {}, {}) } }
+        save("sessao_deitado", androidx.compose.ui.test.hasText("Finalizar sessão"))
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun photosLandscape() {
+        seedPhotos()
+        rule.setContent { JrLinkTheme { PhotosScreen(app, PhotoActions(app, app.store, app.export), onOpenPhoto = {}) } }
+        rule.mainClock.advanceTimeBy(1_000)
+        save("fotos_deitado", androidx.compose.ui.test.hasText("RAW+JPG"))
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun viewerLandscape() {
+        seedPhotos()
+        val actions = PhotoActions(app, app.store, app.export)
+        val id = runBlocking { app.database.photoDao().inSession("Geral").last().id }
+        rule.setContent { JrLinkTheme { ViewerScreen(app, actions, id, onBack = {}, onCalibrate = {}) } }
+        rule.mainClock.advanceTimeBy(1_000)
+        save("visualizador_deitado")
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun settingsLandscape() {
+        rule.setContent { JrLinkTheme { SettingsScreen(onOpen = {}) } }
+        save("ajustes_deitado")
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun editorLightLandscape() {
+        val id = seedLooks()
+        editor(com.example.ui.preset.EditTarget.PhotoTarget(id), null, "editor_luz")
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun toolsLandscape() {
+        rule.setContent { JrLinkTheme { com.example.ui.tools.ToolsScreen(onBack = {}) } }
+        save("ferramentas_deitado", androidx.compose.ui.test.hasText("Flash direto"))
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun cullLandscape() {
+        seedPhotos()
+        runBlocking {
+            val dao = app.database.photoDao()
+            val list = dao.inSession("Geral")
+            list.forEachIndexed { i, p ->
+                dao.setAnalysis(p.id, 80f - i * 9, i == 4, 2, if (i == 2) 1 else 0, 88f - i * 8, 0L)
+                dao.setBurst(p.id, if (i < 2) list.first().id else null, i == 0)
+            }
+        }
+        rule.setContent { JrLinkTheme { com.example.ui.cull.CullScreen(app, onBack = {}, onOpenPhoto = {}) } }
+        save("selecao_rapida_deitado", androidx.compose.ui.test.hasText("Sugerida"))
+        // Finger held part-way down: the card follows it and the "MARCAR" stamp locks in.
+        rule.onNode(androidx.compose.ui.test.hasContentDescription("IMG_1040")).performTouchInput {
+            down(center)
+            repeat(10) { moveBy(androidx.compose.ui.geometry.Offset(0f, 40f)) }
+        }
+        rule.mainClock.advanceTimeBy(100)
+        rule.waitForIdle()
+        val view = rule.activity.window.decorView
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bitmap))
+        File("build/screens/culling_arrastando.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun cropLandscape() {
+        seedPhotos()
+        val id = runBlocking {
+            val p = app.database.photoDao().inSession("Geral").last()
+            val spec = com.example.core.render.CropRatio.IG_PORTRAIT.centred(900f, 600f).copy(angle = -4f)
+            app.database.photoDao().setCrop(listOf(p.id), com.example.core.render.CropGeometry.fitAfterRotation(spec, 900f, 600f).encode())
+            p.id
+        }
+        rule.setContent { JrLinkTheme { com.example.ui.crop.CropScreen(app, id, onDone = {}) } }
+        save("recorte_deitado", androidx.compose.ui.test.hasText("Instagram retrato"))
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun shopLandscape() {
+        seedShop()
+        rule.setContent { JrLinkTheme { com.example.ui.shop.ShopScreen(app, onOpen = {}) } }
+        save("loja_deitado", androidx.compose.ui.test.hasText("Moody 690"))
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun deliveryLandscape() {
+        seedDelivery()
+        app.delivery.showStatusForPreview(running())
+        val actions = com.example.ui.PhotoActions(rule.activity, app.store, app.export, app.looks)
+        rule.setContent { JrLinkTheme { com.example.ui.delivery.DeliveryScreen(app, actions, onBack = {}, onSettings = {}) } }
+        save("entrega_deitado", androidx.compose.ui.test.hasText("Bia Martins"))
+        app.delivery.showStatusForPreview(com.example.core.delivery.DeliveryStatus.Off)
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
+    fun expressLandscape() {
+        seedPhotos()
+        runBlocking {
+            app.settings.set(com.example.core.data.SettingKeys.expressEnabled, true)
+            app.settings.set(com.example.core.data.SettingKeys.deliveryPassword, "jrfotos2026")
+            val session = app.express.expressSession()
+            val dao = app.database.deliveryDao()
+            val photos = app.database.photoDao().inSession("Geral").take(6)
+            // The tiles show the prepared file: the gallery photos stand in for it.
+            photos.forEachIndexed { i, p ->
+                val id = dao.insertItem(com.example.core.delivery.DeliveryItem(sessionId = session.id, photoId = p.id, name = "${p.savedBase}.jpg", queuedAt = i.toLong(), picked = i == 1 || i == 4))
+                val path = android.net.Uri.parse(p.displayUri).path
+                dao.setState(id, com.example.core.delivery.DeliveryState.READY, path, 2_000_000L, null, 1)
+                if (i < 2) dao.setReleased(listOf(id), true)
+            }
+        }
+        app.express.showStatusForPreview(running().copy(port = 8090, ssid = "DIRECT-JR-Express"))
+        rule.setContent { JrLinkTheme { com.example.ui.delivery.ExpressScreen(app, onBack = null, onSettings = {}) } }
+        save("express_deitado", androidx.compose.ui.test.hasText("Liberar todas"))
+        app.express.showStatusForPreview(com.example.core.delivery.DeliveryStatus.Off)
+    }
+
+
+    @Test
+    fun settingsPayments() {
+        runBlocking {
+            app.settings.set(com.example.core.data.SettingKeys.pixKey, "jr.tech.ofc@gmail.com")
+            app.settings.set(com.example.core.data.SettingKeys.pixName, "Jose Renato")
+            app.settings.set(com.example.core.data.SettingKeys.expressPriceCents, 1500)
+            app.settings.set(com.example.core.data.SettingKeys.payPackPhotos, 5)
+            app.settings.set(com.example.core.data.SettingKeys.payPackCents, 6000)
+        }
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Payments, onBack = {}) } }
+        save("ajustes_pagamentos", androidx.compose.ui.test.hasText("Chave Pix"))
+    }
+
+    @Test
     fun liveView() = live("live_view")
 
     @Test
