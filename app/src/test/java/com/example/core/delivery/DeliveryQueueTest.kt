@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.core.data.Photo
 import com.example.core.data.PhotoDatabase
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -25,7 +26,7 @@ class DeliveryQueueTest {
     private lateinit var db: PhotoDatabase
     private lateinit var root: File
     private var fail = false
-    private val prepared = mutableListOf<Long>()
+    private val prepared = java.util.Collections.synchronizedList(mutableListOf<Long>())
 
     @Before
     fun setUp() {
@@ -92,6 +93,20 @@ class DeliveryQueueTest {
         assertEquals(DeliveryState.WAITING, db.deliveryDao().items(ana).single().state)
         q.processNext()
         assertEquals(3, prepared.size)
+    }
+
+    @Test
+    fun twoWorkersNeverPrepareTheSamePhoto() = runBlocking {
+        val q = queue()
+        val ana = client("ana")
+        q.enqueue(ana, (1..8).map { photo(it) })
+        val workers = (1..2).map {
+            kotlinx.coroutines.GlobalScope.async(kotlinx.coroutines.Dispatchers.IO) { while (q.processNext()) Unit }
+        }
+        workers.forEach { it.await() }
+        assertEquals(8, prepared.size)
+        assertEquals(8, prepared.toSet().size)
+        assertTrue(db.deliveryDao().items(ana).all { it.state == DeliveryState.READY })
     }
 
     @Test

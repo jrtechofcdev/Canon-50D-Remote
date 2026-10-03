@@ -136,7 +136,7 @@ class Looks(
      * The photo as it should leave the phone (look applied), as a JPG in the cache, long edge [maxEdge]
      * (0 = full size). Null when the photo has no look: then the file itself is sent.
      */
-    suspend fun exportFile(photo: Photo, maxEdge: Int): java.io.File? {
+    suspend fun exportFile(photo: Photo, maxEdge: Int, tag: String? = null): java.io.File? {
         val s = settingsFor(photo)
         val crop = cropOf(photo)
         if (s == null && crop == null) return null
@@ -144,7 +144,8 @@ class Looks(
         val rendered = withContext(Dispatchers.IO) { finished(source, s, crop, maxEdge) } ?: return null
         return withContext(Dispatchers.IO) {
             val dir = java.io.File(context.cacheDir, "export").apply { mkdirs() }
-            val out = java.io.File(dir, "${photo.savedBase}_look.jpg")
+            // [tag] keeps two copies made at the same time (two clients, two tools) apart.
+            val out = java.io.File(dir, "${photo.savedBase}_look${tag?.let { "_$it" } ?: ""}.jpg")
             out.outputStream().use { rendered.compress(Bitmap.CompressFormat.JPEG, 95, it) }
             rendered.recycle()
             ExifCopy.apply(context, out, source, null, null)

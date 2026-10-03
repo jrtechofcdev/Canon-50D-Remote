@@ -176,5 +176,5 @@
   };
 
   join();
-  setInterval(refresh, 3000);
+  setInterval(refresh, 2000);
 })();

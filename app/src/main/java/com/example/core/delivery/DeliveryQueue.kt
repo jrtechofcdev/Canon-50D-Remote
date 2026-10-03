@@ -8,6 +8,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 
 /** Makes the file a client receives for one photo. Returns false (or throws) when it could not. */
@@ -30,8 +31,9 @@ class DeliveryQueue(
     private val express: Boolean = false,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
-    private val wake = Channel<Unit>(Channel.CONFLATED)
-    private var job: Job? = null
+    private val wake = Channel<Unit>(Channel.UNLIMITED)
+    private val claim = kotlinx.coroutines.sync.Mutex()
+    private val jobs = mutableListOf<Job>()
 
     /** Adds [photoIds] to a client's queue; the ones already there are skipped. Returns how many were added. */
     suspend fun enqueue(sessionId: Long, photoIds: List<Long>): Int {
@@ -48,7 +50,7 @@ class DeliveryQueue(
         }
         if (added > 0) {
             AppLog.i("ENTREGA", "$added foto(s) na fila de ${session.client}")
-            wake.trySend(Unit)
+            repeat(minOf(added, WORKERS)) { wake.trySend(Unit) }
         }
         return added
     }
@@ -60,33 +62,41 @@ class DeliveryQueue(
             dao.retry(it.id)
             any = true
         }
-        if (any) wake.trySend(Unit)
+        if (any) repeat(WORKERS) { wake.trySend(Unit) }
     }
 
     fun poke() {
-        wake.trySend(Unit)
+        repeat(WORKERS) { wake.trySend(Unit) }
     }
 
-    /** Runs the queue in [scope] until it is cancelled. */
+    /**
+     * Runs the queue in [scope] until it is cancelled: [WORKERS] photos are prepared at the same time
+     * (a render waits on the GPU while the next one decodes), still in the order they were sent.
+     */
     fun start(scope: CoroutineScope) {
-        if (job?.isActive == true) return
-        job = scope.launch {
-            dao.resetPreparing(express)
-            while (isActive) {
-                if (!processNext()) wake.receive()
+        if (jobs.any { it.isActive }) return
+        jobs.clear()
+        jobs += scope.launch { dao.resetPreparing(express); poke() }
+        repeat(WORKERS) {
+            jobs += scope.launch {
+                while (isActive) {
+                    if (!processNext()) wake.receive()
+                }
             }
         }
     }
 
     fun stop() {
-        job?.cancel()
-        job = null
+        jobs.forEach { it.cancel() }
+        jobs.clear()
     }
 
     /** Prepares the oldest waiting item. False when there was nothing to do. */
     suspend fun processNext(): Boolean {
-        val item = dao.nextWaiting(express) ?: return false
-        dao.setState(item.id, DeliveryState.PREPARING, null, 0, null, null)
+        // Taking an item is one step, so two workers never prepare the same photo.
+        val item = claim.withLock {
+            dao.nextWaiting(express)?.also { dao.setState(it.id, DeliveryState.PREPARING, null, 0, null, null) }
+        } ?: return false
         val session = dao.session(item.sessionId)
         val photo = photos.get(item.photoId)
         if (session == null || photo == null) {
@@ -95,18 +105,23 @@ class DeliveryQueue(
         }
         val dir = File(root, session.token).apply { mkdirs() }
         val target = File(dir, "${item.id}.jpg")
+        // Old grid pictures go before the new file is made (the preparer may warm new ones).
+        File(dir, "${item.id}.thumb.jpg").delete()
+        File(dir, "${item.id}.pthumb.jpg").delete()
         val ok = runCatching { preparer.prepare(photo, session, target) }
             .onFailure { AppLog.w("ENTREGA", "Não deu para preparar ${item.name}", it) }
             .getOrDefault(false)
         if (ok && target.exists() && target.length() > 0) {
-            File(dir, "${item.id}.thumb.jpg").delete()
-            File(dir, "${item.id}.pthumb.jpg").delete()
             dao.setState(item.id, DeliveryState.READY, target.path, target.length(), null, clock())
         } else {
             target.delete()
             dao.setState(item.id, DeliveryState.ERROR, null, 0, "Não deu para preparar a foto", null)
         }
         return true
+    }
+
+    private companion object {
+        const val WORKERS = 2
     }
 
     /** Deletes every prepared file (the history stays; items go back to waiting). */

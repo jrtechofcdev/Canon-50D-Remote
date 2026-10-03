@@ -390,12 +390,23 @@ class LocalDelivery(
             input?.use { i -> target.outputStream().use { i.copyTo(it) } } ?: return@withContext false
         } else {
             val edge = if (c.size == "edited") 0 else s.lightShareSize.takeIf { it > 0 } ?: 2048
-            val looked = looks.exportFile(photo, edge)
-            val from = looked?.let { Uri.fromFile(it).toString() } ?: source
-            val made = export.exportLight(from, "${mode.dir}_${photo.id}", s.copy(lightShareSize = edge, watermarkEnabled = c.watermark), photo.lat, photo.lon)
-            looked?.delete()
-            made ?: return@withContext false
-            if (!made.renameTo(target)) {
+            val looked = looks.exportFile(photo, edge, tag = "${mode.dir}${target.nameWithoutExtension}")
+            // Encoded once: without a watermark the rendered look (or the camera JPG at full size) is the file.
+            val made = when {
+                !c.watermark && looked != null -> looked
+                !c.watermark && c.size == "edited" && photo.jpgUri != null -> {
+                    val uri = Uri.parse(photo.jpgUri)
+                    val input = if (uri.scheme == "file") File(uri.path!!).inputStream() else context.contentResolver.openInputStream(uri)
+                    input?.use { i -> target.outputStream().use { i.copyTo(it) } }
+                    if (target.length() > 0) target else null
+                }
+                else -> {
+                    val from = looked?.let { Uri.fromFile(it).toString() } ?: source
+                    export.exportLight(from, "${mode.dir}_${target.nameWithoutExtension}", s.copy(lightShareSize = edge, watermarkEnabled = c.watermark), photo.lat, photo.lon)
+                        .also { looked?.delete() }
+                }
+            } ?: return@withContext false
+            if (made != target && !made.renameTo(target)) {
                 made.copyTo(target, overwrite = true)
                 made.delete()
             }
@@ -404,6 +415,8 @@ class LocalDelivery(
             target.delete()
             return@withContext false
         }
+        // The page's grid is ready before the client asks for it.
+        warmThumbs(target, session.express)
         c.folder?.let { folder ->
             runCatching { MirrorCopy(context).copy(Uri.fromFile(target).toString(), folder, listOf(session.client), DeliveryRules.itemName(session.client, photo.savedBase)) }
                 .onFailure { AppLog.w(tag, "Cópia na pasta de entregas falhou", it) }
@@ -437,6 +450,15 @@ class LocalDelivery(
         out.outputStream().use { marked.compress(Bitmap.CompressFormat.JPEG, 80, it) }
         marked.recycle()
         return out.length() > 0
+    }
+
+    private fun warmThumbs(target: File, express: Boolean) {
+        val id = target.nameWithoutExtension.toLongOrNull() ?: return
+        val item = DeliveryItem(id = id, sessionId = 0, photoId = 0, name = "", queuedAt = 0, path = target.path)
+        runCatching {
+            thumbFor(item, locked = false)
+            if (express) thumbFor(item, locked = true)
+        }
     }
 
     /** A small JPG for the page's grid, made once next to the file (from the marked preview when [locked]). */

@@ -44,7 +44,7 @@
   function showGallery() {
     $("login").hidden = true; $("gallery").hidden = false; $("leave").hidden = false;
     $("iosHint").hidden = !ios;
-    refresh(); stop(); timer = setInterval(refresh, 3000);
+    refresh(); stop(); timer = setInterval(refresh, 2000);
   }
 
   function stop() { if (timer) clearInterval(timer); timer = null; }
