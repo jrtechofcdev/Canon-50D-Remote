@@ -186,15 +186,17 @@ fun ViewerScreen(
 
     // One tap hides everything but the photo; another brings it back.
     var chrome by remember { mutableStateOf(true) }
-    // A vertical photo gets a standing screen, a horizontal one a lying screen (Ajustes → Tela).
-    com.example.ui.components.FollowPhotoOrientation(app, viewing, settings.rotateWithPhoto, settings.screenOrientation)
+    // The screen stays in its position; only the photo turns with the way the phone is held (Ajustes → Tela).
+    val phoneTurn = com.example.ui.components.rememberPhoneTurn(settings.photoFollowsPhone && settings.screenOrientation != "auto")
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
         val landscape = maxWidth > maxHeight
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { pagerKey(currentList, it) }) { page ->
             val photo = currentList.getOrNull(page) ?: return@HorizontalPager
             val mask = if (showClipping && photo.id == viewing?.id && photo.crop == null) analysis?.clippedMask else null
-            PhotoPage(app, photo, presets, mask, onTap = { chrome = !chrome }) { zoomed[photo.id] = it }
+            com.example.ui.components.PhoneTurned(phoneTurn) {
+                PhotoPage(app, photo, presets, mask, onTap = { chrome = !chrome }) { zoomed[photo.id] = it }
+            }
         }
 
         val current = list.getOrNull(pager.currentPage) ?: return@BoxWithConstraints

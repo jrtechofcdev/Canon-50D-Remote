@@ -193,7 +193,8 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
             }
         }
         // Vertical photos fill a standing screen, horizontal ones a lying screen.
-        com.example.ui.components.FollowPhotoOrientation(app, current, settings.rotateWithPhoto, settings.screenOrientation)
+        // The screen keeps its position; the photo turns with how the client holds the phone.
+        val phoneTurn = com.example.ui.components.rememberPhoneTurn(settings.photoFollowsPhone && settings.screenOrientation != "auto")
 
         val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
             android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -258,7 +259,7 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
                     Text("As fotos aparecem aqui assim que forem feitas.", color = Muted)
                 }
             } else {
-                ClientPager(app, pager, photos, presets, settings, onTap = { if (!chrome) chrome = true })
+                ClientPager(app, pager, photos, presets, settings, turn = phoneTurn, onTap = { if (!chrome) chrome = true })
                 if (settings.clientWatermark) ClientWatermark(app, settings)
             }
         }
@@ -412,6 +413,7 @@ private fun ClientPager(
     entries: List<Photo>,
     presets: List<Preset>,
     settings: Settings,
+    turn: Int = 0,
     onTap: () -> Unit = {},
 ) {
     // While the client looks closely at a photo, nothing moves it away.
@@ -440,8 +442,10 @@ private fun ClientPager(
         modifier = Modifier.fillMaxSize(),
     ) { page ->
         val photo = latest.getOrNull(page) ?: return@HorizontalPager
-        Zoomable(key = photo.id, onZoomChanged = { zoomed = it }, onTap = { _, _ -> onTap() }) {
-            LookImage(app, photo, presets, Modifier.fillMaxSize())
+        com.example.ui.components.PhoneTurned(turn) {
+            Zoomable(key = photo.id, onZoomChanged = { zoomed = it }, onTap = { _, _ -> onTap() }) {
+                LookImage(app, photo, presets, Modifier.fillMaxSize())
+            }
         }
     }
 }

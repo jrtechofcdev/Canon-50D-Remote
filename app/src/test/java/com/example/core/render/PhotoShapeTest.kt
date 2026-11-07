@@ -40,12 +40,7 @@ class PhotoShapeTest {
     }
 
     @Test
-    fun screenFollowsThePhotoOnTheChosenSide() {
-        assertEquals(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, ScreenTurn.forPhoto(ScreenTurn.Left, portrait = true))
-        assertEquals(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE, ScreenTurn.forPhoto(ScreenTurn.Portrait, portrait = false))
-        assertEquals(ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE, ScreenTurn.forPhoto(ScreenTurn.Right, portrait = false))
-        assertEquals(ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT, ScreenTurn.forPhoto(ScreenTurn.UpsideDown, portrait = true))
-        assertNull(ScreenTurn.forPhoto(ScreenTurn.Auto, portrait = true))
+    fun anUnknownScreenPositionIsStanding() {
         assertEquals(ScreenTurn.Portrait, ScreenTurn.of("desconhecido"))
     }
 }

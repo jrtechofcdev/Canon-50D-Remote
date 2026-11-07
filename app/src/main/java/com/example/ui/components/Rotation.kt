@@ -87,51 +87,7 @@ enum class ScreenTurn(val id: String, val label: String, val orientation: Int, v
 
     companion object {
         fun of(id: String) = entries.firstOrNull { it.id == id } ?: Portrait
-
-        /**
-         * The fixed position for a photo's shape, keeping the side the photographer chose: a vertical
-         * photo stands up (upside down if that was the choice), a horizontal one lies on the chosen side.
-         * Null in Auto: then the phone itself decides.
-         */
-        fun forPhoto(base: ScreenTurn, portrait: Boolean): Int? = when {
-            base == Auto -> null
-            portrait -> if (base == UpsideDown) ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            else -> if (base == Right) ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        }
     }
-}
-
-/**
- * A position asked by the screen on show (the viewer or client mode turning with the photo),
- * above the one chosen in the menu. Null: the menu's choice applies.
- */
-object ScreenOverride {
-    val orientation = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
-
-    /** Counts the picks made on the dial: a pick while a photo is shown wins over turning with it. */
-    val picks = kotlinx.coroutines.flow.MutableStateFlow(0)
-}
-
-/**
- * While on screen, turns the phone's screen to match [photo]: a vertical photo fills a standing screen,
- * a horizontal one a lying screen. Off (or in Auto) it leaves the menu's choice alone.
- */
-@Composable
-fun FollowPhotoOrientation(app: TetherApp, photo: com.example.core.data.Photo?, enabled: Boolean, base: String) {
-    // A turn chosen on the dial holds until the next photo; the photo's own shape decides again after that.
-    val picks by ScreenOverride.picks.collectAsState()
-    val picksAtPhoto = remember(photo?.id) { ScreenOverride.picks.value }
-    androidx.compose.runtime.LaunchedEffect(photo?.id, photo?.crop, photo?.displayUri, enabled, base, picks) {
-        if (!enabled || photo == null || picks != picksAtPhoto) {
-            ScreenOverride.orientation.value = null
-            return@LaunchedEffect
-        }
-        val portrait = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            com.example.core.render.PhotoShape.isPortrait(app, photo)
-        } ?: return@LaunchedEffect
-        ScreenOverride.orientation.value = ScreenTurn.forPhoto(ScreenTurn.of(base), portrait)
-    }
-    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { ScreenOverride.orientation.value = null } }
 }
 
 /**
@@ -152,7 +108,6 @@ fun RotateButton(app: TetherApp, current: String, tint: Color = Tone.Text, modif
     }
     if (open) {
         RotationMenu(turn, onPick = {
-            ScreenOverride.picks.value += 1
             scope.launch { app.settings.set(SettingKeys.screenOrientation, it.id) }
         }, onDismiss = { open = false })
     }

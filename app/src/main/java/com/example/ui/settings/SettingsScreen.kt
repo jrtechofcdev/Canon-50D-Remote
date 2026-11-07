@@ -1082,11 +1082,11 @@ private fun DisplaySettings(app: TetherApp, s: Settings) {
         ) { scope.launch { app.settings.set(SettingKeys.screenOrientation, it) } }
         ToggleRow(
             Icons.Outlined.ScreenRotation,
-            "Girar com a foto",
-            "No visualizador e no modo cliente: foto em pé deixa a tela em pé, foto deitada deixa a tela deitada, sempre em tela cheia",
-            s.rotateWithPhoto,
-        ) { scope.launch { app.settings.set(SettingKeys.rotateWithPhoto, it) } }
-        InfoText("Automático segue o sensor do celular mesmo com a rotação do Android travada. Nas posições fixas a tela não gira sozinha. O botão de girar fica na Sessão, no visualizador, no modo cliente e no live view.")
+            "Foto acompanha o celular",
+            "No visualizador e no modo cliente, a tela fica onde está e só a foto gira quando você deita o celular. Uma foto deitada ocupa a tela inteira sem mexer nos botões.",
+            s.photoFollowsPhone,
+        ) { scope.launch { app.settings.set(SettingKeys.photoFollowsPhone, it) } }
+        InfoText("Automático segue o sensor do celular mesmo com a rotação do Android travada. Nas posições fixas a tela não gira sozinha, nem quando a foto é deitada. O botão de girar fica na Sessão, no visualizador, no modo cliente e no live view.")
     }
     SettingsGroup("Abertura", Icons.Outlined.Animation) {
         ToggleRow(

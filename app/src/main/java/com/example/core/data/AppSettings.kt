@@ -148,6 +148,11 @@ data class Settings(
     val screenOrientation: String = "portrait",
     /** In the viewer and client mode the screen turns with each photo: standing for vertical, lying for horizontal. */
     val rotateWithPhoto: Boolean = true,
+    /**
+     * In the viewer and client mode, the photo turns with the way the phone is held while the screen
+     * stays in its position: a lying photo fills a standing screen held sideways.
+     */
+    val photoFollowsPhone: Boolean = true,
     /** The brand opening when the app starts. */
     val introEnabled: Boolean = true,
     /** Live view: a tap also runs AF. Off, a tap only moves the focus point and AF waits for the AF button. */
@@ -430,6 +435,7 @@ object SettingKeys {
     val screenOrientation = stringPreferencesKey("screen_orientation")
     val rotateWithPhoto = booleanPreferencesKey("rotate_with_photo")
     val introEnabled = booleanPreferencesKey("intro_enabled")
+    val photoFollowsPhone = booleanPreferencesKey("photo_follows_phone")
     val liveTapAf = booleanPreferencesKey("live_tap_af")
     val liveSilentAf = booleanPreferencesKey("live_silent_af")
     val liveFps = intPreferencesKey("live_fps")
@@ -676,6 +682,7 @@ class SettingsRepository(private val context: Context) {
             screenOrientation = this[k.screenOrientation] ?: d.screenOrientation,
             rotateWithPhoto = this[k.rotateWithPhoto] ?: d.rotateWithPhoto,
             introEnabled = this[k.introEnabled] ?: d.introEnabled,
+            photoFollowsPhone = this[k.photoFollowsPhone] ?: d.photoFollowsPhone,
             liveTapAf = this[k.liveTapAf] ?: d.liveTapAf,
             liveSilentAf = this[k.liveSilentAf] ?: d.liveSilentAf,
             liveFps = this[k.liveFps] ?: d.liveFps,
