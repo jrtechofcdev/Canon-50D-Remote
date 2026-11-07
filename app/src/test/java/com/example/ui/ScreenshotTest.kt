@@ -27,6 +27,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import androidx.compose.ui.test.performTextInput
 
 /**
  * Renders the main screens to PNG (app/build/screens) so the layout can be reviewed without a phone.
@@ -132,6 +133,14 @@ class ScreenshotTest {
     fun settings() {
         rule.setContent { JrLinkTheme { SettingsScreen(onOpen = {}) } }
         save("ajustes")
+    }
+
+    @Test
+    fun settingsSearch() {
+        rule.setContent { JrLinkTheme { SettingsScreen(onOpen = {}) } }
+        rule.onNode(androidx.compose.ui.test.hasSetTextAction()).performTextInput("foto")
+        rule.mainClock.advanceTimeBy(500)
+        save("ajustes_busca")
     }
 
     @Test

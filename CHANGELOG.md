@@ -2,6 +2,42 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [4.7] · 2026-11-07
+
+Terceira etapa da auditoria: a interface repensada para o trabalho, em pé e deitado.
+
+- **A tela não gira mais com a foto:**
+  - antes, ao passar de uma foto em pé para uma deitada, a tela inteira virava junto;
+  - agora a tela fica sempre na posição escolhida em Ajustes → Tela;
+  - quem gira é só a foto, conforme você vira o celular: com o app fixo em pé, uma foto deitada ocupa a tela toda ao deitar o aparelho, e os botões ficam onde estavam;
+  - o ajuste "Foto acompanha o celular" (Ajustes → Tela) liga e desliga isso. No modo Automático não é preciso: a tela já acompanha o celular.
+- **Sessão redesenhada:**
+  - em pé: estado da câmera em cima, a última foto logo abaixo e uma barra fixa embaixo com intervalo, disparador e live view, ao alcance do polegar;
+  - deitada: foto à esquerda, controles no meio e o trilho de captura à direita;
+  - o botão flutuante "Iniciar captura", que cobria a exposição, saiu: o disparador da barra faz o mesmo;
+  - as ferramentas se arrumam em 3 a 6 colunas conforme a largura, com ícones maiores.
+- **Abas:**
+  - Entrega e Express só ocupam lugar na barra quando estão ligadas (desligadas, continuam nas ferramentas da Sessão);
+  - Ajustes fica sempre visível: fixo à direita na barra de baixo e embaixo no trilho lateral.
+- **Telas deitadas, lado a lado e sem nada por cima da foto:**
+  - visualizador: o painel de informações fica ao lado, e não mais sobre a metade da foto;
+  - culling: a foto ocupa a altura toda e os filtros, estrelas e botões vão para uma coluna à direita;
+  - modo cliente: ações e presets na coluna da direita; a foto ganha a altura toda;
+  - calibrar (editor): ganhou layout deitado; antes a foto sumia;
+  - recorte e loja: painéis proporcionais à tela; na loja deitada, a busca fica ao lado do título.
+- **Apagar com Desfazer:** a foto apagada sai da tela na hora e a mensagem embaixo oferece **Desfazer** por alguns segundos. Os arquivos só são removidos depois disso.
+- **Busca em Ajustes:** digite "marca", "pix" ou "relógio" e veja em que página está cada opção.
+- **Modo cliente → Fixar a tela:** usa a fixação de tela do Android, e os botões do sistema não tiram o cliente do app. Ele só sai pelo Sair (com o PIN, se houver).
+- **Fotos:** quando os filtros não deixam nenhuma foto, a galeria avisa e oferece "Mostrar todas".
+- **Botões e leitura:**
+  - botões de foco, AF, profundidade, zoom e valores do live view com 48 dp, o tamanho de um dedo;
+  - estrelas maiores no visualizador;
+  - interruptores de Ajustes funcionam com o TalkBack (a linha inteira liga e desliga);
+  - favorita, comparar e estouro dizem o estado ao leitor de tela;
+  - no modo escuro total, os textos apagados e o vermelho de erro ficaram mais legíveis;
+  - recorte: sair com alterações pede confirmação.
+- **Avisos:** uma mensagem nova substitui a que está na tela, em vez de fazer fila.
+
 ## [4.6] · 2026-11-07
 
 Segunda etapa da auditoria: a captura não para.

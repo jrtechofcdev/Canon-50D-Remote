@@ -243,7 +243,8 @@ fun SettingsScreen(onOpen: (SettingsSection) -> Unit) {
             }
             Spacer(Modifier.height(8.dp))
             found.forEach { (section, rows) ->
-                SectionRow(section, if (rows.isEmpty()) section.summary else rows.joinToString(" · ")) { onOpen(section) }
+                val shownRows = rows.take(3).joinToString(" · ") + if (rows.size > 3) " · +${rows.size - 3}" else ""
+                SectionRow(section, if (rows.isEmpty()) section.summary else shownRows) { onOpen(section) }
             }
             Spacer(Modifier.height(40.dp))
             return@SettingsPage

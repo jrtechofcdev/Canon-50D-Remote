@@ -26,7 +26,7 @@ A captura usa só a USB, sem FTP e sem internet. Na hora de entregar, o celular 
 
 <table>
   <tr>
-    <td align="center"><img src="docs/images/tela-sessao.png" width="200" alt="Tela Sessão"><br><sub><b>Sessão</b><br>última foto, exposição, disparador</sub></td>
+    <td align="center"><img src="docs/images/tela-sessao.png" width="200" alt="Tela Sessão"><br><sub><b>Sessão</b><br>última foto e disparador embaixo</sub></td>
     <td align="center"><img src="docs/images/tela-fotos.png" width="200" alt="Galeria"><br><sub><b>Fotos</b><br>RAW/JPG, favoritas, estrelas</sub></td>
     <td align="center"><img src="docs/images/tela-visualizador.png" width="200" alt="Visualizador"><br><sub><b>Visualizador</b><br>zoom, histograma, Lightroom</sub></td>
     <td align="center"><img src="docs/images/tela-marca-dagua.png" width="200" alt="Marca d'água"><br><sub><b>Envio</b><br>JPG leve e marca d'água</sub></td>
@@ -46,7 +46,7 @@ A captura usa só a USB, sem FTP e sem internet. Na hora de entregar, o celular 
   <tr>
     <td align="center"><img src="docs/images/tela-live-view.png" width="200" alt="Live view"><br><sub><b>Live view</b><br>monitor com preset ao vivo</sub></td>
     <td align="center"><img src="docs/images/tela-recorte.png" width="200" alt="Recorte"><br><sub><b>Recorte</b><br>Instagram, Stories, impressão</sub></td>
-    <td align="center"><img src="docs/images/tela-botao-captura.png" width="200" alt="Iniciar captura"><br><sub><b>Iniciar captura</b><br>em qualquer aba</sub></td>
+    <td align="center"><img src="docs/images/tela-sessao-deitada.png" width="200" alt="Sessão com o celular deitado"><br><sub><b>Deitado</b><br>foto, controles e disparador lado a lado</sub></td>
     <td align="center"><img src="docs/images/tela-perfis.png" width="200" alt="Perfis e backup"><br><sub><b>Perfis</b><br>ajustes prontos por evento</sub></td>
   </tr>
   <tr>
@@ -63,7 +63,7 @@ A captura usa só a USB, sem FTP e sem internet. Na hora de entregar, o celular 
 
 | | |
 |---|---|
-| **Captura vinculada** | Fotos feitas pelo botão da câmera ou pelo disparador do app chegam sozinhas no celular. A câmera nunca fica travada. Botão **Iniciar captura** em todas as abas. |
+| **Captura vinculada** | Fotos feitas pelo botão da câmera ou pelo disparador do app chegam sozinhas no celular. A câmera nunca fica travada. Na Sessão, o disparador fica numa barra fixa embaixo (em pé) ou num trilho à direita (deitado). |
 | **Live view** | A imagem da 50D no celular como monitor externo: preset em tempo real (igual perfil de cor), guias de enquadramento (terços, 4:5, 9:16), zebra, focus peaking, histograma, toque para focar, zoom 5×/10×, foco fino, prévia de profundidade, exposição e disparo. |
 | **Recorte** | Recorte no estilo Lightroom: proporções prontas para Instagram, Stories/Reels/Status, Facebook, YouTube e impressão (10×15 a A4), livre, endireitar (manual, Auto e traçando o horizonte), girar e espelhar. Recorte rápido em lote. |
 | **Auto-save** | Só JPG, só RAW ou RAW + JPG. Pasta própria para cada formato (inclusive cartão SD), subpasta por sessão, renomeação com o nome do cliente. |
@@ -73,7 +73,7 @@ A captura usa só a USB, sem FTP e sem internet. Na hora de entregar, o celular 
 | **Loja de presets** | Aba com os presets grátis da sua API: prévia de cada DNG, antes e depois segurando o dedo, seleção de vários, abrir no Lightroom, prévia na sua foto, **Usar** numa foto da galeria ou no editor, **Salvar** em Meus presets (funciona offline em todo o app) e **Baixar** o DNG e o XMP para a pasta `JR_LR_Presets`. |
 | **Cartão** | Navegar pelas fotos que já estão no CF e baixar só as escolhidas. Reenvio automático do que foi feito com o cabo solto. |
 | **Envio** | Lightroom com um toque, "JPG leve" com marca d'água Jr_Tech_OFC e **WhatsApp direto para o número do cliente**: digita o número e a conversa abre com a foto pronta (preset, recorte e marca d'água) já anexada. |
-| **Cliente** | Modo cliente em tela cheia com zoom (pinça e duplo toque), PIN para sair e resumo ao fim da sessão. O cliente pode receber a foto no WhatsApp dele. O cliente escolhe o preset da foto; o botão Calibrar (com PIN) abre os ajustes daquela foto. |
+| **Cliente** | Modo cliente em tela cheia com zoom (pinça e duplo toque), PIN para sair, **Fixar a tela** (os botões do Android não tiram o cliente do app) e resumo ao fim da sessão. O cliente pode receber a foto no WhatsApp dele. O cliente escolhe o preset da foto; o botão Calibrar (com PIN) abre os ajustes daquela foto. |
 | **Entrega local** | O celular cria o Wi-Fi e um portal com as fotos de cada cliente. O cliente entra pelo QR, digita o código dele e salva no próprio celular. Modo manual ou automático (cada foto nova vai para o cliente da vez), fila com estado de cada foto, favoritas pelo portal, placa para imprimir. Sem internet. |
 | **Seleção do cliente** | O cliente marca as fotos no modo cliente; a lista vai para o filtro do Lightroom ou para a pasta Escolhidas. Galeria em lote e mensagens prontas no WhatsApp. |
 | **Evento** | Momentos (Cerimônia, Festa…) com subpasta, notas de texto e voz por foto, backup da sessão para cartão SD ou pendrive. |
@@ -81,7 +81,9 @@ A captura usa só a USB, sem FTP e sem internet. Na hora de entregar, o celular 
 | **Ferramentas** | Calculadora de flash Yongnuo e de profundidade de campo, GPS nas cópias e acerto do relógio da câmera. Tudo offline. |
 | **Campo** | Vibração a cada foto, alerta se o cabo soltar, aviso de cartão e memória cheios, modo escuro total para igreja e evento noturno. |
 
-Cada função tem um liga/desliga em **Ajustes**.
+Cada função tem um liga/desliga em **Ajustes**, com busca no topo: digite "pix" ou "marca" e veja em que página está.
+
+Apagou uma foto sem querer? A mensagem embaixo oferece **Desfazer** por alguns segundos, antes de os arquivos saírem do celular.
 
 ## Instalar
 
@@ -93,7 +95,7 @@ Cada função tem um liga/desliga em **Ajustes**.
 
 1. Na câmera, deixe **Desligamento automático** em **Desativado** (menu de configuração, ícone amarelo).
 2. Ligue a 50D e conecte o cabo **USB OTG** no celular.
-3. O Android pergunta se deve abrir o **JR C50D Sync**. Se o app já estiver aberto, toque em **Iniciar captura** (botão verde no canto). Marque **Usar por padrão** para ele abrir e liberar a USB sozinho das próximas vezes.
+3. O Android pergunta se deve abrir o **JR C50D Sync**. Se o app já estiver aberto, toque em **Conectar** na Sessão. Marque **Usar por padrão** para ele abrir e liberar a USB sozinho das próximas vezes.
 4. Na primeira vez, vá em **Ajustes → Salvamento** e escolha as pastas dos JPG e dos RAW.
 5. Fotografe.
 
@@ -240,10 +242,14 @@ Live view gasta mais bateria da câmera. Com a imagem só no celular, a tela da 
 ### Posição da tela
 
 - O botão de girar (Sessão, visualizador, modo cliente e live view) abre o dial de posição: toque em **Em pé**, **Direita**, **Invertido** ou **Esquerda**, ou arraste em volta do anel, e o celular desenhado no centro gira até lá. **Automático** segue o sensor do celular, mesmo com a rotação do Android travada. Nas posições fixas a tela não gira sozinha.
-- Escolher no dial vale até a próxima foto, mesmo no visualizador com **Girar com a foto** ligado.
+- A tela nunca gira por causa da foto: uma foto deitada não vira o app.
 
 <p><img src="docs/images/dial_posicao.png" width="250" alt="Dial de posição da tela"></p>
-- **Girar com a foto** (Ajustes → Tela): no visualizador e no modo cliente, foto em pé deixa a tela em pé e foto deitada deixa a tela deitada, sempre em tela cheia.
+
+- **Foto acompanha o celular** (Ajustes → Tela, ligado por padrão): com a tela numa posição fixa, no visualizador e no modo cliente, só a foto gira quando você vira o celular. Com o app em pé, deite o celular e a foto deitada ocupa a tela toda, enquanto os botões ficam onde estavam. No **Automático** não é preciso: a tela inteira já segue o celular.
+- Com o celular deitado, cada tela põe a foto à esquerda e os controles à direita, lado a lado, sem nada por cima da foto.
+
+<p><img src="docs/images/tela-visualizador-deitado.png" width="480" alt="Visualizador com o celular deitado"></p>
 - Se a 50D salvar fotos verticais deitadas, ligue na câmera **Menu → Girar automático: Ligado**, ou use **Girar** no visualizador.
 
 ### Abertura e animações
@@ -323,7 +329,7 @@ Para publicar uma versão nova: suba o `versionName` em `app/build.gradle.kts` e
 ```
 app/src/main/java/com/example/
 ├── TetherApp.kt                   cria as peças do app (câmera, banco, configurações)
-├── MainActivity.kt                navegação: Sessão, Fotos, Culling, Presets, Ajustes + botão Iniciar captura
+├── MainActivity.kt                navegação por abas (Ajustes sempre visível), avisos com Desfazer
 ├── core/
 │   ├── ptp/                       protocolo PTP da Canon: pacotes, sessão USB, eventos, valores
 │   ├── camera/CameraManager.kt    conexão com a 50D, eventos, disparo, ISO/Av/Tv, AEB, cartão
