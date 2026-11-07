@@ -120,6 +120,7 @@ import com.example.ui.components.pressScale
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.semantics.stateDescription
 
 @Composable
 fun ViewerScreen(
@@ -191,7 +192,12 @@ fun ViewerScreen(
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
         val landscape = maxWidth > maxHeight
-        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { pagerKey(currentList, it) }) { page ->
+        // Lying down the panel sits beside the photo, never over it: 40 % of the width, at most 360 dp.
+        val panelWidth = minOf(maxWidth * 0.4f, 360.dp)
+        val photoEnd by androidx.compose.animation.core.animateDpAsState(
+            if (landscape && chrome) panelWidth else 0.dp, label = "photoEnd",
+        )
+        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize().padding(end = photoEnd), key = { pagerKey(currentList, it) }) { page ->
             val photo = currentList.getOrNull(page) ?: return@HorizontalPager
             val mask = if (showClipping && photo.id == viewing?.id && photo.crop == null) analysis?.clippedMask else null
             com.example.ui.components.PhoneTurned(phoneTurn) {
@@ -201,7 +207,10 @@ fun ViewerScreen(
 
         val current = list.getOrNull(pager.currentPage) ?: return@BoxWithConstraints
 
-        AnimatedVisibility(chrome, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopCenter)) {
+        AnimatedVisibility(
+            chrome, enter = fadeIn(), exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopStart).padding(end = if (landscape) panelWidth else 0.dp),
+        ) {
             Row(
                 Modifier.fillMaxWidth().background(Tone.Background.copy(alpha = 0.75f)).statusBarsPadding().padding(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -237,7 +246,7 @@ fun ViewerScreen(
         }
 
         val panel: @Composable (Modifier) -> Unit = { m ->
-            Column(m.background(Tone.Background.copy(alpha = 0.88f)).padding(vertical = 10.dp)) {
+            Column(m.background(if (landscape) Tone.Background else Tone.Background.copy(alpha = 0.88f)).padding(vertical = 10.dp)) {
                 // Info: badges, exposure, file and histogram.
                 Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -346,7 +355,7 @@ fun ViewerScreen(
         ) {
             if (landscape) {
                 // Lying down the panel moves to the side, so the photo keeps the full height.
-                panel(Modifier.width(360.dp).fillMaxHeight().verticalScroll(rememberScrollState()).navigationBarsPadding())
+                panel(Modifier.width(panelWidth).fillMaxHeight().verticalScroll(rememberScrollState()).statusBarsPadding().navigationBarsPadding())
             } else {
                 panel(Modifier.fillMaxWidth().navigationBarsPadding())
             }
@@ -391,7 +400,10 @@ fun RatingBar(rating: Int, onRate: (Int) -> Unit) {
         for (star in 1..5) {
             IconButton(
                 onClick = { onRate(star) },
-                modifier = Modifier.size(40.dp).semantics { contentDescription = "$star estrela(s)" },
+                modifier = Modifier.size(48.dp).semantics {
+                    contentDescription = if (star == 1) "1 estrela" else "$star estrelas"
+                    stateDescription = if (star <= rating) "marcada" else "desmarcada"
+                },
             ) {
                 Icon(
                     if (star <= rating) Icons.Filled.Star else Icons.Outlined.StarOutline,

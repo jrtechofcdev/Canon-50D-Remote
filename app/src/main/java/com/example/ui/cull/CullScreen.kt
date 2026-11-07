@@ -79,6 +79,10 @@ import com.example.ui.photos.SheetChip
 import com.example.ui.theme.Tone
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.verticalScroll
 
 enum class CullFilter(val label: String) {
     All("Todas"), Unrated("Não avaliadas"), Suggested("Sugeridas"), Blurry("Tremidas"), EyesClosed("Olhos fechados"), Rejected("Rejeitadas"),
@@ -100,6 +104,7 @@ private data class Snapshot(val favorite: Map<Long, Boolean>, val rejected: Map<
  * Fast culling of the session: swipe up rejects, swipe down keeps (favourite), 1-5 stars, compare two
  * frames side by side with a shared zoom, and accept the local analysis' suggestions in one go.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun CullScreen(app: TetherApp, onBack: (() -> Unit)?, onOpenPhoto: (Long) -> Unit) {
     val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
@@ -145,115 +150,150 @@ fun CullScreen(app: TetherApp, onBack: (() -> Unit)?, onOpenPhoto: (Long) -> Uni
 
     LaunchedEffect(Unit) { app.culler.analyzeMissing(settings.sessionKey) }
 
-    Column(Modifier.fillMaxSize().background(Color.Black)) {
-        Row(Modifier.fillMaxWidth().background(Tone.Background).statusBarsPadding().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (onBack != null) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar") }
-            } else {
-                Spacer(Modifier.width(12.dp))
-            }
-            Column(Modifier.weight(1f)) {
-                Text("Culling", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    if (photos.isEmpty()) "Nenhuma foto neste filtro"
-                    else "${pager.currentPage + 1} de ${photos.size}" + if (pending > 0) " · analisando $pending…" else "",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Tone.TextMuted,
-                )
-            }
-            IconButton(onClick = { compare = !compare }) {
-                Icon(Icons.Outlined.CompareArrows, contentDescription = "Comparar", tint = if (compare) Tone.Accent else Tone.Text)
-            }
-            Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = "Mais opções") }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = Tone.SurfaceHigh) {
-                    if (settings.cullSuggestions) DropdownMenuItem(text = { Text("Aceitar sugestões da análise") }, onClick = { menu = false; confirm = true })
-                    DropdownMenuItem(text = { Text("Analisar fotos sem nota") }, onClick = { menu = false; scope.launch { app.culler.analyzeMissing(settings.sessionKey) } })
-                    current?.let { p -> DropdownMenuItem(text = { Text("Abrir no visualizador") }, onClick = { menu = false; onOpenPhoto(p.id) }) }
+    BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
+        // Lying down the photo keeps the whole height on the left; title, filters and the marks go in a
+        // column on the right, under the thumb. Standing, they stack around the photo as before.
+        val lying = maxWidth > maxHeight
+        val sideWidth = minOf(maxWidth * 0.4f, 360.dp)
+        val header: @Composable () -> Unit = {
+            Row(Modifier.fillMaxWidth().background(Tone.Background).statusBarsPadding().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (onBack != null) {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar") }
+                } else {
+                    Spacer(Modifier.width(12.dp))
                 }
-            }
-        }
-        Row(
-            Modifier.fillMaxWidth().background(Tone.Background).horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            CullFilter.entries.forEach { f ->
-                val count = session.cullFiltered(f).size
-                SheetChip("${f.label} $count", filter == f) { filter = f }
-            }
-        }
-
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (photos.isEmpty()) {
-                Text(
-                    if (session.isEmpty()) {
-                        "Cada foto que chega é analisada aqui no celular, sem internet: tremidas, olhos fechados e a melhor de cada pose. " +
-                            "Depois é só arrastar para cima para rejeitar e para baixo para marcar."
-                    } else "Nenhuma foto neste filtro.",
-                    color = Tone.TextMuted,
-                    modifier = Modifier.align(Alignment.Center).padding(32.dp),
-                )
-            } else if (compare && current != null) {
-                val other = photos.getOrNull(pager.currentPage + 1) ?: photos.getOrNull(pager.currentPage - 1)
-                CompareView(current, other)
-            } else {
-                HorizontalPager(state = pager, key = { com.example.ui.photos.pagerKey(latestPhotos, it) }, modifier = Modifier.fillMaxSize()) { page ->
-                    val p = latestPhotos.getOrNull(page) ?: return@HorizontalPager
-                    SwipeCard(p, onUp = { swipeOut(p) }, onDown = { swipeIn(p) })
+                Column(Modifier.weight(1f)) {
+                    Text("Culling", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (photos.isEmpty()) "Nenhuma foto neste filtro"
+                        else "${pager.currentPage + 1} de ${photos.size}" + if (pending > 0) " · analisando $pending…" else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Tone.TextMuted,
+                    )
                 }
-            }
-            current?.let { Badges(it, settings, Modifier.align(Alignment.TopStart).padding(12.dp)) }
-        }
-
-        current?.let { p ->
-            Column(
-                Modifier.fillMaxWidth().background(Tone.Background)
-                    .then(if (onBack != null) Modifier.navigationBarsPadding() else Modifier)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { reject(p) }) {
-                        Icon(Icons.Outlined.Close, contentDescription = if (p.rejected) "Desfazer rejeição" else "Rejeitar", tint = if (p.rejected) Tone.Error else Tone.Text)
+                IconButton(onClick = { compare = !compare }) {
+                    Icon(Icons.Outlined.CompareArrows, contentDescription = "Comparar", tint = if (compare) Tone.Accent else Tone.Text)
+                }
+                Box {
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = "Mais opções") }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = Tone.SurfaceHigh) {
+                        if (settings.cullSuggestions) DropdownMenuItem(text = { Text("Aceitar sugestões da análise") }, onClick = { menu = false; confirm = true })
+                        DropdownMenuItem(text = { Text("Analisar fotos sem nota") }, onClick = { menu = false; scope.launch { app.culler.analyzeMissing(settings.sessionKey) } })
+                        current?.let { p -> DropdownMenuItem(text = { Text("Abrir no visualizador") }, onClick = { menu = false; onOpenPhoto(p.id) }) }
                     }
-                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        if (settings.ratingEnabled) RatingBar(p.rating) { stars ->
-                            scope.launch { dao.setRating(listOf(p.id), if (stars == p.rating) 0 else stars); next() }
+                }
+            }
+        }
+            val chips: @Composable () -> Unit = {
+                CullFilter.entries.forEach { f ->
+                    val count = session.cullFiltered(f).size
+                    SheetChip("${f.label} $count", filter == f) { filter = f }
+                }
+            }
+
+        val picture: @Composable (Modifier) -> Unit = { mod ->
+            Box(mod) {
+                if (photos.isEmpty()) {
+                    Text(
+                        if (session.isEmpty()) {
+                            "Cada foto que chega é analisada aqui no celular, sem internet: tremidas, olhos fechados e a melhor de cada pose. " +
+                                "Depois é só arrastar para cima para rejeitar e para baixo para marcar."
+                        } else "Nenhuma foto neste filtro.",
+                        color = Tone.TextMuted,
+                        modifier = Modifier.align(Alignment.Center).padding(32.dp),
+                    )
+                } else if (compare && current != null) {
+                    val other = photos.getOrNull(pager.currentPage + 1) ?: photos.getOrNull(pager.currentPage - 1)
+                    CompareView(current, other)
+                } else {
+                    HorizontalPager(state = pager, key = { com.example.ui.photos.pagerKey(latestPhotos, it) }, modifier = Modifier.fillMaxSize()) { page ->
+                        val p = latestPhotos.getOrNull(page) ?: return@HorizontalPager
+                        SwipeCard(p, onUp = { swipeOut(p) }, onDown = { swipeIn(p) })
+                    }
+                }
+                current?.let { Badges(it, settings, Modifier.align(Alignment.TopStart).padding(12.dp)) }
+            }
+
+        }
+        val marks: @Composable (Modifier) -> Unit = { mod ->
+            current?.let { p ->
+                Column(
+                    mod.background(Tone.Background)
+                        .then(if (onBack != null) Modifier.navigationBarsPadding() else Modifier)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { reject(p) }) {
+                            Icon(Icons.Outlined.Close, contentDescription = if (p.rejected) "Desfazer rejeição" else "Rejeitar", tint = if (p.rejected) Tone.Error else Tone.Text)
+                        }
+                        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            if (settings.ratingEnabled) RatingBar(p.rating) { stars ->
+                                scope.launch { dao.setRating(listOf(p.id), if (stars == p.rating) 0 else stars); next() }
+                            }
+                        }
+                        IconButton(onClick = { keep(p) }) {
+                            Icon(if (p.favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, contentDescription = "Favoritar", tint = if (p.favorite) Tone.Accent else Tone.Text)
                         }
                     }
-                    IconButton(onClick = { keep(p) }) {
-                        Icon(if (p.favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, contentDescription = "Favoritar", tint = if (p.favorite) Tone.Accent else Tone.Text)
+                    last?.let { l ->
+                        // The last choice, with undo: a swipe is quick, so a slip is easy to take back.
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("${l.before.savedBase} ${l.label}", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted, modifier = Modifier.weight(1f), maxLines = 1)
+                            TextButton(onClick = {
+                                scope.launch {
+                                    dao.setRejected(listOf(l.before.id), l.before.rejected)
+                                    dao.setFavorite(listOf(l.before.id), l.before.favorite)
+                                    last = null
+                                }
+                            }) { Text("Desfazer") }
+                        }
+                    } ?: Row(Modifier.align(Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = null, tint = Tone.Error, modifier = Modifier.size(16.dp))
+                        Text(" rejeita   ", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+                        Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, tint = Tone.Accent, modifier = Modifier.size(16.dp))
+                        Text(" marca   ·   nada é apagado", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+                    }
+                    undo?.let { snap ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Sugestões aplicadas.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                            TextButton(onClick = {
+                                scope.launch {
+                                    snap.favorite.forEach { (id, v) -> dao.setFavorite(listOf(id), v) }
+                                    snap.rejected.forEach { (id, v) -> dao.setRejected(listOf(id), v) }
+                                    undo = null
+                                }
+                            }) { Text("Desfazer") }
+                        }
                     }
                 }
-                last?.let { l ->
-                    // The last choice, with undo: a swipe is quick, so a slip is easy to take back.
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("${l.before.savedBase} ${l.label}", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted, modifier = Modifier.weight(1f), maxLines = 1)
-                        TextButton(onClick = {
-                            scope.launch {
-                                dao.setRejected(listOf(l.before.id), l.before.rejected)
-                                dao.setFavorite(listOf(l.before.id), l.before.favorite)
-                                last = null
-                            }
-                        }) { Text("Desfazer") }
-                    }
-                } ?: Row(Modifier.align(Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = null, tint = Tone.Error, modifier = Modifier.size(16.dp))
-                    Text(" rejeita   ", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
-                    Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, tint = Tone.Accent, modifier = Modifier.size(16.dp))
-                    Text(" marca   ·   nada é apagado", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+            }
+        }
+        if (lying) {
+            Row(Modifier.fillMaxSize()) {
+                picture(Modifier.weight(1f).fillMaxHeight())
+                Column(
+                    Modifier.width(sideWidth).fillMaxHeight().background(Tone.Background)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    header()
+                    FlowRow(
+                        Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) { chips() }
+                    Spacer(Modifier.height(8.dp))
+                    marks(Modifier.fillMaxWidth())
                 }
-                undo?.let { snap ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Sugestões aplicadas.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                        TextButton(onClick = {
-                            scope.launch {
-                                snap.favorite.forEach { (id, v) -> dao.setFavorite(listOf(id), v) }
-                                snap.rejected.forEach { (id, v) -> dao.setRejected(listOf(id), v) }
-                                undo = null
-                            }
-                        }) { Text("Desfazer") }
-                    }
-                }
+            }
+        } else {
+            Column(Modifier.fillMaxSize()) {
+                header()
+                Row(
+                    Modifier.fillMaxWidth().background(Tone.Background).horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) { chips() }
+                picture(Modifier.weight(1f).fillMaxWidth())
+                marks(Modifier.fillMaxWidth())
             }
         }
     }

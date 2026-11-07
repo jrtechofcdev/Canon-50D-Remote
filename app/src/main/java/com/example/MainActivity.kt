@@ -64,7 +64,6 @@ import com.example.ui.cull.CullScreen
 import com.example.ui.delivery.DeliveryScreen
 import com.example.ui.crop.CropScreen
 import com.example.ui.live.LiveViewScreen
-import com.example.ui.components.CaptureFab
 import com.example.ui.components.ScreenTurn
 import androidx.compose.material.icons.outlined.Swipe
 import androidx.compose.runtime.mutableStateOf
@@ -82,7 +81,6 @@ import com.example.ui.theme.Tone
 import com.example.ui.theme.JrLinkTheme
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.unit.dp
@@ -100,6 +98,9 @@ import androidx.compose.material.icons.outlined.WifiTethering
 import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.offset
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.layout.heightIn
 
 class MainActivity : ComponentActivity() {
 
@@ -167,8 +168,15 @@ class MainActivity : ComponentActivity() {
                 var gallerySelecting by remember { mutableStateOf(false) }
                 val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
                 // Tabs can be hidden in Ajustes → Tela (Sessão and Ajustes always stay); the Loja also in Ajustes → Presets.
+                // Entrega and Express only take a place in the bar while they are switched on; off, they still
+                // open from the Session's tools to be switched on.
                 val hidden = settings.hiddenTabs.split(',').map { it.trim() }.toSet()
-                val tabs = Tab.entries.filter { (it != Tab.Shop || settings.shopEnabled) && (!it.hideable || it.route !in hidden) }
+                val tabs = Tab.entries.filter {
+                    (it != Tab.Shop || settings.shopEnabled) &&
+                        (it != Tab.Delivery || settings.deliveryEnabled) &&
+                        (it != Tab.Express || settings.expressEnabled) &&
+                        (!it.hideable || it.route !in hidden)
+                }
                 val onTab = tabs.any { it.route == route }
                 val goTo = { tab: Tab -> goToTab(nav, tab) }
                 // Entrega and Express open as their tab, or as a page when that tab is hidden.
@@ -187,20 +195,6 @@ class MainActivity : ComponentActivity() {
                         restoreState = true
                     }
                 }
-                // Only on the Session, and only while the camera is not capturing yet. Scrolling the screen up
-                // hides it (it covered the tools at the bottom); scrolling back down brings it back.
-                var fabShown by remember { mutableStateOf(true) }
-                LaunchedEffect(route) { fabShown = true }
-                val showFab = route == Tab.Session.route && cameraState !is ConnectionState.Connected
-                val fabScroll = remember {
-                    object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
-                        override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
-                            if (available.y < -6f) fabShown = false else if (available.y > 6f) fabShown = true
-                            return androidx.compose.ui.geometry.Offset.Zero
-                        }
-                    }
-                }
-
                 LaunchedEffect(Unit) {
                     val cullMessages = app.culler.warnings.map { w ->
                         val problems = listOfNotNull(
@@ -209,9 +203,13 @@ class MainActivity : ComponentActivity() {
                         )
                         "${w.photo.savedBase}: ${problems.joinToString(", ")}"
                     }
+                    val messages = this
                     merge(app.camera.messages, app.tether.errors, cullMessages).collect {
                         AppLog.i("AVISO", it)
-                        snackbar.showSnackbar(it)
+                        // The newest message replaces the one on screen: a burst of warnings used to queue up
+                        // and keep showing old news for minutes.
+                        snackbar.currentSnackbarData?.dismiss()
+                        messages.launch { snackbar.showSnackbar(it) }
                     }
                 }
 
@@ -219,22 +217,6 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     containerColor = Tone.Background,
                     snackbarHost = { SnackbarHost(snackbar) },
-                    floatingActionButton = {
-                        androidx.compose.animation.AnimatedVisibility(
-                            visible = showFab && fabShown,
-                            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 2 },
-                            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { it / 2 },
-                        ) {
-                            CaptureFab(
-                                state = cameraState,
-                                onStart = {
-                                    app.camera.findAndConnect()
-                                    openSession()
-                                },
-                                onOpenSession = openSession,
-                            )
-                        }
-                    },
                     bottomBar = {
                         if (!landscape && onTab) BottomTabs(tabs, route, onClick = goTo)
                     },
@@ -243,34 +225,35 @@ class MainActivity : ComponentActivity() {
                     // Lying down, the tabs move to a rail on the side so the screen keeps its height.
                     if (landscape && onTab) {
                         NavigationRail(containerColor = Tone.Surface, modifier = Modifier.fillMaxHeight()) {
-                          // Six tabs don't fit the height of a phone lying down: the rail scrolls, so Ajustes
-                          // is never cut off.
-                          androidx.compose.foundation.layout.Column(
-                              Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(vertical = 8.dp),
-                              verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp, androidx.compose.ui.Alignment.CenterVertically),
-                              horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
-                          ) {
-                            tabs.forEach { tab ->
-                                NavigationRailItem(
-                                    selected = route == tab.route,
-                                    onClick = { goTo(tab) },
-                                    icon = { TabIcon(tab, route == tab.route) },
-                                    label = { Text(tab.label) },
-                                    colors = NavigationRailItemDefaults.colors(
-                                        selectedIconColor = Tone.Accent,
-                                        selectedTextColor = Tone.Text,
-                                        indicatorColor = Tone.SurfaceHigh,
-                                        unselectedIconColor = Tone.TextMuted,
-                                        unselectedTextColor = Tone.TextMuted,
-                                    ),
-                                )
-                            }
+                          val railItem: @Composable (Tab) -> Unit = { tab ->
+                              NavigationRailItem(
+                                  selected = route == tab.route,
+                                  onClick = { goTo(tab) },
+                                  icon = { TabIcon(tab, route == tab.route) },
+                                  label = { Text(tab.label, maxLines = 1) },
+                                  colors = NavigationRailItemDefaults.colors(
+                                      selectedIconColor = Tone.Accent,
+                                      selectedTextColor = Tone.Text,
+                                      indicatorColor = Tone.SurfaceHigh,
+                                      unselectedIconColor = Tone.TextMuted,
+                                      unselectedTextColor = Tone.TextMuted,
+                                  ),
+                              )
                           }
+                          // The tools scroll when they don't fit the height of a phone lying down; Ajustes stays
+                          // pinned at the bottom, never cut off.
+                          androidx.compose.foundation.layout.Column(
+                              Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(vertical = 8.dp),
+                              verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+                              horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                          ) { tabs.filter { it != Tab.Settings }.forEach { railItem(it) } }
+                          androidx.compose.material3.HorizontalDivider(color = Tone.Line, modifier = Modifier.width(56.dp))
+                          androidx.compose.foundation.layout.Box(Modifier.padding(vertical = 8.dp)) { railItem(Tab.Settings) }
                         }
                     }
                     com.example.ui.components.Motion.tabRoutes = Tab.entries.map { it.route }.toSet()
                     NavHost(
-                        nav, startDestination = Tab.Session.route, modifier = Modifier.weight(1f).fillMaxHeight().nestedScroll(fabScroll),
+                        nav, startDestination = Tab.Session.route, modifier = Modifier.weight(1f).fillMaxHeight(),
                         enterTransition = com.example.ui.components.Motion.enter,
                         exitTransition = com.example.ui.components.Motion.exit,
                         popEnterTransition = com.example.ui.components.Motion.popEnter,
@@ -509,43 +492,52 @@ private fun BottomTabs(tabs: List<Tab>, route: String, onClick: (Tab) -> Unit) {
         }
         return
     }
+    // More than five: the tools slide sideways and Ajustes stays pinned on the right, always one tap away.
     val scroll = rememberScrollState()
+    val tools = tabs.filter { it != Tab.Settings }
     androidx.compose.foundation.layout.BoxWithConstraints(
         Modifier.fillMaxWidth().background(Tone.Surface).navigationBarsPadding(),
     ) {
-        val itemWidth = maxOf(maxWidth / tabs.size, 72.dp)
-        val selected = tabs.indexOfFirst { it.route == route }
+        val itemWidth = maxOf(maxWidth / 5, 72.dp)
+        val selected = tools.indexOfFirst { it.route == route }
         val density = androidx.compose.ui.platform.LocalDensity.current
         LaunchedEffect(selected, itemWidth) {
-            if (selected >= 0) scroll.animateScrollTo(with(density) { (itemWidth * selected - itemWidth * 2).roundToPx() }.coerceAtLeast(0))
+            if (selected >= 0) scroll.animateScrollTo(with(density) { (itemWidth * selected - itemWidth * 1.5f).roundToPx() }.coerceAtLeast(0))
         }
-        Row(Modifier.horizontalScroll(scroll)) {
-            tabs.forEach { tab ->
-                val on = route == tab.route
-                androidx.compose.foundation.layout.Column(
-                    Modifier
-                        .width(itemWidth)
-                        .height(80.dp)
-                        .clickable(role = androidx.compose.ui.semantics.Role.Tab) { onClick(tab) }
-                        .padding(top = 12.dp),
-                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
-                ) {
-                    androidx.compose.foundation.layout.Box(
-                        Modifier.size(width = 64.dp, height = 32.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-                            .background(if (on) Tone.SurfaceHigh else androidx.compose.ui.graphics.Color.Transparent),
-                        contentAlignment = androidx.compose.ui.Alignment.Center,
-                    ) { TabIcon(tab, on, tint = if (on) Tone.Accent else Tone.TextMuted) }
-                    Text(
-                        tab.label,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (on) Tone.Text else Tone.TextMuted,
-                        maxLines = 1,
-                        softWrap = false,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
+        Row(verticalAlignment = androidx.compose.ui.Alignment.Top) {
+            Row(Modifier.weight(1f).horizontalScroll(scroll)) {
+                tools.forEach { tab -> BarTab(tab, route == tab.route, itemWidth) { onClick(tab) } }
             }
+            androidx.compose.foundation.layout.Box(Modifier.padding(vertical = 14.dp).width(1.dp).height(44.dp).background(Tone.Line))
+            if (Tab.Settings in tabs) BarTab(Tab.Settings, route == Tab.Settings.route, itemWidth) { onClick(Tab.Settings) }
         }
+    }
+}
+
+/** One tab of the scrolling bar: icon in its pill, the name under it; grows with large fonts instead of clipping. */
+@Composable
+private fun BarTab(tab: Tab, on: Boolean, width: androidx.compose.ui.unit.Dp, onClick: () -> Unit) {
+    androidx.compose.foundation.layout.Column(
+        Modifier
+            .width(width)
+            .heightIn(min = 80.dp)
+            .selectable(selected = on, role = androidx.compose.ui.semantics.Role.Tab, onClick = onClick)
+            .padding(top = 12.dp, bottom = 8.dp),
+        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+    ) {
+        androidx.compose.foundation.layout.Box(
+            Modifier.size(width = 64.dp, height = 32.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                .background(if (on) Tone.SurfaceHigh else androidx.compose.ui.graphics.Color.Transparent),
+            contentAlignment = androidx.compose.ui.Alignment.Center,
+        ) { TabIcon(tab, on, tint = if (on) Tone.Accent else Tone.TextMuted) }
+        Text(
+            tab.label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (on) Tone.Text else Tone.TextMuted,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 

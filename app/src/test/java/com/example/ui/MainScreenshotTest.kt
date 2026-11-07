@@ -30,9 +30,9 @@ class MainScreenshotTest {
     }
 
     @Test
-    fun photosTabWithCaptureButton() {
+    fun photosTab() {
         rule.onNode(hasText("Fotos")).performClick()
-        save("app_fotos_fab")
+        save("app_fotos")
     }
 
     @Test

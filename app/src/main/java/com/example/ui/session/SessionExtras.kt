@@ -239,11 +239,17 @@ private fun ToolGroup(icon: ImageVector, title: String, items: List<ToolItem>) {
             Spacer(Modifier.width(6.dp))
             Text(title, style = MaterialTheme.typography.labelMedium, color = Tone.TextMuted)
         }
-        // Four per row, always the same width, so the grid lines up from group to group.
-        items.chunked(4).forEach { row ->
-            Row(Modifier.fillMaxWidth()) {
-                row.forEach { item -> ToolTile(item, Modifier.weight(1f)) }
-                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+        // As many per row as fit at about 84 dp each (3 on a narrow phone, up to 6 on a wide screen), the
+        // same in every group so the grid lines up from one group to the next.
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val columns = (maxWidth / 84.dp).toInt().coerceIn(3, 6)
+            Column {
+                items.chunked(columns).forEach { row ->
+                    Row(Modifier.fillMaxWidth()) {
+                        row.forEach { item -> ToolTile(item, Modifier.weight(1f)) }
+                        repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
             }
         }
     }
@@ -258,12 +264,12 @@ private fun ToolTile(item: ToolItem, modifier: Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
-            Modifier.size(48.dp).clip(MaterialTheme.shapes.medium).background(Tone.SurfaceHigh),
+            Modifier.size(52.dp).clip(MaterialTheme.shapes.medium).background(Tone.SurfaceHigh),
             contentAlignment = Alignment.Center,
         ) {
             val mark = item.mark
             if (mark != null) Box(Modifier.graphicsLayer { this.alpha = alpha }) { mark() }
-            else Icon(item.icon, contentDescription = null, tint = Tone.Text.copy(alpha = alpha), modifier = Modifier.size(24.dp))
+            else Icon(item.icon, contentDescription = null, tint = Tone.Text.copy(alpha = alpha), modifier = Modifier.size(26.dp))
         }
         Spacer(Modifier.height(6.dp))
         Text(
