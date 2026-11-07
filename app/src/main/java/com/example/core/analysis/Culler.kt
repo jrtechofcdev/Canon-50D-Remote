@@ -115,7 +115,7 @@ class Culler(
         val hash = CullMath.dHash(gray, w, h)
 
         dao.setAnalysis(photo.id, CullMath.rounded(decisive), blurry, found?.size, closed, CullMath.rounded(score), hash)
-        regroup(photo.session)
+        regroup(photo.session, photo.capturedAt)
 
         if (alert && ((cfg.blurAlert && blurry) || (cfg.eyesCheck && closed > 0))) {
             _warnings.tryEmit(CullWarning(photo, cfg.blurAlert && blurry, closed, found?.size ?: 0))
@@ -126,8 +126,10 @@ class Culler(
      * Groups consecutive near-identical frames of the session (same pose, a burst) and marks the best
      * of each group as suggested. Single frames are suggested when they are simply good.
      */
-    private suspend fun regroup(session: String) {
-        val frames = dao.inSession(session).filter { it.score != null }
+    private suspend fun regroup(session: String, around: Long) {
+        // Only the frames near this one: a new photo can only change the burst it belongs to. Reading the
+        // whole session for every photo made a 2 000-photo wedding slower with each frame.
+        val frames = dao.inSessionBetween(session, around - REGROUP_SPAN_MS, around + REGROUP_SPAN_MS).filter { it.score != null }
         var group = mutableListOf<Photo>()
         val groups = mutableListOf<List<Photo>>()
         for (p in frames) {
@@ -141,7 +143,9 @@ class Culler(
         }
         if (group.isNotEmpty()) groups += group
 
-        for (g in groups) {
+        // Groups at the edges of what was read may continue outside it: those are left as they were.
+        val near = groups.filter { g -> g.any { abs(it.capturedAt - around) <= REGROUP_SPAN_MS / 2 } }
+        for (g in near) {
             if (g.size == 1) {
                 val p = g.first()
                 val good = (p.score ?: 0f) >= GOOD_SCORE && !p.blurry && p.eyesClosed == 0
@@ -163,5 +167,7 @@ class Culler(
         const val GOOD_SCORE = 70f
         /** Frames of one pose usually arrive within this window (downloads add a few seconds per frame). */
         const val BURST_WINDOW_MS = 20_000L
+        /** How far around a new frame its burst is looked for (a burst lasts seconds, so this is plenty). */
+        private const val REGROUP_SPAN_MS = 10 * 60_000L
     }
 }

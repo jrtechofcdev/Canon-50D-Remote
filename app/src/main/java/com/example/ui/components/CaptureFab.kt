@@ -47,12 +47,20 @@ private fun FabFor(state: ConnectionState, onStart: () -> Unit, onOpenSession: (
             contentColor = Tone.OnAccent,
         ) { Icon(Icons.Outlined.CameraAlt, contentDescription = "Voltar para a captura") }
 
-        ConnectionState.Connecting, ConnectionState.WaitingPermission -> ExtendedFloatingActionButton(
+        ConnectionState.Connecting, ConnectionState.WaitingPermission, is ConnectionState.Reconnecting -> ExtendedFloatingActionButton(
             onClick = onOpenSession,
             containerColor = Tone.SurfaceHigh,
             contentColor = Tone.Text,
             icon = { CircularProgressIndicator(Modifier.size(20.dp), color = Tone.Info, strokeWidth = 2.dp) },
-            text = { Text(if (state == ConnectionState.WaitingPermission) "Permita a USB" else "Conectando…") },
+            text = {
+                Text(
+                    when (state) {
+                        ConnectionState.WaitingPermission -> "Permita a USB"
+                        is ConnectionState.Reconnecting -> "Reconectando…"
+                        else -> "Conectando…"
+                    },
+                )
+            },
         )
 
         else -> ExtendedFloatingActionButton(

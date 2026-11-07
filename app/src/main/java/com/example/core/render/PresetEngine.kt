@@ -29,6 +29,8 @@ class PresetEngine {
     private val dispatcher = thread.asCoroutineDispatcher()
     private var gl: GlRenderer? = null
     private var glFailed = false
+    /** GPU failures in a row; one bad photo (or a moment short of memory) doesn't switch the GPU off for good. */
+    private var glFailures = 0
     /** Modo desenvolvedor: render on the CPU only, to compare with the GPU. */
     @Volatile var forceCpu = false
 
@@ -38,12 +40,19 @@ class PresetEngine {
         if (!glFailed && !forceCpu) {
             try {
                 val renderer = gl ?: GlRenderer().also { gl = it }
-                return@withContext renderer.render(src, params)
+                return@withContext renderer.render(src, params).also { glFailures = 0 }
             } catch (t: Throwable) {
-                AppLog.e("RENDER", "Processamento pela GPU falhou; passando para a CPU (${src.width}×${src.height}) · ${AppLog.memory()}", t)
-                glFailed = true
                 runCatching { gl?.release() }
                 gl = null
+                // Out of memory is about this photo, not the GPU: the next one tries the GPU again.
+                if (t !is OutOfMemoryError) glFailures++
+                glFailed = glFailures >= GL_GIVE_UP
+                AppLog.e(
+                    "RENDER",
+                    "Processamento pela GPU falhou ($glFailures seguida(s)); esta foto vai pela CPU" +
+                        (if (glFailed) " e as próximas também" else "") + " (${src.width}×${src.height}) · ${AppLog.memory()}",
+                    t,
+                )
             }
         }
         cpu(src, params)
@@ -71,8 +80,8 @@ class PresetEngine {
     }
 
     companion object {
-        private const val TAG = "PresetEngine"
         const val CPU_MAX_EDGE = 2560
+        private const val GL_GIVE_UP = 3
     }
 }
 
@@ -120,6 +129,9 @@ private class GlRenderer {
         val tex = IntArray(3)
         GLES30.glGenTextures(3, tex, 0)
         val (srcTex, lutTex, outTex) = Triple(tex[0], tex[1], tex[2])
+        val fbo = IntArray(1)
+        // Whatever happens below, the textures, the framebuffer and the scaled copy are given back.
+        try {
 
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, srcTex)
         GLUtils.texImage2D(GLES30.GL_TEXTURE_2D, 0, input, 0)
@@ -142,7 +154,6 @@ private class GlRenderer {
 
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, outTex)
         GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA8, w, h, 0, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, null)
-        val fbo = IntArray(1)
         GLES30.glGenFramebuffers(1, fbo, 0)
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, fbo[0])
         GLES30.glFramebufferTexture2D(GLES30.GL_FRAMEBUFFER, GLES30.GL_COLOR_ATTACHMENT0, GLES30.GL_TEXTURE_2D, outTex, 0)
@@ -159,15 +170,16 @@ private class GlRenderer {
         val pixels = ByteBuffer.allocateDirect(w * h * 4).order(ByteOrder.nativeOrder())
         GLES30.glReadPixels(0, 0, w, h, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, pixels)
         val error = GLES30.glGetError()
-
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
-        GLES30.glDeleteFramebuffers(1, fbo, 0)
-        GLES30.glDeleteTextures(3, tex, 0)
-        if (input !== src) input.recycle()
         check(error == GLES30.GL_NO_ERROR) { "GL error $error" }
 
         pixels.position(0)
         return Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).apply { copyPixelsFromBuffer(pixels) }
+        } finally {
+            GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
+            if (fbo[0] != 0) GLES30.glDeleteFramebuffers(1, fbo, 0)
+            GLES30.glDeleteTextures(3, tex, 0)
+            if (input !== src) input.recycle()
+        }
     }
 
     private fun setUniforms(p: RenderParams, w: Int, h: Int, srcTex: Int, lutTex: Int) {

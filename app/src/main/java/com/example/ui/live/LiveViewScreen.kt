@@ -211,6 +211,12 @@ fun LiveViewScreen(
         val picture: @Composable (Modifier) -> Unit = { m ->
             Box(m) {
                 LivePicture(frame, settings, live, connected, focusMark, onTapPicture)
+                // Battery and card stay in sight while framing, not only in a notification that came once.
+                com.example.ui.components.CameraWarningChips(
+                    com.example.ui.components.cameraWarnings(status, settings),
+                    Modifier.align(Alignment.BottomStart).padding(8.dp),
+                    onDark = true,
+                )
                 if (controls) HistogramOverlay(frame, Modifier.align(Alignment.TopEnd).padding(8.dp).size(width = 112.dp, height = 52.dp))
                 if (!controls) {
                     // Clean monitor: a small button brings the controls back, and the shutter stays at hand.

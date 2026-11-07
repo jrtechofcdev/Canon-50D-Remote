@@ -51,6 +51,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.async
 
 sealed interface ConnectionState {
     data object NoCamera : ConnectionState
@@ -58,6 +59,19 @@ sealed interface ConnectionState {
     data object Connecting : ConnectionState
     data class Connected(val model: String, val serial: String) : ConnectionState
     data class Failed(val message: String) : ConnectionState
+
+    /**
+     * The link dropped with the cable still in (a USB hiccup, the camera's auto power off): the app is
+     * trying again on its own, [attempt] of [Reconnect.TRIES].
+     */
+    data class Reconnecting(val attempt: Int, val reason: String) : ConnectionState
+}
+
+/** How long to wait before each new try after the link drops: 1, 2, 4, 8, 16 and then 30 s. */
+object Reconnect {
+    const val TRIES = 10
+
+    fun delayMs(attempt: Int): Long = (1_000L shl (attempt - 1).coerceIn(0, 5)).coerceAtMost(30_000L)
 }
 
 /** Live view: off, starting, streaming (with measured frame rate and camera zoom), or failed with a hint. */
@@ -104,7 +118,8 @@ class CameraManager(
     private val _status = MutableStateFlow(CameraStatus())
     val status: StateFlow<CameraStatus> = _status.asStateFlow()
 
-    private val _newObjects = MutableSharedFlow<EosEventRecord.ObjectAdded>(extraBufferCapacity = 64)
+    // Room for a long burst (RAW + JPG of every frame) while the download side is busy.
+    private val _newObjects = MutableSharedFlow<EosEventRecord.ObjectAdded>(extraBufferCapacity = 1024)
     val newObjects: SharedFlow<EosEventRecord.ObjectAdded> = _newObjects.asSharedFlow()
 
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 8)
@@ -148,6 +163,9 @@ class CameraManager(
     private var deviceInfo: DeviceInfo? = null
     private var sessionJob: Job? = null
     private var intervalJob: Job? = null
+    private var retryJob: Job? = null
+    /** How each try during a reconnect ended: true = connected, false = failed. */
+    private val attemptEnded = MutableSharedFlow<Boolean>(extraBufferCapacity = 4)
 
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
@@ -161,8 +179,9 @@ class CameraManager(
                     }
                 }
                 UsbManager.ACTION_USB_DEVICE_ATTACHED -> findAndConnect()
-                UsbManager.ACTION_USB_DEVICE_DETACHED -> if (dev != null && dev.deviceName == device?.deviceName) {
+                UsbManager.ACTION_USB_DEVICE_DETACHED -> if (dev != null && (dev.deviceName == device?.deviceName || _state.value is ConnectionState.Reconnecting)) {
                     log("Cabo desconectado")
+                    retryJob?.cancel()
                     val wasConnected = _state.value is ConnectionState.Connected
                     closeSession()
                     _state.value = ConnectionState.NoCamera
@@ -184,10 +203,9 @@ class CameraManager(
     /** Looks for a Canon still-image device and connects, asking for USB permission if needed. */
     fun findAndConnect() {
         if (_state.value is ConnectionState.Connected || _state.value == ConnectionState.Connecting) return
-        val camera = usbManager.deviceList.values
-            .filter { stillImageInterface(it) != null }
-            .sortedByDescending { it.vendorId == CANON_VENDOR_ID }
-            .firstOrNull()
+        // Tapping Conectar while the app is already retrying: the tap takes over right now.
+        retryJob?.cancel()
+        val camera = attachedCamera()
         if (camera == null) {
             _state.value = ConnectionState.NoCamera
             return
@@ -203,22 +221,61 @@ class CameraManager(
         }
     }
 
-    private fun open(dev: UsbDevice) {
+    private fun attachedCamera(): UsbDevice? = usbManager.deviceList.values
+        .filter { stillImageInterface(it) != null }
+        .sortedByDescending { it.vendorId == CANON_VENDOR_ID }
+        .firstOrNull()
+
+    /**
+     * The link dropped while the cable is still in: try again on our own, waiting a little longer each
+     * time, until the camera answers, the cable comes out or [Reconnect.TRIES] are used up.
+     */
+    private fun reconnect(reason: String) {
+        retryJob?.cancel()
+        retryJob = scope.launch {
+            for (attempt in 1..Reconnect.TRIES) {
+                _state.value = ConnectionState.Reconnecting(attempt, reason)
+                kotlinx.coroutines.delay(Reconnect.delayMs(attempt))
+                val dev = attachedCamera()
+                if (dev == null) {
+                    _state.value = ConnectionState.NoCamera
+                    return@launch
+                }
+                if (!usbManager.hasPermission(dev)) break
+                log("Reconectando (tentativa $attempt de ${Reconnect.TRIES})")
+                // The session opens on its own coroutine: listen before opening, then wait for how it ended.
+                val ended = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                    withTimeoutOrNull(20_000) { attemptEnded.first() }
+                }
+                open(dev, retrying = true)
+                if (ended.await() == true) {
+                    log("Câmera reconectada")
+                    _messages.tryEmit("Câmera reconectada")
+                    return@launch
+                }
+                if (session != null) closeSession()
+                _state.value = ConnectionState.Reconnecting(attempt, reason)
+            }
+            _state.value = ConnectionState.Failed("$reason. Confira a câmera e toque em Conectar.")
+        }
+    }
+
+    private fun open(dev: UsbDevice, retrying: Boolean = false) {
         // Two "permission granted" answers (two taps on Conectar) must not open the camera twice: the
         // second connection would replace the first without ever closing it.
         if (_state.value is ConnectionState.Connected || session != null) return
-        _state.value = ConnectionState.Connecting
+        if (!retrying) _state.value = ConnectionState.Connecting
         val iface = stillImageInterface(dev)
         val endpoints = iface?.let { UsbPtpTransport.endpointsOf(it) }
         val connection = usbManager.openDevice(dev)
         if (iface == null || endpoints == null || connection == null) {
             connection?.close()
-            _state.value = ConnectionState.Failed("Não foi possível abrir a câmera pela USB.")
+            if (retrying) attemptEnded.tryEmit(false) else _state.value = ConnectionState.Failed("Não foi possível abrir a câmera pela USB.")
             return
         }
         if (!connection.claimInterface(iface, true)) {
             connection.close()
-            _state.value = ConnectionState.Failed("Outro app está usando a câmera. Feche-o e tente de novo.")
+            if (retrying) attemptEnded.tryEmit(false) else _state.value = ConnectionState.Failed("Outro app está usando a câmera. Feche-o e tente de novo.")
             return
         }
         val transport = UsbPtpTransport(connection, iface, endpoints.first, endpoints.second)
@@ -254,6 +311,7 @@ class CameraManager(
             if (syncClock()) setCameraClock(ptp)
 
             _state.value = ConnectionState.Connected(info.model.ifBlank { "Canon EOS" }, info.serial)
+            attemptEnded.tryEmit(true)
             log("Pronto: captura vinculada ativa")
             eventLoop(ptp, info)
         } catch (e: Exception) {
@@ -261,8 +319,20 @@ class CameraManager(
                 log("Erro: ${e.message}")
                 val wasConnected = _state.value is ConnectionState.Connected
                 closeSession()
-                _state.value = ConnectionState.Failed(e.message ?: "Falha na comunicação com a câmera")
-                if (wasConnected) _lostConnection.tryEmit("Conexão com a câmera perdida")
+                val reason = e.message ?: "Falha na comunicação com a câmera"
+                when {
+                    // A try inside a reconnect: the screen keeps saying "Reconectando", the loop decides.
+                    retryJob?.isActive == true -> attemptEnded.tryEmit(false)
+                    // A link that was working drops with the cable still in: try again on our own.
+                    wasConnected && attachedCamera() != null -> {
+                        _lostConnection.tryEmit("Conexão com a câmera perdida")
+                        reconnect("Conexão perdida")
+                    }
+                    else -> {
+                        _state.value = ConnectionState.Failed(reason)
+                        if (wasConnected) _lostConnection.tryEmit("Conexão com a câmera perdida")
+                    }
+                }
             } else {
                 // A session that was already replaced still holds the USB interface: let it go.
                 runCatching { ptp.close() }
@@ -299,7 +369,8 @@ class CameraManager(
                 _status.update { it.copy(options = it.options + (record.prop to record.values)) }
             is EosEventRecord.ObjectAdded -> if (announceObjects && !record.isFolder) {
                 log("Nova foto: ${record.filename} (${record.size / 1024} KB)")
-                _newObjects.tryEmit(record)
+                // Never silent: a frame that couldn't be announced is found again by the search for missed frames.
+                if (!_newObjects.tryEmit(record)) AppLog.w("CAMERA", "Fila de fotos novas cheia: ${record.filename} fica para a busca de fotos perdidas")
             }
         }
     }
@@ -655,7 +726,16 @@ class CameraManager(
     }
 
     /** All files on the card (folders excluded), newest name last. Uses standard PTP listing. */
-    suspend fun listCardFiles(onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): List<ObjectInfo> {
+    /**
+     * [newestFirst] reads from the last handle back (the camera numbers them in the order it wrote the
+     * files) and, with [isOld], stops after [stopAfterOld] files in a row it says are old.
+     */
+    suspend fun listCardFiles(
+        newestFirst: Boolean = false,
+        stopAfterOld: Int = 0,
+        isOld: (ObjectInfo) -> Boolean = { false },
+        onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
+    ): List<ObjectInfo> {
         val ptp = session ?: throw PtpException("Câmera desconectada")
         val info = deviceInfo ?: throw PtpException("Câmera desconectada")
         if (!info.supports(PtpOp.GET_OBJECT_HANDLES) || !info.supports(PtpOp.GET_OBJECT_INFO)) {
@@ -665,11 +745,18 @@ class CameraManager(
         val files = mutableListOf<ObjectInfo>()
         for (storage in storages) {
             // Parent 0 = every object in the storage, flat, whatever folder it is in.
-            val handles = PtpDataReader(ptp.transactForData(PtpOp.GET_OBJECT_HANDLES, storage, 0, 0)).u32Array()
-            handles.forEachIndexed { i, handle ->
+            val all = PtpDataReader(ptp.transactForData(PtpOp.GET_OBJECT_HANDLES, storage, 0, 0)).u32Array()
+            val handles = if (newestFirst) all.reversed() else all.toList()
+            var oldInARow = 0
+            for ((i, handle) in handles.withIndex()) {
                 val obj = ObjectInfo.parse(handle, ptp.transactForData(PtpOp.GET_OBJECT_INFO, handle))
-                if (!obj.isFolder) files += obj
                 onProgress(i + 1, handles.size)
+                if (obj.isFolder) continue
+                files += obj
+                if (stopAfterOld > 0) {
+                    oldInARow = if (isOld(obj)) oldInARow + 1 else 0
+                    if (oldInARow >= stopAfterOld) break
+                }
             }
         }
         return files.sortedBy { it.filename }
@@ -706,6 +793,8 @@ class CameraManager(
 
     /** Ends the session politely so the camera leaves PC mode and goes back to normal. */
     fun disconnect() {
+        retryJob?.cancel()
+        if (_state.value is ConnectionState.Reconnecting) _state.value = ConnectionState.NoCamera
         val ptp = session ?: return
         // Detach first so the event loop stops and its error handler ignores this session.
         closeSession(closeTransport = false)

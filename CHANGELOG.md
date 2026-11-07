@@ -2,6 +2,38 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [4.6] · 2026-11-07
+
+Segunda etapa da auditoria: a captura não para.
+
+- **Reconexão automática:**
+  - se a comunicação com a 50D cai com o cabo ainda ligado (uma falha da USB, a câmera que desligou sozinha), o app tenta de novo sozinho, esperando 1, 2, 4… até 30 s entre as tentativas, por até 10 vezes;
+  - a Sessão mostra "Reconectando…" e a notificação continua ativa, para o Android não fechar o app;
+  - ao voltar, as fotos feitas durante a queda são baixadas e a contagem da sessão continua de onde parou;
+  - tocar em Conectar interrompe as tentativas e conecta na hora.
+- **Sem fotos repetidas:**
+  - uma foto anunciada duas vezes (pelo evento da câmera e pela busca de fotos perdidas) é baixada uma vez só;
+  - uma foto já salva nesta sessão não é salva de novo;
+  - a numeração que volta a 0001 numa sessão nova não é confundida com uma foto antiga.
+- **Busca de fotos perdidas mais esperta:**
+  - entende quando a câmera passa de 9999 para 0001;
+  - lê o cartão do fim para o começo e para ao encontrar as fotos já recebidas, em vez de perguntar à câmera sobre cada arquivo de um cartão cheio.
+- **Pasta que parou de responder** (apagada, cartão removido, permissão perdida):
+  - as fotos vão para a pasta interna do app, em vez de falhar uma por uma;
+  - a Sessão mostra em destaque "A pasta JPG parou de responder", para você escolher de novo;
+  - permissões de pastas antigas que nenhum ajuste usa são devolvidas ao Android.
+- **Ajustes protegidos:** se o arquivo de ajustes estragar (falta de energia no meio de uma gravação), o app volta aos padrões e avisa no log, em vez de deixar de salvar fotos.
+- **Memória:**
+  - as cópias em tamanho cheio (editada, entrega, Express) são feitas uma de cada vez;
+  - uma falha da GPU numa foto não desliga mais a GPU para sempre: só depois de 3 falhas seguidas;
+  - miniaturas e prévias da entrega são gravadas por inteiro antes de aparecer na página do cliente.
+- **Avisos que ficam na tela:**
+  - bateria fraca e cartão quase cheio aparecem como etiquetas vermelhas na Sessão e sobre a imagem do live view enquanto durarem;
+  - o alerta de bateria não depende mais da opção "Mostrar bateria".
+- **Estado da câmera em qualquer aba:** o ícone da aba Sessão ganha um ponto menta (conectada), ciano (reconectando) ou vermelho (falhou).
+- **Culling mais leve:** ao analisar uma foto nova, o app reagrupa só as fotos perto dela, não a sessão inteira.
+- **Galeria do evento:** uma rajada de fotos não cria mais várias galerias ao mesmo tempo.
+
 ## [4.5] · 2026-11-07
 
 Primeira etapa das correções da auditoria: segurança da entrega e bugs.

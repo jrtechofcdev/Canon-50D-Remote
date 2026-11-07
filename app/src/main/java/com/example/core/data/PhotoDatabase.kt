@@ -117,6 +117,9 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE session = :session ORDER BY capturedAt ASC")
     suspend fun inSession(session: String): List<Photo>
 
+    @Query("SELECT * FROM photos WHERE session = :session AND capturedAt BETWEEN :from AND :to ORDER BY capturedAt ASC")
+    suspend fun inSessionBetween(session: String, from: Long, to: Long): List<Photo>
+
     @Query("UPDATE photos SET presetId = :presetId, adjust = :adjust WHERE id = :id")
     suspend fun setLook(id: Long, presetId: Long?, adjust: String?)
 
@@ -166,6 +169,13 @@ interface PhotoDao {
 
     @Query("SELECT rawCameraName FROM photos WHERE rawCameraName IS NOT NULL UNION SELECT jpgCameraName FROM photos WHERE jpgCameraName IS NOT NULL")
     suspend fun knownCameraNames(): List<String>
+
+    /** The camera's file names already saved in one session (numbers repeat after 9999, so never across sessions). */
+    @Query("SELECT rawCameraName FROM photos WHERE session = :session AND rawCameraName IS NOT NULL UNION SELECT jpgCameraName FROM photos WHERE session = :session AND jpgCameraName IS NOT NULL")
+    suspend fun cameraNamesIn(session: String): List<String>
+
+    @Query("SELECT COUNT(*) FROM photos WHERE session = :session AND (rawCameraName = :name OR jpgCameraName = :name)")
+    suspend fun countCameraName(session: String, name: String): Int
 }
 
 @Entity(tableName = "presets")

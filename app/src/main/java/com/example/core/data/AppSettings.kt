@@ -321,7 +321,15 @@ enum class WatermarkSource(val id: String, val label: String, val asset: String?
     }
 }
 
-private val Context.dataStore by preferencesDataStore(name = "settings")
+// A damaged settings file (power cut in the middle of a write) starts over from the defaults instead of
+// making every read fail, which used to stop every photo from being saved.
+private val Context.dataStore by preferencesDataStore(
+    name = "settings",
+    corruptionHandler = androidx.datastore.core.handlers.ReplaceFileCorruptionHandler { e ->
+        com.example.core.log.AppLog.e("AJUSTES", "Arquivo de ajustes corrompido; voltando aos padrões", e)
+        androidx.datastore.preferences.core.emptyPreferences()
+    },
+)
 
 /** DataStore keys. Screens write through [SettingsRepository.set] with one of these. */
 object SettingKeys {

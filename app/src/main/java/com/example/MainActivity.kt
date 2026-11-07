@@ -100,6 +100,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material.icons.outlined.WifiTethering
 import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.offset
 
 class MainActivity : ComponentActivity() {
 
@@ -152,6 +153,13 @@ class MainActivity : ComponentActivity() {
                 com.example.ui.intro.IntroRequests.replay.collect { if (!first) intro.value = true; first = false }
             }
             JrLinkTheme(night = settings.nightMode) {
+              val sessionDot = when (cameraState) {
+                  is ConnectionState.Connected -> Tone.Accent
+                  is ConnectionState.Reconnecting -> Tone.Info
+                  is ConnectionState.Failed -> Tone.Error
+                  else -> null
+              }
+              androidx.compose.runtime.CompositionLocalProvider(LocalSessionDot provides sessionDot) {
               androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                 val nav = rememberNavController()
                 val entry by nav.currentBackStackEntryAsState()
@@ -248,7 +256,7 @@ class MainActivity : ComponentActivity() {
                                 NavigationRailItem(
                                     selected = route == tab.route,
                                     onClick = { goTo(tab) },
-                                    icon = { Icon(tab.icon, contentDescription = null) },
+                                    icon = { TabIcon(tab, route == tab.route) },
                                     label = { Text(tab.label) },
                                     colors = NavigationRailItemDefaults.colors(
                                         selectedIconColor = Tone.Accent,
@@ -377,6 +385,7 @@ class MainActivity : ComponentActivity() {
                 // The opening plays over the app, which is already loading underneath.
                 if (intro.value) com.example.ui.intro.BrandIntro(onDone = { intro.value = false })
               }
+              }
             }
         }
     }
@@ -455,12 +464,26 @@ private fun TabIcon(tab: Tab, selected: Boolean, tint: androidx.compose.ui.graph
             hop.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.4f, stiffness = 420f))
         }
     }
-    Icon(
-        tab.icon, contentDescription = null,
-        tint = if (tint == androidx.compose.ui.graphics.Color.Unspecified) androidx.compose.material3.LocalContentColor.current else tint,
-        modifier = Modifier.graphicsLayer { scaleX = hop.value; scaleY = hop.value },
-    )
+    val dot = if (tab == Tab.Session) LocalSessionDot.current else null
+    androidx.compose.foundation.layout.Box {
+        Icon(
+            tab.icon, contentDescription = null,
+            tint = if (tint == androidx.compose.ui.graphics.Color.Unspecified) androidx.compose.material3.LocalContentColor.current else tint,
+            modifier = Modifier.graphicsLayer { scaleX = hop.value; scaleY = hop.value },
+        )
+        // The camera's state is seen from any tab: mint connected, cyan reconnecting, red when it failed.
+        val shown by androidx.compose.animation.animateColorAsState(dot ?: androidx.compose.ui.graphics.Color.Transparent, label = "dot")
+        if (dot != null || shown.alpha > 0f) {
+            androidx.compose.foundation.layout.Box(
+                Modifier.align(androidx.compose.ui.Alignment.TopEnd).offset(x = 3.dp, y = (-2).dp).size(8.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape).background(shown),
+            )
+        }
+    }
 }
+
+/** Colour of the dot on the Sessão tab (camera connected, reconnecting, failed), or null for none. */
+private val LocalSessionDot = androidx.compose.runtime.compositionLocalOf<androidx.compose.ui.graphics.Color?> { null }
 
 /**
  * The tab bar. Up to five tabs share the width as usual; with more, each keeps a readable width and the

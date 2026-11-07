@@ -17,6 +17,7 @@ import com.example.core.log.AppLog
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withPermit
 
 /**
  * A photo's "look": the preset applied to it, or its own calibration. Renders looks for the screen
@@ -216,8 +217,16 @@ class Looks(
         return edge
     }
 
-    /** Full pipeline on the file: decode, crop (at the preset's pixel size), then the look. */
-    private suspend fun finished(source: String, look: PresetSettings?, crop: CropSpec?, maxEdge: Int): Bitmap? {
+    /**
+     * Full pipeline on the file: decode, crop (at the preset's pixel size), then the look. Large renders
+     * (the edited copy, a delivery at full size) take turns: two tools and the edited copy at once used to
+     * hold three full frames in memory together.
+     */
+    private suspend fun finished(source: String, look: PresetSettings?, crop: CropSpec?, maxEdge: Int): Bitmap? =
+        if (maxEdge == 0 || maxEdge > PREVIEW_EDGE) bigRender.withPermit { finishedNow(source, look, crop, maxEdge) }
+        else finishedNow(source, look, crop, maxEdge)
+
+    private suspend fun finishedNow(source: String, look: PresetSettings?, crop: CropSpec?, maxEdge: Int): Bitmap? {
         val full = BitmapLoader.load(context, Uri.parse(source), maxEdge) ?: return null
         val cut = crop?.let { CropRenderer.apply(full, it) } ?: full
         if (cut !== full) full.recycle()
@@ -230,5 +239,6 @@ class Looks(
         const val EDITOR_EDGE = 1440
         const val THUMB_EDGE = 320
         private const val MB = 1024L * 1024L
+        private val bigRender = kotlinx.coroutines.sync.Semaphore(1)
     }
 }

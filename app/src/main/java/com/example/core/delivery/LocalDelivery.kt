@@ -85,6 +85,7 @@ class LocalDelivery(
 ) {
     private val root = File(context.cacheDir, mode.dir)
     private val lock = Mutex()
+    /** Creating the client of the moment (Express) or the event gallery happens once even when photos race. */
     private val expressLock = Mutex()
     private var network: DeliveryNetwork? = null
     private var devicesJob: Job? = null
@@ -416,7 +417,10 @@ class LocalDelivery(
         val now = System.currentTimeMillis()
         val active = s.deliveryActiveSession.takeIf { it > 0 }?.let { dao.session(it) }
         val event = if (s.deliveryEventGallery) {
-            dao.openSessions().firstOrNull { it.event && it.isValid(now) } ?: newClient("Galeria do evento", event = true)
+            // One at a time: photos of a burst arrive together and each would open its own gallery.
+            expressLock.withLock {
+                dao.openSessions().firstOrNull { it.event && it.isValid(now) } ?: newClient("Galeria do evento", event = true)
+            }
         } else {
             null
         }
@@ -503,7 +507,7 @@ class LocalDelivery(
         ExpressPreview.mark(marked, logo, photographer, opacity)
         logo?.recycle()
         val out = previewFileOf(target.path)
-        out.outputStream().use { marked.compress(Bitmap.CompressFormat.JPEG, 80, it) }
+        writeWhole(out) { stream -> marked.compress(Bitmap.CompressFormat.JPEG, 80, stream) }
         marked.recycle()
         return out.length() > 0
     }
@@ -526,10 +530,23 @@ class LocalDelivery(
         synchronized(this) {
             if (thumb.exists()) return thumb
             val bitmap = BitmapLoader.load(context, Uri.fromFile(file), THUMB_EDGE) ?: return null
-            thumb.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 80, it) }
+            writeWhole(thumb) { stream -> bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream) }
             bitmap.recycle()
         }
         return thumb
+    }
+
+    /**
+     * Writes next to [target] and renames at the end, so the page never gets a picture cut in half
+     * while it is still being written.
+     */
+    private fun writeWhole(target: File, write: (java.io.OutputStream) -> Unit) {
+        val temp = File(target.parentFile, target.name + ".part")
+        temp.outputStream().use(write)
+        if (!temp.renameTo(target)) {
+            temp.copyTo(target, overwrite = true)
+            temp.delete()
+        }
     }
 
     companion object {

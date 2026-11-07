@@ -51,6 +51,8 @@ class CameraForegroundService : LifecycleService() {
                         "${state.model} · $text"
                     }
                     ConnectionState.Connecting, ConnectionState.WaitingPermission -> "Conectando à câmera…"
+                    // Stays in the foreground while it tries again, so Android doesn't close the app meanwhile.
+                    is ConnectionState.Reconnecting -> "Reconectando à câmera (tentativa ${state.attempt})…"
                     else -> null
                 }
             }.distinctUntilChanged().sample(500).collect { text ->

@@ -163,7 +163,13 @@ fun SessionScreen(
                 }
                 Spacer(Modifier.height(20.dp))
                 ConnectionHeader(state, received, status, settings.showBattery, onConnect = app.camera::findAndConnect)
-                FolderNotice(settings, onOpenSettings)
+                if (state is ConnectionState.Connected) {
+                    com.example.ui.components.CameraWarningChips(
+                        com.example.ui.components.cameraWarnings(status, settings),
+                        Modifier.padding(top = 10.dp),
+                    )
+                }
+                FolderNotice(settings, app.store.lostFolders.collectAsState().value, onOpenSettings)
                 PendingBanner(pending.size, onDownload = app.tether::downloadPending, onDismiss = app.tether::dismissPending)
                 Spacer(Modifier.height(16.dp))
                 ExposureBar(status, connected) { title, prop -> picker = title to prop }
@@ -337,6 +343,7 @@ private fun ConnectionHeader(state: ConnectionState, received: Int, status: Came
         ConnectionState.WaitingPermission -> "Permissão USB" to "Toque em Permitir no aviso do Android"
         ConnectionState.NoCamera -> "Câmera não conectada" to "Ligue a 50D e conecte pelo cabo USB OTG"
         is ConnectionState.Failed -> "Falha na conexão" to state.message
+        is ConnectionState.Reconnecting -> "Reconectando…" to "${state.reason}. Tentativa ${state.attempt} de ${com.example.core.camera.Reconnect.TRIES}; as fotos feitas agora chegam depois."
     }
     val live = state is ConnectionState.Connected
 
@@ -346,6 +353,7 @@ private fun ConnectionHeader(state: ConnectionState, received: Int, status: Came
             when (state) {
                 is ConnectionState.Connected -> Tone.Accent
                 is ConnectionState.Failed -> Tone.Error
+                is ConnectionState.Reconnecting -> Tone.Info
                 else -> Tone.Line
             },
             androidx.compose.animation.core.tween(com.example.ui.components.Motion.LONG),
@@ -365,19 +373,20 @@ private fun ConnectionHeader(state: ConnectionState, received: Int, status: Came
             ) { Text(it, style = MaterialTheme.typography.titleLarge) }
             com.example.ui.components.RollingText(detail, style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted)
         }
-        if (!live && state != ConnectionState.Connecting) {
+        if (!live && state != ConnectionState.Connecting && state !is ConnectionState.Reconnecting) {
             OutlinedButton(onClick = onConnect) { Text("Conectar") }
         }
     }
 }
 
 @Composable
-private fun FolderNotice(settings: Settings, onOpenSettings: () -> Unit) {
+private fun FolderNotice(settings: Settings, lost: Set<com.example.core.storage.FileKind>, onOpenSettings: () -> Unit) {
     val missing = buildList {
         if (settings.downloadMode.jpg && settings.jpgFolder == null) add("JPG")
         if (settings.downloadMode.raw && settings.rawFolder == null) add("RAW")
     }
-    if (missing.isEmpty()) return
+    val gone = lost.filter { it == com.example.core.storage.FileKind.JPG || it == com.example.core.storage.FileKind.RAW }.map { it.folderName }
+    if (missing.isEmpty() && gone.isEmpty()) return
     Spacer(Modifier.height(12.dp))
     Row(
         Modifier
@@ -388,12 +397,17 @@ private fun FolderNotice(settings: Settings, onOpenSettings: () -> Unit) {
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Outlined.FolderOpen, contentDescription = null, tint = Tone.TextMuted)
+        Icon(Icons.Outlined.FolderOpen, contentDescription = null, tint = if (gone.isNotEmpty()) Tone.Error else Tone.TextMuted)
         Spacer(Modifier.width(12.dp))
         Text(
-            "Pasta ${missing.joinToString(" e ")} não escolhida: as fotos vão para a pasta interna do app. Toque para escolher.",
+            if (gone.isNotEmpty()) {
+                // The folder that was working stopped (deleted, card out, permission gone): nothing is lost, but say so.
+                "A pasta ${gone.joinToString(" e ")} parou de responder. As fotos estão indo para a pasta interna do app. Toque para escolher a pasta de novo."
+            } else {
+                "Pasta ${missing.joinToString(" e ")} não escolhida: as fotos vão para a pasta interna do app. Toque para escolher."
+            },
             style = MaterialTheme.typography.bodySmall,
-            color = Tone.TextMuted,
+            color = if (gone.isNotEmpty()) Tone.Text else Tone.TextMuted,
         )
     }
 }

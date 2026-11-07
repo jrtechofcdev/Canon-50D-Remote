@@ -99,6 +99,13 @@ Cada função tem um liga/desliga em **Ajustes**.
 
 O disparador do app funciona como apertar o botão até o fim: com AF ligado, a câmera foca antes e, sem foco, não dispara. Em MF ou com AF-ON o disparo é imediato.
 
+**Se a conexão cair com o cabo ligado:**
+- o app tenta de novo sozinho por alguns minutos, e a Sessão mostra **Reconectando…**;
+- ao voltar, as fotos feitas nesse intervalo são baixadas, sem repetir as que já chegaram;
+- o ponto no ícone da aba Sessão mostra o estado em qualquer tela: menta conectada, ciano reconectando, vermelho falhou.
+
+**Se a pasta escolhida parar de responder** (cartão removido, pasta apagada), as fotos vão para a pasta interna do app e a Sessão pede para escolher a pasta de novo. Bateria fraca e cartão quase cheio ficam como etiquetas vermelhas na Sessão e no live view enquanto durarem.
+
 ### Presets
 
 1. Na aba **Presets**, toque em **Importar** e escolha o arquivo baixado (`.dng`, `.xmp`, `.lrtemplate` ou um `.zip` com vários). O app lê os ajustes e guarda o preset no grupo **Importados**.

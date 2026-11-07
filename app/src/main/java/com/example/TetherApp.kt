@@ -143,17 +143,21 @@ class TetherApp : Application() {
             export.clearOldExports()
             presets.seedIfEmpty()
             runCatching { presets.syncFolder() }
+            runCatching { store.releaseUnused(settings.snapshot().values.joinToString("\n") { it.toString() }) }
         }
 
         appScope.launch {
+            var before: ConnectionState? = null
             camera.state.distinctUntilChangedBy { it::class }.collect { state ->
-                if (state is ConnectionState.Connected) {
+                // Back after a reconnect it is the same shoot: the count of photos received goes on.
+                if (state is ConnectionState.Connected && before !is ConnectionState.Reconnecting) {
                     tether.resetSessionCounter()
                     warnedCard = false
                     warnedBattery = false
                     warnedPhone = false
-                    CameraForegroundService.start(this@TetherApp)
                 }
+                if (state is ConnectionState.Connected) CameraForegroundService.start(this@TetherApp)
+                before = state
                 if (state is ConnectionState.Connected && settings.current().gpsEnabled) location.start() else location.stop()
             }
         }
@@ -194,7 +198,8 @@ class TetherApp : Application() {
                     alerts.warn("Cartão quase cheio", "Restam $shots disparos no cartão da câmera.")
                 }
                 val battery = status.value(EosProp.BATTERY_POWER)
-                if (s.showBattery && !warnedBattery && battery != null && EosValues.batteryIsLow(battery)) {
+                // The alert doesn't depend on showing the battery in the Session: a low battery always warns.
+                if (!warnedBattery && battery != null && EosValues.batteryIsLow(battery)) {
                     warnedBattery = true
                     alerts.warn("Bateria da câmera baixa", "Bateria em ${EosValues.batteryLabel(battery)}.")
                 }

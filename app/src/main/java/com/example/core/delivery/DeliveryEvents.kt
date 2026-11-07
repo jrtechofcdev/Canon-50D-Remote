@@ -23,9 +23,12 @@ sealed interface PhotoEvent {
     data class Delivered(override val photoId: Long, val sessionId: Long) : PhotoEvent
 }
 
-/** The bus between capture, editing and delivery. Emitting never suspends: a full buffer drops the oldest. */
+/**
+ * The bus between capture, editing and delivery. Emitting never suspends. The buffer is large, so a
+ * burst never loses a "Captured" (the automatic send would skip that photo); in the extreme it drops the oldest.
+ */
 class DeliveryEvents {
-    private val flow = MutableSharedFlow<PhotoEvent>(extraBufferCapacity = 128, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST)
+    private val flow = MutableSharedFlow<PhotoEvent>(extraBufferCapacity = 2048, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST)
     val events: SharedFlow<PhotoEvent> = flow.asSharedFlow()
 
     fun emit(event: PhotoEvent) {

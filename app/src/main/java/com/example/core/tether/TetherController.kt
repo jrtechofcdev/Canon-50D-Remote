@@ -58,6 +58,11 @@ class TetherController(
 
     private val queue = Channel<Job>(Channel.UNLIMITED)
     private val queued = AtomicInteger(0)
+    /**
+     * Files in the queue or being saved, by the camera's name. The same frame can be announced twice (the
+     * event and the search for missed frames after a reconnect); it is downloaded once.
+     */
+    private val inFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     private val _transfer = MutableStateFlow<Transfer?>(null)
     val transfer: StateFlow<Transfer?> = _transfer.asStateFlow()
@@ -91,6 +96,7 @@ class TetherController(
         }
         scope.launch {
             for (job in queue) {
+                var retried = false
                 try {
                     process(job.obj, job.force)
                 } catch (e: kotlinx.coroutines.CancellationException) {
@@ -102,6 +108,7 @@ class TetherController(
                         // Usually a busy camera or a brief USB hiccup: try again after the queue drains a bit.
                         delay(1_000L * (job.attempt + 1))
                         queued.incrementAndGet()
+                        retried = true
                         queue.send(Job(job.obj, job.force, job.attempt + 1))
                     } else {
                         _errors.tryEmit("Falha ao salvar ${job.obj.filename}: ${e.message}")
@@ -109,6 +116,7 @@ class TetherController(
                 } finally {
                     queued.decrementAndGet()
                     _transfer.value = null
+                    if (!retried) inFlight -= job.obj.filename
                 }
             }
         }
@@ -116,6 +124,10 @@ class TetherController(
 
     /** Adds a frame to the download queue. [force] ignores the RAW/JPG filter (manual picks from the card). */
     fun enqueue(obj: EosEventRecord.ObjectAdded, force: Boolean) {
+        if (!inFlight.add(obj.filename)) {
+            AppLog.i("DOWNLOAD", "${obj.filename} já está na fila")
+            return
+        }
         queued.incrementAndGet()
         queue.trySend(Job(obj, force))
     }
@@ -136,14 +148,18 @@ class TetherController(
     private suspend fun checkForMissedFrames() {
         val settings = settingsRepository.current()
         if (!settings.autoResend || !camera.supportsCardListing) return
-        val sessionPhotos = dao.inSession(settings.sessionKey)
-        val lastNumber = sessionPhotos.flatMap { listOfNotNull(it.rawCameraName, it.jpgCameraName) }
-            .mapNotNull(::frameNumber).maxOrNull() ?: return
-        val known = dao.knownCameraNames().toSet()
-        val missing = runCatching { camera.listCardFiles() }.getOrElse { return }
+        val known = dao.cameraNamesIn(settings.sessionKey).toSet()
+        val lastNumber = latestFrame(known.mapNotNull(::frameNumber)) ?: return
+        // The card is read from its newest file back, and only until the frames already received show up,
+        // instead of asking the camera about every file on a card with thousands.
+        val missing = runCatching {
+            camera.listCardFiles(newestFirst = true, stopAfterOld = 6, isOld = { file ->
+                frameNumber(file.filename)?.let { !isAfter(it, lastNumber) } ?: false
+            })
+        }.getOrElse { return }
             .filter { file ->
                 val n = frameNumber(file.filename) ?: return@filter false
-                n > lastNumber && file.filename !in known &&
+                isAfter(n, lastNumber) && file.filename !in known && file.filename !in inFlight &&
                     ((file.isRaw && settings.downloadMode.raw) || (file.isJpeg && settings.downloadMode.jpg))
             }
         if (missing.isEmpty()) return
@@ -166,6 +182,11 @@ class TetherController(
         if (!force && kind == FileKind.JPG && !settings.downloadMode.jpg) return
 
         val session = settings.sessionKey
+        // Already saved in this session (announced twice): nothing to do. A manual pick from the card still goes.
+        if (!force && dao.countCameraName(session, obj.filename) > 0) {
+            AppLog.i("DOWNLOAD", "${obj.filename} já foi salva nesta sessão")
+            return
+        }
         val cameraBase = obj.filename.substringBeforeLast('.').ifBlank { "IMG_${obj.handle}" }
         val extension = obj.filename.substringAfterLast('.', if (kind == FileKind.RAW) "CR2" else "JPG")
 
@@ -348,6 +369,16 @@ class TetherController(
 
         /** 1234 from IMG_1234.CR2 or _MG_1234.JPG. */
         fun frameNumber(name: String): Int? = Regex("(\\d{4})\\.[A-Za-z0-9]+$").find(name)?.groupValues?.get(1)?.toIntOrNull()
+
+        /**
+         * True when frame [n] was shot after frame [last]. The camera counts 0001 to 9999 and starts again,
+         * so "after" is up to half the counter ahead, wrapping round: 0003 comes after 9998.
+         */
+        fun isAfter(n: Int, last: Int): Boolean = Math.floorMod(n - last, 10_000) in 1 until 5_000
+
+        /** The newest of the frame numbers already received, taking the 9999 → 0001 wrap into account. */
+        fun latestFrame(numbers: Collection<Int>): Int? =
+            numbers.firstOrNull()?.let { first -> numbers.fold(first) { best, n -> if (isAfter(n, best)) n else best } }
         private const val PAIR_WINDOW_MS = 120_000L
     }
 }
