@@ -3,7 +3,7 @@
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
-  var token = null, data = null, known = {}, first = true, current = 0, asked = false;
+  var token = null, data = null, known = {}, first = true, current = 0, asked = false, ended = false;
   var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
   function toast(t) {
@@ -35,10 +35,29 @@
     }).catch(function () { $("sub").textContent = "Sem conexão com o celular do fotógrafo. Confira o Wi-Fi."; });
   }
 
+  // The photographer finished this client: the page says goodbye and stops. It never moves on to the
+  // next client's photos by itself; a new visit (the QR again) starts fresh.
+  function end() {
+    var name = firstName(data);
+    ended = true; token = null; data = null;
+    $("feed").innerHTML = ""; $("hint").hidden = true; $("dock").hidden = true; $("paySheet").hidden = true;
+    $("empty").hidden = true; $("viewer").hidden = true; $("welcome").hidden = true;
+    $("closed").textContent = "Atendimento encerrado. Obrigado" + (name ? ", " + name : "") + "! Para ver de novo, fale com o fotógrafo.";
+    $("closed").hidden = false; $("sub").textContent = "";
+  }
+
+  // The phone forgot this device (it restarted): ask again, but only stay if it is still the same client.
+  function rekey(then) {
+    get("/api/express").then(function (r) {
+      if (r.status === 200 && r.body.token === token) then(); else end();
+    }).catch(function () {});
+  }
+
   function refresh() {
+    if (ended) return;
     if (!token) return join();
     get("/api/s/" + token).then(function (r) {
-      if (r.status === 404) return join(); // finished: the next client starts clean
+      if (r.status === 404) return end();
       if (r.status === 200) render(r.body);
     }).catch(function () {});
   }
@@ -143,14 +162,18 @@
     btn.onclick = function (e) {
       e.stopPropagation();
       var on = !it.picked;
-      fetch("/api/s/" + token + "/pick/" + it.id + "?on=" + (on ? 1 : 0), { method: "POST" }).then(function (r) {
-        if (r.ok) {
-          it.picked = on; heart(btn, it);
-          var n = firstName(data);
-          toast(on ? (n ? "Obrigado, " + n + "! O fotógrafo já recebeu." : "Favorita marcada") : "Desmarcada");
-          refresh();
-        }
-      });
+      var send = function (again) {
+        fetch("/api/s/" + token + "/pick/" + it.id + "?on=" + (on ? 1 : 0), { method: "POST" }).then(function (r) {
+          if (r.status === 403 && again) return rekey(function () { send(false); });
+          if (r.ok) {
+            it.picked = on; heart(btn, it);
+            var n = firstName(data);
+            toast(on ? (n ? "Obrigado, " + n + "! O fotógrafo já recebeu." : "Favorita marcada") : "Desmarcada");
+            refresh();
+          }
+        });
+      };
+      send(true);
     };
   }
 
@@ -212,9 +235,13 @@
     e.preventDefault();
     var n = $("nameInput").value.trim();
     if (n.length < 2) { $("nameInput").focus(); return; }
-    fetch("/api/s/" + token + "/name?n=" + encodeURIComponent(n), { method: "POST" }).then(function () {
-      $("welcome").hidden = true; toast("Prazer, " + n.split(" ")[0] + "!"); refresh();
-    }).catch(function () { $("welcome").hidden = true; });
+    var send = function (again) {
+      fetch("/api/s/" + token + "/name?n=" + encodeURIComponent(n), { method: "POST" }).then(function (r) {
+        if (r.status === 403 && again) return rekey(function () { send(false); });
+        $("welcome").hidden = true; toast("Prazer, " + n.split(" ")[0] + "!"); refresh();
+      }).catch(function () { $("welcome").hidden = true; });
+    };
+    send(true);
   });
   $("skipName").onclick = function () { $("welcome").hidden = true; };
 

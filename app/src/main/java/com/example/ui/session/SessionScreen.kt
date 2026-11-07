@@ -173,7 +173,7 @@ fun SessionScreen(
                     interval = interval,
                     latest = photos.firstOrNull(),
                     shutter = shutter,
-                    onShoot = { app.camera.capture(settings.shutterWait) },
+                    onShoot = { app.camera.capture(settings.shutterWait, settings.shutterFocusFirst) },
                     onInterval = { if (interval.running) app.camera.stopInterval() else showInterval = true },
                     onOpenLatest = onOpenPhoto,
                 )

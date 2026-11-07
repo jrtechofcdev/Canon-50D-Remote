@@ -144,7 +144,7 @@ fun ExpressSettings(app: TetherApp, s: Settings) {
     SettingsGroup("Prévia antes do pagamento", Icons.Outlined.Lock) {
         ToggleRow(
             Icons.Outlined.Lock, "Modo prévia",
-            "O cliente vê as fotos com marca d'água e só baixa as que você liberar depois do pagamento.",
+            "O cliente vê as fotos com marca d'água e só baixa as que você liberar depois do pagamento. Desligar libera todas as fotos do cliente da vez.",
             s.expressPreview, enabled = on,
         ) { set(SettingKeys.expressPreview, it) }
         SliderRow(

@@ -108,23 +108,30 @@ object DeliveryRules {
 }
 
 /**
- * Wrong codes typed in the portal: after [max] in [windowMs] from the same device, that device waits.
- * Six digits are a million combinations, so 5 a minute takes years to guess.
+ * Wrong codes typed in the portal. After [max] wrong codes in [windowMs] from one device, that device
+ * waits; after [globalMax] from all devices together, everyone waits, so changing address doesn't help.
+ * A right code never clears the count: someone with one valid code can't use it to keep guessing others.
+ * With 4 digits (10 000 codes), [globalMax] a minute means days of trying, and the code only lives as
+ * long as its client's access.
  */
-class AttemptLimiter(private val max: Int = 5, private val windowMs: Long = 60_000L, private val clock: () -> Long = System::currentTimeMillis) {
+class AttemptLimiter(
+    private val max: Int = 5,
+    private val windowMs: Long = 60_000L,
+    private val globalMax: Int = 20,
+    private val clock: () -> Long = System::currentTimeMillis,
+) {
     private val failures = HashMap<String, ArrayDeque<Long>>()
 
     @Synchronized
-    fun blocked(key: String): Boolean = recent(key).size >= max
+    fun blocked(key: String): Boolean = recent(key).size >= max || recent(ALL).size >= globalMax
 
     @Synchronized
     fun failed(key: String) {
-        recent(key).addLast(clock())
-    }
-
-    @Synchronized
-    fun reset(key: String) {
-        failures.remove(key)
+        val now = clock()
+        recent(key).addLast(now)
+        recent(ALL).addLast(now)
+        // Devices that stopped trying are forgotten, so the map never grows without end.
+        if (failures.size > 256) failures.keys.toList().forEach { k -> if (k != ALL && recent(k).isEmpty()) failures.remove(k) }
     }
 
     private fun recent(key: String): ArrayDeque<Long> {
@@ -132,5 +139,9 @@ class AttemptLimiter(private val max: Int = 5, private val windowMs: Long = 60_0
         val now = clock()
         while (list.isNotEmpty() && now - list.first() >= windowMs) list.removeFirst()
         return list
+    }
+
+    private companion object {
+        const val ALL = "*"
     }
 }

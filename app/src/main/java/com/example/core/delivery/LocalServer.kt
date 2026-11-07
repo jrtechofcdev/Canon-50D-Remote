@@ -16,8 +16,10 @@ import java.net.Socket
 import java.net.SocketException
 import java.net.URLDecoder
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * What the portal shows besides the photos. [express] = Fotografia Express is on (its gallery opens
@@ -73,8 +75,16 @@ class LocalServer(
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     @Volatile private var socket: ServerSocket? = null
-    private var pool: ExecutorService? = null
+    private var pool: ThreadPoolExecutor? = null
     private val limiter = AttemptLimiter(clock = clock)
+    /** Connections being answered, so Parar can cut them, and how many each device has open. */
+    private val open = ConcurrentHashMap.newKeySet<Socket>()
+    private val perDevice = ConcurrentHashMap<String, AtomicInteger>()
+    /**
+     * Fotografia Express: the devices that joined each client's page (a key kept in a cookie). Only
+     * they can heart photos or say the name, so a phone left on the Wi-Fi can't change someone else's order.
+     */
+    private val expressKeys = ConcurrentHashMap<Long, MutableSet<String>>()
     private val seen = ConcurrentHashMap<String, Long>()
     private val _online = MutableStateFlow(0)
 
@@ -87,25 +97,66 @@ class LocalServer(
     val port: Int get() = socket?.localPort ?: 0
     val running: Boolean get() = socket?.isClosed == false
 
-    /** Starts on [port] (0 = any free one, for tests), trying the next few if it is taken. Returns the port. */
+    /**
+     * Starts on [port] (0 = any free one, for tests), trying the next few if it is taken. Returns the port.
+     * With [host] it listens only on the delivery network's address, so the phone's other networks (the
+     * venue's Wi-Fi, mobile data) never reach it; if that address can't be used it falls back to all.
+     */
     @Synchronized
-    fun start(port: Int = DeliveryRules.PORT): Int {
+    fun start(port: Int = DeliveryRules.PORT, host: String? = null): Int {
         socket?.takeIf { !it.isClosed }?.let { return it.localPort }
-        val server = (0..5).firstNotNullOfOrNull { offset ->
+        fun bindOn(address: String?) = (0..5).firstNotNullOfOrNull { offset ->
             val p = if (port == 0) 0 else port + offset
-            runCatching { ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress(p), 32) } }.getOrNull()
-        } ?: throw java.io.IOException("Nenhuma porta livre a partir de $port")
+            runCatching {
+                ServerSocket().apply {
+                    reuseAddress = true
+                    bind(if (address == null) InetSocketAddress(p) else InetSocketAddress(address, p), 32)
+                }
+            }.getOrNull()
+        }
+        val server = host?.let { h -> bindOn(h) ?: null.also { AppLog.w("ENTREGA", "Não deu para ouvir só em $h; ouvindo em todas as redes") } }
+            ?: bindOn(null)
+            ?: throw java.io.IOException("Nenhuma porta livre a partir de $port")
         socket = server
-        val workers = Executors.newFixedThreadPool(WORKERS) { r -> Thread(r, "entrega-http").apply { isDaemon = true } }
+        // A fixed team with a short line: a flood of connections is turned away instead of piling up.
+        val workers = ThreadPoolExecutor(
+            WORKERS, WORKERS, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue(QUEUE),
+            { r -> Thread(r, "entrega-http").apply { isDaemon = true } },
+            ThreadPoolExecutor.AbortPolicy(),
+        )
         pool = workers
         Thread({
             while (!server.isClosed) {
-                val client = try { server.accept() } catch (_: SocketException) { break } catch (e: Exception) { continue }
-                runCatching { workers.execute { handle(client) } }.onFailure { client.close() }
+                val client = try {
+                    server.accept()
+                } catch (_: SocketException) {
+                    break
+                } catch (e: Exception) {
+                    // Out of file handles or similar: wait a moment instead of spinning.
+                    AppLog.w("ENTREGA", "Falha ao aceitar conexão", e)
+                    runCatching { Thread.sleep(200) }
+                    continue
+                }
+                val ip = client.inetAddress?.hostAddress.orEmpty()
+                val count = perDevice.getOrPut(ip) { AtomicInteger() }
+                if (count.incrementAndGet() > PER_DEVICE) {
+                    count.decrementAndGet()
+                    runCatching { client.close() }
+                    continue
+                }
+                open += client
+                runCatching { workers.execute { try { handle(client) } finally { done(client, ip) } } }
+                    .onFailure { done(client, ip) }
             }
         }, "entrega-accept").apply { isDaemon = true }.start()
-        AppLog.i("ENTREGA", "Servidor ligado na porta ${server.localPort}")
+        AppLog.i("ENTREGA", "Servidor ligado na porta ${server.localPort}" + (host?.let { " ($it)" } ?: ""))
         return server.localPort
+    }
+
+    private fun done(client: Socket, ip: String) {
+        runCatching { client.close() }
+        open -= client
+        perDevice[ip]?.decrementAndGet()
     }
 
     @Synchronized
@@ -114,20 +165,30 @@ class LocalServer(
         socket = null
         pool?.shutdownNow()
         pool = null
+        // Downloads in the middle stop too: Parar means nothing leaves the phone any more.
+        open.forEach { runCatching { it.close() } }
+        open.clear()
+        perDevice.clear()
+        expressKeys.clear()
         seen.clear()
         _online.value = 0
     }
 
     // ---- one request -------------------------------------------------------------------------
 
-    private class Request(val method: String, val path: String, val query: Map<String, String>, val headers: Map<String, String>, val ip: String)
+    private class Request(val method: String, val path: String, val query: Map<String, String>, val headers: Map<String, String>, val ip: String) {
+        fun cookie(name: String): String? = headers["cookie"]?.split(';')?.map { it.trim() }
+            ?.firstOrNull { it.startsWith("$name=") }?.substringAfter('=')
+    }
 
     private fun handle(client: Socket) = client.use { s ->
-        s.soTimeout = 20_000
+        s.soTimeout = READ_TIMEOUT_MS
         val input = BufferedInputStream(s.getInputStream())
         val out = s.getOutputStream()
         val ip = s.inetAddress?.hostAddress.orEmpty()
-        val request = runCatching { read(input, ip) }.getOrNull()
+        // The whole request head has to arrive in time: a device sending one byte at a time can't hold a worker.
+        val deadline = System.nanoTime() + HEAD_DEADLINE_MS * 1_000_000L
+        val request = runCatching { read(input, ip, deadline) }.getOrNull()
         if (request == null) {
             runCatching { text(out, 400, "Pedido inválido") }
             return@use
@@ -141,13 +202,13 @@ class LocalServer(
         }
     }
 
-    private fun read(input: InputStream, ip: String): Request? {
-        val line = readLine(input) ?: return null
+    private fun read(input: InputStream, ip: String, deadline: Long): Request? {
+        val line = readLine(input, deadline) ?: return null
         val parts = line.split(' ')
         if (parts.size < 2) return null
         val headers = HashMap<String, String>()
         while (true) {
-            val h = readLine(input) ?: break
+            val h = readLine(input, deadline) ?: break
             if (h.isEmpty()) break
             val i = h.indexOf(':')
             if (i > 0) headers[h.substring(0, i).trim().lowercase()] = h.substring(i + 1).trim()
@@ -163,9 +224,10 @@ class LocalServer(
         return Request(parts[0].uppercase(), path, query, headers, ip)
     }
 
-    private fun readLine(input: InputStream): String? {
+    private fun readLine(input: InputStream, deadline: Long): String? {
         val sb = StringBuilder()
         while (true) {
+            if (System.nanoTime() > deadline) return null
             val b = input.read()
             if (b < 0) return if (sb.isEmpty()) null else sb.toString()
             if (b == '\n'.code) return sb.toString().trimEnd('\r')
@@ -185,7 +247,7 @@ class LocalServer(
             seg.size == 1 && seg[0] in ASSETS -> asset(out, seg[0], head)
             seg == listOf("api", "ping") -> json(out, 200, """{"ok":true}""")
             seg == listOf("api", "login") && !expressServer -> login(r, out)
-            seg == listOf("api", "express") && expressServer -> express(out)
+            seg == listOf("api", "express") && expressServer -> express(r, out)
             seg.size == 3 && seg[0] == "api" && seg[1] == "s" -> sessionJson(seg[2], out)
             seg.size == 5 && seg[0] == "api" && seg[1] == "s" && seg[3] == "pick" && r.method == "POST" -> pick(seg[2], seg[4], r, out)
             seg.size == 4 && seg[0] == "api" && seg[1] == "s" && seg[3] == "name" && r.method == "POST" -> name(seg[2], r, out)
@@ -210,17 +272,32 @@ class LocalServer(
             AppLog.i("ENTREGA", "Código errado de ${r.ip}")
             return json(out, 401, """{"error":"Código não encontrado. Confira com o fotógrafo."}""")
         }
-        limiter.reset(r.ip)
         json(out, 200, """{"token":"${session.token}"}""")
     }
 
-    /** Fotografia Express: the open gallery, no code. Only while the module is on. */
-    private fun express(out: OutputStream) {
+    /**
+     * Fotografia Express: the open gallery, no code. Only while the module is on. The device gets a key
+     * (cookie) for this client's page; a device that already has one keeps it.
+     */
+    private fun express(r: Request, out: OutputStream) {
         if (!info().express) return json(out, 404, """{"error":"Sem entrega express agora."}""")
         val session = runBlocking { dao.openExpress() }?.takeIf { it.isValid(clock()) }
             ?: return json(out, 404, """{"error":"Sem entrega express agora."}""")
-        json(out, 200, """{"token":"${session.token}"}""")
+        val keys = expressKeys.getOrPut(session.id) { ConcurrentHashMap.newKeySet() }
+        val key = r.cookie(DEVICE_COOKIE)?.takeIf { it in keys } ?: DeliveryRules.newToken().also { new ->
+            // Old keys go first if a crowd joined, so the list stays small.
+            if (keys.size >= 30) keys.remove(keys.first())
+            keys += new
+        }
+        bytes(
+            out, 200, "application/json; charset=utf-8", """{"token":"${session.token}"}""",
+            listOf("Set-Cookie" to "$DEVICE_COOKIE=$key; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400"),
+        )
     }
+
+    /** An Express client's page changes only from a device that joined it; the Entrega local has its own code. */
+    private fun joined(session: DeliverySession, r: Request): Boolean =
+        !session.express || r.cookie(DEVICE_COOKIE)?.let { it in expressKeys[session.id].orEmpty() } == true
 
     /** An Express photo not released yet while the preview mode is on: only its marked preview leaves the phone. */
     private fun locked(session: DeliverySession, item: DeliveryItem): Boolean =
@@ -289,6 +366,7 @@ class LocalServer(
     private fun pick(token: String, id: String, r: Request, out: OutputStream) {
         if (!info().picks) return json(out, 403, """{"error":"Favoritas desligadas pelo fotógrafo."}""")
         val (session, item) = itemOf(token, id) ?: return json(out, 404, """{"error":"Foto não encontrada"}""")
+        if (!joined(session, r)) return json(out, 403, """{"error":"Abra a página de novo pelo QR.","rekey":true}""")
         val on = r.query["on"] != "0"
         runBlocking {
             dao.setPicked(item.id, on)
@@ -330,6 +408,7 @@ class LocalServer(
     private fun name(token: String, r: Request, out: OutputStream) {
         val session = validSession(token) ?: return json(out, 404, """{"error":"Acesso encerrado"}""")
         if (!session.express) return json(out, 403, """{"error":"O nome já foi cadastrado pelo fotógrafo"}""")
+        if (!joined(session, r)) return json(out, 403, """{"error":"Abra a página de novo pelo QR.","rekey":true}""")
         val typed = cleanName(r.query["n"].orEmpty()) ?: return json(out, 400, """{"error":"Digite seu nome"}""")
         if (session.client == EXPRESS_DEFAULT || session.client.isBlank()) {
             runBlocking { dao.updateSession(session.copy(client = typed)) }
@@ -408,9 +487,9 @@ class LocalServer(
 
     private fun text(out: OutputStream, status: Int, body: String) = bytes(out, status, "text/plain; charset=utf-8", body)
 
-    private fun bytes(out: OutputStream, status: Int, type: String, body: String) {
+    private fun bytes(out: OutputStream, status: Int, type: String, body: String, extra: List<Pair<String, String>> = emptyList()) {
         val data = body.toByteArray()
-        writeHead(out, status, listOf("Content-Type" to type, "Content-Length" to data.size.toString(), "Cache-Control" to "no-store"))
+        writeHead(out, status, listOf("Content-Type" to type, "Content-Length" to data.size.toString(), "Cache-Control" to "no-store") + extra)
         out.write(data)
         out.flush()
     }
@@ -434,6 +513,13 @@ class LocalServer(
 
     companion object {
         private const val WORKERS = 6
+        /** Connections waiting for a worker; more than this are turned away. */
+        private const val QUEUE = 48
+        /** Open connections per device: a browser uses up to 6 at once, so 8 never gets in a client's way. */
+        private const val PER_DEVICE = 8
+        private const val READ_TIMEOUT_MS = 10_000
+        private const val HEAD_DEADLINE_MS = 10_000L
+        private const val DEVICE_COOKIE = "jrx"
         private val TOKEN = Regex("[0-9a-f]{32}")
         const val EXPRESS_DEFAULT = "Express"
 

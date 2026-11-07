@@ -110,6 +110,7 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
     val allItems by app.express.items.collectAsState(initial = emptyList())
     val selected = remember { mutableStateListOf<Long>() }
     var finishing by remember { mutableStateOf(false) }
+    var confirmUnlock by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
     val s = settings ?: return
 
@@ -220,7 +221,11 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
                     }
                     Switch(
                         checked = s.expressPreview,
-                        onCheckedChange = { scope.launch { app.settings.set(SettingKeys.expressPreview, it) } },
+                        onCheckedChange = { on ->
+                            // Turning the preview off frees every photo not paid yet, so it asks first.
+                            if (!on && items.any { !it.released }) confirmUnlock = true
+                            else scope.launch { app.settings.set(SettingKeys.expressPreview, on) }
+                        },
                         colors = SwitchDefaults.colors(checkedTrackColor = Tone.Accent, checkedThumbColor = Tone.OnAccent),
                     )
                 }
@@ -347,6 +352,28 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
             }
             Spacer(Modifier.height(80.dp))
         }
+    }
+
+    if (confirmUnlock) {
+        val unpaid = items.count { !it.released }
+        AlertDialog(
+            onDismissRequest = { confirmUnlock = false },
+            containerColor = Tone.Surface,
+            title = { Text("Liberar todas as fotos?") },
+            text = {
+                Text(
+                    "Com o modo prévia desligado, o cliente baixa sem marca " +
+                        (if (unpaid == 1) "a foto que ainda não foi paga." else "as $unpaid fotos que ainda não foram pagas."),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmUnlock = false
+                    scope.launch { app.settings.set(SettingKeys.expressPreview, false) }
+                }) { Text("Desligar mesmo assim") }
+            },
+            dismissButton = { TextButton(onClick = { confirmUnlock = false }) { Text("Manter a prévia") } },
+        )
     }
 
     if (charging) {

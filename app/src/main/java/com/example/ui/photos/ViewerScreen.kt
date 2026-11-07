@@ -117,6 +117,9 @@ import java.util.Date
 import java.util.Locale
 import androidx.compose.material.icons.outlined.FilterNone
 import com.example.ui.components.pressScale
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.draw.drawWithContent
 
 @Composable
 fun ViewerScreen(
@@ -275,8 +278,32 @@ fun ViewerScreen(
                     }
                 }
                 HorizontalDivider(color = Tone.Line, modifier = Modifier.padding(vertical = 6.dp))
-                // What to do with the photo, as icons with their names.
-                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                // What to do with the photo, as icons with their names. With many tools on, the row slides
+                // sideways (a fade on the edge shows there is more) instead of cutting the last ones off.
+                val actionScroll = rememberScrollState()
+                val edge = Tone.Background
+                androidx.compose.foundation.layout.BoxWithConstraints(
+                    Modifier.fillMaxWidth().drawWithContent {
+                        drawContent()
+                        val w = 32.dp.toPx()
+                        if (actionScroll.canScrollForward) {
+                            drawRect(
+                                androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Color.Transparent, edge), startX = size.width - w, endX = size.width),
+                                topLeft = androidx.compose.ui.geometry.Offset(size.width - w, 0f),
+                            )
+                        }
+                        if (actionScroll.canScrollBackward) {
+                            drawRect(
+                                androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(edge, Color.Transparent), startX = 0f, endX = w),
+                                size = androidx.compose.ui.geometry.Size(w, size.height),
+                            )
+                        }
+                    },
+                ) {
+                Row(
+                    Modifier.horizontalScroll(actionScroll).widthIn(min = maxWidth).padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
                     SetMenuTile(
                         label = "Lightroom",
                         sets = actions.availableSets(current, settings, includeLight = false),
@@ -305,6 +332,7 @@ fun ViewerScreen(
                         ActionTile(Icons.AutoMirrored.Outlined.StickyNote2, "Nota", selected = current.note != null || current.audioNote != null) { noteFor = current }
                     }
                     ActionTile(Icons.AutoMirrored.Outlined.OpenInNew, "Abrir com") { actions.openWith(current) }
+                }
                 }
             }
         }

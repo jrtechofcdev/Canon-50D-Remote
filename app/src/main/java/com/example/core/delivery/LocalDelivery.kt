@@ -231,7 +231,7 @@ class LocalDelivery(
             AppLog.w(tag, "Rede não ligou: $reason")
             return DeliveryStatus.Failed(reason).also { _status.value = it }
         }
-        val port = runCatching { withContext(Dispatchers.IO) { server.start(mode.port) } }.getOrElse {
+        val port = runCatching { withContext(Dispatchers.IO) { server.start(mode.port, state.host) } }.getOrElse {
             runCatching { net.stop() }
             return DeliveryStatus.Failed("O servidor não ligou: ${it.message}").also { s2 -> _status.value = s2 }
         }

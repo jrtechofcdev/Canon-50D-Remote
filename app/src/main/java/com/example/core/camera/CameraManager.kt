@@ -204,7 +204,9 @@ class CameraManager(
     }
 
     private fun open(dev: UsbDevice) {
-        if (_state.value is ConnectionState.Connected) return
+        // Two "permission granted" answers (two taps on Conectar) must not open the camera twice: the
+        // second connection would replace the first without ever closing it.
+        if (_state.value is ConnectionState.Connected || session != null) return
         _state.value = ConnectionState.Connecting
         val iface = stillImageInterface(dev)
         val endpoints = iface?.let { UsbPtpTransport.endpointsOf(it) }
@@ -261,6 +263,9 @@ class CameraManager(
                 closeSession()
                 _state.value = ConnectionState.Failed(e.message ?: "Falha na comunicação com a câmera")
                 if (wasConnected) _lostConnection.tryEmit("Conexão com a câmera perdida")
+            } else {
+                // A session that was already replaced still holds the USB interface: let it go.
+                runCatching { ptp.close() }
             }
         }
     }
@@ -313,9 +318,10 @@ class CameraManager(
     fun capture(waitSeconds: Int = 5, focusFirst: Boolean = false) {
         val ptp = session ?: return
         val info = deviceInfo ?: return
-        if (_shutter.value is ShutterState.Focusing) return
+        // Marked busy before anything starts, so a double tap fires once.
+        val before = _shutter.value
+        if (before is ShutterState.Focusing || !_shutter.compareAndSet(before, ShutterState.Focusing(0))) return
         scope.launch {
-            _shutter.value = ShutterState.Focusing(0)
             val inLive = liveJob?.isActive == true
             liveHold = true
             try {
@@ -612,7 +618,8 @@ class CameraManager(
     fun startBracket(shots: Int, stepThirds: Int) {
         val ptp = session ?: return
         val info = deviceInfo ?: return
-        if (_bracketing.value != null) return
+        // Taken before anything starts, so a double tap runs one bracket.
+        if (!_bracketing.compareAndSet(null, BracketState(0, shots))) return
         scope.launch {
             val mode = _status.value.value(EosProp.SHOOTING_MODE)
             val useShutter = mode == MODE_M
@@ -620,6 +627,7 @@ class CameraManager(
             val base = _status.value.value(prop)
             if (base == null || (useShutter && !EosValues.isKnownShutter(base))) {
                 _messages.tryEmit("Bracketing indisponível: a câmera ainda não informou a exposição")
+                _bracketing.value = null
                 return@launch
             }
             val offsets = Bracket.offsets(shots, stepThirds)

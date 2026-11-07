@@ -170,7 +170,7 @@ Uma ferramenta separada da Entrega local, com aba, rede, senha, página e ajuste
 3. Com o **Modo prévia** ligado, ele vê as fotos com marca d'água e não consegue baixar. Pode marcar as favoritas com o coração.
    Ao entrar, a página pergunta o nome do cliente e passa a tratá-lo pelo nome. Quando ele curte uma foto, você recebe a notificação "Ana gostou de uma foto". Com **Ajustes → Pagamentos** preenchido, a página mostra os valores numa linha discreta e o botão **Pagar**, que abre o QR do Pix com o total exato.
 4. Depois do pagamento, marque as fotos e toque em **Liberar**, ou em **Liberar favoritas** ou **Liberar todas**. No celular do cliente, elas viram a versão limpa e o botão **Salvar foto** aparece.
-5. **Finalizar e limpar para o próximo cliente** encerra o atendimento, apaga as cópias e deixa o portal vazio para o próximo.
+5. **Finalizar e limpar para o próximo cliente** encerra o atendimento, apaga as cópias e deixa o portal vazio para o próximo. A página que estava aberta no celular do cliente mostra "Atendimento encerrado" e não passa para o próximo; só o celular que abriu a página do cliente pode marcar favoritas e dizer o nome.
 
 Para mandar fotos ao cliente, use o botão **Mandar fotos** na aba, ou **Express** na galeria, no visualizador e na Sessão. Para mandar a mesma foto com outro preset, veja [Versões da mesma foto](#versões-da-mesma-foto). Com **Fotos novas entram sozinhas** ligado, cada foto da câmera já vai direto. O pagamento é com você: o app só guarda a decisão de liberar.
 
@@ -272,7 +272,7 @@ O app escreve um diário em arquivo no celular (um por dia, os últimos 10 dias)
 
 - **Ajustes → Perfis e backup** tem sets prontos (Casamento / igreja, Ensaio externo, Evento / festa, Estúdio / produto). Deixe o app do seu jeito e salve como perfil. Na Sessão, o chip **Perfil** troca tudo em um toque.
 - Pastas, PIN, nome da sessão e contatos não mudam com o perfil.
-- **Backup dos ajustes:** salva um .json com ajustes, perfis e presets. Em **Restaurar**, os ajustes do arquivo substituem os atuais, e perfis e presets são somados aos que você já tem.
+- **Backup dos ajustes:** salva um .json com ajustes, perfis e presets. Em **Restaurar**, os ajustes do arquivo substituem os atuais, e perfis e presets são somados aos que você já tem. Senhas, PIN do modo cliente, chave Pix e contatos só entram se você ligar **Incluir senhas e chave Pix**; sem eles no arquivo, os do celular ficam como estão.
 
 <details>
 <summary><b>Se algo der errado</b></summary>

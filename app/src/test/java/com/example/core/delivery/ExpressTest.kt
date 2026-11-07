@@ -157,19 +157,53 @@ class ExpressTest {
         assertEquals(listOf(true, false), made)
     }
 
+    /** Joins the Express page like a phone does and returns the device cookie it got. */
+    private fun join(): String {
+        val c = URL("http://127.0.0.1:$port/api/express").openConnection() as HttpURLConnection
+        assertEquals(200, c.responseCode)
+        return c.getHeaderField("Set-Cookie")!!.substringBefore(';')
+    }
+
+    private fun post(path: String, cookie: String? = null, at: Int = port): Int {
+        val c = URL("http://127.0.0.1:$at$path").openConnection() as HttpURLConnection
+        c.requestMethod = "POST"
+        cookie?.let { c.setRequestProperty("Cookie", it) }
+        return c.responseCode
+    }
+
+    @Test
+    fun onlyAPhoneThatJoinedCanHeartOrName() {
+        val (s, item) = express()
+        // A phone that never opened this client's page (or one left over from the client before) can't touch it.
+        assertEquals(403, post("/api/s/${s.token}/pick/${item.id}?on=1"))
+        assertEquals(403, post("/api/s/${s.token}/pick/${item.id}?on=1", cookie = "jrx=" + "0".repeat(32)))
+        assertEquals(403, post("/api/s/${s.token}/name?n=Intruso"))
+        assertEquals(false, runBlocking { db.deliveryDao().item(item.id)!!.picked })
+        val cookie = join()
+        assertEquals(200, post("/api/s/${s.token}/pick/${item.id}?on=1", cookie))
+        assertEquals(true, runBlocking { db.deliveryDao().item(item.id)!!.picked })
+        // The same phone joining again keeps its key.
+        val c = URL("http://127.0.0.1:$port/api/express").openConnection() as HttpURLConnection
+        c.setRequestProperty("Cookie", cookie)
+        assertEquals(cookie, c.getHeaderField("Set-Cookie")!!.substringBefore(';'))
+        // After Finalizar the old key means nothing for the next client.
+        runBlocking { db.deliveryDao().closeSession(s.id, 5) }
+        val next = runBlocking {
+            val n = DeliverySession(client = "Express", code = "5555", token = "f".repeat(32), createdAt = 6, express = true)
+            n.copy(id = db.deliveryDao().insertSession(n))
+        }
+        assertEquals(403, post("/api/s/${next.token}/name?n=Ana", cookie))
+    }
+
     @Test
     fun theExpressClientSaysTheirNameOnce() {
         val (s, _) = express()
-        fun post(path: String, at: Int = port): Int {
-            val c = URL("http://127.0.0.1:$at$path").openConnection() as HttpURLConnection
-            c.requestMethod = "POST"
-            return c.responseCode
-        }
-        assertEquals(400, post("/api/s/${s.token}/name?n=%20"))
-        assertEquals(200, post("/api/s/${s.token}/name?n=Ana%20Clara"))
+        val cookie = join()
+        assertEquals(400, post("/api/s/${s.token}/name?n=%20", cookie))
+        assertEquals(200, post("/api/s/${s.token}/name?n=Ana%20Clara", cookie))
         assertEquals("Ana Clara", runBlocking { db.deliveryDao().session(s.id)!!.client })
         // Once named, another phone can't rename them.
-        assertEquals(200, post("/api/s/${s.token}/name?n=Outro"))
+        assertEquals(200, post("/api/s/${s.token}/name?n=Outro", cookie))
         assertEquals("Ana Clara", runBlocking { db.deliveryDao().session(s.id)!!.client })
         assertEquals("Ana", LocalServer.cleanName("  Ana \n "))
     }

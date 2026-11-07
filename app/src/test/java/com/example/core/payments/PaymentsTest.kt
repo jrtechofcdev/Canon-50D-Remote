@@ -28,6 +28,37 @@ class PaymentsTest {
     }
 
     @Test
+    fun keysTheBrCodeCantCarryAreFlagged() {
+        assertNull(PixCode.keyProblem("", "email"))
+        assertNull(PixCode.keyProblem("jr.tech.ofc@gmail.com", "email"))
+        assertEquals("Confira o e-mail", PixCode.keyProblem("jr.tech.ofc", "email"))
+        assertTrue(PixCode.keyProblem("joão@gmail.com", "email")!!.contains("acento"))
+        assertTrue(PixCode.keyProblem("a".repeat(70) + "@gmail.com", "email")!!.contains("longa"))
+        assertNull(PixCode.keyProblem("123.456.789-01", "cpf"))
+        assertEquals("O CPF precisa de 11 números", PixCode.keyProblem("123.456.789", "cpf"))
+        assertNull(PixCode.keyProblem("123e4567-e12b-12d1-a456-426655440000", "random"))
+        // A trunk 0 before the area code is dropped.
+        assertEquals("+5581999990000", PixCode.normalizeKey("081 99999-0000", "phone"))
+        assertNull(PixCode.keyProblem("081 99999-0000", "phone"))
+        // No Pix code is made from a key the bank would refuse.
+        val s = Settings(pixKey = "jr.tech.ofc", pixKeyType = "email", payMethods = "pix")
+        assertNull(PricePlan.pix(s, 100))
+    }
+
+    @Test
+    fun amountsUseDotsWhateverThePhoneLanguage() {
+        val before = java.util.Locale.getDefault()
+        try {
+            java.util.Locale.setDefault(java.util.Locale.forLanguageTag("ar-EG"))
+            val code = PixCode.payload("x@y.com", "A", "B", 1234)
+            assertTrue(code, code.contains("540512.34"))
+            assertEquals(PixCode.crc16(code.dropLast(4)), code.takeLast(4))
+        } finally {
+            java.util.Locale.setDefault(before)
+        }
+    }
+
+    @Test
     fun theClientAlwaysGetsTheCheapestPrice() {
         val s = Settings(expressPriceCents = 1500, payPackPhotos = 5, payPackCents = 6000, payAllCents = 10000)
         assertEquals(4500, PricePlan.quote(s, 3, 20)!!.cents)

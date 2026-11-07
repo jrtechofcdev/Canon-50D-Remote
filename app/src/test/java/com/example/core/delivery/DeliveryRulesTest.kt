@@ -63,6 +63,17 @@ class DeliveryRulesTest {
     }
 
     @Test
+    fun manyDevicesTogetherAreBlockedToo() {
+        var now = 0L
+        val limiter = AttemptLimiter(clock = { now })
+        // Four wrong codes each from five addresses: none of them alone is blocked yet, but all together are.
+        (1..5).forEach { d -> repeat(4) { limiter.failed("10.0.0.$d") } }
+        assertTrue(limiter.blocked("10.0.0.99"))
+        now += 60_000
+        assertFalse(limiter.blocked("10.0.0.99"))
+    }
+
+    @Test
     fun autoModeLeavesOutBadFramesButNeverOneItCouldNotCheck() {
         val good = com.example.core.data.Photo(session = "S", baseName = "A", savedBase = "A", capturedAt = 1, score = 80f)
         assertNull(DeliveryRules.autoQualityProblem(good, skipBlurry = true, skipEyes = true))

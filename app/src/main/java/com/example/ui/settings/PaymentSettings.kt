@@ -55,7 +55,8 @@ fun PaymentSettings(app: TetherApp, s: Settings) {
             value = key,
             onValueChange = { key = it.take(80); scope.launch { app.settings.set(SettingKeys.pixKey, key) } },
             label = { Text("Chave Pix") },
-            supportingText = { Text("A mesma do campo {pix} das mensagens") },
+            isError = com.example.core.payments.PixCode.keyProblem(key, s.pixKeyType) != null,
+            supportingText = { Text(com.example.core.payments.PixCode.keyProblem(key, s.pixKeyType) ?: "A mesma do campo {pix} das mensagens") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         )

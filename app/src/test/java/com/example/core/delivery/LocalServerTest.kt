@@ -114,6 +114,54 @@ class LocalServerTest {
     }
 
     @Test
+    fun aRightCodeDoesNotResetTheWrongOnes() {
+        twoClients()
+        // Someone with a valid code tries to keep guessing others between successes: it doesn't help.
+        repeat(4) { assertEquals(401, call("/api/login?code=${1000 + it}").status) }
+        assertEquals(200, call("/api/login?code=1122").status)
+        assertEquals(401, call("/api/login?code=2000").status)
+        assertEquals(429, call("/api/login?code=2001").status)
+    }
+
+    @Test
+    fun aDeviceSendingSlowlyIsCutOff() {
+        twoClients()
+        // A request head that never ends (one byte now and then) can't hold a worker past the deadline.
+        val slow = java.net.Socket("127.0.0.1", port)
+        slow.soTimeout = 15_000
+        slow.getOutputStream().write("GET /api/ping HTTP/1.1\r\n".toByteArray())
+        val started = System.currentTimeMillis()
+        val reply = runCatching {
+            while (System.currentTimeMillis() - started < 14_000) {
+                slow.getOutputStream().write("X-Slow: 1\r\n".toByteArray())
+                slow.getOutputStream().flush()
+                Thread.sleep(500)
+            }
+            null
+        }.exceptionOrNull()
+        val waited = System.currentTimeMillis() - started
+        slow.close()
+        // The server closed the connection (writes start failing) a little after its 10 s deadline.
+        assertTrue("cut after $waited ms", reply != null && waited < 14_000)
+        // Meanwhile everyone else is still served.
+        assertEquals(200, call("/api/ping").status)
+    }
+
+    @Test
+    fun manyConnectionsFromOneDeviceAreTurnedAway() {
+        twoClients()
+        val held = (1..12).map { java.net.Socket("127.0.0.1", port) }
+        // The extra connections are closed right away: reading from one of them ends at once.
+        val closed = held.count { s ->
+            s.soTimeout = 2_000
+            runCatching { s.getInputStream().read() == -1 }.getOrDefault(false)
+        }
+        held.forEach { it.close() }
+        assertTrue("closed $closed", closed >= 4)
+        assertEquals(200, call("/api/ping").status)
+    }
+
+    @Test
     fun closedSessionStopsWorking() {
         val (a, _, _) = twoClients()
         runBlocking { db.deliveryDao().closeSession(a.id, 5) }

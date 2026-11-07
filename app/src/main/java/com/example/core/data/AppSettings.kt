@@ -534,7 +534,13 @@ class SettingsRepository(private val context: Context) {
     suspend fun apply(values: Map<String, Any>, replace: Boolean = false, keep: Set<String> = emptySet()) {
         context.dataStore.edit { prefs ->
             if (replace) prefs.asMap().keys.filter { it.name !in keep && it.name !in values }.forEach { prefs.remove(it) }
-            values.forEach { (name, value) -> SettingsProfiles.keyFor(name, value)?.let { prefs[it] = value } }
+            values.forEach { (name, value) ->
+                if (!SettingsProfiles.typeFits(name, value)) {
+                    com.example.core.log.AppLog.w("AJUSTES", "Ignorado: $name com tipo errado (${value::class.java.simpleName})")
+                    return@forEach
+                }
+                SettingsProfiles.keyFor(name, value)?.let { prefs[it] = value }
+            }
         }
     }
 

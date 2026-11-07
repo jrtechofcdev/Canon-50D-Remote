@@ -2,6 +2,38 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [4.5] · 2026-11-07
+
+Primeira etapa das correções da auditoria: segurança da entrega e bugs.
+
+- **Código do cliente mais protegido (Entrega local):**
+  - antes, um código certo zerava o contador de erros: quem tinha um código válido podia ficar tentando adivinhar os dos outros clientes;
+  - agora os erros continuam contando;
+  - também há um limite para todos os aparelhos juntos, então trocar de aparelho não ajuda.
+- **Fotografia Express mais reservada:**
+  - quando você finaliza um cliente, a página dele mostra "Atendimento encerrado. Obrigado!" e para ali; antes ela entrava sozinha na galeria do próximo cliente;
+  - só o celular que abriu a página do cliente pode marcar favoritas e dizer o nome, e um aparelho esquecido no Wi-Fi não muda o pedido de ninguém;
+  - desligar o **Modo prévia** com fotos ainda não pagas pede confirmação, porque libera todas.
+- **Servidor da entrega mais firme:**
+  - ele só atende pela rede da entrega, não pelo Wi-Fi do local nem pelos dados móveis;
+  - um aparelho que manda pedidos aos pouquinhos é desconectado em 10 s, sem travar a página dos outros;
+  - cada aparelho tem um limite de conexões ao mesmo tempo;
+  - **Parar** corta na hora os downloads em andamento.
+- **Câmera:**
+  - dois toques rápidos em Conectar não abrem mais a câmera duas vezes; a segunda conexão ficava presa;
+  - dois toques no disparador ou no bracketing disparam uma vez só.
+- **Visualizador:** com muitas ferramentas ligadas, a fileira de ícones rola para o lado, com um esmaecido na borda, em vez de cortar os últimos.
+- **Pix:**
+  - Ajustes → Pagamentos avisa quando a chave não serve para o Pix (e-mail incompleto, CPF sem 11 números, acento, chave longa demais);
+  - com a chave errada, o app não gera um QR que o banco recusaria;
+  - telefone digitado com 0 antes do DDD ("081…") sai certo;
+  - o valor sai com ponto em qualquer idioma do celular.
+- **Backup dos ajustes:**
+  - o arquivo sai sem senhas, PIN do modo cliente, chave Pix e contatos, a menos que você ligue **Incluir senhas e chave Pix**;
+  - ao restaurar um arquivo sem esses dados, os do celular ficam como estão;
+  - um ajuste com tipo errado (arquivo editado à mão) é ignorado, em vez de travar o app;
+  - o backup automático do Google deixa de fora o banco de fotos e clientes, que só vale neste celular.
+
 ## [4.4] · 2026-10-03
 
 - **Versões da mesma foto:**

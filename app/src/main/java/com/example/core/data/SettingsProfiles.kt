@@ -59,6 +59,47 @@ object SettingsProfiles {
         SettingKeys.expressFolder, SettingKeys.expressPassword, SettingKeys.pixName, SettingKeys.pixCity, PROFILES, ACTIVE,
     ).map { it.name }.toSet()
 
+    /** Private: left out of a backup file unless the photographer asks to include them. */
+    val secrets: Set<String> = setOf(
+        SettingKeys.pixKey, SettingKeys.deliveryPassword, SettingKeys.expressPassword, SettingKeys.clientPin,
+        SettingKeys.recentContacts,
+    ).map { it.name }.toSet()
+
+    /**
+     * The type each option is stored with, read from [SettingKeys] itself, so a value of the wrong type
+     * (a hand-edited backup, an old profile) is turned away instead of breaking every later read.
+     */
+    private val types: Map<String, Class<*>> by lazy {
+        SettingKeys::class.java.declaredFields.mapNotNull { f ->
+            val generic = f.genericType as? java.lang.reflect.ParameterizedType ?: return@mapNotNull null
+            if (generic.rawType != Preferences.Key::class.java) return@mapNotNull null
+            var arg = generic.actualTypeArguments.firstOrNull()
+            if (arg is java.lang.reflect.WildcardType) arg = arg.upperBounds.firstOrNull()
+            val cls = when (arg) {
+                is java.lang.reflect.ParameterizedType -> arg.rawType as? Class<*>
+                is Class<*> -> arg
+                else -> null
+            } ?: return@mapNotNull null
+            f.isAccessible = true
+            val key = runCatching { f.get(SettingKeys) as Preferences.Key<*> }.getOrNull() ?: return@mapNotNull null
+            key.name to cls
+        }.toMap()
+    }
+
+    /** True when [value] can go into the option [name] (options the app doesn't know are left alone). */
+    fun typeFits(name: String, value: Any): Boolean {
+        val expected = types[name] ?: return true
+        val boxed = when (expected) {
+            java.lang.Boolean.TYPE -> java.lang.Boolean::class.java
+            java.lang.Integer.TYPE -> java.lang.Integer::class.java
+            java.lang.Long.TYPE -> java.lang.Long::class.java
+            java.lang.Float.TYPE -> java.lang.Float::class.java
+            java.lang.Double.TYPE -> java.lang.Double::class.java
+            else -> expected
+        }
+        return boxed.isInstance(value)
+    }
+
     /** Left out of a backup file: folder permissions and preset ids don't carry over to another phone. */
     val deviceOnly: Set<String> = setOf(
         SettingKeys.jpgFolder, SettingKeys.rawFolder, SettingKeys.presetsFolder, SettingKeys.editedFolder,

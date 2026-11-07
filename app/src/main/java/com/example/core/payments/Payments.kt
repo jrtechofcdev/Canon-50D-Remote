@@ -15,13 +15,37 @@ object PixCode {
         return when (type) {
             "cpf", "cnpj" -> k.filter(Char::isDigit)
             "phone" -> {
-                val digits = k.filter(Char::isDigit)
+                // A leading 0 (trunk prefix, "011…") is not part of the number in the BR Code.
+                val digits = k.filter(Char::isDigit).let { if (k.startsWith("+")) it else it.trimStart('0') }
                 if (k.startsWith("+")) "+$digits" else if (digits.startsWith("55") && digits.length >= 12) "+$digits" else "+55$digits"
             }
             "email" -> k.lowercase()
             else -> k
         }
     }
+
+    /**
+     * What is wrong with the key for a BR Code, in words for Ajustes, or null when it is fine (or empty:
+     * then there is simply no Pix). The code only carries plain ASCII and the key has to fit its field.
+     */
+    fun keyProblem(key: String, type: String): String? {
+        if (key.isBlank()) return null
+        val k = normalizeKey(key, type)
+        if (k.any { it.code > 126 || it.code < 32 }) return "A chave tem acento ou símbolo que o Pix não aceita"
+        if (k.length > MAX_KEY) return "Chave longa demais para o Pix (até $MAX_KEY caracteres)"
+        val digits = k.count(Char::isDigit)
+        return when (type) {
+            "cpf" -> "O CPF precisa de 11 números".takeIf { digits != 11 }
+            "cnpj" -> "O CNPJ precisa de 14 números".takeIf { digits != 14 }
+            "phone" -> "Confira o telefone com DDD".takeIf { digits !in 12..13 }
+            "email" -> "Confira o e-mail".takeIf { !Regex("[^@\\s]+@[^@\\s]+\\.[^@\\s]+").matches(k) }
+            "random" -> "A chave aleatória tem 36 caracteres, com hífens".takeIf { k.length != 36 }
+            else -> null
+        }
+    }
+
+    /** The key field (account info, id 26) holds at most 99 characters; the GUI and its own header take 22. */
+    private const val MAX_KEY = 77
 
     /** Upper case, no accents, only what the BR Code accepts, cut to [max]. */
     fun plain(text: String, max: Int): String =
@@ -36,7 +60,7 @@ object PixCode {
             append(field("26", account))
             append(field("52", "0000"))
             append(field("53", "986"))
-            if (amountCents != null && amountCents > 0) append(field("54", "%d.%02d".format(amountCents / 100, amountCents % 100)))
+            if (amountCents != null && amountCents > 0) append(field("54", "%d.%02d".format(java.util.Locale.ROOT, amountCents / 100, amountCents % 100)))
             append(field("58", "BR"))
             append(field("59", plain(name, 25).ifEmpty { "RECEBEDOR" }))
             append(field("60", plain(city, 15).ifEmpty { "BRASIL" }))
@@ -54,7 +78,7 @@ object PixCode {
             repeat(8) { crc = if (crc and 0x8000 != 0) (crc shl 1) xor 0x1021 else crc shl 1 }
             crc = crc and 0xFFFF
         }
-        return "%04X".format(crc)
+        return "%04X".format(java.util.Locale.ROOT, crc)
     }
 }
 
@@ -101,6 +125,8 @@ object PricePlan {
     /** The Pix code for [cents] (null amount = the client types it), or null without a key. */
     fun pix(s: Settings, cents: Int?): String? {
         if (s.pixKey.isBlank() || "pix" !in s.payMethods.split(',')) return null
+        // A key the BR Code can't carry would give a QR the bank refuses: better no Pix than a wrong one.
+        if (PixCode.keyProblem(s.pixKey, s.pixKeyType) != null) return null
         return PixCode.payload(PixCode.normalizeKey(s.pixKey, s.pixKeyType), s.pixName.ifBlank { s.expressPhotographer }, s.pixCity, cents)
     }
 }
