@@ -2,7 +2,7 @@
 
 | Arquivo | Versão | Android |
 |---|---|---|
-| [`JR_C50D_Sync-v4.5.apk`](JR_C50D_Sync-v4.5.apk) | 4.5 | 7.0 ou mais novo |
+| [`JR_C50D_Sync-v4.6.apk`](JR_C50D_Sync-v4.6.apk) | 4.6 | 7.0 ou mais novo |
 
 Para instalar: baixe o arquivo no celular, abra e permita **instalar apps desconhecidos**.
 Atualizações instalam por cima da versão anterior (inclusive do antigo Jr_Link) e mantêm fotos e ajustes.
