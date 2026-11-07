@@ -103,6 +103,12 @@ import androidx.compose.animation.togetherWith
 import com.example.ui.components.pressScale
 import androidx.compose.ui.draw.drawBehind
 import kotlinx.coroutines.launch
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.selectable
 
 /** Framing guides drawn over the live picture. */
 enum class LiveGrid(val id: String, val label: String) {
@@ -499,14 +505,15 @@ private fun FocusGrid(onAf: () -> Unit, onDrive: (Int) -> Unit, onDof: (Boolean)
 @Composable
 private fun AfButton(onAf: () -> Unit) {
     Box(
-        Modifier.size(44.dp).clip(CircleShape).background(Tone.Accent.copy(alpha = 0.2f)).border(1.dp, Tone.Accent, CircleShape).clickable(onClick = onAf),
+        Modifier.size(48.dp).clip(CircleShape).background(Tone.Accent.copy(alpha = 0.2f)).border(1.dp, Tone.Accent, CircleShape).clickable(onClick = onAf),
         contentAlignment = Alignment.Center,
     ) { Icon(Icons.Outlined.CenterFocusStrong, contentDescription = "Focar (AF)", tint = Tone.Accent) }
 }
 
 @Composable
 private fun FocusIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, step: Int, onDrive: (Int) -> Unit, small: Boolean = false) {
-    IconButton(onClick = { onDrive(step) }, modifier = if (small) Modifier.size(32.dp) else Modifier) {
+    // Always a full 48 dp target, even where the icon is drawn small.
+    IconButton(onClick = { onDrive(step) }) {
         Icon(icon, contentDescription = label, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(if (small) 20.dp else 24.dp))
     }
 }
@@ -515,8 +522,18 @@ private fun FocusIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
 @Composable
 private fun HoldIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onHold: (Boolean) -> Unit) {
     var held by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     Box(
-        Modifier.size(44.dp).clip(CircleShape).background(if (held) Tone.Accent else Color.White.copy(alpha = 0.1f))
+        Modifier.size(48.dp).clip(CircleShape).background(if (held) Tone.Accent else Color.White.copy(alpha = 0.1f))
+            // TalkBack can't hold a button: a double tap shows the depth of field for 3 seconds instead.
+            .semantics {
+                contentDescription = label
+                role = androidx.compose.ui.semantics.Role.Button
+                onClick(label) {
+                    scope.launch { held = true; onHold(true); kotlinx.coroutines.delay(3_000); held = false; onHold(false) }
+                    true
+                }
+            }
             .pointerInput(Unit) {
                 detectTapGestures(onPress = {
                     held = true
@@ -570,7 +587,8 @@ private fun ExposureValues(status: com.example.core.camera.CameraStatus, onPick:
 @Composable
 private fun Value(label: String, value: String, enabled: Boolean, onClick: () -> Unit) {
     Column(
-        Modifier.clip(MaterialTheme.shapes.small).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 8.dp, vertical = 2.dp),
+        Modifier.clip(MaterialTheme.shapes.small).clickable(enabled = enabled, onClick = onClick).heightIn(min = 48.dp).padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
@@ -580,13 +598,18 @@ private fun Value(label: String, value: String, enabled: Boolean, onClick: () ->
 
 @Composable
 private fun Pill(label: String, selected: Boolean, compact: Boolean = false, onClick: () -> Unit) {
-    Text(
-        label,
-        style = MaterialTheme.typography.labelLarge,
-        color = if (selected) Tone.OnAccent else Color.White,
-        modifier = Modifier.clip(CircleShape).background(if (selected) Tone.Accent else Color.White.copy(alpha = 0.14f))
-            .clickable(onClick = onClick).padding(horizontal = if (compact) 9.dp else 14.dp, vertical = 8.dp),
-    )
+    Box(
+        Modifier.heightIn(min = 48.dp).clip(CircleShape).selectable(selected = selected, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (selected) Tone.OnAccent else Color.White,
+            modifier = Modifier.clip(CircleShape).background(if (selected) Tone.Accent else Color.White.copy(alpha = 0.14f))
+                .padding(horizontal = if (compact) 9.dp else 14.dp, vertical = 8.dp),
+        )
+    }
 }
 
 @Composable

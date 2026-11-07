@@ -263,19 +263,34 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
                 if (settings.clientWatermark) ClientWatermark(app, settings)
             }
         }
-        // Lying down the actions stand in a column on the side, so the photo keeps its height.
+        // Lying down, the actions and the presets share a column on the side, so the photo keeps the
+        // whole height instead of losing it to a strip of presets underneath.
         if (landscape && current != null && chrome) {
+            val sideWidth = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.34f).dp.coerceIn(200.dp, 320.dp)
             Column(
-                Modifier.fillMaxHeight().width(96.dp).background(Color.White.copy(alpha = 0.06f)).navigationBarsPadding()
+                Modifier.fillMaxHeight().width(sideWidth).background(Color.White.copy(alpha = 0.06f)).navigationBarsPadding()
                     .verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
-            ) { actions(current, Modifier.fillMaxWidth()) }
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(Modifier.fillMaxWidth()) { actions(current, Modifier.weight(1f)) }
+                if (settings.clientPresetsEnabled && presets.isNotEmpty()) {
+                    PresetPicker(
+                        app = app,
+                        presets = presets,
+                        selectedId = current.presetId,
+                        sourceUri = current.displayUri,
+                        onPick = { picked -> scope.launch { app.looks.setLook(current, picked?.id, null) } },
+                        onDark = true,
+                    )
+                }
+                if (settings.clientShowInfo) PhotoInfo(current)
+            }
         }
         }
 
         if (current != null && chrome) {
             if (settings.clientShowInfo && !landscape) PhotoInfo(current)
-            if (settings.clientPresetsEnabled && presets.isNotEmpty()) {
+            if (settings.clientPresetsEnabled && presets.isNotEmpty() && !landscape) {
                 PresetPicker(
                     app = app,
                     presets = presets,
@@ -326,7 +341,7 @@ private val Muted = Color(0xFFBDBDBD)
 /** One round, equal-size slot for a top-bar button, so the icons line up whatever they are. */
 @Composable
 private fun TopIcon(content: @Composable () -> Unit) {
-    Box(Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) { content() }
+    Box(Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) { content() }
 }
 
 /** How long one finger stays still on the screen to leave client mode. */

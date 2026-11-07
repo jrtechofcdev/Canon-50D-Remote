@@ -46,9 +46,13 @@ class MainScreenshotTest {
         save("app_culling")
     }
 
-    /** Entrega and Express have tabs of their own; with eight tabs the bar scrolls sideways. */
+    /** Express gets its tab once it is switched on; Ajustes stays pinned at the end of the bar. */
     @Test
     fun expressTab() {
+        kotlinx.coroutines.runBlocking {
+            rule.activity.application.let { it as com.example.TetherApp }.settings.set(com.example.core.data.SettingKeys.expressEnabled, true)
+        }
+        rule.waitUntil(8_000) { rule.onAllNodes(hasText("Express")).fetchSemanticsNodes().isNotEmpty() }
         val tab = androidx.compose.ui.test.SemanticsMatcher.expectValue(
             androidx.compose.ui.semantics.SemanticsProperties.Role,
             androidx.compose.ui.semantics.Role.Tab,

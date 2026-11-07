@@ -39,6 +39,7 @@ import com.example.ui.theme.ReadoutStyle
 import com.example.ui.theme.Tone
 import kotlin.math.roundToInt
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.selection.toggleable
 
 /** A titled block of related options, with an icon so each block is found at a glance. */
 @Composable
@@ -72,11 +73,12 @@ fun ToggleRow(title: String, detail: String?, checked: Boolean, enabled: Boolean
 /** A switch with its icon on the left, so the option is recognised before reading it. */
 @Composable
 fun ToggleRow(icon: ImageVector?, title: String, detail: String?, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+    // The whole row is one switch for TalkBack: read once with its state, toggled with one double tap.
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .clickable(enabled = enabled) { onChange(!checked) }
+            .toggleable(value = checked, enabled = enabled, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = onChange)
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -87,7 +89,7 @@ fun ToggleRow(icon: ImageVector?, title: String, detail: String?, checked: Boole
         }
         Switch(
             checked = checked,
-            onCheckedChange = onChange,
+            onCheckedChange = null,
             enabled = enabled,
             colors = SwitchDefaults.colors(checkedTrackColor = Tone.Accent, checkedThumbColor = Tone.OnAccent),
         )

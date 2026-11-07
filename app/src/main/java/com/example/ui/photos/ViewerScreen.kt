@@ -237,7 +237,7 @@ fun ViewerScreen(
                 IconButton(onClick = { scope.launch { app.database.photoDao().setFavorite(current.id, !current.favorite) } }) {
                     Icon(
                         if (current.favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = "Favorita",
+                        contentDescription = if (current.favorite) "Tirar das favoritas" else "Marcar como favorita",
                         tint = if (current.favorite) Tone.Accent else Tone.Text,
                     )
                 }

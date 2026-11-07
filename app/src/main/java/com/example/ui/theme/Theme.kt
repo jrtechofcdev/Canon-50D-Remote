@@ -73,11 +73,12 @@ private val NightPalette = Palette(
     SurfaceHigh = Color(0xFF171717),
     Line = Color(0xFF222222),
     Text = Color(0xFFB5B5B5),
-    TextMuted = Color(0xFF6F6F6F),
+    // The darkest grey that still reads (4.9:1 on the night surfaces), so night stays dim but legible.
+    TextMuted = Color(0xFF858585),
     Accent = Color(0xFF00A870),
     OnAccent = Color(0xFF001A11),
     Info = Color(0xFF1290AA),
-    Error = Color(0xFFC75050),
+    Error = Color(0xFFD05E5E),
     GradientStart = Color(0xFF00A870),
     GradientEnd = Color(0xFF1290AA),
 )

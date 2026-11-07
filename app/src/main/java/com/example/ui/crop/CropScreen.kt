@@ -109,6 +109,9 @@ fun CropScreen(app: TetherApp, photoId: Long, onDone: () -> Unit) {
     var drawHorizon by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
+    // What the crop was when the screen opened: leaving with changes asks first, like the editor.
+    var opened by remember { mutableStateOf<CropSpec?>(null) }
+    var confirmExit by remember { mutableStateOf(false) }
 
     LaunchedEffect(photoId) {
         val p = app.database.photoDao().get(photoId) ?: return@LaunchedEffect
@@ -123,7 +126,10 @@ fun CropScreen(app: TetherApp, photoId: Long, onDone: () -> Unit) {
             ratio = CropRatio.of(saved.ratio)
             landscape = saved.width * (source?.width ?: 1) >= saved.height * (source?.height ?: 1)
         }
+        opened = spec
     }
+    val changed = opened != null && spec != opened
+    val leave = { if (changed && !saving) confirmExit = true else onDone() }
 
     // The picture after quarter turns and flips; the straighten angle is drawn on top of it.
     val turned = remember(source, spec.quarterTurns, spec.flipH, spec.flipV) {
@@ -171,11 +177,11 @@ fun CropScreen(app: TetherApp, photoId: Long, onDone: () -> Unit) {
         }
     }
 
-    BackHandler { onDone() }
+    BackHandler { leave() }
 
     Column(Modifier.fillMaxSize().background(Color.Black)) {
         Row(Modifier.fillMaxWidth().background(Tone.Background).statusBarsPadding().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onDone) { Icon(Icons.Outlined.Close, contentDescription = "Cancelar") }
+            IconButton(onClick = leave) { Icon(Icons.Outlined.Close, contentDescription = "Cancelar") }
             Column(Modifier.weight(1f)) {
                 Text("Recortar", style = MaterialTheme.typography.titleMedium)
                 Text(
@@ -283,12 +289,24 @@ fun CropScreen(app: TetherApp, photoId: Long, onDone: () -> Unit) {
         if (lying) {
             Row(Modifier.weight(1f).fillMaxWidth()) {
                 canvasArea(Modifier.weight(1f).fillMaxHeight())
-                toolsArea(Modifier.width(360.dp).fillMaxHeight().verticalScroll(rememberScrollState()))
+                val side = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.4f).dp.coerceAtMost(360.dp)
+                toolsArea(Modifier.width(side).fillMaxHeight().verticalScroll(rememberScrollState()))
             }
         } else {
             canvasArea(Modifier.weight(1f).fillMaxWidth())
             toolsArea(Modifier.fillMaxWidth())
         }
+    }
+
+    if (confirmExit) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmExit = false },
+            containerColor = Tone.Surface,
+            title = { Text("Sair sem salvar o recorte?") },
+            text = { Text("O recorte que você ajustou agora não vai ficar na foto.") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { confirmExit = false; onDone() }) { Text("Sair sem salvar") } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmExit = false }) { Text("Continuar recortando") } },
+        )
     }
 }
 

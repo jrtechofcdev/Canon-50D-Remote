@@ -355,6 +355,7 @@ private fun ShopDetail(
 
     BoxWithConstraints(Modifier.fillMaxSize().background(if (chrome) Tone.Background else Color.Black)) {
         val landscape = maxWidth > maxHeight
+        val panelWidth = minOf(maxWidth * 0.4f, 360.dp)
         if (!chrome) {
             picture(Modifier.fillMaxSize())
             return@BoxWithConstraints
@@ -370,7 +371,7 @@ private fun ShopDetail(
             if (landscape) {
                 Row(Modifier.fillMaxSize()) {
                     picture(Modifier.weight(1f).fillMaxHeight())
-                    panel(Modifier.width(360.dp).fillMaxHeight().verticalScroll(rememberScrollState()).navigationBarsPadding())
+                    panel(Modifier.width(panelWidth).fillMaxHeight().verticalScroll(rememberScrollState()).navigationBarsPadding())
                 }
             } else {
                 picture(Modifier.fillMaxWidth().weight(1f))

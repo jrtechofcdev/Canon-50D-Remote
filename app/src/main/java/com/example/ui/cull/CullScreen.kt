@@ -172,7 +172,7 @@ fun CullScreen(app: TetherApp, onBack: (() -> Unit)?, onOpenPhoto: (Long) -> Uni
                     )
                 }
                 IconButton(onClick = { compare = !compare }) {
-                    Icon(Icons.Outlined.CompareArrows, contentDescription = "Comparar", tint = if (compare) Tone.Accent else Tone.Text)
+                    Icon(Icons.Outlined.CompareArrows, contentDescription = if (compare) "Parar de comparar" else "Comparar com a próxima", tint = if (compare) Tone.Accent else Tone.Text)
                 }
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = "Mais opções") }
