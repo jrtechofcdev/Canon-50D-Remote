@@ -187,6 +187,8 @@ fun ShopScreen(app: TetherApp, onOpen: (Long) -> Unit) {
         }
     }
 
+    val wide = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
     Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             columns = GridCells.Adaptive(150.dp),
@@ -222,7 +224,8 @@ fun ShopScreen(app: TetherApp, onOpen: (Long) -> Unit) {
                     counts.forEach { (c, n) -> ShopChip(null, ShopCatalog.categoryLabel(c), n, category == c) { category = c } }
                 }
             }
-            if (!selecting && items.isNotEmpty()) {
+            // The hint stays standing up; lying down every line of height goes to the presets.
+            if (!selecting && items.isNotEmpty() && !wide) {
                 item(key = "hint", span = { GridItemSpan(maxLineSpan) }) {
                     Text("Segure um preset para marcar vários e salvar ou baixar de uma vez.", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
                 }
@@ -279,22 +282,10 @@ fun ShopScreen(app: TetherApp, onOpen: (Long) -> Unit) {
 
 @Composable
 private fun ShopHeader(total: Int, categories: Int, loading: Boolean, query: String, onQuery: (String) -> Unit, onRefresh: () -> Unit) {
-    Column(Modifier.padding(top = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Loja de presets", style = MaterialTheme.typography.titleLarge, color = Tone.Text)
-                Text(
-                    if (total == 0) "Presets grátis da sua API" else "$total presets grátis · $categories categorias",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Tone.TextMuted,
-                )
-            }
-            if (loading) {
-                CircularProgressIndicator(Modifier.padding(12.dp).size(24.dp), color = Tone.Info, strokeWidth = 2.dp)
-            } else {
-                IconButton(onClick = onRefresh) { Icon(Icons.Outlined.Refresh, contentDescription = "Atualizar a lista", tint = Tone.Text) }
-            }
-        }
+    // Lying down the search sits beside the title, so the presets start higher on a short screen.
+    val wide = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val search: @Composable (Modifier) -> Unit = { mod ->
         OutlinedTextField(
             value = query,
             onValueChange = onQuery,
@@ -305,8 +296,27 @@ private fun ShopHeader(total: Int, categories: Int, loading: Boolean, query: Str
                 { IconButton(onClick = { onQuery("") }) { Icon(Icons.Outlined.Close, contentDescription = "Limpar busca") } }
             } else null,
             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Tone.Accent, unfocusedBorderColor = Tone.Line),
-            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            modifier = mod,
         )
+    }
+    Column(Modifier.padding(top = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(if (wide) Modifier.padding(end = 16.dp) else Modifier.weight(1f)) {
+                Text("Loja de presets", style = MaterialTheme.typography.titleLarge, color = Tone.Text)
+                Text(
+                    if (total == 0) "Presets grátis da sua API" else "$total presets grátis · $categories categorias",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Tone.TextMuted,
+                )
+            }
+            if (wide) search(Modifier.weight(1f))
+            if (loading) {
+                CircularProgressIndicator(Modifier.padding(12.dp).size(24.dp), color = Tone.Info, strokeWidth = 2.dp)
+            } else {
+                IconButton(onClick = onRefresh) { Icon(Icons.Outlined.Refresh, contentDescription = "Atualizar a lista", tint = Tone.Text) }
+            }
+        }
+        if (!wide) search(Modifier.fillMaxWidth().padding(top = 10.dp))
     }
 }
 

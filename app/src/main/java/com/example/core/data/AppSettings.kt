@@ -83,6 +83,8 @@ data class Settings(
     val clientSlideSeconds: Int = 0,
     val clientOnlyFavorites: Boolean = false,
     val clientPin: String = "",
+    /** Screen pinning while the client mode is open: Android's buttons can't leave the app. */
+    val clientPinScreen: Boolean = false,
 
     // Presets
     val presetsFolder: String? = null,
@@ -389,6 +391,7 @@ object SettingKeys {
     val clientSlideSeconds = intPreferencesKey("client_slide_seconds")
     val clientOnlyFavorites = booleanPreferencesKey("client_only_favorites")
     val clientPin = stringPreferencesKey("client_pin")
+    val clientPinScreen = booleanPreferencesKey("client_pin_screen")
 
     val presetsFolder = stringPreferencesKey("presets_folder")
     val editedFolder = stringPreferencesKey("edited_folder")
@@ -636,6 +639,7 @@ class SettingsRepository(private val context: Context) {
             clientSlideSeconds = this[k.clientSlideSeconds] ?: d.clientSlideSeconds,
             clientOnlyFavorites = this[k.clientOnlyFavorites] ?: d.clientOnlyFavorites,
             clientPin = this[k.clientPin] ?: d.clientPin,
+            clientPinScreen = this[k.clientPinScreen] ?: d.clientPinScreen,
 
             presetsFolder = this[k.presetsFolder],
             editedFolder = this[k.editedFolder],

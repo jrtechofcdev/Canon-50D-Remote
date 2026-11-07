@@ -107,7 +107,7 @@ private data class Snapshot(val favorite: Map<Long, Boolean>, val rejected: Map<
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun CullScreen(app: TetherApp, onBack: (() -> Unit)?, onOpenPhoto: (Long) -> Unit) {
-    val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
+    val all by remember { app.photos }.collectAsState(initial = null)
     val settings by app.settings.settings.collectAsState(initial = Settings())
     val pending by app.culler.pending.collectAsState()
     val scope = rememberCoroutineScope()

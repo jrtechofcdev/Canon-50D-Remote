@@ -178,6 +178,10 @@ import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Animation
+import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Close
 
 /** The app's chain, Capturar → Controlar → Melhorar → Entregar, plus the system: how Ajustes is grouped. */
 enum class SettingsModule(val title: String) {
@@ -211,9 +215,39 @@ enum class SettingsSection(val route: String, val title: String, val summary: St
 fun SettingsScreen(onOpen: (SettingsSection) -> Unit) {
     val app = LocalContext.current.applicationContext as? TetherApp
     val developer by (app?.settings?.settings?.collectAsState(initial = null) ?: remember { mutableStateOf(null) })
+    var query by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     SettingsPage(title = "Ajustes", onBack = null) {
         Spacer(Modifier.height(8.dp))
         val shown = SettingsSection.entries.filter { it != SettingsSection.Developer || developer?.developerMode == true }
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            singleLine = true,
+            placeholder = { Text("Buscar um ajuste") },
+            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, tint = Tone.TextMuted) },
+            trailingIcon = if (query.isNotEmpty()) {
+                { IconButton(onClick = { query = "" }) { Icon(Icons.Outlined.Close, contentDescription = "Limpar busca") } }
+            } else null,
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Tone.Accent, unfocusedBorderColor = Tone.Line),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (query.isNotBlank()) {
+            // Results: each page with the rows that match, so the photographer knows where to look inside.
+            val found = shown.mapNotNull { section -> settingsMatches(section, query)?.let { section to it } }
+            if (found.isEmpty()) {
+                Text(
+                    "Nenhum ajuste com \"$query\".",
+                    color = Tone.TextMuted,
+                    modifier = Modifier.padding(vertical = 24.dp, horizontal = 4.dp),
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            found.forEach { (section, rows) ->
+                SectionRow(section, if (rows.isEmpty()) section.summary else rows.joinToString(" · ")) { onOpen(section) }
+            }
+            Spacer(Modifier.height(40.dp))
+            return@SettingsPage
+        }
         SettingsModule.entries.forEach { module ->
           val sections = shown.filter { it.module == module }
           if (sections.isNotEmpty()) Text(
@@ -222,28 +256,31 @@ fun SettingsScreen(onOpen: (SettingsSection) -> Unit) {
               color = Tone.TextMuted,
               modifier = Modifier.padding(start = 4.dp, top = 14.dp, bottom = 2.dp),
           )
-          sections.forEach { section ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(MaterialTheme.shapes.small)
-                    .clickable { onOpen(section) }
-                    .heightIn(min = 64.dp)
-                    .padding(horizontal = 4.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(section.icon, contentDescription = null, tint = Tone.TextMuted)
-                Spacer(Modifier.width(16.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(section.title, style = MaterialTheme.typography.titleMedium)
-                    Text(section.summary, style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
-                }
-                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = Tone.TextMuted)
-            }
-        }
+          sections.forEach { section -> SectionRow(section, section.summary) { onOpen(section) } }
         }
         Spacer(Modifier.height(40.dp))
         AboutFooter(app, developer?.developerMode == true)
+    }
+}
+
+@Composable
+private fun SectionRow(section: SettingsSection, summary: String, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.small)
+            .clickable(onClick = onClick)
+            .heightIn(min = 64.dp)
+            .padding(horizontal = 4.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(section.icon, contentDescription = null, tint = Tone.TextMuted)
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(section.title, style = MaterialTheme.typography.titleMedium)
+            Text(summary, style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+        }
+        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = Tone.TextMuted)
     }
 }
 
@@ -951,6 +988,13 @@ private fun ShareSettings(app: TetherApp, s: Settings) {
                 if (!on) app.settings.set(SettingKeys.clientExitHold, true)
             }
         }
+        ToggleRow(
+            Icons.Outlined.PushPin,
+            "Fixar a tela",
+            "Os botões do Android não tiram o cliente do app. Só sai pelo Sair (e pelo PIN, se houver). Na primeira vez o Android pede para confirmar",
+            s.clientPinScreen,
+            enabled = s.clientModeEnabled,
+        ) { set(SettingKeys.clientPinScreen, it) }
         ToggleRow(Icons.Outlined.TouchApp, "Sair segurando o dedo 2 s", "Um dedo parado na tela por 2 segundos; um anel mostra o tempo", s.clientExitHold, enabled = s.clientModeEnabled && s.clientExitButton) { set(SettingKeys.clientExitHold, it) }
         ChoiceRow(
             "Passar as fotos",

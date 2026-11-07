@@ -57,7 +57,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpressPickSheet(app: TetherApp, alreadyIn: Set<Long>, onDismiss: () -> Unit, onSend: (List<Long>) -> Unit) {
-    val photos by remember { app.database.photoDao().observeAll() }.collectAsState(initial = emptyList())
+    val photos by remember { app.photos }.collectAsState(initial = emptyList())
     val chosen = remember { mutableStateListOf<Long>() }
     val shown = photos.filter { it.displayUri != null }.take(120)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = Tone.Surface) {

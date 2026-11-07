@@ -213,10 +213,36 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Every delete offers Desfazer while the photo waits in the trash.
+                LaunchedEffect(Unit) {
+                    val offers = this
+                    app.trash.deleted.collect { batch ->
+                        snackbar.currentSnackbarData?.dismiss()
+                        offers.launch {
+                            val n = batch.ids.size
+                            val result = snackbar.showSnackbar(
+                                if (n == 1) "Foto apagada do celular" else "$n fotos apagadas do celular",
+                                actionLabel = "Desfazer",
+                                duration = androidx.compose.material3.SnackbarDuration.Long,
+                            )
+                            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) app.trash.undo(batch)
+                        }
+                    }
+                }
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = Tone.Background,
-                    snackbarHost = { SnackbarHost(snackbar) },
+                    snackbarHost = {
+                        SnackbarHost(snackbar) { data ->
+                            androidx.compose.material3.Snackbar(
+                                data,
+                                containerColor = Tone.SurfaceHigh,
+                                contentColor = Tone.Text,
+                                actionColor = Tone.Accent,
+                            )
+                        }
+                    },
                     bottomBar = {
                         if (!landscape && onTab) BottomTabs(tabs, route, onClick = goTo)
                     },

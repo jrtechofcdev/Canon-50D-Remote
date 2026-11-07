@@ -133,7 +133,7 @@ fun ViewerScreen(
     onOpenDelivery: () -> Unit = {},
     onOpenExpress: () -> Unit = {},
 ) {
-    val photos by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
+    val photos by remember { app.photos }.collectAsState(initial = null)
     val presets by app.presets.presets.collectAsState(initial = emptyList())
     val s by app.settings.settings.collectAsState(initial = null)
     val list = photos ?: return
@@ -378,7 +378,7 @@ fun ViewerScreen(
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = null
-                    scope.launch(Dispatchers.IO) { deletePhoto(app, photo) }
+                    app.trash.delete(listOf(photo.id))
                 }) { Text("Apagar", color = Tone.Error) }
             },
             dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Cancelar") } },

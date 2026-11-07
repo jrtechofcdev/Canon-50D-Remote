@@ -129,7 +129,7 @@ fun SessionScreen(
     val transfer by app.tether.transfer.collectAsState()
     val received by app.tether.receivedThisSession.collectAsState()
     val settings by app.settings.settings.collectAsState(initial = Settings())
-    val photos by remember { app.database.photoDao().observeAll() }.collectAsState(initial = emptyList())
+    val photos by remember { app.photos }.collectAsState(initial = emptyList())
     val looks by app.presets.presets.collectAsState(initial = emptyList())
     var showLooks by remember { mutableStateOf(false) }
     var showMoments by remember { mutableStateOf(false) }

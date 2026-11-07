@@ -256,7 +256,9 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
                     }
                     Button(
                         onClick = { picking = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
+                        // Mint only once the Express is on the air; before that Iniciar is the one to press.
+                        colors = if (status is DeliveryStatus.Running) ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent)
+                        else ButtonDefaults.buttonColors(containerColor = Tone.SurfaceHigh, contentColor = Tone.Accent),
                         modifier = Modifier.heightIn(min = 48.dp),
                     ) {
                         Icon(Icons.Outlined.AddPhotoAlternate, null)

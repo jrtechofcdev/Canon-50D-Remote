@@ -603,7 +603,7 @@ class ScreenshotTest {
     @Config(qualifiers = "w891dp-h411dp-land-xxhdpi")
     fun editorLightLandscape() {
         val id = seedLooks()
-        editor(com.example.ui.preset.EditTarget.PhotoTarget(id), null, "editor_luz")
+        editor(com.example.ui.preset.EditTarget.PhotoTarget(id), null, "editor_luz_deitado")
     }
 
     @Test

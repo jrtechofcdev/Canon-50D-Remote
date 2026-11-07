@@ -77,6 +77,16 @@ class TetherApp : Application() {
     /** Fotografia Express: its own tool, no code, preview until paid. Independent of [delivery]. */
     lateinit var express: LocalDelivery
         private set
+    /** Deleted photos wait here a few seconds so Desfazer can bring them back. */
+    lateinit var trash: com.example.core.data.PhotoTrash
+        private set
+
+    /** Every photo except the ones waiting in [trash]: what the screens list. */
+    val photos: kotlinx.coroutines.flow.Flow<List<com.example.core.data.Photo>> by lazy {
+        kotlinx.coroutines.flow.combine(database.photoDao().observeAll(), trash.pending) { list, gone ->
+            if (gone.isEmpty()) list else list.filter { it.id !in gone }
+        }
+    }
 
     // A failure in one of these collectors is written to the log instead of closing the app.
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main + AppLog.handler("APP"))
@@ -93,6 +103,12 @@ class TetherApp : Application() {
         settings = SettingsRepository(this)
         database = PhotoDatabase.create(this)
         store = PhotoStore(this)
+        trash = com.example.core.data.PhotoTrash(appScope) { ids ->
+            withContext(Dispatchers.IO) {
+                ids.forEach { id -> database.photoDao().get(id)?.let { com.example.ui.photos.deletePhoto(this@TetherApp, it) } }
+            }
+            AppLog.i("FOTOS", "${ids.size} foto(s) apagada(s)")
+        }
         camera = CameraManager(
             this,
             keepCameraAwake = { settings.current().keepCameraAwake },

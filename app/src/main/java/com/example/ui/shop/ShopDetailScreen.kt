@@ -434,7 +434,7 @@ private fun PhotoChooser(
     onDismiss: () -> Unit,
     onApply: (Photo, edit: Boolean) -> Unit,
 ) {
-    val photos by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
+    val photos by remember { app.photos }.collectAsState(initial = null)
     var pick by remember { mutableStateOf(selected) }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Tone.Surface, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding()) {

@@ -88,6 +88,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.layout.heightIn
 
 enum class PhotoFilter(val label: String) {
     All("Todas"), Session("Sessão atual"), Favorites("Favoritas"), ClientPicks("Escolhidas pelo cliente"),
@@ -115,7 +117,7 @@ fun PhotosScreen(
     onOpenExpress: () -> Unit = {},
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = emptyList())
+    val all by remember { app.photos }.collectAsState(initial = emptyList())
     val settings by app.settings.settings.collectAsState(initial = Settings())
     val presets by app.presets.presets.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
@@ -176,23 +178,36 @@ fun PhotosScreen(
         }
 
         if (photos.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+            // Photos there, but the stars, the moment or hidden rejects leave none: say so, with a way out.
+            val narrowed = all.filtered(filter, 0, null, settings).isNotEmpty()
+            Column(
+                Modifier.fillMaxSize().padding(32.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 Text(
-                    when (filter) {
-                        PhotoFilter.Favorites -> "Nenhuma favorita ainda. Toque no coração ao ver uma foto."
-                        PhotoFilter.ClientPicks -> "O cliente ainda não escolheu fotos. No modo cliente, ele toca no coração."
+                    when {
+                        narrowed -> "Nenhuma foto com esses filtros."
+                        filter == PhotoFilter.Favorites -> "Nenhuma favorita ainda. Toque no coração ao ver uma foto."
+                        filter == PhotoFilter.ClientPicks -> "O cliente ainda não escolheu fotos. No modo cliente, ele toca no coração."
+                        filter == PhotoFilter.Session && all.isNotEmpty() -> "Nenhuma foto nesta sessão ainda."
                         else -> "Nenhuma foto recebida. Conecte a 50D e dispare."
                     },
                     color = Tone.TextMuted,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
+                if (narrowed || (filter != PhotoFilter.All && all.isNotEmpty())) {
+                    OutlinedButton(onClick = { filter = PhotoFilter.All; minStars = 0; moment = null }, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text("Mostrar todas", color = Tone.Accent)
+                    }
+                }
             }
             return@Column
         }
 
         LazyVerticalGrid(
             columns = GridCells.Adaptive(settings.galleryThumb.dp),
-            // Room under the last row for the capture button.
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = if (selecting) 16.dp else 88.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.weight(1f),
@@ -316,7 +331,8 @@ fun PhotosScreen(
             confirmButton = {
                 TextButton(onClick = {
                     sheet = null
-                    runBatch("Apagando", selection) { p -> withContext(Dispatchers.IO) { deletePhoto(app, p) } }
+                    app.trash.delete(selection.map { it.id })
+                    selected.clear()
                 }) { Text("Apagar", color = Tone.Error) }
             },
             dismissButton = { TextButton(onClick = { sheet = null }) { Text("Cancelar") } },
@@ -344,7 +360,10 @@ fun PhotosScreen(
     }
 }
 
-/** Removes every file the app made for [photo] (never the card's original) and its row. */
+/**
+ * Removes every file the app made for [photo] (never the card's original) and its row, for good.
+ * Screens go through [TetherApp.trash] instead, which waits so Desfazer can bring the photo back.
+ */
 suspend fun deletePhoto(app: TetherApp, photo: Photo) {
     listOfNotNull(photo.jpgUri, photo.rawUri, photo.editedUri).forEach(app.store::delete)
     photo.previewPath?.let { java.io.File(it).delete() }

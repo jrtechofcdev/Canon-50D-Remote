@@ -98,6 +98,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.verticalScroll
 import com.example.ui.components.pressScale
+import androidx.compose.ui.platform.LocalContext
 
 /**
  * Full-screen photos for the client to follow along. No settings, no delete.
@@ -106,7 +107,7 @@ import com.example.ui.components.pressScale
  */
 @Composable
 fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> Unit, onCrop: (Long) -> Unit = {}) {
-    val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
+    val all by remember { app.photos }.collectAsState(initial = null)
     val presets by app.presets.presets.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     val s by app.settings.settings.collectAsState(initial = null)
@@ -120,10 +121,21 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
     val pager = rememberPagerState { photos.size }
 
     com.example.ui.components.ImmersiveMode()
+    // "Fixar a tela": Android's screen pinning, so Início and Recentes don't leave the app. It stays on
+    // through Calibrar and Recortar (same screen of the app) and comes off only through Sair.
+    val activity = LocalContext.current.findActivity()
+    LaunchedEffect(settings.clientPinScreen) {
+        if (settings.clientPinScreen) runCatching { activity?.startLockTask() }
+        else runCatching { activity?.stopLockTask() }
+    }
+    val leave = {
+        if (settings.clientPinScreen) runCatching { activity?.stopLockTask() }
+        onExit()
+    }
     // Back does nothing here, so a client can't leave by accident.
     BackHandler { }
 
-    val requestExit = { if (settings.clientPin.isEmpty()) onExit() else askPin = true }
+    val requestExit = { if (settings.clientPin.isEmpty()) leave() else askPin = true }
     // Calibrar and Recortar are the photographer's: both ask for the PIN when one is set.
     var cropAsk by remember { mutableStateOf<Long?>(null) }
     val guarded = settings.clientCalibratePin && settings.clientPin.isNotEmpty()
@@ -323,7 +335,7 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
     }
 
     if (askPin) {
-        PinDialog(settings.clientPin, "PIN para sair", "Sair", onOk = { askPin = false; onExit() }, onCancel = { askPin = false })
+        PinDialog(settings.clientPin, "PIN para sair", "Sair", onOk = { askPin = false; leave() }, onCancel = { askPin = false })
     }
     whatsFor?.let { photo ->
         WhatsAppSheet(app, remember { PhotoActions(app, app.store, app.export, app.looks) }, settings, listOf(photo), forClient = true, onDismiss = { whatsFor = null })
@@ -487,4 +499,10 @@ private fun PinDialog(expected: String, title: String, action: String, onOk: () 
         confirmButton = { TextButton(onClick = { if (pin == expected) onOk() else wrong = true }) { Text(action) } },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancelar") } },
     )
+}
+
+private tailrec fun android.content.Context.findActivity(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

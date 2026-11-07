@@ -86,6 +86,7 @@ import kotlin.math.min
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clipToBounds
 
 private enum class CropTab(val label: String) { Ratio("Proporção"), Straighten("Endireitar"), Turn("Girar") }
 private enum class Grid(val label: String) { Thirds("Terços"), Golden("Áurea"), Fine("Grade fina"), None("Sem grade") }
@@ -213,7 +214,8 @@ fun CropScreen(app: TetherApp, photoId: Long, onDone: () -> Unit) {
         val lying = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
             android.content.res.Configuration.ORIENTATION_LANDSCAPE
         val canvasArea: @Composable (Modifier) -> Unit = { mod ->
-            Box(mod, contentAlignment = Alignment.Center) {
+            // Clipped: a straightened (turned) picture would otherwise draw over the top bar.
+            Box(mod.clipToBounds(), contentAlignment = Alignment.Center) {
                 if (image == null) {
                     CircularProgressIndicator(color = Tone.Info)
                 } else {
