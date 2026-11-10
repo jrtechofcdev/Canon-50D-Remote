@@ -2,6 +2,52 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [5.0] · 2026-11-10
+
+Novo visual. A identidade continua a mesma (grafite, menta, Exo 2 e o símbolo da Jr_Tech_OFC), agora com um sistema só no app inteiro.
+
+- **O bloco inclinado da marca virou a assinatura do app:**
+  - é o único jeito de marcar o que está escolhido: filtros, presets, opções, proporções e a aba aberta ganham o fundo um tom acima e o bloco menta;
+  - marca o estado da câmera e da Entrega na cor do estado: menta conectada, âmbar reconectando, cinza parada, vermelho com falha;
+  - aparece nas etiquetas RAW e JPG e nas telas vazias.
+- **Carregador da marca (ideia do José):**
+  - o símbolo em linhas com um bloco aceso girando no sentido horário substitui todas as rodinhas do app;
+  - onde a espera tem fim (backup, fotos chegando, lotes), cada quarto concluído fica aceso;
+  - na abertura do Android 12 ou mais novo, os blocos acendem um a um até formar o logo;
+  - com as animações do Android desligadas, ele fica parado.
+- **Menta só para agir ou dizer "pronto":**
+  - ícones de grupo, títulos e valores ficaram neutros;
+  - o degradê menta → ciano aparece só no disparador e numa linha fina embaixo de "Conectada".
+- **Sessão:**
+  - o estado da câmera cabe em uma linha;
+  - desconectada, aparece um cartão com o botão "Conectar câmera" em largura total;
+  - conectada, aparecem bateria, cartão e fotos recebidas com números que não pulam;
+  - o disparador fica menor e cinza até haver câmera;
+  - a legenda da última foto aparece sobre a imagem.
+- **Visualizador:**
+  - botões redondos e brancos sobre a foto, com menta só na favorita marcada;
+  - alerta de estouro e Apagar ficam no menu do topo;
+  - embaixo ficam as 4 ações mais usadas (Editar, WhatsApp, Entregar e Recortar) e as outras em **Mais**;
+  - o "Lr" ficou neutro.
+- **Fotos:**
+  - cabeçalho com o total;
+  - os filtros rolam com a borda esmaecida, sem cortar palavra no meio;
+  - etiquetas e estrelas sobre um véu;
+  - telas vazias com o símbolo, o motivo e o que fazer.
+- **Avisos:** pasta, fotos no cartão e falha ao salvar usam o mesmo formato de faixa, com o bloco na cor da gravidade.
+- **Botões:** um padrão em todo o app:
+  - primário menta, um por área;
+  - secundário cinza;
+  - só texto para cancelar;
+  - vermelho para parar ou apagar.
+- **Outras telas:**
+  - Entrega: "Parar" em vermelho e "Abrir portal" secundário;
+  - culling: o carimbo de marcar e rejeitar ficou menor;
+  - modo cliente: o botão Sair ficou no mesmo véu dos outros botões;
+  - live view: as leituras de exposição ficaram com cara de visor;
+  - modo escuro total: o branco sobre a foto e os véus agora seguem o modo, em vez de ficarem acesos.
+- **Por baixo:** um kit de componentes e uma escala de espaço e de cantos, descritos no DESIGN.md. Um teste impede que telas novas voltem a usar cores e cantos fora do padrão.
+
 ## [4.8] · 2026-11-10
 
 Primeira etapa do novo plano: sessão e cliente sem confusão, e avisos que não se perdem.
