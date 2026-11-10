@@ -109,6 +109,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.unit.sp
 
 /** Framing guides drawn over the live picture. */
 enum class LiveGrid(val id: String, val label: String) {
@@ -592,7 +593,7 @@ private fun Value(label: String, value: String, enabled: Boolean, onClick: () ->
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = Tone.OnPhoto.copy(alpha = 0.6f))
-        Text(value, style = MaterialTheme.typography.labelLarge, color = if (enabled) Tone.OnPhoto else Tone.OnPhoto.copy(alpha = 0.5f))
+        Text(value, style = com.example.ui.theme.ReadoutStyle.copy(fontSize = 16.sp), color = if (enabled) Tone.OnPhoto else Tone.OnPhoto.copy(alpha = 0.5f))
     }
 }
 

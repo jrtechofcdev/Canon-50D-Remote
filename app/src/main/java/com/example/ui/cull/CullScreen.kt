@@ -438,20 +438,20 @@ private fun SwipeCard(photo: Photo, onUp: () -> Unit, onDown: () -> Unit) {
                     }
                     .clip(MaterialTheme.shapes.medium)
                     .background(if (locked) color else Tone.Scrim)
-                    .border(3.dp, color, MaterialTheme.shapes.medium)
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                    .border(2.dp, color, MaterialTheme.shapes.medium)
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     if (up) Icons.Outlined.Close else Icons.Filled.Favorite,
                     contentDescription = null,
                     tint = if (locked) Color.Black else color,
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    if (up) "REJEITAR" else "MARCAR",
-                    style = MaterialTheme.typography.titleLarge,
+                    if (up) "Rejeitar" else "Marcar",
+                    style = MaterialTheme.typography.titleMedium,
                     color = if (locked) Color.Black else color,
                 )
             }

@@ -215,11 +215,12 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
         // two screen buttons on the right, all the same height and the same quiet style.
         if (chrome) Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp).heightIn(min = 48.dp)) {
             if (settings.clientExitButton) {
-                androidx.compose.material3.OutlinedButton(
+                androidx.compose.material3.Button(
                     onClick = requestExit,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Tone.OnPhoto.copy(alpha = 0.25f)),
+                    shape = MaterialTheme.shapes.small,
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Tone.Scrim, contentColor = Tone.OnPhoto),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp),
-                    modifier = Modifier.align(Alignment.CenterStart).heightIn(min = 40.dp),
+                    modifier = Modifier.align(Alignment.CenterStart).heightIn(min = 48.dp),
                 ) {
                     Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null, tint = Muted, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
