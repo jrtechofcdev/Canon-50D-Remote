@@ -98,7 +98,8 @@ class SettingsProfilesTest {
         app.settings.set(SettingKeys.clientPin, "4321")
         val plain = app.appBackup.export("4.5")
         assertFalse(plain.contains("jr.tech.ofc@gmail.com"))
-        assertFalse(plain.contains("4321"))
+        // By the key's name: the four digits alone can turn up inside the file's timestamp or an id.
+        assertFalse(plain.contains("\"${SettingKeys.clientPin.name}\""))
         assertTrue(app.appBackup.export("4.5", includeSecrets = true).contains("jr.tech.ofc@gmail.com"))
 
         // Restoring a file without them leaves this phone's own Pix key and PIN where they are.
