@@ -65,6 +65,16 @@ class ScreenshotTest {
     }
 
     @Test
+    @Config(fontScale = 1.3f)
+    fun sessionLargeText() {
+        seedPhotos()
+        runBlocking { app.settings.set(com.example.core.data.SettingKeys.sessionName, "Casamento Ana e Leo") }
+        val actions = PhotoActions(app, app.store, app.export)
+        rule.setContent { JrLinkTheme { SessionScreen(app, actions, {}, {}, {}, {}) } }
+        save("sessao_texto_grande", androidx.compose.ui.test.hasText("Finalizar sessão"))
+    }
+
+    @Test
     fun sessionNight() {
         seedPhotos()
         val actions = PhotoActions(app, app.store, app.export)

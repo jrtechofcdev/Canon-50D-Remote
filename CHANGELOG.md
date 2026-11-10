@@ -2,6 +2,43 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [4.8] · 2026-11-10
+
+Primeira etapa do novo plano: sessão e cliente sem confusão, e avisos que não se perdem.
+
+- **A sessão aparece na tela:**
+  - o topo da Sessão mostra o nome da sessão e quantas fotos ela tem; um toque abre a troca de sessão;
+  - sem nome, aparece "Sem nome (Geral)" em cinza, para lembrar de nomear;
+  - o nome só vale depois de confirmar. Antes era gravado a cada letra, e uma foto que chegava no meio da digitação ia para meio nome.
+  - a troca de sessão também mostra os nomes usados há pouco, para voltar a um cliente com um toque.
+- **Próximo cliente sem misturar fotos:**
+  - no resumo da sessão, o botão principal agora é **Encerrar e começar nova**: pede o nome do próximo cliente e zera o contador e o backup;
+  - "Desconectar a câmera" ficou à parte e só desconecta.
+- **A Entrega segue a sessão:**
+  - o bloco Entrega mostra para quem vão as fotos automáticas ("no ar → Ana");
+  - ao trocar de sessão, o app pergunta se as próximas fotos vão para o novo cliente e cria ou reabre esse cliente na Entrega.
+- **Avisos que não somem:**
+  - quando uma foto não é salva, uma faixa fica na Sessão com o motivo (celular sem espaço, pasta sem permissão, pasta sumiu) e o que fazer. Ela sai sozinha quando uma foto volta a salvar;
+  - erros ficam alguns segundos sem ser trocados por avisos de foto tremida ou olhos fechados;
+  - avisos que explicam o próximo passo (Wi-Fi, cliente da Entrega, backup dos ajustes) aparecem embaixo por mais tempo, com botão de fechar.
+- **Primeiros passos:**
+  - um cartão na Sessão lembra de desligar o desligamento automático da 50D, marcar "Usar por padrão" na USB, escolher as pastas e permitir os avisos;
+  - a permissão de avisos é pedida nesse cartão, com o motivo, e não mais na abertura do app.
+- **Mais avisos visíveis:**
+  - etiqueta "Celular: X GB livres" quando a memória do celular está acabando;
+  - ponto vermelho na aba Sessão quando o cabo sai no meio da sessão, visível de qualquer aba.
+- **Backup até o fim:** o backup da sessão continua com a tela apagada ou a câmera desconectada, com o andamento na notificação.
+- **Correções:**
+  - "Copiar escolhidas" conta só os arquivos realmente copiados e avisa quantos falharam;
+  - o resumo não mostra mais o backup da sessão anterior;
+  - apagar um cliente da Entrega pede confirmação;
+  - o intervalômetro avisa quando para porque a câmera desconectou;
+  - o "Teste de entrega local" saiu do modo desenvolvedor e está em Ajustes → Entrega local.
+- **Texto grande e visual:**
+  - a leitura de exposição não corta "Fluorescente" e outros nomes longos;
+  - etiquetas de aviso e botões da Loja crescem com a fonte do Android;
+  - na Sessão, só o que é para tocar fica em menta.
+
 ## [4.7] · 2026-11-07
 
 Terceira etapa da auditoria: a interface repensada para o trabalho, em pé e deitado.

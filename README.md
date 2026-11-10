@@ -83,6 +83,8 @@ A captura usa só a USB, sem FTP e sem internet. Na hora de entregar, o celular 
 
 Cada função tem um liga/desliga em **Ajustes**, com busca no topo: digite "pix" ou "marca" e veja em que página está.
 
+**Um cliente depois do outro:** o nome da sessão fica no topo da Sessão. No fim, **Finalizar → Encerrar e começar nova** pede o nome do próximo cliente, e as fotos dele vão para outra pasta e, se a Entrega estiver no automático, para o novo cliente.
+
 Apagou uma foto sem querer? A mensagem embaixo oferece **Desfazer** por alguns segundos, antes de os arquivos saírem do celular.
 
 ## Instalar
@@ -167,7 +169,7 @@ Toque 7 vezes na marca no fim de **Ajustes**. Aparece **Ajustes → Desenvolvedo
 5. O cliente salva cada foto (ou todas) e pode marcar favoritas, que aparecem na galeria e no culling.
 6. **Encerrar acesso** invalida o código. **Parar** desliga a rede e o servidor.
 
-Se o celular do cliente avisar que o Wi-Fi não tem internet, ele toca em **Manter conectado**. Antes do primeiro evento, faça o **Teste de entrega local** (modo desenvolvedor) com o seu celular e um iPhone.
+Se o celular do cliente avisar que o Wi-Fi não tem internet, ele toca em **Manter conectado**. Antes do primeiro evento, faça o **Teste de entrega local** (Ajustes → Entrega local, no fim da página) com o seu celular e um iPhone.
 
 ### Fotografia Express
 
