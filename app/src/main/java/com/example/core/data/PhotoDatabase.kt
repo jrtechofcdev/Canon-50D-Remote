@@ -99,6 +99,10 @@ interface PhotoDao {
     @Query("SELECT COUNT(*) FROM photos WHERE session = :session")
     suspend fun countInSession(session: String): Int
 
+    /** Session names, the most recently used first. */
+    @Query("SELECT session FROM photos GROUP BY session ORDER BY MAX(capturedAt) DESC LIMIT :limit")
+    suspend fun recentSessions(limit: Int): List<String>
+
     @Insert
     suspend fun insert(photo: Photo): Long
 

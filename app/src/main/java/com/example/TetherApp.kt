@@ -81,6 +81,17 @@ class TetherApp : Application() {
     lateinit var trash: com.example.core.data.PhotoTrash
         private set
 
+    /**
+     * Switches the session new photos go to (folder, name, delivery): the name, the photo counter
+     * and the last backup result all belong to the session that just ended.
+     */
+    suspend fun startSession(name: String) {
+        settings.set(SettingKeys.sessionName, name.trim())
+        tether.resetSessionCounter()
+        backup.dismiss()
+        AppLog.i("SESSAO", "Sessão: ${name.trim().ifEmpty { "Geral" }}")
+    }
+
     /** Every photo except the ones waiting in [trash]: what the screens list. */
     val photos: kotlinx.coroutines.flow.Flow<List<com.example.core.data.Photo>> by lazy {
         kotlinx.coroutines.flow.combine(database.photoDao().observeAll(), trash.pending) { list, gone ->

@@ -439,18 +439,13 @@ private fun SaveSettings(app: TetherApp, s: Settings) {
     }
 
     SettingsGroup("Sessão / cliente", Icons.Outlined.Badge) {
-        var name by remember { mutableStateOf(s.sessionName) }
-        OutlinedTextField(
-            value = name,
-            onValueChange = {
-                name = it
-                scope.launch { app.settings.set(SettingKeys.sessionName, it) }
-            },
-            label = { Text("Nome da sessão") },
-            placeholder = { Text("Ex.: Casamento Ana e Leo") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        )
+        // Saved only on confirm (the sheet), never letter by letter: a photo arriving mid-typing used to
+        // land in half a name.
+        var renaming by remember { mutableStateOf(false) }
+        com.example.ui.session.SessionChip(s.sessionName, -1, Modifier.fillMaxWidth().padding(vertical = 8.dp)) { renaming = true }
+        if (renaming) {
+            com.example.ui.session.SessionNameSheet(app, s.sessionName, startNew = false, onStarted = { renaming = false }, onDismiss = { renaming = false })
+        }
         val example = s.sessionName.ifBlank { "Casamento" }
         ToggleRow(Icons.Outlined.CreateNewFolder, "Criar subpasta com o nome da sessão", "Ex.: …/JPG/$example/", s.sessionSubfolder) {
             scope.launch { app.settings.set(SettingKeys.sessionSubfolder, it) }

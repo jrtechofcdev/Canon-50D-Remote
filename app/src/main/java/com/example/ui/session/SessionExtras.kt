@@ -368,7 +368,15 @@ private fun describe(p: ExposurePreset) = listOfNotNull(
 
 /** End-of-session recap with one-tap delivery of the picks to Lightroom. */
 @Composable
-fun SessionSummaryDialog(app: TetherApp, actions: PhotoActions, settings: Settings, onEnd: () -> Unit, onDismiss: () -> Unit) {
+fun SessionSummaryDialog(
+    app: TetherApp,
+    actions: PhotoActions,
+    settings: Settings,
+    connected: Boolean,
+    onDisconnect: () -> Unit,
+    onNewSession: () -> Unit,
+    onDismiss: () -> Unit,
+) {
     val scope = rememberCoroutineScope()
     val photos by produceState<List<Photo>?>(null, settings.sessionKey) {
         value = app.database.photoDao().inSession(settings.sessionKey)
@@ -411,17 +419,21 @@ fun SessionSummaryDialog(app: TetherApp, actions: PhotoActions, settings: Settin
                     OutlinedButton(
                         onClick = {
                             scope.launch {
-                                var done = 0
-                                withContext(Dispatchers.IO) {
-                                    picks.forEach { p ->
-                                        listOfNotNull(p.jpgUri, p.rawUri, p.editedUri).forEach { uri ->
-                                            copying = "Copiando ${++done}…"
-                                            runCatching { app.store.copy(uri, FileKind.SELECTED, settings) }
-                                        }
+                                val files = picks.flatMap { p -> listOfNotNull(p.jpgUri, p.rawUri, p.editedUri) }
+                                // Only what really got there counts: a file that failed used to be counted too.
+                                val copied = withContext(Dispatchers.IO) {
+                                    copyAll(files) { i ->
+                                        copying = "Copiando ${i + 1} de ${files.size}…"
+                                        app.store.copy(files[i], FileKind.SELECTED, settings)
                                     }
                                 }
                                 copying = null
-                                Toast.makeText(context, "$done arquivo(s) na pasta Escolhidas", Toast.LENGTH_LONG).show()
+                                val failed = files.size - copied
+                                Toast.makeText(
+                                    context,
+                                    if (failed == 0) "$copied arquivo(s) na pasta Escolhidas" else "$copied de ${files.size} copiados. $failed falharam; veja o log em Ajustes → Diagnóstico.",
+                                    Toast.LENGTH_LONG,
+                                ).show()
                             }
                         },
                         enabled = copying == null,
@@ -436,6 +448,9 @@ fun SessionSummaryDialog(app: TetherApp, actions: PhotoActions, settings: Settin
                     Text("Mensagem para o cliente")
                 }
                 BackupPanel(app, settings)
+                if (connected) {
+                    OutlinedButton(onClick = onDisconnect, modifier = Modifier.fillMaxWidth()) { Text("Desconectar a câmera") }
+                }
                 val sendSet = if (settings.downloadMode.raw) ShareSet.RAW else ShareSet.JPG
                 OutlinedButton(
                     onClick = { scope.launch { actions.openInLightroom(favorites, sendSet, settings) } },
@@ -451,11 +466,12 @@ fun SessionSummaryDialog(app: TetherApp, actions: PhotoActions, settings: Settin
                 }
             }
         },
+        // The next client starts here: a new name, so their photos never mix with this session's.
         confirmButton = {
             Button(
-                onClick = onEnd,
+                onClick = onNewSession,
                 colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
-            ) { Text("Encerrar conexão") }
+            ) { Text("Encerrar e começar nova") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Continuar fotografando") } },
     )
@@ -476,7 +492,13 @@ private fun BackupPanel(app: TetherApp, settings: Settings) {
         Text("Escolha a pasta de backup em Ajustes → Salvamento (cartão SD ou pendrive OTG).", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
         return
     }
-    when (val s = state) {
+    // A result from another session (the one before) is not this session's backup.
+    val mine = when (val s = state) {
+        is BackupState.Running -> s
+        is BackupState.Finished -> s.takeIf { it.session == settings.sessionKey } ?: BackupState.Idle
+        BackupState.Idle -> s
+    }
+    when (val s = mine) {
         is BackupState.Running -> {
             Text("Copiando ${s.done + 1} de ${s.total}…", style = MaterialTheme.typography.bodySmall)
             LinearProgressIndicator(
@@ -522,3 +544,7 @@ private fun SummaryLine(label: String, value: String) {
         Text(value, style = MaterialTheme.typography.labelLarge)
     }
 }
+
+/** Runs [copy] for each of [count] files and returns how many worked; a failure doesn't stop the rest. */
+internal inline fun copyAll(files: List<String>, copy: (Int) -> Unit): Int =
+    files.indices.count { i -> runCatching { copy(i) }.isSuccess }

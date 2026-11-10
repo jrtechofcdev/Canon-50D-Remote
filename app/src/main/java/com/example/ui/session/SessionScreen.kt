@@ -143,6 +143,13 @@ fun SessionScreen(
     var showInterval by remember { mutableStateOf(false) }
     var showPresets by remember { mutableStateOf(false) }
     var showSummary by remember { mutableStateOf(false) }
+    // null: closed; false: rename or go back to a session; true: a new session for the next client.
+    var sessionSheet by remember { mutableStateOf<Boolean?>(null) }
+    var follow by remember { mutableStateOf<Pair<String, String>?>(null) }
+    val sessionCount = remember(photos, settings.sessionKey) { photos.count { it.session == settings.sessionKey } }
+    val activeClient by androidx.compose.runtime.produceState<String?>(null, settings.deliveryActiveSession, settings.deliveryEnabled, deliveryStatus) {
+        value = app.delivery.activeClient()?.client
+    }
 
     val currentSettings by rememberUpdatedState(settings)
     LaunchedEffect(Unit) {
@@ -157,6 +164,8 @@ fun SessionScreen(
                 BrandMark(Modifier.weight(1f), subtitle = "Captura vinculada · Canon 50D")
                 RotateButton(app, settings.screenOrientation)
             }
+            Spacer(Modifier.height(12.dp))
+            SessionChip(settings.sessionName, sessionCount, Modifier.fillMaxWidth()) { sessionSheet = false }
             Spacer(Modifier.height(16.dp))
             ConnectionHeader(state, received, status, settings.showBattery, onConnect = app.camera::findAndConnect)
             if (state is ConnectionState.Connected) {
@@ -218,7 +227,11 @@ fun SessionScreen(
                 // Capturar → Selecionar → Editar → Entregar: the last step one tap away.
                 onDelivery = onOpenDelivery,
                 deliveryState = when (val d = deliveryStatus) {
-                    is com.example.core.delivery.DeliveryStatus.Running -> if (deliveryOnline > 0) "no ar · $deliveryOnline" else "no ar"
+                    // "→ Ana": who gets the photos that go by themselves, so the next client's never go to the last one.
+                    is com.example.core.delivery.DeliveryStatus.Running -> buildString {
+                        append(if (deliveryOnline > 0) "no ar · $deliveryOnline" else "no ar")
+                        activeClient?.let { append(" → $it") }
+                    }
                     else -> null
                 },
                 onDeliverLatest = if (settings.deliveryEnabled) ({ deliverFor = photos.firstOrNull() }) else null,
@@ -325,11 +338,44 @@ fun SessionScreen(
             app = app,
             actions = actions,
             settings = settings,
-            onEnd = {
+            connected = connected,
+            onDisconnect = {
                 showSummary = false
-                if (connected) app.camera.disconnect()
+                app.camera.disconnect()
+            },
+            onNewSession = {
+                showSummary = false
+                sessionSheet = true
             },
             onDismiss = { showSummary = false },
+        )
+    }
+
+    sessionSheet?.let { startNew ->
+        SessionNameSheet(
+            app = app,
+            current = settings.sessionName,
+            startNew = startNew,
+            onStarted = { name ->
+                sessionSheet = null
+                if (name.isNotBlank()) scope.launch {
+                    val active = app.delivery.activeClient()
+                    if (active != null && !active.client.equals(name, ignoreCase = true)) follow = name to active.client
+                }
+            },
+            onDismiss = { sessionSheet = null },
+        )
+    }
+
+    follow?.let { (name, previous) ->
+        FollowSessionDialog(
+            session = name,
+            previousClient = previous,
+            onFollow = {
+                follow = null
+                scope.launch { app.delivery.followSession(name) }
+            },
+            onKeep = { follow = null },
         )
     }
 

@@ -306,6 +306,24 @@ class LocalDelivery(
 
     suspend fun setActive(id: Long) = settings.set(SettingKeys.deliveryActiveSession, id)
 
+    /** The client automatic sending goes to right now, or null when nothing goes by itself. */
+    suspend fun activeClient(): DeliverySession? {
+        val s = settings.current()
+        val c = mode.config(s)
+        if (mode.express || !c.enabled || !c.auto) return null
+        return s.deliveryActiveSession.takeIf { it > 0 }?.let { dao.session(it) }?.takeIf { it.isValid(System.currentTimeMillis()) }
+    }
+
+    /** Makes [name] the client automatic photos go to: the open client with that name, or a new one. */
+    suspend fun followSession(name: String): DeliverySession {
+        val now = System.currentTimeMillis()
+        val client = dao.openSessions().firstOrNull {
+            !it.event && !it.express && it.isValid(now) && it.client.equals(name.trim(), ignoreCase = true)
+        } ?: newClient(name.trim())
+        setActive(client.id)
+        return client
+    }
+
     /** Ends a client's access: the token and code stop working, the files are deleted, the history stays. */
     suspend fun closeClient(id: Long) {
         val session = dao.session(id) ?: return
