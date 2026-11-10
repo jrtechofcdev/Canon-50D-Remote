@@ -438,22 +438,7 @@ private fun ShopCard(
 
 @Composable
 private fun ShopChip(icon: ImageVector?, text: String, count: Int, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text("$text  $count", maxLines = 1) },
-        leadingIcon = icon?.let { { Icon(it, contentDescription = null, modifier = Modifier.size(16.dp)) } },
-        colors = FilterChipDefaults.filterChipColors(
-            containerColor = Tone.SurfaceHigh,
-            labelColor = Tone.TextMuted,
-            iconColor = Tone.TextMuted,
-            selectedContainerColor = Tone.Accent,
-            selectedLabelColor = Tone.OnAccent,
-            selectedLeadingIconColor = Tone.OnAccent,
-        ),
-        border = null,
-        modifier = Modifier.heightIn(min = 40.dp),
-    )
+    com.example.ui.components.JrChip(text, selected, onClick, count = count, icon = icon)
 }
 
 @Composable

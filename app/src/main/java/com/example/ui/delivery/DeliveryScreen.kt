@@ -286,7 +286,7 @@ fun networkLabel(id: String) = when (id) {
 @Composable
 private fun Intro(onEnable: () -> Unit) {
     DeliveryCard {
-        Icon(Icons.Outlined.WifiTethering, null, tint = Tone.Accent, modifier = Modifier.size(36.dp))
+        Icon(Icons.Outlined.WifiTethering, null, tint = Tone.TextMuted, modifier = Modifier.size(36.dp))
         Text("Entregue as fotos pelo Wi-Fi", style = MaterialTheme.typography.titleLarge)
         listOf(
             "O celular cria uma rede Wi-Fi e uma página com as fotos de cada cliente.",
@@ -318,14 +318,15 @@ internal fun StatusCard(
     val running = status as? DeliveryStatus.Running
     val (dot, title, detail) = when (status) {
         is DeliveryStatus.Running -> Triple(Tone.Accent, if (status.test) "Teste de entrega no ar" else liveTitle, "${status.network} · ${status.niceUrl ?: status.url()}")
-        DeliveryStatus.Starting -> Triple(Tone.Info, "Ligando…", network)
+        DeliveryStatus.Starting -> Triple(Tone.Warning, "Ligando…", network)
         is DeliveryStatus.Failed -> Triple(Tone.Error, "Não ligou", status.reason)
-        DeliveryStatus.Off -> Triple(Tone.TextMuted, "Parada", "$network · toque em Iniciar quando for entregar")
+        DeliveryStatus.Off -> Triple(Tone.Line, "Parada", "$network · toque em Iniciar quando for entregar")
     }
     DeliveryCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(12.dp).clip(CircleShape).background(dot))
-            Spacer(Modifier.width(10.dp))
+            // The brand block as the state mark, the same as the camera state on the Session.
+            if (status == DeliveryStatus.Starting) com.example.ui.components.BrandLoader(20.dp) else com.example.ui.components.StatusMark(dot, height = 18.dp)
+            Spacer(Modifier.width(12.dp))
             Text(title, style = MaterialTheme.typography.titleMedium)
         }
         Text(detail, style = MaterialTheme.typography.bodySmall, color = if (status is DeliveryStatus.Failed) Tone.Error else Tone.TextMuted)
@@ -338,27 +339,16 @@ internal fun StatusCard(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (running != null) {
-                OutlinedButton(onClick = onOpenPortal, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                    Icon(Icons.Outlined.OpenInBrowser, null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Abrir portal", maxLines = 1)
-                }
-                OutlinedButton(onClick = onStop, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                    Icon(Icons.Outlined.StopCircle, null, tint = Tone.Error)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Parar", color = Tone.Error, maxLines = 1)
-                }
+                com.example.ui.components.JrButton("Abrir portal", onOpenPortal, Modifier.weight(1f), kind = com.example.ui.components.JrButtonKind.Secondary, icon = Icons.Outlined.OpenInBrowser)
+                com.example.ui.components.JrButton("Parar", onStop, Modifier.weight(1f), kind = com.example.ui.components.JrButtonKind.Danger, icon = Icons.Outlined.StopCircle)
             } else {
-                Button(
-                    onClick = onStart,
+                com.example.ui.components.JrButton(
+                    if (status is DeliveryStatus.Failed) "Tentar de novo" else "Iniciar entrega",
+                    onStart,
+                    Modifier.fillMaxWidth(),
+                    icon = Icons.Outlined.WifiTethering,
                     enabled = status != DeliveryStatus.Starting,
-                    colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                ) {
-                    Icon(Icons.Outlined.WifiTethering, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (status is DeliveryStatus.Failed) "Tentar de novo" else "Iniciar entrega")
-                }
+                )
             }
         }
     }
@@ -385,14 +375,7 @@ internal fun QrBlock(title: String, qr: String, caption: String) {
 
 @Composable
 private fun ModeChip(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label) },
-        leadingIcon = { Icon(icon, null, Modifier.size(18.dp)) },
-        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Tone.SurfaceHigh, selectedLabelColor = Tone.Text, selectedLeadingIconColor = Tone.Accent),
-        modifier = Modifier.heightIn(min = 48.dp),
-    )
+    com.example.ui.components.JrChip(label, selected, onClick, Modifier.heightIn(min = 48.dp), icon = icon)
 }
 
 @Composable
@@ -445,7 +428,7 @@ private fun NewClientDialog(onDismiss: () -> Unit, onCreate: (String, String?) -
 @Composable
 internal fun DeliveryCard(content: @Composable ColumnScope.() -> Unit) {
     Column(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(Tone.Surface).padding(16.dp).animateContentSize(),
+        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(Tone.Surface).padding(16.dp).animateContentSize(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         content = content,
     )

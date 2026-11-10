@@ -246,7 +246,10 @@ fun PhotosScreen(
                         modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = inset; scaleY = inset },
                     )
                     FormatTag(photo.rawUri != null, photo.jpgUri != null, Modifier.align(Alignment.BottomStart).padding(4.dp))
-                    Row(
+                    // The veil only behind icons that are there (an empty one showed as a dark dot).
+                    val marks = photo.blurry || (settings.eyesCheck && photo.eyesClosed > 0) || (settings.cullSuggestions && photo.suggested) ||
+                        photo.note != null || photo.audioNote != null || (photo.clientPick && settings.clientPicksEnabled) || photo.favorite
+                    if (marks) Row(
                         Modifier.align(Alignment.TopEnd).padding(4.dp).clip(MaterialTheme.shapes.extraSmall).background(Tone.Scrim).padding(2.dp),
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                     ) {

@@ -404,19 +404,7 @@ private fun MenuItem(icon: ImageVector, text: String, color: androidx.compose.ui
 
 @Composable
 private fun CategoryFilter(icon: ImageVector, text: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(text, maxLines = 1) },
-        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp)) },
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = Tone.SurfaceHigh,
-            selectedLabelColor = Tone.Accent,
-            selectedLeadingIconColor = Tone.Accent,
-            labelColor = Tone.TextMuted,
-            iconColor = Tone.TextMuted,
-        ),
-    )
+    com.example.ui.components.JrChip(text, selected, onClick, icon = icon)
 }
 
 /** Name input for a category. */

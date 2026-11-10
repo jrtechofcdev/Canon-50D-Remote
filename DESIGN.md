@@ -14,7 +14,12 @@ Tudo segue a cadeia **Capturar → Controlar → Melhorar → Entregar**, que ta
 
 ## Identidade
 - Ferramenta de trabalho do fotógrafo: a foto é a protagonista, e a marca aparece com peso nos pontos de identidade (ícone, cabeçalho, disparador, marca d'água).
-- O motivo visual é o **bloco inclinado** do símbolo, um paralelogramo a ~16° com cantos suaves. Ele aparece como indicador de estado, etiquetas de formato e ilustração de tela vazia. Nunca vira padrão de fundo repetido (a grade do kit é para peças impressas, não para uma tela de trabalho).
+- O motivo visual é o **bloco inclinado** do símbolo, um paralelogramo a ~16° com cantos suaves. É a assinatura do app:
+  - **escolhido:** o único jeito de marcar seleção (chips, presets, opções, aba aberta) é o fundo um tom acima com o bloco menta à esquerda (ou sobre o ícone, nas abas);
+  - **estado:** a câmera, a Entrega e os avisos marcam o estado com o bloco na cor do estado (`StatusMark`);
+  - **etiquetas** de formato (RAW, JPG) e a **arte das telas vazias** (o símbolo em linhas);
+  - **carregador:** o símbolo em linhas com um bloco aceso girando no sentido horário (`BrandLoader`, ideia do José).
+- Nunca vira padrão de fundo repetido (a grade do kit é para peças impressas, não para uma tela de trabalho).
 
 ## Tema
 - Escuro por decisão: igrejas e eventos com pouca luz, e cinza neutro para julgar cor e exposição. O grafite da marca (`#292929`) é neutro, então serve de base sem tingir a foto.
@@ -24,27 +29,53 @@ Tudo segue a cadeia **Capturar → Controlar → Melhorar → Entregar**, que ta
 |---|---|---|
 | Fundo | `#1F1F1F` | Telas |
 | Superfície | `#292929` (grafite da marca) | Cartões, barras |
-| Superfície alta | `#333333` | Chips, campos |
-| Linha | `#3D3D3D` | Divisórias |
+| Superfície alta | `#333333` | Controles dentro do cartão, item escolhido |
+| Linha | `#3D3D3D` | Divisórias, contorno de chip |
 | Texto | `#F2F2F2` / `#A6A6A6` | Principal / secundário |
 | **Menta** `#00FCA8` | acento principal | Ação principal da tela, estado "conectado", seleção |
 | **Ciano** `#1CDAFF` | acento de informação | Progresso de download, histograma de luminância, links |
 | Degradê menta → ciano | só identidade | Símbolo, disparador |
-| Erro | `#FF6B6B` | Falhas reais |
+| Âmbar | `#FFB547` | Algo errado que ainda funciona: reconectando, pouco espaço |
+| Erro | `#FF6B6B` | Falhas reais, apagar, parar |
+| Véu | preto 55% | Legendas e botões redondos sobre a foto |
+| Sobre a foto | `#FFFFFF` | Ícones e texto em cima da foto (`Tone.OnPhoto`) |
 
-Regra: no máximo **um** elemento menta por área da tela. O degradê só aparece no símbolo e no disparador.
+Regras:
+- No máximo **um** elemento menta por área: a ação a fazer ali, o estado "conectado" ou o que está escolhido. Ícones de grupo, títulos e valores ficam neutros.
+- O degradê aparece em dois lugares: o disparador e a linha fina embaixo de "Conectada" na Sessão (além do símbolo).
+- Três níveis de superfície: fundo é a tela, superfície é o cartão ou a folha, superfície alta é o controle dentro dele.
+- Nenhuma cor escrita à mão nas telas: tudo sai de `Tone` (`ui/theme/Theme.kt`). O `DesignTokensTest` cobra isso.
 
 ## Tipografia
 - **Exo 2**, a fonte do logo, em toda a interface: 600 em títulos, 500 em rótulos e botões, 400 no texto.
 - Números de exposição com algarismos tabulares, como no LCD da câmera.
 - Letras espaçadas só no nome "JR C50D Sync", do jeito do logo. Rótulos de seção ficam em caixa normal.
 
-## Formas e movimento
-- Raio 8dp em cartões e campos, 4dp nas miniaturas, círculo só no disparador.
+## Formas e espaço
+- Raio 8 dp em cartões, campos, chips e botões; 4 dp em miniaturas e etiquetas; 16 dp no topo das folhas.
+- Círculo só no disparador e nos botões redondos sobre a foto (um círculo some menos na imagem que um quadrado).
+- Espaços só da escala `Space`: 4, 8, 12, 16, 24 e 32 dp.
 - Sem sombras decorativas e sem brilho.
 
+## Componentes (`ui/components/Kit.kt`)
+| Componente | Para quê |
+|---|---|
+| `JrButton` | Primário (menta, um por área), Secundário (tonal), Fantasma (só texto), Perigo (texto vermelho). 48 dp |
+| `JrChip` / `ChipRow` | Filtro ou opção com a seleção única; a fileira rola com a borda esmaecida, sem cortar palavra |
+| `PhotoChip` | O mesmo chip sobre a foto ou o live view, no véu |
+| `JrCard` | Um cartão: superfície, 8 dp, sem borda e sem sombra |
+| `JrBanner` | Aviso que fica na tela: informação (ciano), atenção (âmbar) ou erro (vermelho), com ações |
+| `ScreenHeader` / `SheetHeader` | Título da tela (nunca cortado pelos botões, no máximo 2 ações) e da folha |
+| `JrTile` | Ferramenta: ícone de 24 dp num quadrado de 52 dp, nome embaixo; menta só enquanto ligada |
+| `PhotoButton` | Botão redondo sobre a foto, véu e ícone branco |
+| `EmptyState` | Tela vazia: o símbolo em linhas, o que falta, por quê e o que fazer |
+| `StatusMark` | O bloco inclinado na cor do estado |
+| `BrandLoader` | Carregador da marca, com versão de progresso (cada quarto concluído fica aceso) |
+
 ## Movimento
-Cada animação responde a algo que aconteceu, e nada fica em loop. As curvas e durações ficam em `ui/components/Motion.kt` (160, 280 e 420 ms, curva "emphasized").
+Cada animação responde a algo que aconteceu. As curvas e durações ficam em `ui/components/Motion.kt` (160, 280 e 420 ms, curva "emphasized").
+
+Só duas coisas repetem, e só enquanto o motivo existe: o carregador da marca (uma volta a cada 0,6 s enquanto a espera dura) e o pisca do estouro no visualizador (só com o alerta ligado e áreas estouradas). Com as animações do Android desligadas, o carregador fica parado com um bloco aceso.
 
 | Momento | Movimento |
 |---|---|
@@ -55,6 +86,8 @@ Cada animação responde a algo que aconteceu, e nada fica em loop. As curvas e 
 | Número mudou | O número rola para cima quando cresce e para baixo quando diminui |
 | Escolher | A foto afunda na moldura, o coração pulsa e o ícone da aba pula |
 | Girar a tela | Dial redondo: o celular desenhado gira com mola e encaixa a cada 90° |
+| Esperar | O bloco aceso gira no símbolo; com progresso, os blocos acendem e ficam |
+| Abrir o app (Android 12+) | Os blocos do símbolo acendem um a um, no sentido horário, até o logo completo |
 
 A abertura (`ui/intro/BrandIntro.kt`) é a única peça longa:
 - os blocos do símbolo entram pela própria inclinação;
@@ -65,7 +98,8 @@ A abertura (`ui/intro/BrandIntro.kt`) é a única peça longa:
 Ela dura menos de 3 s, pula com um toque e respeita a opção de animações do Android.
 
 ## Modo escuro total
-- Fundo preto, menta escurecida `#00A870`, ciano escurecido `#1290AA`, texto `#B5B5B5`.
+- Fundo preto, menta escurecida `#00A870`, ciano escurecido `#1290AA`, âmbar `#B98235`, texto `#B5B5B5`, branco sobre a foto `#B5B5B5`.
+- É o único lugar com preto puro, de propósito: igreja e evento no escuro, onde qualquer cinza aceso incomoda.
 
 ## Dials
 - ENERGY 2 / RHYTHM 2 / MOTION 3

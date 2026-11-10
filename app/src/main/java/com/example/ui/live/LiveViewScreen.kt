@@ -598,18 +598,7 @@ private fun Value(label: String, value: String, enabled: Boolean, onClick: () ->
 
 @Composable
 private fun Pill(label: String, selected: Boolean, compact: Boolean = false, onClick: () -> Unit) {
-    Box(
-        Modifier.heightIn(min = 48.dp).clip(CircleShape).selectable(selected = selected, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (selected) Tone.OnAccent else Color.White,
-            modifier = Modifier.clip(CircleShape).background(if (selected) Tone.Accent else Color.White.copy(alpha = 0.14f))
-                .padding(horizontal = if (compact) 9.dp else 14.dp, vertical = 8.dp),
-        )
-    }
+    com.example.ui.components.PhotoChip(label, selected, onClick, compact = compact)
 }
 
 @Composable

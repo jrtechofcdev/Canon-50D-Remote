@@ -489,19 +489,7 @@ private fun PhotoChooser(
 
 @Composable
 private fun ModeChip(text: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(text, maxLines = 1) },
-        colors = FilterChipDefaults.filterChipColors(
-            containerColor = Tone.SurfaceHigh,
-            labelColor = Tone.TextMuted,
-            selectedContainerColor = Tone.Text,
-            selectedLabelColor = Tone.Background,
-        ),
-        border = null,
-        modifier = Modifier.heightIn(min = 40.dp),
-    )
+    com.example.ui.components.JrChip(text, selected, onClick)
 }
 
 @Composable

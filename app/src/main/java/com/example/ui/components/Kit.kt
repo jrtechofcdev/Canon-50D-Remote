@@ -154,6 +154,39 @@ fun JrChip(
     }
 }
 
+/** [JrChip] for use over a photo or the live view: on the photo veil, with the same mint block when chosen. */
+@Composable
+fun PhotoChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    compact: Boolean = false,
+) {
+    Box(Modifier.heightIn(min = 48.dp).then(modifier), contentAlignment = Alignment.Center) {
+        Row(
+            Modifier
+                .clip(MaterialTheme.shapes.small)
+                .background(Tone.Scrim)
+                .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+                .heightIn(min = 36.dp)
+                .padding(horizontal = if (compact) Space.s else Space.m),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (selected) {
+                StatusMark(Tone.Accent, height = 12.dp)
+                Spacer(Modifier.width(6.dp))
+            }
+            icon?.let {
+                Icon(it, contentDescription = null, tint = Tone.OnPhoto, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+            }
+            Text(label, style = MaterialTheme.typography.labelLarge, color = if (selected) Tone.OnPhoto else Tone.OnPhoto.copy(alpha = 0.72f), maxLines = 1)
+        }
+    }
+}
+
 /** Fades the edges of a sideways-scrolling row where there is more to see, instead of cutting a word in half. */
 fun Modifier.edgeFade(state: ScrollState, color: Color, width: Dp = 32.dp): Modifier = drawWithContent {
     drawContent()

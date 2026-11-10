@@ -252,7 +252,7 @@ fun ViewerScreen(
                     active = current.favorite,
                 )
                 Box {
-                    PhotoButton(Icons.Outlined.MoreVert, "Mais opções", onClick = { menuOpen = true }, active = showClipping)
+                    PhotoButton(Icons.Outlined.MoreVert, "Mais opções", onClick = { menuOpen = true })
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, containerColor = Tone.SurfaceHigh) {
                         DropdownMenuItem(
                             text = { Text(if (showClipping) "Esconder alerta de estouro" else "Mostrar alerta de estouro") },

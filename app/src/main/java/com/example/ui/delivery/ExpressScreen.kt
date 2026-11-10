@@ -154,7 +154,7 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
 
             if (!s.expressEnabled) {
                 DeliveryCard {
-                    Icon(Icons.Outlined.Collections, null, tint = Tone.Accent, modifier = Modifier.size(36.dp))
+                    Icon(Icons.Outlined.Collections, null, tint = Tone.TextMuted, modifier = Modifier.size(36.dp))
                     Text("Fotografou, mostrou, entregou", style = MaterialTheme.typography.titleLarge)
                     listOf(
                         "Um cliente por vez e sem código: ele entra no Wi-Fi e as fotos já aparecem.",

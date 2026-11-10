@@ -49,7 +49,7 @@ fun SettingsGroup(title: String, icon: ImageVector? = null, content: @Composable
         SectionLabel(title)
     } else {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = Tone.Accent, modifier = Modifier.size(16.dp))
+            Icon(icon, contentDescription = null, tint = Tone.TextMuted, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
             SectionLabel(title)
         }
@@ -156,27 +156,9 @@ fun <T> ChoiceRow(title: String, options: List<Pair<T, String>>, selected: T, en
             Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) Tone.Text else Tone.TextMuted)
         }
         Spacer(Modifier.height(6.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             options.forEach { (value, label) ->
-                val isSelected = value == selected
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { onPick(value) },
-                    enabled = enabled,
-                    label = { Text(label) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Tone.SurfaceHigh,
-                        selectedLabelColor = Tone.Accent,
-                        labelColor = Tone.TextMuted,
-                    ),
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = enabled,
-                        selected = isSelected,
-                        borderColor = Tone.Line,
-                        selectedBorderColor = Tone.Accent,
-                        selectedBorderWidth = 1.dp,
-                    ),
-                )
+                com.example.ui.components.JrChip(label, value == selected, { onPick(value) }, enabled = enabled)
             }
         }
     }
@@ -184,7 +166,7 @@ fun <T> ChoiceRow(title: String, options: List<Pair<T, String>>, selected: T, en
 
 @Composable
 private fun RowIcon(icon: ImageVector, on: Boolean) {
-    Icon(icon, contentDescription = null, tint = if (on) Tone.Accent else Tone.TextMuted, modifier = Modifier.padding(end = 14.dp).size(22.dp))
+    Icon(icon, contentDescription = null, tint = if (on) Tone.Text else Tone.TextMuted, modifier = Modifier.padding(end = 14.dp).size(22.dp))
 }
 
 @Composable

@@ -338,14 +338,7 @@ private fun clippingMask(bmp: Bitmap): Bitmap? {
 
 @Composable
 fun PresetChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label, maxLines = 1) },
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = Tone.SurfaceHigh, selectedLabelColor = Tone.Accent, labelColor = Tone.TextMuted,
-        ),
-    )
+    com.example.ui.components.JrChip(label, selected, onClick)
 }
 
 @Composable
