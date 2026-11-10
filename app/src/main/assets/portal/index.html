@@ -6,69 +6,88 @@
 <meta name="theme-color" content="#1f1f1f">
 <title>Suas fotos</title>
 <link rel="icon" href="/icon.png">
+<link rel="stylesheet" href="/brand.css">
 <link rel="stylesheet" href="/style.css">
 </head>
-<body>
-<header class="top">
+<body class="opening">
+<header class="top" id="top">
   <img class="logo" src="/logo.png" alt="Jr_Tech_OFC">
-  <button id="leave" class="link" hidden>Sair</button>
+  <button id="leave" class="btn ghost small" hidden>Sair</button>
 </header>
 
-<main id="login" class="panel" hidden>
-  <h1>Suas fotos estão aqui</h1>
-  <p class="muted">Digite o código de 4 números que o fotógrafo te passou.</p>
-  <form id="codeForm" autocomplete="off">
-    <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="0000" aria-label="Código">
-    <button class="primary" type="submit">Ver minhas fotos</button>
-  </form>
-  <p id="loginError" class="error" role="alert"></p>
-  <p class="hint">Se o celular avisar que este Wi-Fi não tem internet, toque em <b>Manter conectado</b>. As fotos vêm direto do celular do fotógrafo.</p>
-</main>
+<div class="stage">
+  <!-- Code: four numbers, four blocks of the symbol. Each number typed lights one block. -->
+  <main id="login" class="gate" hidden>
+    <div id="gateSymbol" class="gate-symbol"></div>
+    <h1>Suas fotos estão aqui</h1>
+    <p class="muted lead">Digite o código de 4 números que o fotógrafo te passou.</p>
+    <form id="codeForm" autocomplete="off" novalidate>
+      <label class="code" id="codeBox">
+        <span class="sr">Código de 4 números</span>
+        <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" enterkeyhint="go">
+        <span class="cells" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </label>
+      <p id="loginError" class="error" role="alert"></p>
+      <button class="btn primary wide" type="submit" id="enter">Ver minhas fotos</button>
+    </form>
+    <p class="note"><i class="mark info" aria-hidden="true"></i><span>Se o celular avisar que este Wi-Fi não tem internet, toque em <b>Manter conectado</b>. As fotos vêm direto do celular do fotógrafo.</span></p>
+  </main>
 
-<main id="gallery" hidden>
-  <section class="hello">
-    <h1 id="hello"></h1>
-    <p id="count" class="muted"></p>
-  </section>
+  <main id="gallery" class="gallery" hidden>
+    <section class="hello">
+      <p id="eyebrow" class="eyebrow"></p>
+      <h1 id="hello"></h1>
+      <p class="meta"><span class="state"><i class="mark on" aria-hidden="true"></i><span id="count"></span></span><span id="by" class="muted"></span></p>
+    </section>
 
-  <section id="hero" class="hero" hidden>
-    <p class="tag" id="heroTag">Sua foto está pronta!</p>
-    <button id="heroOpen" class="heroImg" aria-label="Abrir foto"><img id="heroImg" alt=""></button>
-    <div class="row">
-      <a id="heroSave" class="primary" download>Salvar foto</a>
-      <button id="heroPick" class="ghost pick" hidden aria-label="Favorita">♡</button>
+    <section id="hero" class="hero" hidden>
+      <button id="heroOpen" class="hero-photo" aria-label="Abrir a foto mais recente">
+        <span class="hero-frame"><img id="heroImg" alt=""><span id="heroTag" class="photo-tag"></span></span>
+      </button>
+      <div class="hero-actions">
+        <p class="hero-side"><b id="heroTitle">A mais recente</b><span class="muted">Toque na foto para ver em tela cheia e passar para as outras.</span></p>
+        <a id="heroSave" class="btn primary">Salvar foto</a>
+        <button id="heroPick" class="btn secondary icon heart" hidden></button>
+      </div>
+    </section>
+
+    <p id="waiting" class="waiting" hidden></p>
+    <p id="iosHint" class="note" hidden><i class="mark info" aria-hidden="true"></i><span>No iPhone: abra a foto, toque e segure nela e escolha <b>Adicionar às Fotos</b>.</span></p>
+
+    <section id="all" class="all" hidden>
+      <div class="section-head">
+        <h2>Todas as fotos <span id="allCount" class="muted num"></span></h2>
+        <button id="saveAll" class="btn secondary small" hidden>Salvar todas</button>
+      </div>
+      <div id="grid" class="grid"></div>
+    </section>
+
+    <div id="empty" class="empty" hidden>
+      <div id="emptyArt"></div>
+      <p class="empty-title">As fotos aparecem aqui</p>
+      <p class="muted">Assim que o fotógrafo enviar, elas chegam nesta página sozinhas. Pode deixar aberta.</p>
     </div>
-  </section>
+  </main>
 
-  <p id="waiting" class="waiting" hidden></p>
-  <p id="iosHint" class="hint" hidden>No iPhone: toque e segure a foto aberta e escolha <b>Adicionar às Fotos</b>.</p>
+  <footer class="foot" id="foot"></footer>
+</div>
 
-  <section>
-    <div class="gridHead">
-      <h2>Todas as fotos</h2>
-      <button id="saveAll" class="ghost small" hidden>Salvar todas</button>
-    </div>
-    <div id="grid" class="grid"></div>
-    <p id="empty" class="muted center" hidden>As fotos aparecem aqui assim que o fotógrafo enviar.</p>
-  </section>
-</main>
-
-<div id="viewer" class="viewer" hidden>
-  <div class="viewerBar">
-    <button id="close" class="ghost" aria-label="Fechar">Fechar</button>
-    <span id="position" class="muted"></span>
+<div id="viewer" class="viewer" hidden role="dialog" aria-modal="true" aria-label="Foto">
+  <div class="viewer-bar">
+    <button id="close" class="round" aria-label="Fechar"></button>
+    <span id="pos" class="pos num"></span>
+    <button id="pick" class="round heart" hidden></button>
   </div>
-  <img id="big" alt="">
-  <div class="viewerActions">
-    <button id="prev" class="ghost" aria-label="Anterior">‹</button>
-    <a id="save" class="primary" download>Salvar foto</a>
-    <button id="pick" class="ghost pick" hidden aria-label="Favorita">♡</button>
-    <button id="next" class="ghost" aria-label="Próxima">›</button>
+  <div class="viewer-stage"><img id="big" alt=""></div>
+  <div class="viewer-actions">
+    <button id="prev" class="round" aria-label="Foto anterior"></button>
+    <a id="save" class="btn primary">Salvar foto</a>
+    <button id="next" class="round" aria-label="Próxima foto"></button>
   </div>
 </div>
 
-<div id="toast" class="toast" role="status"></div>
-<footer class="foot muted" id="foot"></footer>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="/brand.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

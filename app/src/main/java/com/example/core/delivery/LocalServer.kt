@@ -526,7 +526,10 @@ class LocalServer(
         /** A typed name, tidy: no control characters, single spaces, 2 to 40 characters. */
         fun cleanName(typed: String): String? =
             typed.filter { !it.isISOControl() }.replace(Regex("\\s+"), " ").trim().take(40).takeIf { it.length >= 2 }
-        val ASSETS = setOf("index.html", "app.js", "style.css", "exo2.ttf", "logo.png", "icon.png")
+        val ASSETS = setOf(
+            "index.html", "app.js", "style.css", "brand.css", "brand.js",
+            "exo2.ttf", "exo2-400.ttf", "exo2-500.ttf", "exo2-600.ttf", "logo.png", "icon.png",
+        )
         private val COMMON = listOf(
             "Connection" to "close",
             "X-Content-Type-Options" to "nosniff",

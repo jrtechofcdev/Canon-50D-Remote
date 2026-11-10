@@ -2,6 +2,39 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [5.1] · 2026-11-10
+
+As páginas que o cliente abre no celular (Entrega local e Fotografia Express) foram refeitas do zero. É o primeiro contato dele com a marca.
+
+- **Abertura da marca:**
+  - os 4 blocos do símbolo entram pela inclinação e acendem no sentido horário;
+  - em seguida, o nome Jr_Tech_OFC aparece com o lema;
+  - dura menos de 2,5 s, aparece uma vez por visita e some com um toque.
+- **Código da Entrega:**
+  - as 4 casas do código são blocos inclinados como os do símbolo;
+  - cada número digitado acende um bloco do logo;
+  - na conferência, o símbolo vira o carregador da marca;
+  - com código errado, as casas tremem em vermelho e o aviso não empurra a tela.
+- **Galeria da Entrega:**
+  - saudação grande com o nome do cliente ("Boa noite, Ana");
+  - a foto mais recente ocupa a largura do celular, com **Salvar foto** logo embaixo;
+  - a grade mostra cada foto no formato dela (em pé ou deitada), em linhas que fecham a largura, sem cortar ninguém pela metade;
+  - a grade não pisca a cada atualização: as fotos são mantidas e só as novas entram, com o flash de obturador.
+- **Fotografia Express:**
+  - "Ao vivo" no topo enquanto o celular do fotógrafo responde, e "Reconectando" se o Wi-Fi piscar;
+  - cartão "Escolha as suas favoritas", que explica a prévia e mostra o preço;
+  - cada foto mostra **Prévia**, **Prévia · escolhida** ou **Liberada**;
+  - quando o fotógrafo libera, a etiqueta acende e o **Salvar** aparece;
+  - pagamento com o valor grande, o QR do Pix numa placa branca e os 3 passos numerados;
+  - telas próprias para "esperando a primeira foto", "nenhum atendimento" e "atendimento encerrado".
+- **Visualizador:**
+  - fundo preto;
+  - a foto acompanha o dedo ao arrastar;
+  - o botão Voltar do celular fecha a foto e o pagamento.
+- **Em pé, deitado e no computador:** cada um tem o seu arranjo. No computador e no celular deitado, a foto fica ao lado dos botões.
+- **Exo 2 nos três pesos (400, 500 e 600)**, servida pelo próprio app. Ícones desenhados para as páginas, no lugar dos símbolos de texto (♡, ‹ ›).
+- **`ClientPagesTest`:** confere que cada arquivo pedido pelas páginas é servido pelo celular.
+
 ## [5.0.1] · 2026-11-10
 
 Correções a partir do log da 5.0 na 50D (disparo, intervalômetro e live view).

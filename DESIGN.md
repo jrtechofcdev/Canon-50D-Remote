@@ -104,7 +104,29 @@ Ela dura menos de 3 s, pula com um toque e respeita a opção de animações do 
 ## Dials
 - ENERGY 2 / RHYTHM 2 / MOTION 3
 
-## Portal da entrega local
-- É a página que o cliente abre no celular dele (`assets/portal`), com a mesma identidade: grafite `#1F1F1F`, menta `#00FCA8` só na ação principal (**Salvar foto**) e Exo 2 servida pelo próprio app.
-- A foto vem primeiro: a mais recente em destaque e a grade das outras logo abaixo. Botões com 48 px de altura, sem bibliotecas externas e sem CDN.
-- A placa impressa é clara (papel branco, pouca tinta), com a faixa e os números de passo em menta e os QR em preto sobre branco.
+## Páginas do cliente (Entrega local e Fotografia Express)
+São o primeiro contato do cliente com a marca, no celular dele. Ficam em `assets/portal` e `assets/express`, com a base comum em `assets/shared` (`brand.css` e `brand.js`).
+
+- **Leitura:** página de fotos para o cliente do evento, na identidade Jr_Tech_OFC (grafite, menta, bloco inclinado), dial ENERGY 3 na abertura e 2 no resto / RHYTHM 2 / MOTION 3.
+- **Mesma identidade do app:**
+  - grafite `#1F1F1F`;
+  - menta `#00FCA8` só na ação da área (**Ver minhas fotos**, **Salvar foto**, **Pagar**);
+  - Exo 2 em 400, 500 e 600, servida pelo próprio app;
+  - sem bibliotecas externas e sem CDN.
+- **Abertura** (uma vez por visita, menos de 2,5 s, pula com um toque, some com "reduzir movimento"):
+  - os 4 blocos entram pela própria inclinação;
+  - acendem no sentido horário;
+  - o nome Jr_Tech_OFC fecha o espaçamento das letras, com o lema embaixo.
+- **Código:** 4 números, 4 blocos. Cada número digitado acende um bloco do símbolo, e as casas do código têm a mesma inclinação de 16°. Durante a conferência, o símbolo vira o carregador. Com código errado, as casas tremem em vermelho.
+- **A foto vem primeiro:**
+  - a mais recente ocupa a largura do celular;
+  - a grade guarda o formato de cada foto, em pé ou deitada, em linhas que fecham a largura;
+  - no visualizador, o fundo é preto, dá para arrastar com o dedo e o botão Voltar do celular fecha.
+- **Estados com o bloco:**
+  - "Ao vivo" (menta), "Reconectando" (âmbar) e "Encerrado" (cinza) no Express;
+  - "Prévia" (cinza) e "Liberada" (menta) em cada foto.
+- **Movimento:**
+  - foto nova chega com o flash de obturador;
+  - foto liberada acende a etiqueta;
+  - o coração pulsa ao escolher.
+- **Placa impressa:** é clara (papel branco, pouca tinta), com a faixa e os números de passo em menta e os QR em preto sobre branco.

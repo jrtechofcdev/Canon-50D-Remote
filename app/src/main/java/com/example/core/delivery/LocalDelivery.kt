@@ -503,14 +503,17 @@ class LocalDelivery(
     }
 
     /**
-     * The page's files: assets/portal (Entrega local) or assets/express (Fotografia Express), and the
-     * brand's font and logos from the app itself. A font resource is stored as the plain .ttf, so it
-     * opens as raw without a second copy in the APK.
+     * The page's files: assets/portal (Entrega local) or assets/express (Fotografia Express), what both
+     * share (assets/shared), and the brand's font and logos from the app itself. A font resource is
+     * stored as the plain .ttf, so it opens as raw without a second copy in the APK.
      */
     @android.annotation.SuppressLint("ResourceType")
     private fun portalFile(name: String): java.io.InputStream? = runCatching {
         when (name) {
-            "exo2.ttf" -> context.resources.openRawResource(com.example.R.font.exo2_semibold)
+            "exo2-400.ttf" -> context.resources.openRawResource(com.example.R.font.exo2_regular)
+            "exo2-500.ttf" -> context.resources.openRawResource(com.example.R.font.exo2_medium)
+            "exo2.ttf", "exo2-600.ttf" -> context.resources.openRawResource(com.example.R.font.exo2_semibold)
+            "brand.css", "brand.js" -> context.assets.open("shared/$name")
             "logo.png" -> context.assets.open("watermarks/horizontal_branco.png")
             "icon.png" -> context.assets.open("watermarks/simbolo.png")
             else -> context.assets.open("${mode.assets}/$name")

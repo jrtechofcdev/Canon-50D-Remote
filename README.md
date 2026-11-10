@@ -161,6 +161,10 @@ Toque 7 vezes na marca no fim de **Ajustes**. Aparece **Ajustes → Desenvolvedo
 
 <p><img src="docs/images/portal_computador.png" width="100%" alt="Portal da entrega local no computador"></p>
 
+<p><img src="docs/images/portal_codigo.png" width="230" alt="Código de 4 números em blocos inclinados"> <img src="docs/images/portal_celular.png" width="230" alt="Galeria do cliente no celular"></p>
+
+A página do cliente abre com o símbolo da Jr_Tech_OFC se montando. Cada número do código acende um bloco do logo. Depois vêm a foto mais recente em destaque e a grade com cada foto no seu formato. Tudo vem do seu celular, sem internet.
+
 1. **Ajustes → Entrega local:** ligue e escolha a rede.
    - **Wi-Fi Direct:** o app cria a rede `DIRECT-JR-Fotos`, com senha fixa. É o padrão.
    - **Roteador do celular:** você liga o roteador nas configurações do Android, com o mesmo nome e senha.
