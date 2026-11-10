@@ -425,7 +425,11 @@ class ScreenshotTest {
     fun shopSelecting() {
         seedShop()
         rule.setContent { JrLinkTheme { com.example.ui.shop.ShopScreen(app, onOpen = {}) } }
-        runCatching { rule.waitUntil(15_000) { rule.onAllNodes(androidx.compose.ui.test.hasText("Moody 690")).fetchSemanticsNodes().isNotEmpty() } }
+        // The catalogue builds its DNG previews first; on a busy CI runner that took over 15 s. Wait for both
+        // cards (the test touches both) and fail here with a clear timeout instead of an empty node list.
+        rule.waitUntil(60_000) {
+            listOf("Moody 690", "Cinematográfico 692").all { rule.onAllNodes(androidx.compose.ui.test.hasText(it)).fetchSemanticsNodes().isNotEmpty() }
+        }
         rule.onNode(androidx.compose.ui.test.hasText("Moody 690")).performTouchInput { longClick() }
         rule.onNode(androidx.compose.ui.test.hasText("Cinematográfico 692")).performClick()
         save("loja_selecao", androidx.compose.ui.test.hasText("Salvar 2"))
