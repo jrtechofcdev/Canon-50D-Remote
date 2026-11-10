@@ -92,6 +92,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.heightIn
 import com.example.ui.components.pressScale
+import com.example.ui.theme.Space
+import com.example.ui.components.StatusMark
 
 @Composable
 fun SessionScreen(
@@ -409,58 +411,78 @@ fun SessionScreen(
 
 @Composable
 private fun ConnectionHeader(state: ConnectionState, received: Int, status: CameraStatus, showBattery: Boolean, onConnect: () -> Unit) {
-    val (title, detail) = when (state) {
-        is ConnectionState.Connected -> state.model to buildString {
-            append(if (received == 1) "1 foto recebida" else "$received fotos recebidas")
-            status.shotsLeft?.let { append(" · cartão: $it disparos") }
-            if (showBattery) status.value(EosProp.BATTERY_POWER)?.let { append(" · bateria: ${EosValues.batteryLabel(it)}") }
-        }
-        ConnectionState.Connecting -> "Conectando…" to "Abrindo sessão com a câmera"
-        ConnectionState.WaitingPermission -> "Permissão USB" to "Toque em Permitir no aviso do Android"
-        ConnectionState.NoCamera -> "Câmera não conectada" to "Ligue a 50D e conecte pelo cabo USB OTG"
-        is ConnectionState.Failed -> "Falha na conexão" to state.message
-        is ConnectionState.Reconnecting -> "Reconectando…" to "${state.reason}. Tentativa ${state.attempt} de ${com.example.core.camera.Reconnect.TRIES}; as fotos feitas agora chegam depois."
+    // One line for the state, with the brand block in the state's colour; the details below it.
+    val mark by androidx.compose.animation.animateColorAsState(
+        when (state) {
+            is ConnectionState.Connected -> Tone.Accent
+            is ConnectionState.Failed -> Tone.Error
+            is ConnectionState.Reconnecting -> Tone.Warning
+            else -> Tone.Line
+        },
+        androidx.compose.animation.core.tween(com.example.ui.components.Motion.LONG),
+        label = "state",
+    )
+    val title = when (state) {
+        is ConnectionState.Connected -> "Conectada · ${state.model.removePrefix("Canon ")}"
+        ConnectionState.Connecting -> "Conectando…"
+        ConnectionState.WaitingPermission -> "Permissão USB"
+        ConnectionState.NoCamera -> "Desconectada"
+        is ConnectionState.Failed -> "Falha na conexão"
+        is ConnectionState.Reconnecting -> "Reconectando ${state.attempt}/${com.example.core.camera.Reconnect.TRIES}"
     }
-    val live = state is ConnectionState.Connected
-
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        // The state block eases to its new colour, and the title slides to the new state, so connecting reads as a change.
-        val tile by androidx.compose.animation.animateColorAsState(
-            when (state) {
-                is ConnectionState.Connected -> Tone.Accent
-                is ConnectionState.Failed -> Tone.Error
-                is ConnectionState.Reconnecting -> Tone.Info
-                else -> Tone.Line
-            },
-            androidx.compose.animation.core.tween(com.example.ui.components.Motion.LONG),
-            label = "state",
-        )
-        StateTile(tile)
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            androidx.compose.animation.AnimatedContent(
-                targetState = title,
-                transitionSpec = {
-                    (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, 80)) +
-                        androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(320, 80, com.example.ui.components.Motion.Emphasized)) { it / 2 }) togetherWith
-                        androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(100))
-                },
-                label = "title",
-            ) { Text(it, style = MaterialTheme.typography.titleLarge) }
-            com.example.ui.components.RollingText(detail, style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted)
-        }
-        // Not connected: connecting is the one thing to do here, so it is the screen's mint button.
-        if (!live && state != ConnectionState.Connecting && state !is ConnectionState.Reconnecting) {
-            androidx.compose.material3.Button(
-                onClick = onConnect,
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
-                modifier = Modifier.heightIn(min = 48.dp).pressScale(),
-            ) {
-                Icon(Icons.Outlined.Usb, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Conectar")
+    val detail = when (state) {
+        is ConnectionState.Connected -> null
+        ConnectionState.Connecting -> "Abrindo sessão com a câmera"
+        ConnectionState.WaitingPermission -> "Toque em Permitir no aviso do Android"
+        ConnectionState.NoCamera -> "Ligue a 50D e conecte o cabo USB OTG"
+        is ConnectionState.Failed -> state.message
+        is ConnectionState.Reconnecting -> "${state.reason}. As fotos feitas agora chegam depois."
+    }
+    val stateLine: @Composable () -> Unit = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (state == ConnectionState.Connecting) com.example.ui.components.BrandLoader(22.dp) else StatusMark(mark, height = 20.dp)
+            Spacer(Modifier.width(Space.m))
+            Column(Modifier.weight(1f)) {
+                androidx.compose.animation.AnimatedContent(
+                    targetState = title,
+                    transitionSpec = {
+                        (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(com.example.ui.components.Motion.SHORT, 80)) +
+                            androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(com.example.ui.components.Motion.MEDIUM, 80, com.example.ui.components.Motion.Emphasized)) { it / 2 }) togetherWith
+                            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(100))
+                    },
+                    label = "title",
+                ) { Text(it, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                detail?.let { com.example.ui.components.RollingText(it, style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted) }
             }
         }
+    }
+    when (state) {
+        is ConnectionState.Connected -> Column(verticalArrangement = Arrangement.spacedBy(Space.s)) {
+            stateLine()
+            // The brand's mint → cyan line: one of the two places the gradient appears (the other is the shutter).
+            Box(Modifier.fillMaxWidth().height(2.dp).clip(MaterialTheme.shapes.extraSmall).background(com.example.ui.theme.BrandGradient))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.l)) {
+                if (showBattery) status.value(EosProp.BATTERY_POWER)?.let { MiniReadout("Bateria", EosValues.batteryLabel(it)) }
+                status.shotsLeft?.let { MiniReadout("Cartão", "$it") }
+                MiniReadout("Recebidas", "$received")
+            }
+        }
+        ConnectionState.Connecting, is ConnectionState.Reconnecting -> stateLine()
+        // Not connected: connecting is the one thing to do here, so it is the screen's mint button.
+        else -> com.example.ui.components.JrCard {
+            stateLine()
+            com.example.ui.components.JrButton("Conectar câmera", onConnect, Modifier.fillMaxWidth(), icon = Icons.Outlined.Usb)
+        }
+    }
+}
+
+/** A small label and its value side by side, the value with steady digits. */
+@Composable
+private fun MiniReadout(label: String, value: String) {
+    Row(verticalAlignment = Alignment.Bottom) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = Tone.TextMuted)
+        Spacer(Modifier.width(Space.xs + 2.dp))
+        Text(value, style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"), color = Tone.Text)
     }
 }
 
@@ -472,27 +494,21 @@ private fun FolderNotice(settings: Settings, lost: Set<com.example.core.storage.
     }
     val gone = lost.filter { it == com.example.core.storage.FileKind.JPG || it == com.example.core.storage.FileKind.RAW }.map { it.folderName }
     if (missing.isEmpty() && gone.isEmpty()) return
-    Spacer(Modifier.height(12.dp))
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.small)
-            .background(Tone.Surface)
-            .clickable(onClick = onOpenSettings)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.Outlined.FolderOpen, contentDescription = null, tint = if (gone.isNotEmpty()) Tone.Error else Tone.TextMuted)
-        Spacer(Modifier.width(12.dp))
-        Text(
-            if (gone.isNotEmpty()) {
-                // The folder that was working stopped (deleted, card out, permission gone): nothing is lost, but say so.
-                "A pasta ${gone.joinToString(" e ")} parou de responder. As fotos estão indo para a pasta interna do app. Toque para escolher a pasta de novo."
-            } else {
-                "Pasta ${missing.joinToString(" e ")} não escolhida: as fotos vão para a pasta interna do app. Toque para escolher."
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = if (gone.isNotEmpty()) Tone.Text else Tone.TextMuted,
+    Spacer(Modifier.height(Space.m))
+    if (gone.isNotEmpty()) {
+        // The folder that was working stopped (deleted, card out, permission gone): nothing is lost, but say so.
+        com.example.ui.components.JrBanner(
+            com.example.ui.components.BannerKind.Error,
+            "A pasta ${gone.joinToString(" e ")} parou de responder",
+            text = "As fotos estão indo para a pasta interna do app. Toque para escolher a pasta de novo.",
+            onClick = onOpenSettings,
+        )
+    } else {
+        com.example.ui.components.JrBanner(
+            com.example.ui.components.BannerKind.Info,
+            "Pasta ${missing.joinToString(" e ")} não escolhida",
+            text = "As fotos vão para a pasta interna do app. Toque para escolher.",
+            onClick = onOpenSettings,
         )
     }
 }
@@ -551,7 +567,8 @@ private fun CaptureBar(
     }
     val shutterBlock: @Composable () -> Unit = {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            ShutterButton(shutter, connected, 72.dp, Modifier.semantics { contentDescription = "Disparar" }, onShoot)
+            // Smaller and grey until there is a camera to fire: the shutter is the biggest thing on screen only when it works.
+            ShutterButton(shutter, connected, if (connected) 72.dp else 60.dp, Modifier.semantics { contentDescription = "Disparar" }, onShoot)
             Text(
                 hint ?: " ", style = MaterialTheme.typography.labelSmall, maxLines = 1,
                 color = if (shutter is ShutterState.Failed) Tone.Error else Tone.TextMuted,
@@ -608,24 +625,10 @@ private fun CaptureBar(
     }
 }
 
-/** A round 52 dp control beside the shutter, with its name under it. */
+/** A control beside the shutter: the app's tool tile, mint while it runs (the interval timer). */
 @Composable
 private fun CaptureSide(icon: ImageVector, label: String, on: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    val bg by androidx.compose.animation.animateColorAsState(if (on) Tone.Accent else Tone.SurfaceHigh, label = "side")
-    Column(
-        Modifier.then(if (enabled) Modifier.pressScale() else Modifier).clip(MaterialTheme.shapes.small)
-            .clickable(enabled = enabled, onClick = onClick).padding(4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(Modifier.size(52.dp).clip(CircleShape).background(bg), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = if (on) Tone.OnAccent else if (enabled) Tone.Text else Tone.TextMuted, modifier = Modifier.size(26.dp))
-        }
-        com.example.ui.components.RollingText(
-            label, style = MaterialTheme.typography.labelSmall,
-            color = if (enabled) Tone.TextMuted else Tone.TextMuted.copy(alpha = 0.6f),
-            modifier = Modifier.padding(top = 4.dp),
-        )
-    }
+    com.example.ui.components.JrTile(icon, label, onClick, enabled = enabled, active = on)
 }
 
 @Composable
@@ -655,8 +658,8 @@ private fun LatestPhoto(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    BrandSymbol(40.dp, tint = Tone.Line)
-                    Spacer(Modifier.height(12.dp))
+                    com.example.ui.components.BrandLoader(48.dp, still = true)
+                    Spacer(Modifier.height(Space.m))
                     Text(
                         "Cada foto feita pelo botão da câmera ou pelo disparador aparece aqui e é salva sozinha no celular.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -668,33 +671,30 @@ private fun LatestPhoto(
         }
         if (photo != null) {
             Row(
-                Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Tone.Background.copy(alpha = 0.7f)).padding(horizontal = 12.dp, vertical = 8.dp),
+                Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Tone.Scrim).padding(horizontal = Space.m, vertical = Space.s),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(photo.savedBase, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text(photo.savedBase, style = MaterialTheme.typography.labelLarge, color = Tone.OnPhoto, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 Text(
-                    listOfNotNull(photo.shutter, photo.aperture, photo.iso).joinToString("  "),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Tone.TextMuted,
+                    listOfNotNull(photo.shutter, photo.aperture, photo.iso).joinToString("   "),
+                    style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
+                    color = Tone.OnPhoto,
                 )
             }
-            FormatTag(photo.rawUri != null, photo.jpgUri != null, Modifier.align(Alignment.TopEnd).padding(8.dp))
+            FormatTag(photo.rawUri != null, photo.jpgUri != null, Modifier.align(Alignment.TopEnd).padding(Space.s))
         }
     }
     if (transfer != null) {
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Recebendo ${transfer.fileName}" + if (transfer.queued > 0) " · mais ${transfer.queued} na fila" else "",
-            style = MaterialTheme.typography.bodySmall,
-            color = Tone.TextMuted,
-        )
-        Spacer(Modifier.height(4.dp))
-        LinearProgressIndicator(
-            progress = { transfer.progress },
-            modifier = Modifier.fillMaxWidth(),
-            color = Tone.Info,
-            trackColor = Tone.SurfaceHigh,
-        )
+        // The file coming in, with the brand loader filling a block per quarter.
+        Row(Modifier.padding(top = Space.s), verticalAlignment = Alignment.CenterVertically) {
+            com.example.ui.components.BrandLoader(20.dp, progress = transfer.progress)
+            Spacer(Modifier.width(Space.s))
+            Text(
+                "Recebendo ${transfer.fileName}" + if (transfer.queued > 0) " · mais ${transfer.queued} na fila" else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = Tone.TextMuted,
+            )
+        }
     }
 }
 

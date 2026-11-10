@@ -52,10 +52,7 @@ fun FirstStepsCard(settings: Settings, onDone: () -> Unit) {
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { notified = it }
 
     Spacer(Modifier.height(12.dp))
-    Column(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(Tone.Surface).padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
+    com.example.ui.components.JrCard(padding = 12.dp, gap = 2.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Primeiros passos", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
             TextButton(onClick = onDone, modifier = Modifier.heightIn(min = 48.dp)) { Text("Fechar") }

@@ -105,26 +105,25 @@ import androidx.compose.material.icons.outlined.Image
 import androidx.compose.ui.graphics.graphicsLayer
 import com.example.ui.components.pressScale
 import androidx.compose.foundation.border
+import com.example.ui.theme.Space
+import com.example.ui.components.JrBanner
+import com.example.ui.components.BannerKind
+import com.example.ui.components.JrButton
+import com.example.ui.components.JrButtonKind
+import com.example.ui.components.JrTile
 
 /** Shown when the card has frames shot while the cable was out and "perguntar antes" is on. */
 @Composable
 fun PendingBanner(count: Int, onDownload: () -> Unit, onDismiss: () -> Unit) {
     if (count == 0) return
-    Spacer(Modifier.height(12.dp))
-    Column(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(Tone.Surface).padding(12.dp),
+    Spacer(Modifier.height(Space.m))
+    JrBanner(
+        BannerKind.Warning,
+        if (count == 1) "1 foto ainda no cartão" else "$count fotos ainda no cartão",
+        text = "Feitas com o cabo solto. Ainda não vieram para o celular.",
     ) {
-        Text(
-            if (count == 1) "1 foto no cartão ainda não veio para o celular" else "$count fotos no cartão ainda não vieram para o celular",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-            Button(
-                onClick = onDownload,
-                colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
-            ) { Text("Baixar agora") }
-            TextButton(onClick = onDismiss) { Text("Ignorar") }
-        }
+        JrButton("Baixar agora", onDownload)
+        JrButton("Ignorar", onDismiss, kind = JrButtonKind.Ghost)
     }
 }
 
@@ -135,26 +134,15 @@ fun PendingBanner(count: Int, onDownload: () -> Unit, onDismiss: () -> Unit) {
 @Composable
 fun SaveProblemBanner(problem: com.example.core.tether.SaveProblem?, onOpenSettings: () -> Unit, onDismiss: () -> Unit) {
     if (problem == null) return
-    Spacer(Modifier.height(12.dp))
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.small)
-            .background(Tone.Surface)
-            .border(1.dp, Tone.Error, MaterialTheme.shapes.small)
-            .padding(12.dp),
+    Spacer(Modifier.height(Space.m))
+    JrBanner(
+        BannerKind.Error,
+        problem.reason.title,
+        text = (if (problem.count == 1) "${problem.lastFile} não foi salva no celular. " else "${problem.count} fotos não foram salvas (a última: ${problem.lastFile}). ") +
+            problem.reason.action,
     ) {
-        Text(problem.reason.title, style = MaterialTheme.typography.titleSmall, color = Tone.Error)
-        Text(
-            (if (problem.count == 1) "${problem.lastFile} não foi salva no celular. " else "${problem.count} fotos não foram salvas (a última: ${problem.lastFile}). ") +
-                problem.reason.action,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-            OutlinedButton(onClick = onOpenSettings, modifier = Modifier.heightIn(min = 48.dp)) { Text("Abrir Salvamento") }
-            TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) { Text("Fechar") }
-        }
+        JrButton("Abrir Salvamento", onOpenSettings, kind = JrButtonKind.Secondary)
+        JrButton("Fechar", onDismiss, kind = JrButtonKind.Ghost)
     }
 }
 
@@ -263,9 +251,9 @@ fun ToolsRow(
 private fun ToolGroup(icon: ImageVector, title: String, items: List<ToolItem>) {
     if (items.isEmpty()) return
     Column(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(Tone.Surface).padding(horizontal = 8.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(Tone.Surface).padding(horizontal = Space.s, vertical = Space.m),
     ) {
-        Row(Modifier.padding(start = 6.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(start = Space.s, bottom = Space.s), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, contentDescription = null, tint = Tone.TextMuted, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(6.dp))
             Text(title, style = MaterialTheme.typography.labelMedium, color = Tone.TextMuted)
@@ -288,34 +276,7 @@ private fun ToolGroup(icon: ImageVector, title: String, items: List<ToolItem>) {
 
 @Composable
 private fun ToolTile(item: ToolItem, modifier: Modifier) {
-    val alpha = if (item.enabled) 1f else 0.38f
-    Column(
-        modifier.then(if (item.enabled) Modifier.pressScale() else Modifier).clip(MaterialTheme.shapes.small)
-            .clickable(enabled = item.enabled, onClick = item.onClick).padding(vertical = 6.dp, horizontal = 2.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            Modifier.size(52.dp).clip(MaterialTheme.shapes.medium).background(Tone.SurfaceHigh),
-            contentAlignment = Alignment.Center,
-        ) {
-            val mark = item.mark
-            if (mark != null) Box(Modifier.graphicsLayer { this.alpha = alpha }) { mark() }
-            else Icon(item.icon, contentDescription = null, tint = Tone.Text.copy(alpha = alpha), modifier = Modifier.size(26.dp))
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            item.label,
-            style = MaterialTheme.typography.labelMedium,
-            color = Tone.Text.copy(alpha = alpha),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
-        item.value?.let {
-            // Neutral: mint stays for the one thing to press on the screen (DESIGN.md, one mint per area).
-            Text(it, style = MaterialTheme.typography.labelSmall, color = Tone.Text, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-        }
-    }
+    JrTile(item.icon, item.label, item.onClick, modifier, enabled = item.enabled, value = item.value, mark = item.mark)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
