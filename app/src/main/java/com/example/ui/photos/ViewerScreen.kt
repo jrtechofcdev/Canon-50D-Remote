@@ -567,7 +567,7 @@ private fun PhotoPage(
                 "Antes",
                 style = MaterialTheme.typography.labelLarge,
                 color = Color.White,
-                modifier = Modifier.align(Alignment.Center).clip(CircleShape).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 16.dp, vertical = 6.dp),
+                modifier = Modifier.align(Alignment.Center).clip(CircleShape).background(Tone.Scrim).padding(horizontal = 16.dp, vertical = 6.dp),
             )
         }
     }

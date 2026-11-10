@@ -237,9 +237,9 @@ fun CropScreen(app: TetherApp, photoId: Long, onDone: () -> Unit) {
                 message?.let {
                     Text(
                         it,
-                        color = Color.White,
+                        color = Tone.OnPhoto,
                         style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.align(Alignment.TopCenter).padding(8.dp).background(Color.Black.copy(alpha = 0.6f), MaterialTheme.shapes.small)
+                        modifier = Modifier.align(Alignment.TopCenter).padding(8.dp).background(Tone.Scrim, MaterialTheme.shapes.small)
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                     LaunchedEffect(it) { kotlinx.coroutines.delay(2500); message = null }

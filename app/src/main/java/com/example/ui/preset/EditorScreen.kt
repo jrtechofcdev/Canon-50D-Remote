@@ -232,7 +232,7 @@ fun EditorScreen(app: TetherApp, target: EditTarget, onDone: () -> Unit) {
                 if (!showOriginal) clipMask?.let { Image(it.asImageBitmap(), contentDescription = "Áreas estouradas", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
                 if (showOriginal) {
                     Text("Original", style = MaterialTheme.typography.labelMedium, color = Color.White,
-                        modifier = Modifier.align(Alignment.TopStart).padding(12.dp).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 8.dp, vertical = 2.dp))
+                        modifier = Modifier.align(Alignment.TopStart).padding(12.dp).background(Tone.Scrim).padding(horizontal = 8.dp, vertical = 2.dp))
                 }
                 if (!loaded || (busy && rendered == null)) com.example.ui.components.BrandLoader(40.dp)
             }
@@ -434,7 +434,7 @@ private fun MixerPanel(s: PresetSettings, mono: Boolean, onChange: (PresetSettin
 @Composable
 private fun CurvePanel(s: PresetSettings, onChange: (PresetSettings) -> Unit, onCommit: () -> Unit) {
     var channel by remember { mutableIntStateOf(0) }
-    val channels = listOf("RGB" to Tone.Text, "Vermelho" to Color(0xFFE5484D), "Verde" to Color(0xFF46A758), "Azul" to Color(0xFF3E63DD))
+    val channels = listOf("RGB" to Tone.Text, "Vermelho" to Tone.Red, "Verde" to Tone.Green, "Azul" to Tone.Blue)
     PanelTitle("Curva de pontos")
     ChipRow {
         channels.forEachIndexed { i, (label, _) -> PresetChip(label, channel == i) { channel = i } }

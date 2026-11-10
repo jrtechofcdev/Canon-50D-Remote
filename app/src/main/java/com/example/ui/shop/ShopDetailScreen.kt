@@ -276,18 +276,18 @@ private fun ShopDetail(
                 Text(
                     it,
                     style = MaterialTheme.typography.labelLarge,
-                    color = Color.White,
+                    color = Tone.OnPhoto,
                     modifier = Modifier.align(Alignment.TopStart).padding(12.dp)
-                        .clip(MaterialTheme.shapes.small).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 10.dp, vertical = 4.dp),
+                        .clip(MaterialTheme.shapes.small).background(Tone.Scrim).padding(horizontal = 10.dp, vertical = 4.dp),
                 )
             }
             if (!holding && chrome) {
                 Text(
                     "Segure para ver sem o preset · toque para tela cheia",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
+                    color = Tone.OnPhoto,
                     modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp)
-                        .clip(MaterialTheme.shapes.small).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 10.dp, vertical = 4.dp),
+                        .clip(MaterialTheme.shapes.small).background(Tone.Scrim).padding(horizontal = 10.dp, vertical = 4.dp),
                 )
             }
         }

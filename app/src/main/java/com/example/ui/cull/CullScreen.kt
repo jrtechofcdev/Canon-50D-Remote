@@ -437,7 +437,7 @@ private fun SwipeCard(photo: Photo, onUp: () -> Unit, onDown: () -> Unit) {
                         rotationZ = if (up) -10f else 10f
                     }
                     .clip(MaterialTheme.shapes.medium)
-                    .background(if (locked) color else Color.Black.copy(alpha = 0.55f))
+                    .background(if (locked) color else Tone.Scrim)
                     .border(3.dp, color, MaterialTheme.shapes.medium)
                     .padding(horizontal = 18.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -487,8 +487,8 @@ private fun CompareView(a: Photo, b: Photo?) {
                 Text(
                     p.savedBase + (p.score?.let { " · nota ${it.toInt()}" } ?: ""),
                     style = MaterialTheme.typography.labelMedium,
-                    color = Color.White,
-                    modifier = Modifier.align(Alignment.BottomStart).background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 8.dp, vertical = 4.dp),
+                    color = Tone.OnPhoto,
+                    modifier = Modifier.align(Alignment.BottomStart).background(Tone.Scrim).padding(horizontal = 8.dp, vertical = 4.dp),
                 )
             }
         }
@@ -513,6 +513,6 @@ private fun Badge(text: String, color: Color) {
         text,
         style = MaterialTheme.typography.labelMedium,
         color = color,
-        modifier = Modifier.clip(MaterialTheme.shapes.extraSmall).background(Color.Black.copy(alpha = 0.65f)).padding(horizontal = 8.dp, vertical = 3.dp),
+        modifier = Modifier.clip(MaterialTheme.shapes.extraSmall).background(Tone.Scrim).padding(horizontal = 8.dp, vertical = 3.dp),
     )
 }

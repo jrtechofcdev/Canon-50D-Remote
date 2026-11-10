@@ -412,7 +412,7 @@ private fun ShopCard(
             if (selecting) {
                 Box(
                     Modifier.align(Alignment.TopStart).padding(8.dp).size(26.dp).clip(CircleShape)
-                        .background(if (selected) Tone.Accent else Color.Black.copy(alpha = 0.45f))
+                        .background(if (selected) Tone.Accent else Tone.Scrim)
                         .border(2.dp, if (selected) Tone.Accent else Color.White, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -421,7 +421,7 @@ private fun ShopCard(
             }
             if (saved) {
                 Box(
-                    Modifier.align(Alignment.TopEnd).padding(6.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.55f)).padding(3.dp),
+                    Modifier.align(Alignment.TopEnd).padding(6.dp).clip(CircleShape).background(Tone.Scrim).padding(3.dp),
                 ) {
                     Icon(Icons.Outlined.BookmarkAdded, contentDescription = "Salvo em Meus presets", tint = Tone.Accent, modifier = Modifier.size(18.dp))
                 }

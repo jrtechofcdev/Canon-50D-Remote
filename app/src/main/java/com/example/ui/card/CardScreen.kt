@@ -169,7 +169,7 @@ private fun CardCell(app: TetherApp, file: ObjectInfo, onPhone: Boolean, selecte
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             color = Tone.Text,
-            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 4.dp, vertical = 2.dp),
+            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Tone.Scrim).padding(horizontal = 4.dp, vertical = 2.dp),
         )
         if (selected) {
             Icon(Icons.Filled.CheckCircle, contentDescription = "Selecionada", tint = Tone.Accent,

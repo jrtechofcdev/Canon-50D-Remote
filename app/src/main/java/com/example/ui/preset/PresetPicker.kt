@@ -81,8 +81,8 @@ fun PresetPicker(
             else -> it.group == category
         }
     }.forPicking()
-    val label = if (onDark) Color.White else Tone.Text
-    val muted = if (onDark) Color.White.copy(alpha = 0.6f) else Tone.TextMuted
+    val label = if (onDark) Tone.OnPhoto else Tone.Text
+    val muted = if (onDark) Tone.OnPhoto.copy(alpha = 0.6f) else Tone.TextMuted
 
     Column(modifier) {
         if (showCategories && (categories.size > 1 || hasFavorites)) {
@@ -108,7 +108,7 @@ fun PresetPicker(
                     onClick = { onPick(null) },
                     onLongClick = null,
                 ) {
-                    Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) {
+                    Box(Modifier.fillMaxSize().background(Tone.OnPhoto.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) {
                         Icon(Icons.Outlined.Block, contentDescription = null, tint = muted)
                     }
                 }
@@ -178,7 +178,7 @@ private fun Thumb(app: TetherApp, preset: Preset, sourceUri: String?) {
     LaunchedEffect(sourceUri, preset.settings) {
         bitmap = sourceUri?.let { runCatching { app.looks.thumb(it, preset.settings) }.getOrNull() }
     }
-    Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.08f))) {
+    Box(Modifier.fillMaxSize().background(Tone.OnPhoto.copy(alpha = 0.08f))) {
         bitmap?.let { Image(it.asImageBitmap(), contentDescription = preset.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
     }
 }

@@ -160,7 +160,7 @@ fun RotationMenu(current: ScreenTurn, onPick: (ScreenTurn) -> Unit, onDismiss: (
         Box(
             Modifier.fillMaxSize()
                 .graphicsLayer { alpha = shown.value.coerceIn(0f, 1f) }
-                .background(Color.Black.copy(alpha = 0.7f))
+                .background(Tone.Scrim)
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { close() },
             contentAlignment = Alignment.Center,
         ) {

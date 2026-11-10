@@ -191,7 +191,7 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
                     modifier = mod,
                     icon = if (photo.clientPick) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                     label = if (photo.clientPick) "Escolhida" else "Escolher",
-                    tint = if (photo.clientPick) Tone.Accent else Color.White,
+                    tint = if (photo.clientPick) Tone.Accent else Tone.OnPhoto,
                 ) { scope.launch { app.database.photoDao().setClientPick(photo.id, !photo.clientPick) } }
             }
             if (settings.clientWhatsApp) {
@@ -217,7 +217,7 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
             if (settings.clientExitButton) {
                 androidx.compose.material3.OutlinedButton(
                     onClick = requestExit,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Tone.OnPhoto.copy(alpha = 0.25f)),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp),
                     modifier = Modifier.align(Alignment.CenterStart).heightIn(min = 40.dp),
                 ) {
@@ -237,7 +237,7 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
                     BrandSymbol(if (wide) 18.dp else 22.dp)
                     if (wide) {
                         Spacer(Modifier.width(8.dp))
-                        Text("Jr_Tech_OFC", style = WordmarkStyle.copy(fontSize = 13.sp), color = Color.White)
+                        Text("Jr_Tech_OFC", style = WordmarkStyle.copy(fontSize = 13.sp), color = Tone.OnPhoto)
                     }
                 }
             }
@@ -250,7 +250,7 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
                     Text(
                         "${pager.currentPage + 1} / ${photos.size}",
                         style = MaterialTheme.typography.labelLarge, color = Muted,
-                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.08f)).padding(horizontal = 12.dp, vertical = 8.dp),
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Tone.OnPhoto.copy(alpha = 0.08f)).padding(horizontal = 12.dp, vertical = 8.dp),
                     )
                 }
                 TopIcon { com.example.ui.components.RotateButton(app, settings.screenOrientation, tint = Muted) }
@@ -280,7 +280,7 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
         if (landscape && current != null && chrome) {
             val sideWidth = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.34f).dp.coerceIn(200.dp, 320.dp)
             Column(
-                Modifier.fillMaxHeight().width(sideWidth).background(Color.White.copy(alpha = 0.06f)).navigationBarsPadding()
+                Modifier.fillMaxHeight().width(sideWidth).background(Tone.OnPhoto.copy(alpha = 0.06f)).navigationBarsPadding()
                     .verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -314,7 +314,7 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
             }
             // Big icons with a short name under each, all the same width so they line up.
             if (!landscape) Row(
-                Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.06f)).navigationBarsPadding().padding(vertical = 4.dp),
+                Modifier.fillMaxWidth().background(Tone.OnPhoto.copy(alpha = 0.06f)).navigationBarsPadding().padding(vertical = 4.dp),
             ) { actions(current, Modifier.weight(1f)) }
         }
     }
@@ -324,7 +324,7 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
         val ringColor = Tone.Accent
         androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
             val r = 44.dp.toPx()
-            drawCircle(Color.Black.copy(alpha = 0.35f), r, at)
+            drawCircle(Color.Black.copy(alpha = 0.55f), r, at)
             drawArc(
                 ringColor, -90f, 360f * holdProgress.value, false,
                 topLeft = at - androidx.compose.ui.geometry.Offset(r, r), size = androidx.compose.ui.geometry.Size(r * 2, r * 2),
@@ -353,7 +353,7 @@ private val Muted = Color(0xFFBDBDBD)
 /** One round, equal-size slot for a top-bar button, so the icons line up whatever they are. */
 @Composable
 private fun TopIcon(content: @Composable () -> Unit) {
-    Box(Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) { content() }
+    Box(Modifier.size(48.dp).clip(CircleShape).background(Tone.OnPhoto.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) { content() }
 }
 
 /** How long one finger stays still on the screen to leave client mode. */
@@ -404,7 +404,7 @@ private fun InfoItem(icon: ImageVector, text: String) {
 }
 
 @Composable
-private fun ClientAction(icon: ImageVector, label: String, modifier: Modifier = Modifier, tint: Color = Color.White, locked: Boolean = false, onClick: () -> Unit) {
+private fun ClientAction(icon: ImageVector, label: String, modifier: Modifier = Modifier, tint: Color = Tone.OnPhoto, locked: Boolean = false, onClick: () -> Unit) {
     // When the icon changes (the heart filling in), it pops and settles: the client sees the choice was taken.
     val pop = remember { androidx.compose.animation.core.Animatable(1f) }
     val first = remember { mutableStateOf(true) }

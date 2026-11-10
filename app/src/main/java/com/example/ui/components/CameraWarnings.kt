@@ -66,7 +66,7 @@ fun CameraWarningChips(warnings: List<CameraWarning>, modifier: Modifier = Modif
             warnings.forEach { w ->
                 Row(
                     Modifier.clip(CircleShape)
-                        .background(if (onDark) Color.Black.copy(alpha = 0.6f) else Tone.Error.copy(alpha = 0.14f))
+                        .background(if (onDark) Tone.Scrim else Tone.Error.copy(alpha = 0.14f))
                         .padding(horizontal = 10.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
