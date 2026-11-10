@@ -178,7 +178,6 @@ fun SessionScreen(
             PendingBanner(pending.size, onDownload = app.tether::downloadPending, onDismiss = app.tether::dismissPending)
             FirstStepsCard(
                 settings,
-                onFolders = { onOpenSection(com.example.ui.settings.SettingsSection.Save) },
                 onDone = { scope.launch { app.settings.set(SettingKeys.firstStepsDone, true) } },
             )
             SaveProblemBanner(
