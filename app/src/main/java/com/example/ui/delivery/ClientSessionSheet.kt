@@ -54,6 +54,7 @@ import com.example.ui.PhotoActions
 import com.example.ui.photos.messages
 import com.example.ui.theme.Tone
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.setValue
 
 /** One client: their code and QR (straight into their photos), what is queued for them, and their access. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,6 +68,7 @@ fun ClientSessionSheet(app: TetherApp, actions: PhotoActions, session: DeliveryS
     val running = status as? DeliveryStatus.Running
     val valid = session.isValid(System.currentTimeMillis())
     val active = settings?.deliveryActiveSession == session.id
+    var confirmDelete by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = Tone.Surface) {
         Column(
@@ -130,16 +132,33 @@ fun ClientSessionSheet(app: TetherApp, actions: PhotoActions, session: DeliveryS
                     OutlinedButton(onClick = { scope.launch { app.delivery.closeClient(session.id); onDismiss() } }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
                         Icon(Icons.Outlined.Lock, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Encerrar acesso", maxLines = 1)
+                        Text("Encerrar acesso", maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
                 }
-                OutlinedButton(onClick = { scope.launch { app.delivery.deleteClient(session.id); onDismiss() } }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                OutlinedButton(onClick = { confirmDelete = true }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
                     Icon(Icons.Outlined.Delete, null, Modifier.size(18.dp), tint = Tone.Error)
                     Spacer(Modifier.width(6.dp))
-                    Text("Apagar", color = Tone.Error, maxLines = 1)
+                    Text("Apagar", color = Tone.Error, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 }
             }
         }
+    }
+
+    // Deleting removes the client's files and history at once, so it asks first.
+    if (confirmDelete) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            containerColor = Tone.Surface,
+            title = { Text("Apagar ${session.client}?") },
+            text = { Text("O código para de funcionar e as cópias preparadas para este cliente saem do celular. As fotos originais continuam na galeria.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    confirmDelete = false
+                    scope.launch { app.delivery.deleteClient(session.id); onDismiss() }
+                }) { Text("Apagar", color = Tone.Error) }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmDelete = false }) { Text("Cancelar") } },
+        )
     }
 }
 

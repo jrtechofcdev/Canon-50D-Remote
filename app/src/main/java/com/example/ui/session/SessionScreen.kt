@@ -641,7 +641,7 @@ private fun LatestPhoto(
         Modifier
             .fillMaxWidth()
             .aspectRatio(3f / 2f)
-            .clip(MaterialTheme.shapes.large)
+            .clip(MaterialTheme.shapes.medium)
             .background(Tone.Surface)
             // Every new frame lands with a shutter blink: the photographer sees it arrived without reading.
             .shutterFlash(photo?.id)

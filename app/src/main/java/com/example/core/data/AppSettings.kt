@@ -148,8 +148,6 @@ data class Settings(
     val galleryThumb: Int = 112,
     /** Whole-app screen orientation: one of [ScreenTurn] ids. */
     val screenOrientation: String = "portrait",
-    /** In the viewer and client mode the screen turns with each photo: standing for vertical, lying for horizontal. */
-    val rotateWithPhoto: Boolean = true,
     /**
      * In the viewer and client mode, the photo turns with the way the phone is held while the screen
      * stays in its position: a lying photo fills a standing screen held sideways.
@@ -438,7 +436,6 @@ object SettingKeys {
     val whatsDefaultSet = stringPreferencesKey("whats_default_set")
     val galleryThumb = intPreferencesKey("gallery_thumb")
     val screenOrientation = stringPreferencesKey("screen_orientation")
-    val rotateWithPhoto = booleanPreferencesKey("rotate_with_photo")
     val introEnabled = booleanPreferencesKey("intro_enabled")
     val firstStepsDone = booleanPreferencesKey("first_steps_done")
     val photoFollowsPhone = booleanPreferencesKey("photo_follows_phone")
@@ -687,7 +684,6 @@ class SettingsRepository(private val context: Context) {
             whatsDefaultSet = this[k.whatsDefaultSet] ?: d.whatsDefaultSet,
             galleryThumb = this[k.galleryThumb] ?: d.galleryThumb,
             screenOrientation = this[k.screenOrientation] ?: d.screenOrientation,
-            rotateWithPhoto = this[k.rotateWithPhoto] ?: d.rotateWithPhoto,
             introEnabled = this[k.introEnabled] ?: d.introEnabled,
             firstStepsDone = this[k.firstStepsDone] ?: d.firstStepsDone,
             photoFollowsPhone = this[k.photoFollowsPhone] ?: d.photoFollowsPhone,

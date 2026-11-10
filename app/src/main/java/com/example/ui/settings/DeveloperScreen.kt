@@ -103,8 +103,6 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
         }
     }
 
-    DeliveryTest(app, s)
-
     SettingsGroup("Processamento", Icons.Outlined.Memory) {
         ToggleRow(Icons.Outlined.Memory, "Processar presets só pela CPU", "Para comparar com a GPU quando alguma cor parecer errada (mais lento)", s.devRender == "cpu") {
             scope.launch { app.settings.set(SettingKeys.devRender, if (it) "cpu" else "auto"); app.looks.trim() }
@@ -178,7 +176,7 @@ private fun DevButton(text: String, enabled: Boolean, modifier: Modifier, onClic
  * DIRECT-JR-Teste network, serves a page with one photo at /teste and logs each connection.
  */
 @Composable
-private fun DeliveryTest(app: TetherApp, s: Settings) {
+internal fun DeliveryTest(app: TetherApp, s: Settings) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val status by app.delivery.status.collectAsState()

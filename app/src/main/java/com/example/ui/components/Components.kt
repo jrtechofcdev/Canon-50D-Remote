@@ -53,7 +53,16 @@ fun Readout(label: String, value: String, enabled: Boolean, onClick: () -> Unit,
         verticalArrangement = Arrangement.Center,
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = Tone.TextMuted)
-        Text(value, style = ReadoutStyle, color = if (enabled) Tone.Text else Tone.TextMuted, maxLines = 1)
+        // Long names ("Fluorescente", "Personalizado") get a smaller size instead of being cut, and with big
+        // system text whatever still doesn't fit ends in "…".
+        Text(
+            value,
+            style = if (value.length > 8) ReadoutStyle.copy(fontSize = ReadoutStyle.fontSize * 0.72f) else ReadoutStyle,
+            color = if (enabled) Tone.Text else Tone.TextMuted,
+            maxLines = 1,
+            softWrap = false,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        )
     }
 }
 

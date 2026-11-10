@@ -127,6 +127,7 @@ val settingsIndex: Map<SettingsSection, List<String>> = mapOf(
         "Apagar as cópias ao parar",
         "Pasta das entregas",
         "Cópia do que foi entregue (07 Entregas)",
+        "Teste de entrega local",
     ),
     SettingsSection.Payments to listOf(
         "Pix",

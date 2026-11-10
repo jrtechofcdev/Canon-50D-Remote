@@ -352,7 +352,7 @@ private fun SelectionBar(count: Int, progress: Pair<String, Float>?, modifier: M
             LinearProgressIndicator(progress = { progress.second }, modifier = Modifier.fillMaxWidth(), color = Tone.Info, trackColor = Tone.SurfaceHigh)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onDownload, enabled = progress == null, modifier = Modifier.weight(1f).height(52.dp)) {
+            OutlinedButton(onClick = onDownload, enabled = progress == null, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) {
                 Icon(Icons.Outlined.Download, contentDescription = null, tint = Tone.Text, modifier = Modifier.size(18.dp))
                 Text("  Baixar $count", color = Tone.Text, maxLines = 1)
             }
@@ -360,7 +360,7 @@ private fun SelectionBar(count: Int, progress: Pair<String, Float>?, modifier: M
                 onClick = onSave,
                 enabled = progress == null,
                 colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
-                modifier = Modifier.weight(1f).height(52.dp),
+                modifier = Modifier.weight(1f).heightIn(min = 52.dp),
             ) {
                 Icon(Icons.Outlined.BookmarkAdd, contentDescription = null, modifier = Modifier.size(18.dp))
                 Text("  Salvar $count", maxLines = 1)

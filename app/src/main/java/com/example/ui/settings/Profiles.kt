@@ -112,7 +112,7 @@ fun ProfilesSettings(app: TetherApp) {
                 val text = app.appBackup.export(BuildConfig.VERSION_NAME, includeSecrets = withSecrets)
                 withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(text.toByteArray()) } }
             }.isSuccess
-            Toast.makeText(context, if (ok) "Backup dos ajustes salvo" else "Não deu para salvar o backup", Toast.LENGTH_LONG).show()
+            app.notice(if (ok) "Backup dos ajustes salvo" else "Não deu para salvar o backup. Escolha outra pasta ou confira o espaço do celular.")
         }
     }
     val importFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -120,7 +120,7 @@ fun ProfilesSettings(app: TetherApp) {
             restoreAsk = withContext(Dispatchers.IO) {
                 runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() } }.getOrNull()
             }
-            if (restoreAsk == null) Toast.makeText(context, "Não deu para abrir o arquivo", Toast.LENGTH_LONG).show()
+            if (restoreAsk == null) app.notice("Não deu para abrir o arquivo. Escolha um backup .json salvo pelo app.")
         }
     }
 
@@ -216,7 +216,7 @@ fun ProfilesSettings(app: TetherApp) {
                             onSuccess = { "Restaurado: ${it.settings} ajustes, ${it.profiles} perfis, ${it.presets} presets novos" },
                             onFailure = { it.message ?: "Arquivo inválido" },
                         )
-                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                        app.notice(message)
                     }
                 }) { Text("Restaurar") }
             },

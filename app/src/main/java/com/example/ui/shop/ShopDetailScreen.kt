@@ -308,7 +308,7 @@ private fun ShopDetail(
                 onClick = { choosing = true },
                 enabled = busy == null && presetError == null,
                 colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
             ) {
                 Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null)
                 Text("  Usar numa foto", style = MaterialTheme.typography.labelLarge)
@@ -472,7 +472,7 @@ private fun PhotoChooser(
             }
             val chosen = pick
             Row(Modifier.padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { chosen?.let { onApply(it, true) } }, enabled = chosen != null, modifier = Modifier.weight(1f).height(48.dp)) {
+                OutlinedButton(onClick = { chosen?.let { onApply(it, true) } }, enabled = chosen != null, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
                     Icon(Icons.Outlined.Tune, contentDescription = null, tint = Tone.Text, modifier = Modifier.size(18.dp))
                     Text("  No editor", color = Tone.Text, maxLines = 1)
                 }
@@ -480,7 +480,7 @@ private fun PhotoChooser(
                     onClick = { chosen?.let { onApply(it, false) } },
                     enabled = chosen != null,
                     colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
-                    modifier = Modifier.weight(1f).height(48.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                 ) { Text("Aplicar e ver", maxLines = 1) }
             }
         }

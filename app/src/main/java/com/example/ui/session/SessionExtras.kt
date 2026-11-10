@@ -266,7 +266,7 @@ private fun ToolGroup(icon: ImageVector, title: String, items: List<ToolItem>) {
         Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(Tone.Surface).padding(horizontal = 8.dp, vertical = 10.dp),
     ) {
         Row(Modifier.padding(start = 6.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = Tone.Accent, modifier = Modifier.size(14.dp))
+            Icon(icon, contentDescription = null, tint = Tone.TextMuted, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(6.dp))
             Text(title, style = MaterialTheme.typography.labelMedium, color = Tone.TextMuted)
         }
@@ -312,7 +312,8 @@ private fun ToolTile(item: ToolItem, modifier: Modifier) {
             textAlign = TextAlign.Center,
         )
         item.value?.let {
-            Text(it, style = MaterialTheme.typography.labelSmall, color = Tone.Accent, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+            // Neutral: mint stays for the one thing to press on the screen (DESIGN.md, one mint per area).
+            Text(it, style = MaterialTheme.typography.labelSmall, color = Tone.Text, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
         }
     }
 }

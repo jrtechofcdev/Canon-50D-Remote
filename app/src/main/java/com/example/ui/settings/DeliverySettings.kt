@@ -201,4 +201,7 @@ fun DeliverySettings(app: TetherApp, s: Settings) {
             onReset = s.deliveryFolder?.let { { scope.launch { app.settings.setOrClear(SettingKeys.deliveryFolder, null) } } },
         )
     }
+
+    // Before the first event: the README asks for this test, so it lives here and not behind developer mode.
+    DeliveryTest(app, s)
 }

@@ -133,7 +133,7 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
 
     val askPermissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         if (result.values.all { it }) scope.launch { app.express.start() }
-        else Toast.makeText(context, "Sem a permissão de Wi-Fi o celular não cria a rede. Use o roteador do celular em Ajustes da entrega.", Toast.LENGTH_LONG).show()
+        else app.notice("Sem a permissão de Wi-Fi o celular não cria a rede. Permita, ou use o roteador do celular em Ajustes da entrega.")
     }
     val start: () -> Unit = {
         val needed = permissionsFor(s.expressNetwork).filter { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }

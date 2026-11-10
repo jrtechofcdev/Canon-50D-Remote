@@ -212,6 +212,7 @@ class MainActivity : ComponentActivity() {
                     merge(
                         app.camera.messages.map { it to true },
                         app.tether.errors.map { it to true },
+                        app.notices.map { it to true },
                         cullMessages.map { it to false },
                     ).collect { (text, important) ->
                         AppLog.i("AVISO", text)

@@ -114,7 +114,7 @@ fun DeliveryScreen(app: TetherApp, actions: PhotoActions, onBack: (() -> Unit)?,
 
     val askPermissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         if (result.values.all { it }) scope.launch { app.delivery.start() }
-        else Toast.makeText(context, "Sem a permissão de Wi-Fi o celular não cria a rede. Use o roteador do celular em Ajustes da entrega.", Toast.LENGTH_LONG).show()
+        else app.notice("Sem a permissão de Wi-Fi o celular não cria a rede. Permita, ou use o roteador do celular em Ajustes da entrega.")
     }
     val start: () -> Unit = {
         val needed = permissionsFor(s.deliveryNetwork).filter { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
@@ -192,7 +192,7 @@ fun DeliveryScreen(app: TetherApp, actions: PhotoActions, onBack: (() -> Unit)?,
             SkippedCard(app.delivery) { ids ->
                 scope.launch {
                     val target = open.firstOrNull { it.id == s.deliveryActiveSession } ?: open.firstOrNull()
-                    if (target == null) Toast.makeText(context, "Crie um cliente primeiro", Toast.LENGTH_SHORT).show()
+                    if (target == null) app.notice("Nenhum cliente aberto. Crie um cliente aqui na Entrega e mande as fotos de novo.")
                     else Toast.makeText(context, "${app.delivery.send(target.id, ids)} foto(s) para ${target.client}", Toast.LENGTH_SHORT).show()
                 }
             }

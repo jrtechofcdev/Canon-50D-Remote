@@ -776,8 +776,13 @@ class CameraManager(
         intervalJob = scope.launch {
             _interval.value = IntervalState(running = true, done = 0, total = shots, seconds = seconds)
             for (i in 1..shots) {
-                val ptp = session ?: break
-                val info = deviceInfo ?: break
+                // The camera went away mid-series: say so, instead of the counter just stopping.
+                val ptp = session
+                val info = deviceInfo
+                if (ptp == null || info == null) {
+                    _messages.tryEmit("Intervalômetro parou na foto ${i - 1} de $shots: a câmera desconectou")
+                    break
+                }
                 runCatching { releaseShutter(ptp, info) }.onFailure { _messages.tryEmit("Intervalômetro: ${it.message}") }
                 _interval.update { it.copy(done = i) }
                 if (i < shots) delay(seconds * 1000L)

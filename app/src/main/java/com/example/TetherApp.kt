@@ -113,6 +113,15 @@ class TetherApp : Application() {
     /** Free space on the phone when it is under the warning level, else null: a chip on the Session. */
     val phoneLowGb: kotlinx.coroutines.flow.StateFlow<Double?> = _phoneLowGb
 
+    private val _notices = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 8)
+
+    /** Messages that say what to do next: shown at the bottom, longer than a Toast and with a close button. */
+    val notices: kotlinx.coroutines.flow.SharedFlow<String> = _notices
+
+    fun notice(text: String) {
+        _notices.tryEmit(text)
+    }
+
     fun forgetLostCamera() {
         _cameraLost.value = false
     }
