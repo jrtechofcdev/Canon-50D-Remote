@@ -24,7 +24,7 @@ object MessageLibrary {
         MessageKind.Selection to "sel",
     )
 
-    private const val SIGN = "\n\n*Jr_Tech_OFC*"
+    private const val SIGN = com.example.brand.AppBrand.SIGNATURE
 
     val extras = listOf(
         MessageTemplate(

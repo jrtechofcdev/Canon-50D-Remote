@@ -69,7 +69,7 @@ object AppLog {
         scope.launch { writer() }
         scope.launch { mirrorLoop() }
         scope.launch { cleanOld() }
-        always("APP", "Início · JR C50D Sync ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · ${device()} · ${memory()}")
+        always("APP", "Início · ${com.example.brand.AppBrand.APP_NAME} ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · ${device()} · ${memory()}")
         scope.launch { readLastExit() }
     }
 
@@ -116,7 +116,7 @@ object AppLog {
         flushNow()
         val out = File(File(requireNotNull(context).cacheDir, "export").apply { mkdirs() }, "JR_C50D_Sync_log.txt")
         out.bufferedWriter().use { w ->
-            w.write("JR C50D Sync ${BuildConfig.VERSION_NAME} · ${device()}\n")
+            w.write("${com.example.brand.AppBrand.APP_NAME} ${BuildConfig.VERSION_NAME} · ${device()}\n")
             _lastExit.value?.let { w.write("Última saída anormal: $it\n") }
             files().take(days).reversed().forEach { f ->
                 w.write("\n===== ${f.name} =====\n")

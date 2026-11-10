@@ -96,7 +96,7 @@ data class PresetSettings(
 data class Preset(
     val id: Long = 0,
     val name: String,
-    val group: String = "JR C50D Sync",
+    val group: String = com.example.brand.AppBrand.APP_NAME,
     val settings: PresetSettings = PresetSettings(),
     /** Where it came from: "dng", "xmp", "lrtemplate" or "criado". */
     val source: String = "criado",

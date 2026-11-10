@@ -157,6 +157,11 @@ data class Settings(
     val introEnabled: Boolean = true,
     /** The Session's "Primeiros passos" card was closed. */
     val firstStepsDone: Boolean = false,
+    /** "Sua marca" (Revela): the studio's name, colour (ARGB, 0 = the app's own) and logo file; set up once at first launch. */
+    val brandName: String = "",
+    val brandColor: Int = 0,
+    val brandLogo: String? = null,
+    val brandSetupDone: Boolean = false,
     /** Live view: a tap also runs AF. Off, a tap only moves the focus point and AF waits for the AF button. */
     val liveTapAf: Boolean = false,
     /** Live view: ask the 50D for its silent contrast AF ("Modo Live") instead of Quick mode (mirror flips). */
@@ -225,7 +230,7 @@ data class Settings(
     /** The client session that auto mode sends to (0 = none). */
     val deliveryActiveSession: Long = 0L,
     /** Name at the top of the portal and on the printed plate. */
-    val deliveryPhotographer: String = "Jr_Tech_OFC",
+    val deliveryPhotographer: String = com.example.brand.AppBrand.DEFAULT_STUDIO,
 
     // Fotografia Express: the same delivery, one client at a time, no code, preview until paid.
     val expressEnabled: Boolean = false,
@@ -243,7 +248,7 @@ data class Settings(
     val expressSize: String = "edited",
     /** The brand mark on released photos too (off: paid photos go clean). */
     val expressWatermark: Boolean = false,
-    val expressPhotographer: String = "Jr_Tech_OFC",
+    val expressPhotographer: String = com.example.brand.AppBrand.DEFAULT_STUDIO,
     val expressPicks: Boolean = true,
     /** Copies of what each Express client received, one folder per client. */
     val expressFolder: String? = null,
@@ -438,6 +443,10 @@ object SettingKeys {
     val screenOrientation = stringPreferencesKey("screen_orientation")
     val introEnabled = booleanPreferencesKey("intro_enabled")
     val firstStepsDone = booleanPreferencesKey("first_steps_done")
+    val brandName = stringPreferencesKey("brand_name")
+    val brandColor = intPreferencesKey("brand_color")
+    val brandLogo = stringPreferencesKey("brand_logo")
+    val brandSetupDone = booleanPreferencesKey("brand_setup_done")
     val photoFollowsPhone = booleanPreferencesKey("photo_follows_phone")
     val liveTapAf = booleanPreferencesKey("live_tap_af")
     val liveSilentAf = booleanPreferencesKey("live_silent_af")
@@ -686,6 +695,10 @@ class SettingsRepository(private val context: Context) {
             screenOrientation = this[k.screenOrientation] ?: d.screenOrientation,
             introEnabled = this[k.introEnabled] ?: d.introEnabled,
             firstStepsDone = this[k.firstStepsDone] ?: d.firstStepsDone,
+            brandName = this[k.brandName] ?: d.brandName,
+            brandColor = this[k.brandColor] ?: d.brandColor,
+            brandLogo = this[k.brandLogo],
+            brandSetupDone = this[k.brandSetupDone] ?: d.brandSetupDone,
             photoFollowsPhone = this[k.photoFollowsPhone] ?: d.photoFollowsPhone,
             liveTapAf = this[k.liveTapAf] ?: d.liveTapAf,
             liveSilentAf = this[k.liveSilentAf] ?: d.liveSilentAf,

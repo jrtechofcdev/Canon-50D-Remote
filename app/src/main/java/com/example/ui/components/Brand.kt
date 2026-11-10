@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,7 +48,7 @@ fun BrandMark(modifier: Modifier = Modifier, subtitle: String? = null) {
         BrandSymbol(28.dp)
         Spacer(Modifier.width(10.dp))
         Column {
-            Text("JR C50D Sync", style = WordmarkStyle, color = Tone.Text)
+            Text(com.example.brand.AppBrand.APP_NAME, style = WordmarkStyle, color = Tone.Text)
             subtitle?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Tone.TextMuted) }
         }
     }
@@ -60,6 +61,58 @@ fun BrandMark(modifier: Modifier = Modifier, subtitle: String? = null) {
 @Composable
 fun StateTile(color: Color, modifier: Modifier = Modifier) {
     StatusMark(color, modifier, height = 18.dp)
+}
+
+/**
+ * Revela's loader (branding/revela/logo.py): the print's frame in outline and the light rising inside it,
+ * like a picture coming up in the developer tray, then fading to rise again. With [progress] the light
+ * stands as high as the job is done.
+ */
+@Composable
+private fun RevelaLoader(size: Dp, modifier: Modifier, progress: Float?, still: Boolean) {
+    val line = Tone.Line
+    val light = Tone.Accent
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val animate = !still && progress == null && androidx.compose.runtime.remember {
+        runCatching {
+            android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+        }.getOrDefault(1f) != 0f
+    }
+    val t = if (animate) {
+        androidx.compose.animation.core.rememberInfiniteTransition(label = "develop").animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.LinearEasing),
+            ),
+            label = "t",
+        ).value
+    } else 0f
+    // Rise during the first 55 %, hold, then fade out in the last 25 %.
+    val rise = progress?.coerceIn(0f, 1f) ?: if (animate) androidx.compose.animation.core.FastOutSlowInEasing.transform((t / 0.55f).coerceAtMost(1f)) else 0.6f
+    val alpha = if (animate && t > 0.75f) 1f - (t - 0.75f) / 0.25f else 1f
+    val described = if (still) Modifier else Modifier.semantics {
+        if (progress != null) progressBarRangeInfo = ProgressBarRangeInfo(progress.coerceIn(0f, 1f), 0f..1f)
+        else { progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate; contentDescription = "Carregando" }
+    }
+    androidx.compose.foundation.Canvas(modifier.size(size).then(described)) {
+        val k = this.size.minDimension / 100f
+        val frame = androidx.compose.ui.geometry.Rect(19.5f * k, 23.5f * k, 80.5f * k, 76.5f * k)
+        drawRoundRect(
+            line, topLeft = frame.topLeft, size = frame.size,
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(5.5f * k),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 7f * k),
+        )
+        // The light, kept inside the frame's window.
+        clipRect(23f * k, 27f * k, 77f * k, 73f * k) {
+            val r = 17f * k
+            val cy = 73f * k + r * (1f - rise)
+            drawArc(
+                light.copy(alpha = alpha), startAngle = 180f, sweepAngle = 180f, useCenter = true,
+                topLeft = androidx.compose.ui.geometry.Offset(50f * k - r, cy - r), size = androidx.compose.ui.geometry.Size(2 * r, 2 * r),
+            )
+        }
+    }
 }
 
 /**
@@ -93,6 +146,10 @@ internal fun loaderGlow(phase: Float, k: Int): Float {
  */
 @Composable
 fun BrandLoader(size: Dp, modifier: Modifier = Modifier, progress: Float? = null, still: Boolean = false) {
+    if (com.example.brand.AppBrand.IS_REVELA) {
+        RevelaLoader(size, modifier, progress, still)
+        return
+    }
     val line = Tone.Line
     val mint = Tone.Accent
     val context = androidx.compose.ui.platform.LocalContext.current

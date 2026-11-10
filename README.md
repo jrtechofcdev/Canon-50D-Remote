@@ -20,6 +20,10 @@
 
 ---
 
+> **Novo: Revela**, o app irmão para outros fotógrafos. São as mesmas ferramentas, com nome, logo e visual próprios ("Câmara escura"), a marca de cada estúdio e português e inglês. Ele instala ao lado do JR C50D Sync. Veja [`CHANGELOG_REVELA.md`](CHANGELOG_REVELA.md) e o plano em [`docs/PLANO_REVELA.md`](docs/PLANO_REVELA.md).
+>
+> <img src="docs/images/revela/boas_vindas.png" width="160" alt="Revela: boas-vindas e Sua marca"> <img src="docs/images/revela/captura.png" width="160" alt="Revela: tela Captura"> <img src="docs/images/revela/menu.png" width="160" alt="Revela: menu"> <img src="docs/images/revela/captura_luz_vermelha.png" width="160" alt="Revela: modo luz vermelha">
+
 Você fotografa pela **Canon EOS 50D** como sempre, com botão, dials e menus funcionando. Cada foto vai para o cartão CF e **uma cópia chega sozinha no celular** pelo cabo USB OTG, salva em RAW, JPG ou nos dois, cada formato na pasta que você escolher.
 
 A captura usa só a USB, sem FTP e sem internet. Na hora de entregar, o celular cria o próprio Wi-Fi e o cliente baixa as fotos pelo QR, também sem internet. (A única parte que usa internet é a Loja de presets, e só para pegar presets novos.)

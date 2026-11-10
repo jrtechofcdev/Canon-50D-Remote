@@ -34,7 +34,7 @@ object Brand {
     val Graphite = Color(0xFF292929)
 }
 
-class Palette(
+data class Palette(
     val Background: Color,
     val Surface: Color,
     val SurfaceHigh: Color,
@@ -61,7 +61,7 @@ class Palette(
     val Blue: Color,
 )
 
-private val DayPalette = Palette(
+internal val DayPalette = Palette(
     Background = Color(0xFF1F1F1F),
     Surface = Brand.Graphite,
     SurfaceHigh = Color(0xFF333333),
@@ -83,7 +83,7 @@ private val DayPalette = Palette(
 )
 
 /** "Modo escuro total": for churches and night events, nothing on screen brighter than it needs to be. */
-private val NightPalette = Palette(
+internal val NightPalette = Palette(
     Background = Color(0xFF000000),
     Surface = Color(0xFF0D0D0D),
     SurfaceHigh = Color(0xFF171717),
@@ -109,6 +109,43 @@ private val LocalPalette = staticCompositionLocalOf { DayPalette }
 
 val Tone: Palette
     @Composable @ReadOnlyComposable get() = LocalPalette.current
+
+/**
+ * Everything that makes one app look like itself: JR C50D Sync ([JrLook]) or Revela (src/revela). Shared
+ * screens read colours, type and corners only through this, so each app shows them in its own identity.
+ */
+class Look(
+    val day: Palette,
+    /** Night mode: "modo escuro total" in JR, red safelight in Revela. */
+    val night: Palette,
+    val typography: Typography,
+    val shapes: Shapes,
+    /** Exposure readouts: tabular digits so values don't jump while changing. */
+    val readout: TextStyle,
+    /** The app's name set as a wordmark. */
+    val wordmark: TextStyle,
+    /** Large editorial titles (greetings, empty screens); JR uses its normal title. */
+    val display: TextStyle,
+)
+
+private val LocalLook = staticCompositionLocalOf<Look?> { null }
+
+private val currentLook: Look
+    @Composable @ReadOnlyComposable get() = LocalLook.current ?: com.example.brand.BrandStyle.look
+
+/** A brand colour picked by the photographer, with the text colour that reads on it. */
+fun Palette.withAccent(accent: Color): Palette = copy(
+    Accent = accent,
+    OnAccent = if (accent.luminanceValue() > 0.36f) Color(0xFF14110E) else Color(0xFFFFFFFF),
+    GradientStart = accent,
+    GradientEnd = accent,
+)
+
+/** WCAG relative luminance, 0 (black) to 1 (white). */
+fun Color.luminanceValue(): Float {
+    fun ch(c: Float) = if (c <= 0.03928f) c / 12.92f else Math.pow(((c + 0.055f) / 1.055f).toDouble(), 2.4).toFloat()
+    return 0.2126f * ch(red) + 0.7152f * ch(green) + 0.0722f * ch(blue)
+}
 
 /** The logo's diagonal mint → cyan. Reserved for the symbol and the shutter button. */
 val BrandGradient: Brush
@@ -178,7 +215,7 @@ private val typography = Typography(
 )
 
 /** Exposure readout, like the 50D's top LCD: large, tabular digits so values don't jump while changing. */
-val ReadoutStyle = TextStyle(
+private val jrReadout = TextStyle(
     fontFamily = Exo2,
     fontSize = 20.sp,
     lineHeight = 24.sp,
@@ -187,13 +224,25 @@ val ReadoutStyle = TextStyle(
 )
 
 /** The app name set like the logo's wordmark: Exo 2 with open tracking. */
-val WordmarkStyle = TextStyle(
+private val jrWordmark = TextStyle(
     fontFamily = Exo2,
     fontSize = 22.sp,
     lineHeight = 26.sp,
     fontWeight = FontWeight.Normal,
     letterSpacing = 1.4.sp,
 )
+
+/** Exposure readout of the app that is running (tabular digits). */
+val ReadoutStyle: TextStyle
+    @Composable @ReadOnlyComposable get() = currentLook.readout
+
+/** The running app's name as a wordmark. */
+val WordmarkStyle: TextStyle
+    @Composable @ReadOnlyComposable get() = currentLook.wordmark
+
+/** Large editorial title of the running app. */
+val DisplayStyle: TextStyle
+    @Composable @ReadOnlyComposable get() = currentLook.display
 
 private val shapes = Shapes(
     extraSmall = RoundedCornerShape(4.dp),
@@ -229,11 +278,27 @@ private fun colorsFor(p: Palette) = darkColorScheme(
     error = p.Error,
 )
 
+/** JR C50D Sync: graphite, mint, Exo 2 (DESIGN.md). */
+val JrLook = Look(
+    day = DayPalette,
+    night = NightPalette,
+    typography = typography,
+    shapes = shapes,
+    readout = jrReadout,
+    wordmark = jrWordmark,
+    display = style(28, 34, FontWeight.SemiBold),
+)
+
+/**
+ * The app's theme. [accent] is a brand colour chosen by the photographer (Revela); night mode keeps its
+ * own dim accent so nothing bright comes back at a night event.
+ */
 @Composable
-fun JrLinkTheme(night: Boolean = false, content: @Composable () -> Unit) {
-    val palette = if (night) NightPalette else DayPalette
-    CompositionLocalProvider(LocalPalette provides palette) {
-        MaterialTheme(colorScheme = colorsFor(palette), typography = typography, shapes = shapes) {
+fun JrLinkTheme(night: Boolean = false, accent: Color? = null, content: @Composable () -> Unit) {
+    val look = com.example.brand.BrandStyle.look
+    val palette = if (night) look.night else accent?.let { look.day.withAccent(it) } ?: look.day
+    CompositionLocalProvider(LocalPalette provides palette, LocalLook provides look) {
+        MaterialTheme(colorScheme = colorsFor(palette), typography = look.typography, shapes = look.shapes) {
             // Text outside a Surface/Scaffold still gets the palette's colour, never Material's black default.
             CompositionLocalProvider(LocalContentColor provides palette.Text, content = content)
         }

@@ -98,7 +98,7 @@ class LocalDelivery(
     /** A client hearted a photo (the app shows a notification when that is on). */
     var onLike: suspend (DeliverySession, DeliveryItem) -> Unit = { _, _ -> }
 
-    @Volatile private var portalInfo = PortalInfo("Jr_Tech_OFC", true, express = mode.express)
+    @Volatile private var portalInfo = PortalInfo(com.example.brand.AppBrand.DEFAULT_STUDIO, true, express = mode.express)
 
     val queue = DeliveryQueue(dao, photos, DeliveryPreparer { photo, session, target -> prepare(photo, session, target) }, root, events, express = mode.express)
 

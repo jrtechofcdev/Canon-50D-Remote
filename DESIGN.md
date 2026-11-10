@@ -1,5 +1,7 @@
 # DESIGN.md: JR C50D Sync
 
+> Este arquivo é a identidade do **JR C50D Sync**. O **Revela** (o app irmão para outros fotógrafos) tem identidade própria, "Câmara escura", descrita em `docs/PLANO_REVELA.md`.
+
 App de captura vinculada da **Jr_Tech_OFC** ("Nossa Arte, Seu Sucesso").
 Direção tirada do kit da marca enviado pelo José Renato (`branding/`).
 

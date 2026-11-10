@@ -8,25 +8,25 @@ import java.util.Locale
 object MessageDefaults {
     const val WHATSAPP = "Olá, {cliente}! 📸\n\n" +
         "Aqui estão suas fotos: *{quantidade}* do dia {data}.\n\n" +
-        "Qualquer dúvida, estou à disposição.\n\n" +
-        "*Jr_Tech_OFC*"
+        "Qualquer dúvida, estou à disposição." +
+        com.example.brand.AppBrand.SIGNATURE
     const val PREVIEW = "Olá, {cliente}! 📸\n\n" +
         "Suas fotos já estão prontas para escolher: *{quantidade} fotos* do dia {data}.\n\n" +
-        "Me envie os números das que você mais gostou.\n\n" +
-        "*Jr_Tech_OFC*"
+        "Me envie os números das que você mais gostou." +
+        com.example.brand.AppBrand.SIGNATURE
     const val DELIVERED = "Olá, {cliente}! ✨\n\n" +
-        "Suas *{quantidade} fotos* editadas estão entregues. Foi um prazer fotografar vocês.\n\n" +
-        "Se puder, marque *@jr_tech_ofc* quando postar.\n\n" +
-        "*Jr_Tech_OFC*"
+        "Suas *{quantidade} fotos* editadas estão entregues. Foi um prazer fotografar vocês." +
+        com.example.brand.AppBrand.TAG_LINE +
+        com.example.brand.AppBrand.SIGNATURE
     const val PAYMENT = "Olá, {cliente}! Tudo bem?\n\n" +
         "*Lembrete:* o restante do pagamento do ensaio de {data} fica para a entrega das fotos.\n\n" +
-        "Qualquer dúvida, estou à disposição.\n\n" +
-        "*Jr_Tech_OFC*"
+        "Qualquer dúvida, estou à disposição." +
+        com.example.brand.AppBrand.SIGNATURE
     const val SELECTION = "Olá, {cliente}! 💚\n\n" +
         "Recebi sua seleção: *{quantidade} fotos*.\n\n" +
         "{lista}\n\n" +
-        "Agora sigo com a edição e aviso quando estiver pronto.\n\n" +
-        "*Jr_Tech_OFC*"
+        "Agora sigo com a edição e aviso quando estiver pronto." +
+        com.example.brand.AppBrand.SIGNATURE
 }
 
 enum class MessageKind(val label: String) {

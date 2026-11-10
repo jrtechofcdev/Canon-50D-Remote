@@ -41,7 +41,7 @@ class AppBackup(private val settings: SettingsRepository, private val presets: P
      */
     suspend fun restore(text: String): RestoreReport {
         val json = runCatching { JSONObject(text) }.getOrNull()
-        require(json != null && json.optString("app") == APP) { "Este arquivo não é um backup do JR C50D Sync" }
+        require(json != null && json.optString("app") == APP) { "Este arquivo não é um backup do ${com.example.brand.AppBrand.APP_NAME}" }
 
         val values = SettingsProfiles.decodeValues(json.optJSONObject("settings") ?: JSONObject())
             .filterKeys { it !in SettingsProfiles.deviceOnly }
@@ -86,7 +86,7 @@ class AppBackup(private val settings: SettingsRepository, private val presets: P
     }
 
     companion object {
-        const val APP = "JR C50D Sync"
+        const val APP = com.example.brand.AppBrand.APP_NAME
         const val FORMAT = 1
     }
 }

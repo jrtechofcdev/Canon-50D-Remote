@@ -18,7 +18,7 @@ import kotlinx.coroutines.withContext
  */
 object AppFolders {
 
-    const val ROOT_NAME = "JR C50D Sync"
+    const val ROOT_NAME = com.example.brand.AppBrand.ROOT_FOLDER
 
     /** One folder: where it sits, what goes in it, and which setting points at it. */
     data class Folder(val path: List<String>, val label: String, val key: Preferences.Key<String>?)

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Revela speaks Portuguese and English; Android 13+ lets the photographer pick per app. -->
+    <application
+        android:localeConfig="@xml/locales_config"
+        tools:targetApi="33" />
+</manifest>

@@ -571,15 +571,3 @@ private fun BarTab(tab: Tab, on: Boolean, width: androidx.compose.ui.unit.Dp, on
         )
     }
 }
-
-/** [hideable]: can be taken off the bar in Ajustes → Tela. */
-enum class Tab(val route: String, val label: String, val icon: ImageVector, val hideable: Boolean = true) {
-    Session("session", "Sessão", Icons.Outlined.CameraAlt, hideable = false),
-    Photos("photos", "Fotos", Icons.Outlined.PhotoLibrary),
-    Delivery("delivery", "Entrega", Icons.Outlined.WifiTethering),
-    Express("express", "Express", Icons.Outlined.Collections),
-    Cull("cull", "Culling", Icons.Outlined.Swipe),
-    Presets("presets", "Presets", Icons.Outlined.Style),
-    Shop("shop", "Loja", Icons.Outlined.Storefront),
-    Settings("settings", "Ajustes", Icons.Outlined.Tune, hideable = false),
-}

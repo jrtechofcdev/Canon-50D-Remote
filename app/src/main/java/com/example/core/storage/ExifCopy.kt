@@ -27,7 +27,7 @@ object ExifCopy {
                 }
             }
             if (lat != null && lon != null) out.setLatLong(lat, lon)
-            out.setAttribute(ExifInterface.TAG_SOFTWARE, "JR C50D Sync")
+            out.setAttribute(ExifInterface.TAG_SOFTWARE, com.example.brand.AppBrand.APP_NAME)
             out.saveAttributes()
         }
     }
