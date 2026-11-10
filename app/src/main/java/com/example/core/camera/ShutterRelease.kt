@@ -38,21 +38,34 @@ object ShutterRelease {
         else -> "A câmera não disparou (código $code)."
     }
 
+    /** How long the camera may answer only "busy" before [fire] calls its recovery once. */
+    const val STUCK_MS = 1_500L
+
     /**
      * Tries until the camera fires. [remoteRelease] is the 50D's one-step release; without it the
      * newer press/release pair is used. [onWaiting] reports how long it has been waiting.
+     *
+     * The wait is the longer of the retries counted and the real time spent: each RemoteRelease that
+     * hunts for focus can take half a second on the camera, and a log showed "up to 5 s" lasting 10 s.
+     * When the camera answers only "busy" for [STUCK_MS], [onStuck] runs once (the app closes a
+     * leftover AF or live view there). [report] gets one line with every answer, for the log.
      */
     suspend fun fire(
         ptp: PtpSession,
         remoteRelease: Boolean,
         waitMs: Long,
+        onStuck: (suspend () -> Unit)? = null,
+        report: (String) -> Unit = {},
         onWaiting: (Long) -> Unit = {},
     ) {
+        val started = System.currentTimeMillis()
+        val answers = Answers()
         var lastRefusal: Int? = null
+        var busySince: Long? = null
+        var unstuck = false
         var attempt = 0
         while (true) {
-            // Counted in retries, so the wait doesn't depend on how long each USB round trip takes.
-            val waited = attempt++ * RETRY_MS
+            val waited = maxOf(attempt++ * RETRY_MS, System.currentTimeMillis() - started)
             try {
                 val refusal = if (remoteRelease) {
                     refusal(ptp.transact(PtpOp.EOS_REMOTE_RELEASE))
@@ -61,18 +74,50 @@ object ShutterRelease {
                     ptp.transact(PtpOp.EOS_REMOTE_RELEASE_OFF, 3)
                     null
                 }
-                if (refusal == null) return
-                if (refusal == CARD_FULL) throw PtpException(message(refusal))
+                answers.add(refusal?.let { if (it == NO_FOCUS) "sem foco" else "recusou $it" } ?: "disparou")
+                if (refusal == null) {
+                    report(answers.line(System.currentTimeMillis() - started))
+                    return
+                }
                 lastRefusal = refusal
+                busySince = null
+                if (refusal == CARD_FULL) {
+                    report(answers.line(System.currentTimeMillis() - started))
+                    throw PtpException(message(refusal))
+                }
             } catch (e: PtpResponseException) {
-                if (e.code != PtpResponse.DEVICE_BUSY && e.code != PtpResponse.NOT_READY) throw e
+                if (e.code != PtpResponse.DEVICE_BUSY && e.code != PtpResponse.NOT_READY) {
+                    answers.add("0x%04X".format(e.code))
+                    report(answers.line(System.currentTimeMillis() - started))
+                    throw e
+                }
+                answers.add(if (e.code == PtpResponse.DEVICE_BUSY) "ocupada (0x2019)" else "não pronta (0xA102)")
                 lastRefusal = null
+                val since = busySince ?: waited.also { busySince = it }
+                if (!unstuck && onStuck != null && waited - since >= STUCK_MS) {
+                    unstuck = true
+                    answers.add("recuperação", attempt = false)
+                    onStuck()
+                }
             }
             if (waited + RETRY_MS > waitMs) {
+                report(answers.line(System.currentTimeMillis() - started))
                 throw PtpException(lastRefusal?.let(::message) ?: "A câmera ficou ocupada por ${waitMs / 1000} s e não disparou.")
             }
             onWaiting(waited)
             delay(RETRY_MS)
         }
+    }
+
+    /** Counts the camera's answers in order of first appearance: "ocupada (0x2019) ×12, disparou". */
+    private class Answers {
+        private val counts = LinkedHashMap<String, Int>()
+        private var total = 0
+        fun add(answer: String, attempt: Boolean = true) {
+            counts[answer] = (counts[answer] ?: 0) + 1
+            if (attempt) total++
+        }
+        fun line(ms: Long) = "$total tentativa(s) em $ms ms: " +
+            counts.entries.joinToString(", ") { (k, n) -> if (n > 1) "$k ×$n" else k }
     }
 }

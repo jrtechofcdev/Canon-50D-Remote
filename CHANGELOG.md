@@ -2,6 +2,24 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [5.0.1] · 2026-11-10
+
+Correções a partir do log da 5.0 na 50D (disparo, intervalômetro e live view).
+
+- **Botão e intervalômetro não disparam mais juntos:**
+  - no log, os dois mandavam o disparo ao mesmo tempo, a câmera respondia "ocupada" aos dois e nenhum disparava;
+  - com o intervalômetro ou o bracketing rodando, o botão avisa e espera;
+  - a série dispara uma foto de cada vez, com o live view pausado como no botão.
+- **Intervalômetro para depois de 3 falhas seguidas**, com o motivo, em vez de repetir o mesmo aviso a cada foto.
+- **Tempo de espera real:** "espera até 5 s" agora são 5 s no relógio. Antes contava as tentativas, e um disparo chegou a levar 10 s.
+- **Câmera presa em "ocupada":**
+  - depois de 1,5 s só recebendo "ocupada", o app fecha o AF e, se o live view foi usado, desliga o live view de novo antes de continuar tentando;
+  - ao sair do live view, o app também fecha o AF.
+- **Prévia de profundidade:** a 50D não faz pelo cabo (responde "operação não suportada"). O botão some depois da primeira recusa, com um aviso só, em vez de dois a cada toque.
+- **Log mais claro para o próximo teste:**
+  - cada disparo registra todas as respostas da câmera ("ocupada", "não pronta", "sem foco") e o tempo real;
+  - o log também mostra para onde a câmera diz que o live view está indo.
+
 ## [5.0] · 2026-11-10
 
 Novo visual. A identidade continua a mesma (grafite, menta, Exo 2 e o símbolo da Jr_Tech_OFC), agora com um sistema só no app inteiro.
