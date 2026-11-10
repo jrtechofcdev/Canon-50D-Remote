@@ -647,7 +647,7 @@ Funções novas, cada uma com liga/desliga em Ajustes.
 
 ## [2.0] · 2026-09-27
 
-Reescrita da captura vinculada. Detalhes em [`docs/AUDITORIA.md`](docs/AUDITORIA.md).
+Reescrita da captura vinculada.
 
 - Corrigido o travamento da 50D no modo de transferência: toda comunicação com a câmera agora espera a resposta antes do próximo comando.
 - A câmera continua disparando pelo próprio botão durante a conexão.
