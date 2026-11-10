@@ -569,7 +569,7 @@ class LocalServer(
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Teste de entrega</title>
 <style>body{margin:0;background:#101413;color:#e8efec;font-family:system-ui,sans-serif;padding:16px}
 img{width:100%;border-radius:12px}a{display:block;margin-top:16px;padding:14px;border-radius:12px;background:#00fca8;color:#0b1f17;text-align:center;font-weight:700;text-decoration:none}</style>
-</head><body><h1>${com.example.brand.AppBrand.APP_NAME}</h1><p>Se esta página abriu, o Wi-Fi e o servidor funcionam.</p>
+</head><body><h1>JR C50D Sync</h1><p>Se esta página abriu, o Wi-Fi e o servidor funcionam.</p>
 <img src="/teste.jpg" alt="Foto de teste"><a href="/teste.jpg?dl=1" download>Baixar a foto</a></body></html>"""
     }
 }

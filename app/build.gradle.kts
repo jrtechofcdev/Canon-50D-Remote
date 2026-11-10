@@ -4,10 +4,6 @@ plugins {
   alias(libs.plugins.google.devtools.ksp)
 }
 
-// Revela's own version (the JR version is the versionName literal in defaultConfig).
-val revelaVersionName = "1.0"
-val revelaVersionCode = 1
-
 android {
   namespace = "com.example"
   compileSdk = 36
@@ -21,22 +17,6 @@ android {
     // Phones only (the face model ships native code for each CPU type; x86 is emulators).
     // "-Pabis=arm64-v8a" builds a smaller APK for modern phones only.
     ndk { abiFilters += ((project.findProperty("abis") as String?) ?: "arm64-v8a,armeabi-v7a").split(",") }
-  }
-
-  // Two apps from one code base (docs/PLANO_REVELA.md). "jr" is JR C50D Sync, unchanged: same id, name
-  // and key, so it keeps installing over every earlier version. "revela" is the app for other photographers.
-  // The JR version stays in defaultConfig above (the release workflow reads it from there).
-  flavorDimensions += "brand"
-  productFlavors {
-    create("jr") {
-      dimension = "brand"
-    }
-    create("revela") {
-      dimension = "brand"
-      applicationId = "com.jrtechofc.revela"
-      versionCode = revelaVersionCode
-      versionName = revelaVersionName
-    }
   }
 
   // Compressed native code keeps the APK small to download and send; it is unpacked once at install.

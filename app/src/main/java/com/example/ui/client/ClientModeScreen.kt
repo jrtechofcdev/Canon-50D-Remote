@@ -238,7 +238,7 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
                     BrandSymbol(if (wide) 18.dp else 22.dp)
                     if (wide) {
                         Spacer(Modifier.width(8.dp))
-                        Text(com.example.brand.AppBrand.DEFAULT_STUDIO, style = WordmarkStyle.copy(fontSize = 13.sp), color = Tone.OnPhoto)
+                        Text("Jr_Tech_OFC", style = WordmarkStyle.copy(fontSize = 13.sp), color = Tone.OnPhoto)
                     }
                 }
             }

@@ -24,23 +24,13 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # Two apps from one code base (docs/PLANO_REVELA.md): every test runs on JR C50D Sync; Revela runs
-      # the shared core tests and its own, so the screen tests are not repeated twice.
-      - name: Unit tests (JR C50D Sync)
-        run: ./gradlew :app:testJrDebugUnitTest --no-daemon
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
 
-      - name: Unit tests (Revela)
-        run: ./gradlew :app:testRevelaDebugUnitTest --tests 'com.example.core.*' --tests 'com.example.revela.*' --no-daemon
-
-      - name: Build APKs
-        run: ./gradlew :app:assembleJrDebug :app:assembleRevelaDebug --no-daemon
+      - name: Build APK
+        run: ./gradlew :app:assembleDebug --no-daemon
 
       - uses: actions/upload-artifact@v4
         with:
           name: JR_C50D_Sync-apk
-          path: app/build/outputs/apk/jr/debug/app-jr-debug.apk
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Revela-apk
-          path: app/build/outputs/apk/revela/debug/app-revela-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk

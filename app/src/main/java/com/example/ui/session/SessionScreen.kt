@@ -718,7 +718,7 @@ private fun RecentStrip(photos: List<Photo>, onOpen: (Long) -> Unit) {
 }
 
 @Composable
-internal fun IntervalDialog(onStart: (Int, Int) -> Unit, onDismiss: () -> Unit) {
+private fun IntervalDialog(onStart: (Int, Int) -> Unit, onDismiss: () -> Unit) {
     var seconds by remember { mutableStateOf("10") }
     var shots by remember { mutableStateOf("30") }
     val s = seconds.toIntOrNull()?.takeIf { it in 1..3600 }

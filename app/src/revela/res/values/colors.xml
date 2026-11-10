@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Darkroom black (BrandStyle.darkroom.Background), so the window matches the first frame. -->
-    <color name="window_background">#FF110F0D</color>
-</resources>

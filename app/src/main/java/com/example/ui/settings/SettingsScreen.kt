@@ -316,8 +316,8 @@ private fun AboutFooter(app: TetherApp?, unlocked: Boolean) {
     ) {
         BrandSymbol(36.dp)
         Spacer(Modifier.height(10.dp))
-        Text("${com.example.brand.AppBrand.APP_NAME} ${BuildConfig.VERSION_NAME}", style = WordmarkStyle.copy(fontSize = 16.sp), color = Tone.Text)
-        Text(com.example.brand.AppBrand.ABOUT, style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+        Text("JR C50D Sync ${BuildConfig.VERSION_NAME}", style = WordmarkStyle.copy(fontSize = 16.sp), color = Tone.Text)
+        Text("por Jr_Tech_OFC · Nossa Arte, Seu Sucesso", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -1145,8 +1145,7 @@ private fun DisplaySettings(app: TetherApp, s: Settings) {
             scope.launch { app.settings.set(SettingKeys.keepScreenOn, it) }
         }
     }
-    // Revela has a menu instead of the tab bar.
-    if (!com.example.brand.AppBrand.IS_REVELA) SettingsGroup("Abas da barra", Icons.Outlined.Tab) {
+    SettingsGroup("Abas da barra", Icons.Outlined.Tab) {
         InfoText("Esconda as abas que não usa. Sessão e Ajustes ficam sempre. Com mais de 5 abas, a barra rola para o lado.")
         val hidden = s.hiddenTabs.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
         com.example.Tab.entries.filter { it.hideable }.forEach { tab ->
@@ -1268,12 +1267,12 @@ private suspend fun shareLog(context: Context) {
     val send = android.content.Intent(android.content.Intent.ACTION_SEND)
         .setType("text/plain")
         .putExtra(android.content.Intent.EXTRA_STREAM, uri)
-        .putExtra(android.content.Intent.EXTRA_SUBJECT, "Log do ${com.example.brand.AppBrand.APP_NAME}")
+        .putExtra(android.content.Intent.EXTRA_SUBJECT, "Log do JR C50D Sync")
         .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
     context.startActivity(android.content.Intent.createChooser(send, "Enviar log"))
 }
 
 private fun copyLog(context: Context, lines: List<String>) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText("Log ${com.example.brand.AppBrand.APP_NAME}", lines.joinToString("\n")))
+    clipboard.setPrimaryClip(ClipData.newPlainText("Log JR C50D Sync", lines.joinToString("\n")))
 }

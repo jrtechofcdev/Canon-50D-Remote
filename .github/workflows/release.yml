@@ -49,19 +49,18 @@ jobs:
 
       - name: Unit tests
         if: steps.version.outputs.publish == 'true'
-        run: ./gradlew :app:testJrDebugUnitTest --no-daemon
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
 
-      # This workflow publishes JR C50D Sync only; Revela gets its own releases in phase R5.
       - name: Build APK
         if: steps.version.outputs.publish == 'true'
-        run: ./gradlew :app:assembleJrDebug --no-daemon
+        run: ./gradlew :app:assembleDebug --no-daemon
 
       - name: Name the APK and extract release notes
         if: steps.version.outputs.publish == 'true'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          cp app/build/outputs/apk/jr/debug/app-jr-debug.apk "JR_C50D_Sync-v${VERSION}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "JR_C50D_Sync-v${VERSION}.apk"
           # Section of CHANGELOG.md between "## [VERSION]" and the next "## [".
           awk -v v="$VERSION" '
             $0 ~ "^## \\[" v "\\]" { on=1; next }

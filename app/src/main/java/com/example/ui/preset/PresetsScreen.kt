@@ -485,7 +485,7 @@ private fun sourceLabel(source: String) = when (source) {
     "dng" -> "Importado de DNG"
     "xmp" -> "Importado de XMP"
     "lrtemplate" -> "Importado de LRTemplate"
-    "jr_link" -> "Pack ${com.example.brand.AppBrand.APP_NAME}"
+    "jr_link" -> "Pack JR C50D Sync"
     else -> if (source.startsWith(com.example.core.shop.ShopItem.SOURCE_PREFIX)) "Da Loja de presets" else "Criado no app"
 }
 

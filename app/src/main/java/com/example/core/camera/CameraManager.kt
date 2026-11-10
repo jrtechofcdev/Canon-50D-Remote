@@ -950,7 +950,7 @@ class CameraManager(
         private const val MODE_M = 3
         private val TV_MODES = setOf(1, 3, 4)
         private val AV_MODES = setOf(2, 3, 4)
-        private const val ACTION_USB_PERMISSION = com.example.BuildConfig.APPLICATION_ID + ".USB_PERMISSION"
+        private const val ACTION_USB_PERMISSION = "com.jrtechofc.tether50d.USB_PERMISSION"
         const val CANON_VENDOR_ID = 0x04A9
         private const val LIVE_VIEW_PARAM = 0x00100000
         private const val LIVE_TIMEOUT_MS = 3_000
