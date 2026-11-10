@@ -5,6 +5,7 @@ import com.example.core.alerts.Alerts
 import com.example.core.camera.CameraManager
 import com.example.core.camera.ConnectionState
 import com.example.core.data.AppBackup
+import com.example.core.log.AppLog
 import com.example.core.data.PhotoDatabase
 import com.example.core.data.SettingKeys
 import com.example.core.data.SettingsRepository
@@ -22,6 +23,10 @@ import com.example.core.location.LocationTracker
 import com.example.core.backup.SessionBackup
 import com.example.core.analysis.Culler
 import com.example.core.analysis.MlKitFaceAnalyzer
+import com.example.core.shop.PresetShop
+import com.example.core.delivery.DeliveryEvents
+import com.example.core.delivery.LocalDelivery
+import com.example.core.delivery.PhotoEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -62,8 +67,64 @@ class TetherApp : Application() {
         private set
     lateinit var appBackup: AppBackup
         private set
+    lateinit var shop: PresetShop
+        private set
+    /** Photo events (captured, edited, approved): the only link between capture and delivery. */
+    val events = DeliveryEvents()
+    /** Entrega local: clients with a code. */
+    lateinit var delivery: LocalDelivery
+        private set
+    /** Fotografia Express: its own tool, no code, preview until paid. Independent of [delivery]. */
+    lateinit var express: LocalDelivery
+        private set
+    /** Deleted photos wait here a few seconds so Desfazer can bring them back. */
+    lateinit var trash: com.example.core.data.PhotoTrash
+        private set
 
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    /**
+     * Switches the session new photos go to (folder, name, delivery): the name, the photo counter
+     * and the last backup result all belong to the session that just ended.
+     */
+    suspend fun startSession(name: String) {
+        settings.set(SettingKeys.sessionName, name.trim())
+        tether.resetSessionCounter()
+        backup.dismiss()
+        _cameraLost.value = false
+        AppLog.i("SESSAO", "Sessão: ${name.trim().ifEmpty { "Geral" }}")
+    }
+
+    /** Every photo except the ones waiting in [trash]: what the screens list. */
+    val photos: kotlinx.coroutines.flow.Flow<List<com.example.core.data.Photo>> by lazy {
+        kotlinx.coroutines.flow.combine(database.photoDao().observeAll(), trash.pending) { list, gone ->
+            if (gone.isEmpty()) list else list.filter { it.id !in gone }
+        }
+    }
+
+    // A failure in one of these collectors is written to the log instead of closing the app.
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main + AppLog.handler("APP"))
+
+    private val _cameraLost = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    /** The camera dropped during a session (not a deliberate Desconectar), for the red dot on the Sessão tab. */
+    val cameraLost: kotlinx.coroutines.flow.StateFlow<Boolean> = _cameraLost
+
+    private val _phoneLowGb = kotlinx.coroutines.flow.MutableStateFlow<Double?>(null)
+
+    /** Free space on the phone when it is under the warning level, else null: a chip on the Session. */
+    val phoneLowGb: kotlinx.coroutines.flow.StateFlow<Double?> = _phoneLowGb
+
+    private val _notices = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 8)
+
+    /** Messages that say what to do next: shown at the bottom, longer than a Toast and with a close button. */
+    val notices: kotlinx.coroutines.flow.SharedFlow<String> = _notices
+
+    fun notice(text: String) {
+        _notices.tryEmit(text)
+    }
+
+    fun forgetLostCamera() {
+        _cameraLost.value = false
+    }
 
     // Each warning fires once per connection, not on every event.
     private var warnedCard = false
@@ -72,9 +133,17 @@ class TetherApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // First, so everything after it (and any crash) is written down.
+        AppLog.init(this)
         settings = SettingsRepository(this)
         database = PhotoDatabase.create(this)
         store = PhotoStore(this)
+        trash = com.example.core.data.PhotoTrash(appScope) { ids ->
+            withContext(Dispatchers.IO) {
+                ids.forEach { id -> database.photoDao().get(id)?.let { com.example.ui.photos.deletePhoto(this@TetherApp, it) } }
+            }
+            AppLog.i("FOTOS", "${ids.size} foto(s) apagada(s)")
+        }
         camera = CameraManager(
             this,
             keepCameraAwake = { settings.current().keepCameraAwake },
@@ -92,43 +161,87 @@ class TetherApp : Application() {
         backup = SessionBackup(this, database.photoDao(), store)
         culler = Culler(this, database.photoDao(), settings, MlKitFaceAnalyzer())
         appBackup = AppBackup(settings, presets)
+        shop = PresetShop(this, settings, presets)
+        looks.onEdited = { id -> events.emit(PhotoEvent.Edited(id)) }
+        delivery = LocalDelivery(this, settings, database.deliveryDao(), database.photoDao(), looks, export, events, appScope, com.example.core.delivery.DeliveryMode.Normal, analysis = { culler.awaitAnalysis(it) })
+        express = LocalDelivery(this, settings, database.deliveryDao(), database.photoDao(), looks, export, events, appScope, com.example.core.delivery.DeliveryMode.Express, analysis = { culler.awaitAnalysis(it) })
+        // One Wi-Fi at a time: starting either tool stops the other.
+        delivery.peer = express
+        express.peer = delivery
+        val likes = com.example.core.delivery.LikeNotifier(this)
+        delivery.onLike = { session, item -> if (settings.current().deliveryNotifyLikes) likes.liked(session, item) }
+        express.onLike = { session, item -> if (settings.current().expressNotifyLikes) likes.liked(session, item) }
+        delivery.init()
+        express.init()
+        appScope.launch {
+            events.events.collect { e ->
+                if ((e is PhotoEvent.Delivered || e is PhotoEvent.Approved) && settings.current().deliveryVibrate) alerts.photoReceived()
+            }
+        }
+
+        appScope.launch {
+            settings.settings.distinctUntilChangedBy { it.logEnabled to it.logFolder }.collect { AppLog.configure(it.logEnabled, it.logFolder) }
+        }
+        appScope.launch {
+            // Modo desenvolvedor: detailed log and the CPU-only render follow their switches.
+            settings.settings.collect {
+                AppLog.verbose = it.developerMode && it.devVerboseLog
+                engine.forceCpu = it.developerMode && it.devRender == "cpu"
+            }
+        }
 
         appScope.launch(Dispatchers.IO) {
             export.clearOldExports()
             presets.seedIfEmpty()
             runCatching { presets.syncFolder() }
+            runCatching { store.releaseUnused(settings.snapshot().values.joinToString("\n") { it.toString() }) }
         }
 
         appScope.launch {
+            var before: ConnectionState? = null
             camera.state.distinctUntilChangedBy { it::class }.collect { state ->
-                if (state is ConnectionState.Connected) {
+                // Back after a reconnect it is the same shoot: the count of photos received goes on.
+                if (state is ConnectionState.Connected && before !is ConnectionState.Reconnecting) {
                     tether.resetSessionCounter()
                     warnedCard = false
                     warnedBattery = false
                     warnedPhone = false
-                    CameraForegroundService.start(this@TetherApp)
                 }
+                if (state is ConnectionState.Connected) _cameraLost.value = false
+                if (state is ConnectionState.Connected) CameraForegroundService.start(this@TetherApp)
+                before = state
                 if (state is ConnectionState.Connected && settings.current().gpsEnabled) location.start() else location.stop()
             }
         }
 
         appScope.launch {
+            // The backup runs under the foreground service too: the screen going off used to be able to stop it.
+            backup.state.collect { if (it is com.example.core.backup.BackupState.Running) CameraForegroundService.start(this@TetherApp) }
+        }
+
+        appScope.launch {
             camera.lostConnection.collect { reason ->
+                _cameraLost.value = true
                 if (settings.current().alertOnDisconnect) alerts.warn("Câmera desconectada", "$reason. Confira o cabo e a câmera.")
             }
         }
 
         appScope.launch {
             tether.saved.collect {
+                AppLog.i("FOTO", "${it.savedBase} salva · ${AppLog.memory()}")
+                events.emit(PhotoEvent.Captured(it.id))
                 val s = settings.current()
                 if (s.blurAlert || s.eyesCheck || s.cullSuggestions) culler.enqueue(it.id)
                 if (s.vibrateOnReceive) alerts.photoReceived()
-                if (s.phoneLowWarning && !warnedPhone) {
+                if (s.phoneLowWarning) {
                     val free = withContext(Dispatchers.IO) { alerts.phoneFreeGb() }
-                    if (free < s.phoneLowGb) {
+                    _phoneLowGb.value = free.takeIf { it < s.phoneLowGb }
+                    if (free < s.phoneLowGb && !warnedPhone) {
                         warnedPhone = true
                         alerts.warn("Memória do celular acabando", "Restam %.1f GB livres.".format(free))
                     }
+                } else {
+                    _phoneLowGb.value = null
                 }
             }
         }
@@ -146,11 +259,28 @@ class TetherApp : Application() {
                     alerts.warn("Cartão quase cheio", "Restam $shots disparos no cartão da câmera.")
                 }
                 val battery = status.value(EosProp.BATTERY_POWER)
-                if (s.showBattery && !warnedBattery && battery != null && EosValues.batteryIsLow(battery)) {
+                // The alert doesn't depend on showing the battery in the Session: a low battery always warns.
+                if (!warnedBattery && battery != null && EosValues.batteryIsLow(battery)) {
                     warnedBattery = true
                     alerts.warn("Bateria da câmera baixa", "Bateria em ${EosValues.batteryLabel(battery)}.")
                 }
             }
         }
+    }
+
+    /** Android asks for memory back: drop the preview caches (they are rebuilt when needed). */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_RUNNING_LOW) {
+            AppLog.w("MEM", "Android pediu memória (nível $level) · ${AppLog.memory()}")
+            if (::looks.isInitialized) looks.trim()
+            if (::shop.isInitialized) shop.trim()
+        }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        AppLog.w("MEM", "Memória baixa · ${AppLog.memory()}")
+        if (::looks.isInitialized) looks.trim()
     }
 }

@@ -27,6 +27,14 @@ class PhotoStore(private val context: Context) {
 
     class Target(val uri: Uri, val stream: OutputStream)
 
+    private val _lostFolders = kotlinx.coroutines.flow.MutableStateFlow<Set<FileKind>>(emptySet())
+
+    /**
+     * Folders chosen in Ajustes that stopped working (deleted, card removed, permission gone). Their
+     * photos go to the app's own folder meanwhile, so nothing is lost; the Session asks to pick again.
+     */
+    val lostFolders: kotlinx.coroutines.flow.StateFlow<Set<FileKind>> = _lostFolders
+
     /**
      * [moment] adds a "02 Cerimônia" level under the session folder when "subpasta por momento" is on.
      * Picks ([FileKind.SELECTED]) go to an "Escolhidas" folder inside the JPG folder's session.
@@ -38,14 +46,21 @@ class PhotoStore(private val context: Context) {
             FileKind.EDITED -> settings.editedFolder
         }
         val path = subfolders(settings, moment).let { if (kind == FileKind.SELECTED && treeUri != null) it + kind.folderName else it }
-        return if (treeUri != null) createInTree(Uri.parse(treeUri), path, kind, fileName)
-        else createInAppFolder(kind, path, fileName)
+        if (treeUri == null) return createInAppFolder(kind, path, fileName)
+        val root = DocumentFile.fromTreeUri(context, Uri.parse(treeUri))?.takeIf { it.exists() && it.canWrite() }
+        if (root == null) {
+            // The chosen folder is gone: keep shooting into the app's folder instead of failing every frame.
+            if (kind !in _lostFolders.value) {
+                com.example.core.log.AppLog.w("PASTA", "Pasta ${kind.folderName} indisponível; salvando na pasta do app")
+                _lostFolders.value = _lostFolders.value + kind
+            }
+            return createInAppFolder(kind, path, fileName)
+        }
+        if (kind in _lostFolders.value) _lostFolders.value = _lostFolders.value - kind
+        return createInTree(root, path, fileName)
     }
 
-    private fun createInTree(treeUri: Uri, path: List<String>, kind: FileKind, fileName: String): Target {
-        val root = DocumentFile.fromTreeUri(context, treeUri)
-            ?: throw IOException("Pasta ${kind.folderName} indisponível. Escolha de novo em Ajustes.")
-        if (!root.canWrite()) throw IOException("Sem permissão na pasta ${kind.folderName}. Escolha de novo em Ajustes.")
+    private fun createInTree(root: DocumentFile, path: List<String>, fileName: String): Target {
         val dir = path.fold(root) { parent, name ->
             parent.findFile(name)?.takeIf { it.isDirectory } ?: parent.createDirectory(name)
                 ?: throw IOException("Não foi possível criar a pasta $name")
@@ -109,16 +124,42 @@ class PhotoStore(private val context: Context) {
     }
 
     fun takePersistablePermission(uri: Uri) {
+        // A folder picked again is tried again on the next photo.
+        _lostFolders.value = emptySet()
         context.contentResolver.takePersistableUriPermission(
             uri,
             Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
         )
     }
 
+    /**
+     * Gives back folder permissions no option uses any more ([inUse] = every saved text that may hold a
+     * folder). Android keeps a limited number per app; without this, picking folders over the years
+     * would one day stop working.
+     */
+    fun releaseUnused(inUse: String) {
+        val held = context.contentResolver.persistedUriPermissions
+        if (held.size < 32) return
+        held.filter { it.uri.toString() !in inUse }.forEach { p ->
+            runCatching {
+                context.contentResolver.releasePersistableUriPermission(
+                    p.uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+        }
+        com.example.core.log.AppLog.i("PASTA", "Permissões de pastas antigas devolvidas")
+    }
+
     /** Human-readable path of a chosen tree, e.g. "Pictures/Clientes/RAW". */
     fun describeTree(uri: String?): String {
         if (uri == null) return "Pasta do app (padrão)"
-        val docId = runCatching { DocumentsContract.getTreeDocumentId(Uri.parse(uri)) }.getOrNull() ?: return uri
+        val parsed = Uri.parse(uri)
+        // A folder the app created inside a chosen one ("Pastas do app") is a document of that tree.
+        val docId = runCatching {
+            if (parsed.pathSegments.size >= 4 && parsed.pathSegments[2] == "document") DocumentsContract.getDocumentId(parsed)
+            else DocumentsContract.getTreeDocumentId(parsed)
+        }.getOrNull() ?: return uri
         val volume = docId.substringBefore(':')
         val path = docId.substringAfter(':', "")
         val prefix = if (volume == "primary") "Armazenamento interno" else "Cartão SD"

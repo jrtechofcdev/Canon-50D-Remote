@@ -17,13 +17,18 @@ data class RestoreReport(val settings: Int, val profiles: Int, val presets: Int)
  */
 class AppBackup(private val settings: SettingsRepository, private val presets: PresetRepository) {
 
-    suspend fun export(version: String): String {
+    /**
+     * [includeSecrets] = also the passwords, the client PIN, the Pix key and the recent contacts. Off by
+     * default: a backup file travels (Drive, WhatsApp) and those are not for anyone who finds it.
+     */
+    suspend fun export(version: String, includeSecrets: Boolean = false): String {
+        val left = if (includeSecrets) SettingsProfiles.deviceOnly else SettingsProfiles.deviceOnly + SettingsProfiles.secrets
         val json = JSONObject()
             .put("app", APP)
             .put("format", FORMAT)
             .put("version", version)
             .put("created", System.currentTimeMillis())
-            .put("settings", SettingsProfiles.encodeValues(settings.snapshot(SettingsProfiles.deviceOnly)))
+            .put("settings", SettingsProfiles.encodeValues(settings.snapshot(left)))
             .put("profiles", JSONArray(settings.profiles.first().map(SettingsProfiles::encodeProfile)))
             .put("presets", JSONArray(presets.all().map(::encodePreset)))
         return json.toString(2)
@@ -40,7 +45,8 @@ class AppBackup(private val settings: SettingsRepository, private val presets: P
 
         val values = SettingsProfiles.decodeValues(json.optJSONObject("settings") ?: JSONObject())
             .filterKeys { it !in SettingsProfiles.deviceOnly }
-        settings.apply(values, replace = true, keep = SettingsProfiles.deviceOnly)
+        // A file saved without the passwords keeps this phone's own instead of wiping them.
+        settings.apply(values, replace = true, keep = SettingsProfiles.deviceOnly + SettingsProfiles.secrets.filter { it !in values })
 
         val incoming = json.optJSONArray("profiles")?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it)?.let(SettingsProfiles::decodeProfile) } }.orEmpty()
         if (incoming.isNotEmpty()) {

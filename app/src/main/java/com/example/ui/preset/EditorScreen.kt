@@ -80,6 +80,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
 
 /** What the editor is working on: a preset (id 0 = new one) or one photo's calibration. */
 sealed interface EditTarget {
@@ -158,104 +160,125 @@ fun EditorScreen(app: TetherApp, target: EditTarget, onDone: () -> Unit) {
 
     BackHandler { if (dirty) confirmExit = true else onDone() }
 
-    Column(Modifier.fillMaxSize().background(Color.Black)) {
-        Row(
-            Modifier.fillMaxWidth().background(Tone.Background).statusBarsPadding().padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = { if (dirty) confirmExit = true else onDone() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar") }
-            Column(Modifier.weight(1f)) {
-                Text(
-                    when (target) {
-                        is EditTarget.PresetTarget -> preset?.name ?: "Preset"
-                        is EditTarget.PhotoTarget -> "Calibrar ${photo?.savedBase.orEmpty()}"
-                    },
-                    style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-                Text("Segure a foto: antes", style = MaterialTheme.typography.labelSmall, color = Tone.TextMuted)
-            }
-            IconButton(onClick = { showClipping = !showClipping }) {
-                Icon(Icons.Outlined.WbSunny, contentDescription = "Mostrar estouro", tint = if (showClipping) Tone.Info else Tone.TextMuted)
-            }
-            IconButton(enabled = historyIndex > 0, onClick = { historyIndex--; settings = history[historyIndex] }) {
-                Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = "Desfazer")
-            }
-            IconButton(enabled = historyIndex < history.lastIndex, onClick = { historyIndex++; settings = history[historyIndex] }) {
-                Icon(Icons.AutoMirrored.Outlined.Redo, contentDescription = "Refazer")
-            }
-            Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = "Mais opções") }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = Tone.SurfaceHigh) {
-                    DropdownMenuItem(text = { Text("Zerar todos os ajustes") }, onClick = {
-                        menu = false; settings = PresetSettings(settings.values.filterKeys { it in PresetSettings.META_KEYS }); commit()
-                    })
-                    if (target is EditTarget.PhotoTarget) {
-                        DropdownMenuItem(text = { Text("Aplicar às próximas fotos") }, onClick = {
-                            menu = false
-                            scope.launch {
-                                basePresetId?.let { app.settings.set(SettingKeys.sessionPresetId, it) }
-                                app.settings.set(SettingKeys.sessionAdjust, settings.encode())
-                            }
-                        })
-                        DropdownMenuItem(text = { Text("Salvar como preset") }, onClick = { menu = false; askName = "new-from-photo" })
-                    } else {
-                        DropdownMenuItem(text = { Text("Renomear") }, onClick = { menu = false; askName = "save" })
-                    }
-                }
-            }
-            IconButton(onClick = {
-                when (target) {
-                    is EditTarget.PresetTarget -> if (target.id == 0L) askName = "save" else scope.launch {
-                        app.presets.save(preset!!.copy(settings = settings)); onDone()
-                    }
-                    is EditTarget.PhotoTarget -> scope.launch { applyToPhoto(app, photo, basePresetId, settings); onDone() }
-                }
-            }) { Icon(Icons.Filled.Check, contentDescription = "Salvar", tint = Tone.Accent) }
-        }
-
-        Box(
-            Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .pointerInput(Unit) { detectTapGestures(onPress = { showOriginal = true; tryAwaitRelease(); showOriginal = false }) },
-            contentAlignment = Alignment.Center,
-        ) {
-            val shown = if (showOriginal) original else rendered ?: original
-            shown?.let { Image(it.asImageBitmap(), contentDescription = if (showOriginal) "Original" else "Com ajustes", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
-            if (!showOriginal) clipMask?.let { Image(it.asImageBitmap(), contentDescription = "Áreas estouradas", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
-            if (showOriginal) {
-                Text("Original", style = MaterialTheme.typography.labelMedium, color = Color.White,
-                    modifier = Modifier.align(Alignment.TopStart).padding(12.dp).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 8.dp, vertical = 2.dp))
-            }
-            if (!loaded || (busy && rendered == null)) CircularProgressIndicator(color = Tone.Info, modifier = Modifier.size(32.dp))
-        }
-
-        Column(Modifier.fillMaxWidth().background(Tone.Background).navigationBarsPadding()) {
-            if (target is EditTarget.PhotoTarget) {
-                val all by app.presets.presets.collectAsState(initial = emptyList())
-                PresetPicker(app, all, basePresetId, photo?.displayUri, onPick = { chosen ->
-                    basePresetId = chosen?.id
-                    settings = chosen?.settings ?: PresetSettings()
-                    commit()
-                })
-            }
-            ScrollableTabRow(
-                selectedTabIndex = tab.ordinal,
-                containerColor = Tone.Background,
-                contentColor = Tone.Text,
-                edgePadding = 8.dp,
-                indicator = { positions ->
-                    TabRowDefaults.SecondaryIndicator(Modifier.tabIndicatorOffset(positions[tab.ordinal]), color = Tone.Accent)
-                },
+    BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
+        // Lying down the photo keeps the full height on the left and the presets, tabs and sliders stand
+        // in a column on the right; standing, they sit under the photo as before.
+        val lying = maxWidth > maxHeight
+        val sideWidth = minOf(maxWidth * 0.42f, 400.dp)
+        val header: @Composable () -> Unit = {
+            Row(
+                Modifier.fillMaxWidth().background(Tone.Background).statusBarsPadding().padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                EditorTab.entries.forEach { t ->
-                    Tab(selected = tab == t, onClick = { tab = t }, text = { Text(t.label) },
-                        selectedContentColor = Tone.Text, unselectedContentColor = Tone.TextMuted)
+                IconButton(onClick = { if (dirty) confirmExit = true else onDone() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar") }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        when (target) {
+                            is EditTarget.PresetTarget -> preset?.name ?: "Preset"
+                            is EditTarget.PhotoTarget -> "Calibrar ${photo?.savedBase.orEmpty()}"
+                        },
+                        style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                    Text("Segure a foto: antes", style = MaterialTheme.typography.labelSmall, color = Tone.TextMuted)
+                }
+                IconButton(onClick = { showClipping = !showClipping }) {
+                    Icon(Icons.Outlined.WbSunny, contentDescription = if (showClipping) "Esconder estouro" else "Mostrar estouro", tint = if (showClipping) Tone.Info else Tone.TextMuted)
+                }
+                IconButton(enabled = historyIndex > 0, onClick = { historyIndex--; settings = history[historyIndex] }) {
+                    Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = "Desfazer")
+                }
+                IconButton(enabled = historyIndex < history.lastIndex, onClick = { historyIndex++; settings = history[historyIndex] }) {
+                    Icon(Icons.AutoMirrored.Outlined.Redo, contentDescription = "Refazer")
+                }
+                Box {
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = "Mais opções") }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = Tone.SurfaceHigh) {
+                        DropdownMenuItem(text = { Text("Zerar todos os ajustes") }, onClick = {
+                            menu = false; settings = PresetSettings(settings.values.filterKeys { it in PresetSettings.META_KEYS }); commit()
+                        })
+                        if (target is EditTarget.PhotoTarget) {
+                            DropdownMenuItem(text = { Text("Aplicar às próximas fotos") }, onClick = {
+                                menu = false
+                                scope.launch {
+                                    basePresetId?.let { app.settings.set(SettingKeys.sessionPresetId, it) }
+                                    app.settings.set(SettingKeys.sessionAdjust, settings.encode())
+                                }
+                            })
+                            DropdownMenuItem(text = { Text("Salvar como preset") }, onClick = { menu = false; askName = "new-from-photo" })
+                        } else {
+                            DropdownMenuItem(text = { Text("Renomear") }, onClick = { menu = false; askName = "save" })
+                        }
+                    }
+                }
+                IconButton(onClick = {
+                    when (target) {
+                        is EditTarget.PresetTarget -> if (target.id == 0L) askName = "save" else scope.launch {
+                            app.presets.save(preset!!.copy(settings = settings)); onDone()
+                        }
+                        is EditTarget.PhotoTarget -> scope.launch { applyToPhoto(app, photo, basePresetId, settings); onDone() }
+                    }
+                }) { Icon(Icons.Filled.Check, contentDescription = "Salvar", tint = Tone.Accent) }
+            }
+
+        }
+        val picture: @Composable (Modifier) -> Unit = { mod ->
+            Box(
+                mod
+                    .pointerInput(Unit) { detectTapGestures(onPress = { showOriginal = true; tryAwaitRelease(); showOriginal = false }) },
+                contentAlignment = Alignment.Center,
+            ) {
+                val shown = if (showOriginal) original else rendered ?: original
+                shown?.let { Image(it.asImageBitmap(), contentDescription = if (showOriginal) "Original" else "Com ajustes", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
+                if (!showOriginal) clipMask?.let { Image(it.asImageBitmap(), contentDescription = "Áreas estouradas", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
+                if (showOriginal) {
+                    Text("Original", style = MaterialTheme.typography.labelMedium, color = Color.White,
+                        modifier = Modifier.align(Alignment.TopStart).padding(12.dp).background(Tone.Scrim).padding(horizontal = 8.dp, vertical = 2.dp))
+                }
+                if (!loaded || (busy && rendered == null)) com.example.ui.components.BrandLoader(40.dp)
+            }
+
+        }
+        val controls: @Composable (Modifier, Boolean) -> Unit = { mod, tall ->
+            Column(mod.background(Tone.Background).navigationBarsPadding()) {
+                if (target is EditTarget.PhotoTarget) {
+                    val all by app.presets.presets.collectAsState(initial = emptyList())
+                    PresetPicker(app, all, basePresetId, photo?.displayUri, onPick = { chosen ->
+                        basePresetId = chosen?.id
+                        settings = chosen?.settings ?: PresetSettings()
+                        commit()
+                    })
+                }
+                ScrollableTabRow(
+                    selectedTabIndex = tab.ordinal,
+                    containerColor = Tone.Background,
+                    contentColor = Tone.Text,
+                    edgePadding = 8.dp,
+                    indicator = { positions ->
+                        TabRowDefaults.SecondaryIndicator(Modifier.tabIndicatorOffset(positions[tab.ordinal]), color = Tone.Accent)
+                    },
+                ) {
+                    EditorTab.entries.forEach { t ->
+                        Tab(selected = tab == t, onClick = { tab = t }, text = { Text(t.label) },
+                            selectedContentColor = Tone.Text, unselectedContentColor = Tone.TextMuted)
+                    }
+                }
+                // Beside the photo the sliders take what height is left; under it, a fixed 300 dp.
+                Column((if (tall) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth().height(300.dp)).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp)) {
+                    EditorPanel(tab, settings, onChange = { settings = it }, onCommit = ::commit)
+                    Spacer(Modifier.height(16.dp))
                 }
             }
-            Column(Modifier.fillMaxWidth().height(300.dp).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp)) {
-                EditorPanel(tab, settings, onChange = { settings = it }, onCommit = ::commit)
-                Spacer(Modifier.height(16.dp))
+        }
+        Column(Modifier.fillMaxSize()) {
+            header()
+            if (lying) {
+                Row(Modifier.weight(1f).fillMaxWidth()) {
+                    picture(Modifier.weight(1f).fillMaxHeight())
+                    controls(Modifier.width(sideWidth).fillMaxHeight(), true)
+                }
+            } else {
+                picture(Modifier.weight(1f).fillMaxWidth())
+                controls(Modifier.fillMaxWidth(), false)
             }
         }
     }
@@ -315,14 +338,7 @@ private fun clippingMask(bmp: Bitmap): Bitmap? {
 
 @Composable
 fun PresetChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label, maxLines = 1) },
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = Tone.SurfaceHigh, selectedLabelColor = Tone.Accent, labelColor = Tone.TextMuted,
-        ),
-    )
+    com.example.ui.components.JrChip(label, selected, onClick)
 }
 
 @Composable
@@ -418,7 +434,7 @@ private fun MixerPanel(s: PresetSettings, mono: Boolean, onChange: (PresetSettin
 @Composable
 private fun CurvePanel(s: PresetSettings, onChange: (PresetSettings) -> Unit, onCommit: () -> Unit) {
     var channel by remember { mutableIntStateOf(0) }
-    val channels = listOf("RGB" to Tone.Text, "Vermelho" to Color(0xFFE5484D), "Verde" to Color(0xFF46A758), "Azul" to Color(0xFF3E63DD))
+    val channels = listOf("RGB" to Tone.Text, "Vermelho" to Tone.Red, "Verde" to Tone.Green, "Azul" to Tone.Blue)
     PanelTitle("Curva de pontos")
     ChipRow {
         channels.forEachIndexed { i, (label, _) -> PresetChip(label, channel == i) { channel = i } }

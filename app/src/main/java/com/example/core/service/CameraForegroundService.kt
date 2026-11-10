@@ -17,10 +17,12 @@ import com.example.MainActivity
 import com.example.TetherApp
 import com.example.core.camera.ConnectionState
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
 
 /**
- * Keeps the tether alive with the screen off: a foreground notification plus a partial wake lock,
+ * Keeps the tether (and a session backup) alive with the screen off: a foreground notification plus a partial wake lock,
  * so event polling and downloads continue while the phone sits in a pocket or on a stand.
  */
 class CameraForegroundService : LifecycleService() {
@@ -39,18 +41,26 @@ class CameraForegroundService : LifecycleService() {
 
         val app = application as TetherApp
         lifecycleScope.launch {
-            combine(app.camera.state, app.tether.receivedThisSession, app.tether.transfer) { state, count, transfer ->
-                Triple(state, count, transfer)
-            }.collect { (state, count, transfer) ->
-                when (state) {
+            // The notification text changes in 20 % steps and at most twice a second: updating it for every
+            // USB chunk flooded Android (it rate-limits notifications) and kept the main thread busy.
+            combine(app.camera.state, app.tether.receivedThisSession, app.tether.transfer, app.backup.state) { state, count, transfer, backup ->
+                // A session backup keeps the service (and the wake lock) on by itself, so it finishes with the
+                // screen off or the camera already disconnected.
+                val copying = (backup as? com.example.core.backup.BackupState.Running)?.let { "Backup: ${it.done + 1} de ${it.total}" }
+                val camera = when (state) {
                     is ConnectionState.Connected -> {
-                        val text = transfer?.let { "Recebendo ${it.fileName} · ${(it.progress * 100).toInt()}%" }
+                        val text = transfer?.let { "Recebendo ${it.fileName} · ${(it.progress * 5).toInt() * 20}%" }
                             ?: "$count ${if (count == 1) "foto recebida" else "fotos recebidas"}"
-                        update("${state.model} · $text")
+                        "${state.model} · $text"
                     }
-                    ConnectionState.Connecting, ConnectionState.WaitingPermission -> update("Conectando à câmera…")
-                    else -> stopSelf()
+                    ConnectionState.Connecting, ConnectionState.WaitingPermission -> "Conectando à câmera…"
+                    // Stays in the foreground while it tries again, so Android doesn't close the app meanwhile.
+                    is ConnectionState.Reconnecting -> "Reconectando à câmera (tentativa ${state.attempt})…"
+                    else -> null
                 }
+                listOfNotNull(camera, copying).joinToString(" · ").ifEmpty { null }
+            }.distinctUntilChanged().sample(500).collect { text ->
+                if (text == null) stopSelf() else update(text)
             }
         }
     }
@@ -61,7 +71,8 @@ class CameraForegroundService : LifecycleService() {
     }
 
     private fun update(text: String) {
-        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text))
+        runCatching { getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text)) }
+            .onFailure { com.example.core.log.AppLog.e("SERVICO", "Notificação não atualizada", it) }
     }
 
     private fun notification(text: String) = NotificationCompat.Builder(this, CHANNEL_ID)

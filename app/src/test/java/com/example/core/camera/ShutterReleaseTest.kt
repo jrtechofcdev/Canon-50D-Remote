@@ -49,4 +49,35 @@ class ShutterReleaseTest {
         }
         assertEquals(1, t.written.size)
     }
+
+    @Test
+    fun aCameraStuckBusyGetsOneRecoveryAndTheLogSaysWhy() = runTest {
+        // Like the 5.0 log after live view: only "busy" for a while, then the shot.
+        val t = FakeTransport()
+        repeat(7) { t.queueResponse(PtpResponse.DEVICE_BUSY, it + 1) }
+        t.queueResponse(PtpResponse.OK, 8, 0)
+        var recoveries = 0
+        var line = ""
+        ShutterRelease.fire(PtpSession(t), remoteRelease = true, waitMs = 5_000, onStuck = { recoveries++ }, report = { line = it })
+        assertEquals(1, recoveries)
+        assertEquals(8, t.written.size)
+        assertTrue(line, line.startsWith("8 tentativa(s)"))
+        assertTrue(line, line.contains("ocupada (0x2019) ×7"))
+        assertTrue(line, line.contains("recuperação"))
+        assertTrue(line, line.endsWith("disparou"))
+    }
+
+    @Test
+    fun aFailedShotStillReportsTheAnswers() = runTest {
+        val t = FakeTransport()
+        repeat(4) { t.queueResponse(PtpResponse.NOT_READY, it + 1) }
+        var line = ""
+        try {
+            ShutterRelease.fire(PtpSession(t), remoteRelease = true, waitMs = 1_000, report = { line = it })
+            fail("expected a failure")
+        } catch (e: PtpException) {
+            assertTrue(e.message!!.contains("ocupada"))
+        }
+        assertTrue(line, line.contains("não pronta (0xA102) ×4"))
+    }
 }

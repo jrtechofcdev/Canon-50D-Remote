@@ -38,6 +38,8 @@ import com.example.ui.components.SectionLabel
 import com.example.ui.theme.ReadoutStyle
 import com.example.ui.theme.Tone
 import kotlin.math.roundToInt
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.selection.toggleable
 
 /** A titled block of related options, with an icon so each block is found at a glance. */
 @Composable
@@ -47,7 +49,7 @@ fun SettingsGroup(title: String, icon: ImageVector? = null, content: @Composable
         SectionLabel(title)
     } else {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = Tone.Accent, modifier = Modifier.size(16.dp))
+            Icon(icon, contentDescription = null, tint = Tone.TextMuted, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
             SectionLabel(title)
         }
@@ -57,6 +59,8 @@ fun SettingsGroup(title: String, icon: ImageVector? = null, content: @Composable
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
             .background(Tone.Surface)
+            // Options that appear when a switch turns on slide the group open instead of jumping.
+            .animateContentSize(androidx.compose.animation.core.spring(dampingRatio = 0.9f, stiffness = 400f))
             .padding(horizontal = 12.dp, vertical = 4.dp),
         content = content,
     )
@@ -69,11 +73,12 @@ fun ToggleRow(title: String, detail: String?, checked: Boolean, enabled: Boolean
 /** A switch with its icon on the left, so the option is recognised before reading it. */
 @Composable
 fun ToggleRow(icon: ImageVector?, title: String, detail: String?, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+    // The whole row is one switch for TalkBack: read once with its state, toggled with one double tap.
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .clickable(enabled = enabled) { onChange(!checked) }
+            .toggleable(value = checked, enabled = enabled, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = onChange)
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -84,7 +89,7 @@ fun ToggleRow(icon: ImageVector?, title: String, detail: String?, checked: Boole
         }
         Switch(
             checked = checked,
-            onCheckedChange = onChange,
+            onCheckedChange = null,
             enabled = enabled,
             colors = SwitchDefaults.colors(checkedTrackColor = Tone.Accent, checkedThumbColor = Tone.OnAccent),
         )
@@ -107,6 +112,9 @@ fun SliderRow(
 ) {
     var dragging by remember(value) { mutableFloatStateOf(value.toFloat()) }
     val shown = (dragging / step).roundToInt() * step
+    // A light tick on every step while dragging, so the value is felt as well as seen.
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    var lastStep by remember(value) { androidx.compose.runtime.mutableIntStateOf(value) }
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             icon?.let { RowIcon(it, enabled) }
@@ -115,7 +123,14 @@ fun SliderRow(
         }
         Slider(
             value = dragging,
-            onValueChange = { dragging = it },
+            onValueChange = {
+                dragging = it
+                val now = (it / step).roundToInt() * step
+                if (now != lastStep) {
+                    lastStep = now
+                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                }
+            },
             onValueChangeFinished = { onChange(shown.coerceIn(range)) },
             valueRange = range.first.toFloat()..range.last.toFloat(),
             steps = ((range.last - range.first) / step - 1).coerceAtLeast(0),
@@ -141,27 +156,9 @@ fun <T> ChoiceRow(title: String, options: List<Pair<T, String>>, selected: T, en
             Text(title, style = MaterialTheme.typography.bodyLarge, color = if (enabled) Tone.Text else Tone.TextMuted)
         }
         Spacer(Modifier.height(6.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             options.forEach { (value, label) ->
-                val isSelected = value == selected
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { onPick(value) },
-                    enabled = enabled,
-                    label = { Text(label) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Tone.SurfaceHigh,
-                        selectedLabelColor = Tone.Accent,
-                        labelColor = Tone.TextMuted,
-                    ),
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = enabled,
-                        selected = isSelected,
-                        borderColor = Tone.Line,
-                        selectedBorderColor = Tone.Accent,
-                        selectedBorderWidth = 1.dp,
-                    ),
-                )
+                com.example.ui.components.JrChip(label, value == selected, { onPick(value) }, enabled = enabled)
             }
         }
     }
@@ -169,7 +166,7 @@ fun <T> ChoiceRow(title: String, options: List<Pair<T, String>>, selected: T, en
 
 @Composable
 private fun RowIcon(icon: ImageVector, on: Boolean) {
-    Icon(icon, contentDescription = null, tint = if (on) Tone.Accent else Tone.TextMuted, modifier = Modifier.padding(end = 14.dp).size(22.dp))
+    Icon(icon, contentDescription = null, tint = if (on) Tone.Text else Tone.TextMuted, modifier = Modifier.padding(end = 14.dp).size(22.dp))
 }
 
 @Composable

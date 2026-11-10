@@ -16,13 +16,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.WifiTethering
+import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Alignment
-import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Style
+import androidx.compose.material.icons.outlined.FactCheck
+import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.outlined.Calculate
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Flag
@@ -88,31 +92,70 @@ import com.example.ui.PhotoActions
 import com.example.ui.ShareSet
 import com.example.ui.theme.Tone
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.outlined.Swipe
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Crop
+import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.ui.graphics.graphicsLayer
+import com.example.ui.components.pressScale
+import androidx.compose.foundation.border
+import com.example.ui.theme.Space
+import com.example.ui.components.JrBanner
+import com.example.ui.components.BannerKind
+import com.example.ui.components.JrButton
+import com.example.ui.components.JrButtonKind
+import com.example.ui.components.JrTile
 
 /** Shown when the card has frames shot while the cable was out and "perguntar antes" is on. */
 @Composable
 fun PendingBanner(count: Int, onDownload: () -> Unit, onDismiss: () -> Unit) {
     if (count == 0) return
-    Spacer(Modifier.height(12.dp))
-    Column(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(Tone.Surface).padding(12.dp),
+    Spacer(Modifier.height(Space.m))
+    JrBanner(
+        BannerKind.Warning,
+        if (count == 1) "1 foto ainda no cartão" else "$count fotos ainda no cartão",
+        text = "Feitas com o cabo solto. Ainda não vieram para o celular.",
     ) {
-        Text(
-            if (count == 1) "1 foto no cartão ainda não veio para o celular" else "$count fotos no cartão ainda não vieram para o celular",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-            Button(
-                onClick = onDownload,
-                colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
-            ) { Text("Baixar agora") }
-            TextButton(onClick = onDismiss) { Text("Ignorar") }
-        }
+        JrButton("Baixar agora", onDownload)
+        JrButton("Ignorar", onDismiss, kind = JrButtonKind.Ghost)
+    }
+}
+
+/**
+ * A save failure that stays on screen: the message at the bottom used to be replaced by the next blurry
+ * photo warning in a burst, and the photographer kept shooting into a full phone.
+ */
+@Composable
+fun SaveProblemBanner(problem: com.example.core.tether.SaveProblem?, onOpenSettings: () -> Unit, onDismiss: () -> Unit) {
+    if (problem == null) return
+    Spacer(Modifier.height(Space.m))
+    JrBanner(
+        BannerKind.Error,
+        problem.reason.title,
+        text = (if (problem.count == 1) "${problem.lastFile} não foi salva no celular. " else "${problem.count} fotos não foram salvas (a última: ${problem.lastFile}). ") +
+            problem.reason.action,
+    ) {
+        JrButton("Abrir Salvamento", onOpenSettings, kind = JrButtonKind.Secondary)
+        JrButton("Fechar", onDismiss, kind = JrButtonKind.Ghost)
     }
 }
 
 /** One tool: an icon in a tile with its name under it, and what it is set to (in mint) when that matters. */
-private data class ToolItem(val icon: ImageVector, val label: String, val value: String? = null, val enabled: Boolean = true, val onClick: () -> Unit)
+private data class ToolItem(
+    val icon: ImageVector,
+    val label: String,
+    val value: String? = null,
+    val enabled: Boolean = true,
+    /** Drawn instead of [icon], for marks that are not icons (the Lightroom "Lr"). */
+    val mark: (@Composable () -> Unit)? = null,
+    val onClick: () -> Unit,
+)
 
 /**
  * The Session's tools in three groups, so each one is found by where it lives, not by reading a
@@ -138,27 +181,68 @@ fun ToolsRow(
     onLive: () -> Unit = {},
     profile: String = "",
     onProfile: () -> Unit = {},
+    hasLatest: Boolean = false,
+    latestName: String? = null,
+    onEditLatest: () -> Unit = {},
+    onCropLatest: () -> Unit = {},
+    onWhatsAppLatest: () -> Unit = {},
+    onLightroomLatest: () -> Unit = {},
+    onNoteLatest: () -> Unit = {},
+    onShop: (() -> Unit)? = null,
+    onPresetsTab: () -> Unit = {},
+    onCull: () -> Unit = {},
+    onFolders: () -> Unit = {},
+    onMessages: () -> Unit = {},
+    onLog: () -> Unit = {},
+    onDelivery: (() -> Unit)? = null,
+    deliveryState: String? = null,
+    onDeliverLatest: (() -> Unit)? = null,
+    onExpress: (() -> Unit)? = null,
+    expressState: String? = null,
+    onExpressLatest: (() -> Unit)? = null,
 ) {
     val camera = buildList {
         if (settings.liveViewEnabled) add(ToolItem(Icons.Outlined.Videocam, "Live view", enabled = connected, onClick = onLive))
         if (settings.presetsEnabled) add(ToolItem(Icons.Outlined.Tune, "Exposições", enabled = connected, onClick = onPresets))
-        if (settings.aebEnabled) add(ToolItem(Icons.Outlined.Exposure, "Bracketing", bracket?.let { "${it.shot}/${it.total}" } ?: "${settings.aebShots}×", connected && bracket == null, onBracket))
+        if (settings.aebEnabled) add(ToolItem(Icons.Outlined.Exposure, "Bracketing", bracket?.let { "${it.shot}/${it.total}" } ?: "${settings.aebShots}×", connected && bracket == null, onClick = onBracket))
         if (settings.cardBrowserEnabled) add(ToolItem(Icons.Outlined.SdCard, "Cartão", enabled = connected, onClick = onCard))
     }
     val session = buildList {
-        add(ToolItem(Icons.Outlined.AutoAwesome, "Look", sessionLook ?: "nenhum", onClick = onLook))
+        add(ToolItem(Icons.Outlined.Style, "Look", sessionLook ?: "nenhum", onClick = onLook))
         if (settings.momentsEnabled) add(ToolItem(Icons.Outlined.Flag, "Momento", settings.currentMoment.ifBlank { null }, onClick = onMoment))
         add(ToolItem(Icons.Outlined.SettingsSuggest, "Perfil", profile.ifBlank { null }, onClick = onProfile))
+        add(ToolItem(Icons.Outlined.Swipe, "Culling", onClick = onCull))
+        add(ToolItem(Icons.Outlined.FolderOpen, "Pastas", onClick = onFolders))
         if (settings.sessionSummary && hasSessionPhotos) add(ToolItem(Icons.Outlined.Summarize, "Finalizar", onClick = onSummary))
     }
+    // The last photo that arrived, one tap from each thing done to it between shots.
+    val latest = buildList {
+        add(ToolItem(Icons.Outlined.Tune, "Editar", enabled = hasLatest, onClick = onEditLatest))
+        add(ToolItem(Icons.Outlined.Crop, "Recortar", enabled = hasLatest, onClick = onCropLatest))
+        add(ToolItem(Icons.AutoMirrored.Outlined.Send, "WhatsApp", enabled = hasLatest, onClick = onWhatsAppLatest))
+        add(ToolItem(Icons.Outlined.PhotoLibrary, "Lightroom", enabled = hasLatest, mark = @Composable { com.example.ui.photos.LightroomMark() }, onClick = onLightroomLatest))
+        if (settings.notesEnabled) add(ToolItem(Icons.Outlined.EditNote, "Nota", enabled = hasLatest, onClick = onNoteLatest))
+        onDeliverLatest?.let { add(ToolItem(Icons.Outlined.WifiTethering, "Entregar", enabled = hasLatest, onClick = it)) }
+        onExpressLatest?.let { add(ToolItem(Icons.Outlined.Collections, "Express", enabled = hasLatest, onClick = it)) }
+    }
+    val looks = buildList {
+        onShop?.let { add(ToolItem(Icons.Outlined.Storefront, "Loja", onClick = it)) }
+        add(ToolItem(Icons.Outlined.Style, "Presets", onClick = onPresetsTab))
+    }
     val extras = buildList {
+        onDelivery?.let { add(ToolItem(Icons.Outlined.WifiTethering, "Entrega", deliveryState, onClick = it)) }
+        onExpress?.let { add(ToolItem(Icons.Outlined.Collections, "Express", expressState, onClick = it)) }
         if (settings.clientModeEnabled) add(ToolItem(Icons.Outlined.Slideshow, "Modo cliente", onClick = onClient))
         if (settings.toolsEnabled) add(ToolItem(Icons.Outlined.Calculate, "Flash e foco", onClick = onTools))
         add(ToolItem(Icons.Outlined.Bedtime, if (settings.nightMode) "Modo normal" else "Modo noite", onClick = onNight))
+        add(ToolItem(Icons.AutoMirrored.Outlined.Chat, "Mensagens", onClick = onMessages))
+        add(ToolItem(Icons.Outlined.BugReport, "Log", onClick = onLog))
     }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         ToolGroup(Icons.Outlined.CameraAlt, "Câmera", camera)
+        ToolGroup(Icons.Outlined.Image, latestName?.let { "Última foto · $it" } ?: "Última foto", latest)
         ToolGroup(Icons.Outlined.Folder, "Sessão", session)
+        ToolGroup(Icons.Outlined.Style, "Presets", looks)
         ToolGroup(Icons.Outlined.Person, "Cliente e extras", extras)
     }
 }
@@ -167,18 +251,24 @@ fun ToolsRow(
 private fun ToolGroup(icon: ImageVector, title: String, items: List<ToolItem>) {
     if (items.isEmpty()) return
     Column(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(Tone.Surface).padding(horizontal = 8.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(Tone.Surface).padding(horizontal = Space.s, vertical = Space.m),
     ) {
-        Row(Modifier.padding(start = 6.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = Tone.Accent, modifier = Modifier.size(14.dp))
+        Row(Modifier.padding(start = Space.s, bottom = Space.s), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = Tone.TextMuted, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(6.dp))
-            Text(title.uppercase(), style = MaterialTheme.typography.labelSmall, color = Tone.TextMuted)
+            Text(title, style = MaterialTheme.typography.labelMedium, color = Tone.TextMuted)
         }
-        // Four per row, always the same width, so the grid lines up from group to group.
-        items.chunked(4).forEach { row ->
-            Row(Modifier.fillMaxWidth()) {
-                row.forEach { item -> ToolTile(item, Modifier.weight(1f)) }
-                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+        // As many per row as fit at about 84 dp each (3 on a narrow phone, up to 6 on a wide screen), the
+        // same in every group so the grid lines up from one group to the next.
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val columns = (maxWidth / 84.dp).toInt().coerceIn(3, 6)
+            Column {
+                items.chunked(columns).forEach { row ->
+                    Row(Modifier.fillMaxWidth()) {
+                        row.forEach { item -> ToolTile(item, Modifier.weight(1f)) }
+                        repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
             }
         }
     }
@@ -186,30 +276,7 @@ private fun ToolGroup(icon: ImageVector, title: String, items: List<ToolItem>) {
 
 @Composable
 private fun ToolTile(item: ToolItem, modifier: Modifier) {
-    val alpha = if (item.enabled) 1f else 0.38f
-    Column(
-        modifier.clip(MaterialTheme.shapes.small).clickable(enabled = item.enabled, onClick = item.onClick).padding(vertical = 6.dp, horizontal = 2.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            Modifier.size(48.dp).clip(MaterialTheme.shapes.medium).background(Tone.SurfaceHigh),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(item.icon, contentDescription = null, tint = Tone.Text.copy(alpha = alpha), modifier = Modifier.size(24.dp))
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            item.label,
-            style = MaterialTheme.typography.labelMedium,
-            color = Tone.Text.copy(alpha = alpha),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
-        item.value?.let {
-            Text(it, style = MaterialTheme.typography.labelSmall, color = Tone.Accent, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-        }
-    }
+    JrTile(item.icon, item.label, item.onClick, modifier, enabled = item.enabled, value = item.value, mark = item.mark)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -294,7 +361,15 @@ private fun describe(p: ExposurePreset) = listOfNotNull(
 
 /** End-of-session recap with one-tap delivery of the picks to Lightroom. */
 @Composable
-fun SessionSummaryDialog(app: TetherApp, actions: PhotoActions, settings: Settings, onEnd: () -> Unit, onDismiss: () -> Unit) {
+fun SessionSummaryDialog(
+    app: TetherApp,
+    actions: PhotoActions,
+    settings: Settings,
+    connected: Boolean,
+    onDisconnect: () -> Unit,
+    onNewSession: () -> Unit,
+    onDismiss: () -> Unit,
+) {
     val scope = rememberCoroutineScope()
     val photos by produceState<List<Photo>?>(null, settings.sessionKey) {
         value = app.database.photoDao().inSession(settings.sessionKey)
@@ -337,17 +412,21 @@ fun SessionSummaryDialog(app: TetherApp, actions: PhotoActions, settings: Settin
                     OutlinedButton(
                         onClick = {
                             scope.launch {
-                                var done = 0
-                                withContext(Dispatchers.IO) {
-                                    picks.forEach { p ->
-                                        listOfNotNull(p.jpgUri, p.rawUri, p.editedUri).forEach { uri ->
-                                            copying = "Copiando ${++done}…"
-                                            runCatching { app.store.copy(uri, FileKind.SELECTED, settings) }
-                                        }
+                                val files = picks.flatMap { p -> listOfNotNull(p.jpgUri, p.rawUri, p.editedUri) }
+                                // Only what really got there counts: a file that failed used to be counted too.
+                                val copied = withContext(Dispatchers.IO) {
+                                    copyAll(files) { i ->
+                                        copying = "Copiando ${i + 1} de ${files.size}…"
+                                        app.store.copy(files[i], FileKind.SELECTED, settings)
                                     }
                                 }
                                 copying = null
-                                Toast.makeText(context, "$done arquivo(s) na pasta Escolhidas", Toast.LENGTH_LONG).show()
+                                val failed = files.size - copied
+                                Toast.makeText(
+                                    context,
+                                    if (failed == 0) "$copied arquivo(s) na pasta Escolhidas" else "$copied de ${files.size} copiados. $failed falharam; veja o log em Ajustes → Diagnóstico.",
+                                    Toast.LENGTH_LONG,
+                                ).show()
                             }
                         },
                         enabled = copying == null,
@@ -362,6 +441,9 @@ fun SessionSummaryDialog(app: TetherApp, actions: PhotoActions, settings: Settin
                     Text("Mensagem para o cliente")
                 }
                 BackupPanel(app, settings)
+                if (connected) {
+                    OutlinedButton(onClick = onDisconnect, modifier = Modifier.fillMaxWidth()) { Text("Desconectar a câmera") }
+                }
                 val sendSet = if (settings.downloadMode.raw) ShareSet.RAW else ShareSet.JPG
                 OutlinedButton(
                     onClick = { scope.launch { actions.openInLightroom(favorites, sendSet, settings) } },
@@ -377,11 +459,12 @@ fun SessionSummaryDialog(app: TetherApp, actions: PhotoActions, settings: Settin
                 }
             }
         },
+        // The next client starts here: a new name, so their photos never mix with this session's.
         confirmButton = {
             Button(
-                onClick = onEnd,
+                onClick = onNewSession,
                 colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
-            ) { Text("Encerrar conexão") }
+            ) { Text("Encerrar e começar nova") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Continuar fotografando") } },
     )
@@ -402,16 +485,17 @@ private fun BackupPanel(app: TetherApp, settings: Settings) {
         Text("Escolha a pasta de backup em Ajustes → Salvamento (cartão SD ou pendrive OTG).", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
         return
     }
-    when (val s = state) {
+    // A result from another session (the one before) is not this session's backup.
+    val mine = when (val s = state) {
+        is BackupState.Running -> s
+        is BackupState.Finished -> s.takeIf { it.session == settings.sessionKey } ?: BackupState.Idle
+        BackupState.Idle -> s
+    }
+    when (val s = mine) {
         is BackupState.Running -> {
             Text("Copiando ${s.done + 1} de ${s.total}…", style = MaterialTheme.typography.bodySmall)
-            LinearProgressIndicator(
-                progress = { if (s.total == 0) 0f else (s.done + 1f) / s.total },
-                modifier = Modifier.fillMaxWidth(),
-                color = Tone.Info,
-                trackColor = Tone.SurfaceHigh,
-            )
-            Text("Deixe o app aberto até terminar.", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+            com.example.ui.components.BrandLoader(32.dp, progress = if (s.total == 0) 0f else (s.done + 1f) / s.total)
+            Text("Continua com a tela apagada; o andamento fica na notificação.", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
         }
         is BackupState.Finished -> {
             val ok = s.failed.isEmpty()
@@ -448,3 +532,7 @@ private fun SummaryLine(label: String, value: String) {
         Text(value, style = MaterialTheme.typography.labelLarge)
     }
 }
+
+/** Runs [copy] for each of [count] files and returns how many worked; a failure doesn't stop the rest. */
+internal inline fun copyAll(files: List<String>, copy: (Int) -> Unit): Int =
+    files.indices.count { i -> runCatching { copy(i) }.isSuccess }

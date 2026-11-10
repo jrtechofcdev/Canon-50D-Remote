@@ -97,8 +97,9 @@ fun LiveOptionsSheet(app: TetherApp, s: Settings, presets: List<Preset>, onDismi
             Label("Silêncio e foco")
             Toggle(Icons.Outlined.VolumeOff, "AF silencioso (Modo Live)", s.liveSilentAf) { set(SettingKeys.liveSilentAf, it) }
             Text(
-                "O barulho vem do espelho: no Modo rápido ele desce a cada foco. O app pede o Modo Live (foco pelo sensor, sem espelho). " +
-                    "Se a 50D não aceitar pelo cabo, escolha na câmera: Menu → Live View → Modo AF: Modo Live, e Disparo silencioso: Modo 1.",
+                "Desligado (padrão): Modo rápido, o foco mais certeiro da 50D; o espelho desce a cada foco e faz barulho. " +
+                    "Ligado: Modo Live, foco pelo sensor sem o espelho, mais silencioso e mais lento (até 3 s, e pode falhar com pouca luz). " +
+                    "Na câmera, deixe Disparo silencioso em Modo 1 (Modo 2 e Desativado atrapalham o disparo pelo cabo).",
                 style = MaterialTheme.typography.bodySmall,
                 color = Tone.TextMuted,
             )

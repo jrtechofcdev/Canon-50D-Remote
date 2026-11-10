@@ -14,6 +14,9 @@ import androidx.room.RoomDatabase
 import androidx.room.Update
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.core.delivery.DeliveryDao
+import com.example.core.delivery.DeliveryItem
+import com.example.core.delivery.DeliverySession
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -96,6 +99,10 @@ interface PhotoDao {
     @Query("SELECT COUNT(*) FROM photos WHERE session = :session")
     suspend fun countInSession(session: String): Int
 
+    /** Session names, the most recently used first. */
+    @Query("SELECT session FROM photos GROUP BY session ORDER BY MAX(capturedAt) DESC LIMIT :limit")
+    suspend fun recentSessions(limit: Int): List<String>
+
     @Insert
     suspend fun insert(photo: Photo): Long
 
@@ -113,6 +120,9 @@ interface PhotoDao {
 
     @Query("SELECT * FROM photos WHERE session = :session ORDER BY capturedAt ASC")
     suspend fun inSession(session: String): List<Photo>
+
+    @Query("SELECT * FROM photos WHERE session = :session AND capturedAt BETWEEN :from AND :to ORDER BY capturedAt ASC")
+    suspend fun inSessionBetween(session: String, from: Long, to: Long): List<Photo>
 
     @Query("UPDATE photos SET presetId = :presetId, adjust = :adjust WHERE id = :id")
     suspend fun setLook(id: Long, presetId: Long?, adjust: String?)
@@ -163,6 +173,13 @@ interface PhotoDao {
 
     @Query("SELECT rawCameraName FROM photos WHERE rawCameraName IS NOT NULL UNION SELECT jpgCameraName FROM photos WHERE jpgCameraName IS NOT NULL")
     suspend fun knownCameraNames(): List<String>
+
+    /** The camera's file names already saved in one session (numbers repeat after 9999, so never across sessions). */
+    @Query("SELECT rawCameraName FROM photos WHERE session = :session AND rawCameraName IS NOT NULL UNION SELECT jpgCameraName FROM photos WHERE session = :session AND jpgCameraName IS NOT NULL")
+    suspend fun cameraNamesIn(session: String): List<String>
+
+    @Query("SELECT COUNT(*) FROM photos WHERE session = :session AND (rawCameraName = :name OR jpgCameraName = :name)")
+    suspend fun countCameraName(session: String, name: String): Int
 }
 
 @Entity(tableName = "presets")
@@ -223,16 +240,21 @@ interface PresetDao {
     suspend fun detachFromPhotos(id: Long)
 }
 
-@Database(entities = [Photo::class, PresetEntity::class], version = 7, exportSchema = false)
+@Database(
+    entities = [Photo::class, PresetEntity::class, DeliverySession::class, DeliveryItem::class],
+    version = 10,
+    exportSchema = false,
+)
 abstract class PhotoDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
     abstract fun presetDao(): PresetDao
+    abstract fun deliveryDao(): DeliveryDao
 
     companion object {
         /** [name] is only changed by tests, which must not share the file the app itself opens. */
         fun create(context: Context, name: String = "tether50d.db"): PhotoDatabase =
             Room.databaseBuilder(context, PhotoDatabase::class.java, name)
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                 // Version 1 only ever held simulator entries, so dropping it loses nothing real.
                 .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1)
                 .build()
@@ -251,6 +273,43 @@ abstract class PhotoDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE presets ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE presets ADD COLUMN lastUsed INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /** Entrega local: client sessions and the queue of photos for each one. Photos and presets are untouched. */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `delivery_sessions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`client` TEXT NOT NULL, `phone` TEXT, `code` TEXT NOT NULL, `token` TEXT NOT NULL, `event` INTEGER NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL, `expiresAt` INTEGER NOT NULL, `closedAt` INTEGER, `lastSeenAt` INTEGER NOT NULL)",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `delivery_items` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`sessionId` INTEGER NOT NULL, `photoId` INTEGER NOT NULL, `name` TEXT NOT NULL, `state` TEXT NOT NULL, " +
+                        "`path` TEXT, `size` INTEGER NOT NULL, `downloads` INTEGER NOT NULL, `error` TEXT, `queuedAt` INTEGER NOT NULL, " +
+                        "`readyAt` INTEGER, `picked` INTEGER NOT NULL)",
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_delivery_items_sessionId_photoId` ON `delivery_items` (`sessionId`, `photoId`)")
+            }
+        }
+
+        /** Fotografia Express: the open-to-all session and the photos released after payment. */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE delivery_sessions ADD COLUMN express INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE delivery_items ADD COLUMN released INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /** Versions: the same photo can go to a client more than once, each time with another look. */
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE delivery_items ADD COLUMN variant INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE delivery_items ADD COLUMN look TEXT")
+                db.execSQL("ALTER TABLE delivery_items ADD COLUMN label TEXT")
+                db.execSQL("DROP INDEX IF EXISTS `index_delivery_items_sessionId_photoId`")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_delivery_items_sessionId_photoId_variant` ON `delivery_items` (`sessionId`, `photoId`, `variant`)")
             }
         }
 

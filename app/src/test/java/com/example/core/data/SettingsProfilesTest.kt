@@ -90,4 +90,38 @@ class SettingsProfilesTest {
         assertTrue(restored.favorite)
         assertEquals(1, report.presets)
     }
+
+    @Test
+    fun backupLeavesSecretsOutUnlessAskedAndRestoreKeepsThePhonesOwn() = runBlocking {
+        val app = ApplicationProvider.getApplicationContext<com.example.TetherApp>()
+        app.settings.set(SettingKeys.pixKey, "jr.tech.ofc@gmail.com")
+        app.settings.set(SettingKeys.clientPin, "4321")
+        val plain = app.appBackup.export("4.5")
+        assertFalse(plain.contains("jr.tech.ofc@gmail.com"))
+        // By the key's name: the four digits alone can turn up inside the file's timestamp or an id.
+        assertFalse(plain.contains("\"${SettingKeys.clientPin.name}\""))
+        assertTrue(app.appBackup.export("4.5", includeSecrets = true).contains("jr.tech.ofc@gmail.com"))
+
+        // Restoring a file without them leaves this phone's own Pix key and PIN where they are.
+        app.appBackup.restore(plain)
+        assertEquals("jr.tech.ofc@gmail.com", app.settings.current().pixKey)
+        assertEquals("4321", app.settings.current().clientPin)
+    }
+
+    @Test
+    fun aValueOfTheWrongTypeIsTurnedAway() = runBlocking {
+        assertTrue(SettingsProfiles.typeFits("night_mode", true))
+        assertFalse(SettingsProfiles.typeFits("night_mode", "sim"))
+        assertTrue(SettingsProfiles.typeFits("night_brightness", 30))
+        assertFalse(SettingsProfiles.typeFits("night_brightness", 30L))
+        assertTrue(SettingsProfiles.typeFits("unknown_option", 5))
+
+        // A hand-edited backup with a text where a number goes no longer breaks every later read.
+        val repo = SettingsRepository(ApplicationProvider.getApplicationContext<Context>())
+        val before = repo.current().nightBrightness
+        repo.apply(mapOf("night_brightness" to "muito", "gallery_thumb" to 140))
+        val s = repo.current()
+        assertEquals(140, s.galleryThumb)
+        assertEquals(before, s.nightBrightness)
+    }
 }

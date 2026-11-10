@@ -81,8 +81,8 @@ fun PresetPicker(
             else -> it.group == category
         }
     }.forPicking()
-    val label = if (onDark) Color.White else Tone.Text
-    val muted = if (onDark) Color.White.copy(alpha = 0.6f) else Tone.TextMuted
+    val label = if (onDark) Tone.OnPhoto else Tone.Text
+    val muted = if (onDark) Tone.OnPhoto.copy(alpha = 0.6f) else Tone.TextMuted
 
     Column(modifier) {
         if (showCategories && (categories.size > 1 || hasFavorites)) {
@@ -108,7 +108,7 @@ fun PresetPicker(
                     onClick = { onPick(null) },
                     onLongClick = null,
                 ) {
-                    Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) {
+                    Box(Modifier.fillMaxSize().background(Tone.OnPhoto.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) {
                         Icon(Icons.Outlined.Block, contentDescription = null, tint = muted)
                     }
                 }
@@ -143,26 +143,32 @@ private fun Tile(
             Modifier
                 .size(64.dp)
                 .clip(MaterialTheme.shapes.small)
-                .then(if (selected) Modifier.border(2.dp, Tone.Accent, MaterialTheme.shapes.small) else Modifier)
+                // Chosen look: a light frame on the picture and the mint block before its name (the app's one sign).
+                .then(if (selected) Modifier.border(2.dp, Tone.Text, MaterialTheme.shapes.small) else Modifier)
                 .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         ) {
             picture()
             if (favorite) {
                 Icon(
-                    Icons.Filled.Star, contentDescription = "Favorito", tint = Tone.Accent,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(2.dp).size(16.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape).padding(1.dp),
+                    Icons.Filled.Star, contentDescription = "Favorito", tint = Tone.OnPhoto,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(2.dp).size(16.dp).background(Tone.Scrim, CircleShape).padding(1.dp),
                 )
             }
         }
-        Text(
-            name,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (selected) Tone.Accent else label,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 2.dp),
-        )
+        Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (selected) {
+                com.example.ui.components.StatusMark(Tone.Accent, height = 9.dp)
+                androidx.compose.foundation.layout.Spacer(Modifier.width(3.dp))
+            }
+            Text(
+                name,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (selected) Tone.Text else label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 
@@ -172,31 +178,15 @@ private fun Thumb(app: TetherApp, preset: Preset, sourceUri: String?) {
     LaunchedEffect(sourceUri, preset.settings) {
         bitmap = sourceUri?.let { runCatching { app.looks.thumb(it, preset.settings) }.getOrNull() }
     }
-    Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.08f))) {
+    Box(Modifier.fillMaxSize().background(Tone.OnPhoto.copy(alpha = 0.08f))) {
         bitmap?.let { Image(it.asImageBitmap(), contentDescription = preset.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
     }
 }
 
 @Composable
 private fun CategoryChip(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector?, selected: Boolean, onDark: Boolean, onClick: () -> Unit) {
-    val bg = when {
-        selected -> Tone.Accent
-        onDark -> Color.White.copy(alpha = 0.12f)
-        else -> Tone.SurfaceHigh
-    }
-    val fg = when {
-        selected -> Tone.OnAccent
-        onDark -> Color.White
-        else -> Tone.Text
-    }
-    Row(
-        Modifier.clip(CircleShape).background(bg).combinedClickableCompat(onClick).padding(horizontal = 10.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        icon?.let { Icon(it, contentDescription = null, tint = fg, modifier = Modifier.size(14.dp)) }
-        Text(text, style = MaterialTheme.typography.labelMedium, color = fg, maxLines = 1)
-    }
+    if (onDark) com.example.ui.components.PhotoChip(text, selected, onClick, icon = icon)
+    else com.example.ui.components.JrChip(text, selected, onClick, icon = icon)
 }
 
 @OptIn(ExperimentalFoundationApi::class)

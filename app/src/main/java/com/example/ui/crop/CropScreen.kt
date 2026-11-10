@@ -83,6 +83,10 @@ import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.hypot
 import kotlin.math.min
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clipToBounds
 
 private enum class CropTab(val label: String) { Ratio("Proporção"), Straighten("Endireitar"), Turn("Girar") }
 private enum class Grid(val label: String) { Thirds("Terços"), Golden("Áurea"), Fine("Grade fina"), None("Sem grade") }
@@ -106,6 +110,9 @@ fun CropScreen(app: TetherApp, photoId: Long, onDone: () -> Unit) {
     var drawHorizon by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
+    // What the crop was when the screen opened: leaving with changes asks first, like the editor.
+    var opened by remember { mutableStateOf<CropSpec?>(null) }
+    var confirmExit by remember { mutableStateOf(false) }
 
     LaunchedEffect(photoId) {
         val p = app.database.photoDao().get(photoId) ?: return@LaunchedEffect
@@ -120,7 +127,10 @@ fun CropScreen(app: TetherApp, photoId: Long, onDone: () -> Unit) {
             ratio = CropRatio.of(saved.ratio)
             landscape = saved.width * (source?.width ?: 1) >= saved.height * (source?.height ?: 1)
         }
+        opened = spec
     }
+    val changed = opened != null && spec != opened
+    val leave = { if (changed && !saving) confirmExit = true else onDone() }
 
     // The picture after quarter turns and flips; the straighten angle is drawn on top of it.
     val turned = remember(source, spec.quarterTurns, spec.flipH, spec.flipV) {
@@ -168,11 +178,11 @@ fun CropScreen(app: TetherApp, photoId: Long, onDone: () -> Unit) {
         }
     }
 
-    BackHandler { onDone() }
+    BackHandler { leave() }
 
     Column(Modifier.fillMaxSize().background(Color.Black)) {
         Row(Modifier.fillMaxWidth().background(Tone.Background).statusBarsPadding().padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onDone) { Icon(Icons.Outlined.Close, contentDescription = "Cancelar") }
+            IconButton(onClick = leave) { Icon(Icons.Outlined.Close, contentDescription = "Cancelar") }
             Column(Modifier.weight(1f)) {
                 Text("Recortar", style = MaterialTheme.typography.titleMedium)
                 Text(
@@ -199,77 +209,106 @@ fun CropScreen(app: TetherApp, photoId: Long, onDone: () -> Unit) {
             }
         }
 
-        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            if (image == null) {
-                CircularProgressIndicator(color = Tone.Info)
-            } else {
-                CropCanvas(
-                    image = image,
-                    spec = spec,
-                    aspect = aspect,
-                    grid = grid,
-                    drawHorizon = drawHorizon,
-                    onChange = { spec = it },
-                    onHorizon = { lineDeg ->
-                        drawHorizon = false
-                        // Level the traced line: turn the picture by the opposite of its tilt.
-                        setAngle(spec.angle - lineDeg)
-                        message = "Horizonte nivelado (${"%+.1f°".format(Locale("pt", "BR"), spec.angle)})"
-                    },
-                )
-            }
-            message?.let {
-                Text(
-                    it,
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(8.dp).background(Color.Black.copy(alpha = 0.6f), MaterialTheme.shapes.small)
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                )
-                LaunchedEffect(it) { kotlinx.coroutines.delay(2500); message = null }
-            }
-        }
-
-        Column(Modifier.fillMaxWidth().background(Tone.Background).navigationBarsPadding()) {
-            TabRow(
-                selectedTabIndex = tab,
-                containerColor = Tone.Background,
-                contentColor = Tone.Text,
-                indicator = { positions -> TabRowDefaults.SecondaryIndicator(Modifier.tabIndicatorOffset(positions[tab]), color = Tone.Accent) },
-            ) {
-                CropTab.entries.forEachIndexed { i, t ->
-                    Tab(selected = tab == i, onClick = { tab = i; drawHorizon = false }, text = { Text(t.label) }, unselectedContentColor = Tone.TextMuted)
+        // Standing: the photo on top, the tools below. Lying down: the photo on the left and the tools in
+        // a column on the right, so the picture keeps the screen's height.
+        val lying = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val canvasArea: @Composable (Modifier) -> Unit = { mod ->
+            // Clipped: a straightened (turned) picture would otherwise draw over the top bar.
+            Box(mod.clipToBounds(), contentAlignment = Alignment.Center) {
+                if (image == null) {
+                    com.example.ui.components.BrandLoader(56.dp)
+                } else {
+                    CropCanvas(
+                        image = image,
+                        spec = spec,
+                        aspect = aspect,
+                        grid = grid,
+                        drawHorizon = drawHorizon,
+                        onChange = { spec = it },
+                        onHorizon = { lineDeg ->
+                            drawHorizon = false
+                            // Level the traced line: turn the picture by the opposite of its tilt.
+                            setAngle(spec.angle - lineDeg)
+                            message = "Horizonte nivelado (${"%+.1f°".format(Locale("pt", "BR"), spec.angle)})"
+                        },
+                    )
+                }
+                message?.let {
+                    Text(
+                        it,
+                        color = Tone.OnPhoto,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.align(Alignment.TopCenter).padding(8.dp).background(Tone.Scrim, MaterialTheme.shapes.small)
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                    LaunchedEffect(it) { kotlinx.coroutines.delay(2500); message = null }
                 }
             }
-            Box(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                when (CropTab.entries[tab]) {
-                    CropTab.Ratio -> RatioPanel(ratio, landscape, onPick = { applyRatio(it, if (it == ratio) landscape else it.defaultLandscape(w, h)) }, onSwap = { applyRatio(ratio, !landscape) })
-                    CropTab.Straighten -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        AdjustSlider(SliderSpec("angle", "Ângulo", -45f, 45f, decimals = 1), spec.angle, { setAngle(it) }, {})
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = {
-                                val src = turned ?: return@OutlinedButton
-                                scope.launch {
-                                    val found = withContext(Dispatchers.Default) { autoHorizon(src) }
-                                    if (found == null) message = "Não achei linhas retas nesta foto"
-                                    else { setAngle(found); message = "Auto: ${"%+.1f°".format(Locale("pt", "BR"), found)}" }
+        }
+        val toolsArea: @Composable (Modifier) -> Unit = { mod ->
+            Column(mod.background(Tone.Background).navigationBarsPadding()) {
+                TabRow(
+                    selectedTabIndex = tab,
+                    containerColor = Tone.Background,
+                    contentColor = Tone.Text,
+                    indicator = { positions -> TabRowDefaults.SecondaryIndicator(Modifier.tabIndicatorOffset(positions[tab]), color = Tone.Accent) },
+                ) {
+                    CropTab.entries.forEachIndexed { i, t ->
+                        Tab(selected = tab == i, onClick = { tab = i; drawHorizon = false }, text = { Text(t.label) }, unselectedContentColor = Tone.TextMuted)
+                    }
+                }
+                Box(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    when (CropTab.entries[tab]) {
+                        CropTab.Ratio -> RatioPanel(ratio, landscape, onPick = { applyRatio(it, if (it == ratio) landscape else it.defaultLandscape(w, h)) }, onSwap = { applyRatio(ratio, !landscape) })
+                        CropTab.Straighten -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            AdjustSlider(SliderSpec("angle", "Ângulo", -45f, 45f, decimals = 1), spec.angle, { setAngle(it) }, {})
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = {
+                                    val src = turned ?: return@OutlinedButton
+                                    scope.launch {
+                                        val found = withContext(Dispatchers.Default) { autoHorizon(src) }
+                                        if (found == null) message = "Não achei linhas retas nesta foto"
+                                        else { setAngle(found); message = "Auto: ${"%+.1f°".format(Locale("pt", "BR"), found)}" }
+                                    }
+                                }) { Text("Auto") }
+                                OutlinedButton(onClick = { drawHorizon = !drawHorizon }) {
+                                    Text(if (drawHorizon) "Trace na foto…" else "Traçar horizonte", color = if (drawHorizon) Tone.Accent else Tone.Text)
                                 }
-                            }) { Text("Auto") }
-                            OutlinedButton(onClick = { drawHorizon = !drawHorizon }) {
-                                Text(if (drawHorizon) "Trace na foto…" else "Traçar horizonte", color = if (drawHorizon) Tone.Accent else Tone.Text)
+                                OutlinedButton(onClick = { setAngle(0f) }) { Text("Zerar") }
                             }
-                            OutlinedButton(onClick = { setAngle(0f) }) { Text("Zerar") }
+                        }
+                        CropTab.Turn -> Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TurnButton(Icons.AutoMirrored.Outlined.RotateLeft, "Girar à esquerda") { turn(-1) }
+                            TurnButton(Icons.AutoMirrored.Outlined.RotateRight, "Girar à direita") { turn(1) }
+                            TurnButton(Icons.Outlined.Flip, "Espelhar") { spec = spec.copy(flipH = !spec.flipH, left = 1f - spec.right, right = 1f - spec.left, angle = -spec.angle) }
+                            TurnButton(Icons.Outlined.ScreenRotationAlt, "Virar de cabeça") { spec = spec.copy(flipV = !spec.flipV, top = 1f - spec.bottom, bottom = 1f - spec.top, angle = -spec.angle) }
                         }
                     }
-                    CropTab.Turn -> Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TurnButton(Icons.AutoMirrored.Outlined.RotateLeft, "Girar à esquerda") { turn(-1) }
-                        TurnButton(Icons.AutoMirrored.Outlined.RotateRight, "Girar à direita") { turn(1) }
-                        TurnButton(Icons.Outlined.Flip, "Espelhar") { spec = spec.copy(flipH = !spec.flipH, left = 1f - spec.right, right = 1f - spec.left, angle = -spec.angle) }
-                        TurnButton(Icons.Outlined.ScreenRotationAlt, "Virar de cabeça") { spec = spec.copy(flipV = !spec.flipV, top = 1f - spec.bottom, bottom = 1f - spec.top, angle = -spec.angle) }
-                    }
                 }
             }
         }
+        if (lying) {
+            Row(Modifier.weight(1f).fillMaxWidth()) {
+                canvasArea(Modifier.weight(1f).fillMaxHeight())
+                val side = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.4f).dp.coerceAtMost(360.dp)
+                toolsArea(Modifier.width(side).fillMaxHeight().verticalScroll(rememberScrollState()))
+            }
+        } else {
+            canvasArea(Modifier.weight(1f).fillMaxWidth())
+            toolsArea(Modifier.fillMaxWidth())
+        }
+    }
+
+    if (confirmExit) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmExit = false },
+            containerColor = Tone.Surface,
+            title = { Text("Sair sem salvar o recorte?") },
+            text = { Text("O recorte que você ajustou agora não vai ficar na foto.") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { confirmExit = false; onDone() }) { Text("Sair sem salvar") } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmExit = false }) { Text("Continuar recortando") } },
+        )
     }
 }
 

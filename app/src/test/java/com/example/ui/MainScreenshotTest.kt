@@ -30,15 +30,36 @@ class MainScreenshotTest {
     }
 
     @Test
-    fun photosTabWithCaptureButton() {
+    fun photosTab() {
         rule.onNode(hasText("Fotos")).performClick()
-        save("app_fotos_fab")
+        save("app_fotos")
     }
 
     @Test
     fun cullingTab() {
-        rule.onNode(hasText("Culling")).performClick()
+        // The tab, not the Culling tile of the Session's tools.
+        val tab = androidx.compose.ui.test.SemanticsMatcher.expectValue(
+            androidx.compose.ui.semantics.SemanticsProperties.Role,
+            androidx.compose.ui.semantics.Role.Tab,
+        )
+        rule.onNode(hasText("Culling") and tab).performClick()
         save("app_culling")
+    }
+
+    /** Express gets its tab once it is switched on; Ajustes stays pinned at the end of the bar. */
+    @Test
+    fun expressTab() {
+        kotlinx.coroutines.runBlocking {
+            rule.activity.application.let { it as com.example.TetherApp }.settings.set(com.example.core.data.SettingKeys.expressEnabled, true)
+        }
+        rule.waitUntil(8_000) { rule.onAllNodes(hasText("Express")).fetchSemanticsNodes().isNotEmpty() }
+        val tab = androidx.compose.ui.test.SemanticsMatcher.expectValue(
+            androidx.compose.ui.semantics.SemanticsProperties.Role,
+            androidx.compose.ui.semantics.Role.Tab,
+        )
+        rule.onNode(hasText("Express") and tab).performClick()
+        rule.waitUntil(8_000) { rule.onAllNodes(hasText("Fotografia Express")).fetchSemanticsNodes().isNotEmpty() }
+        save("app_express")
     }
 
     @Test

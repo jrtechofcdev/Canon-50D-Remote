@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f1f1f">
+<title>Fotografia Express</title>
+<link rel="icon" href="/icon.png">
+<link rel="stylesheet" href="/brand.css">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="opening">
+<header class="top" id="top">
+  <img class="logo" src="/logo.png" alt="Jr_Tech_OFC">
+  <span id="live" class="state"><i class="mark off" aria-hidden="true"></i><span>Conectando</span></span>
+</header>
+
+<div class="stage">
+  <main>
+    <section class="hello">
+      <p id="eyebrow" class="eyebrow">Fotografia Express</p>
+      <h1 id="title">Suas fotos de hoje</h1>
+      <p id="sub" class="muted sub">Conectando ao celular do fotógrafo…</p>
+    </section>
+
+    <!-- What a preview is and what it costs: one line, only while there are previews. -->
+    <section id="hint" class="howto" hidden>
+      <div class="howto-icon" aria-hidden="true"></div>
+      <div>
+        <p class="howto-title">Escolha as suas favoritas</p>
+        <p class="muted">Estas são prévias com marca d'água. Toque no coração das fotos que você quer levar; o fotógrafo libera sem marca depois do pagamento.</p>
+        <p id="price" class="price num" hidden></p>
+      </div>
+    </section>
+
+    <p id="waiting" class="waiting" hidden></p>
+
+    <section id="feed" class="feed" aria-live="polite"></section>
+
+    <div id="empty" class="empty" hidden>
+      <div id="emptyArt"></div>
+      <p class="empty-title">Pode ficar à vontade</p>
+      <p class="muted">Cada foto aparece aqui assim que o fotógrafo clicar. Deixe esta página aberta.</p>
+    </div>
+
+    <div id="closed" class="empty" hidden>
+      <div id="closedArt"></div>
+      <p id="closedTitle" class="empty-title"></p>
+      <p id="closedText" class="muted"></p>
+    </div>
+  </main>
+  <footer class="foot" id="foot"></footer>
+</div>
+
+<!-- Bottom bar: what the client chose and the one thing to do next. -->
+<footer id="dock" class="dock" hidden>
+  <p id="dockText" class="dock-text"></p>
+  <button id="payBtn" class="btn primary" hidden>Pagar</button>
+  <button id="saveAll" class="btn primary" hidden>Salvar liberadas</button>
+</footer>
+
+<div id="welcome" class="welcome" hidden role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+  <div class="welcome-card">
+    <div id="welcomeArt" class="welcome-art"></div>
+    <h2 id="welcomeTitle">Que bom ter você aqui</h2>
+    <p class="muted">Suas fotos vão aparecer nesta página, na hora em que forem feitas. Como podemos te chamar?</p>
+    <form id="nameForm" autocomplete="off">
+      <label class="sr" for="nameInput">Seu nome</label>
+      <input id="nameInput" maxlength="40" placeholder="Seu nome" autocapitalize="words" enterkeyhint="go">
+      <button class="btn primary" type="submit">Ver minhas fotos</button>
+    </form>
+    <button id="skipName" class="btn ghost">Agora não</button>
+  </div>
+</div>
+
+<div id="paySheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="payTitle">
+  <div class="sheet-card">
+    <span class="grip" aria-hidden="true"></span>
+    <div class="sheet-head">
+      <p id="payTitle" class="sheet-title">Pagamento</p>
+      <button id="payClose" class="btn ghost small">Fechar</button>
+    </div>
+    <p id="payTotal" class="pay-total num"></p>
+    <p id="payDetail" class="muted"></p>
+    <div id="pixBox" class="pix" hidden>
+      <div class="pix-plate"><img id="pixQr" alt="QR Code do Pix"></div>
+      <button id="copyPix" class="btn primary">Copiar Pix copia e cola</button>
+    </div>
+    <ol class="steps">
+      <li id="stepPix"><span>Abra o app do banco, escolha <b>Pix</b> e leia o QR ou cole o código.</span></li>
+      <li><span>Mostre o comprovante ao fotógrafo.</span></li>
+      <li><span>Ele libera as fotos aqui mesmo, sem marca d'água.</span></li>
+    </ol>
+    <p id="payMethods" class="muted small"></p>
+    <p id="payNote" class="small"></p>
+  </div>
+</div>
+
+<div id="viewer" class="viewer" hidden role="dialog" aria-modal="true" aria-label="Foto">
+  <div class="viewer-bar">
+    <button id="close" class="round" aria-label="Fechar"></button>
+    <span id="pos" class="pos num"></span>
+    <button id="vPick" class="round heart" hidden></button>
+  </div>
+  <div class="viewer-stage"><img id="big" alt=""></div>
+  <div class="viewer-actions">
+    <button id="prev" class="round" aria-label="Foto anterior"></button>
+    <a id="vSave" class="btn primary">Salvar foto</a>
+    <button id="next" class="round" aria-label="Próxima foto"></button>
+  </div>
+</div>
+
+<div id="toast" class="toast lift" role="status" aria-live="polite"></div>
+<script src="/brand.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

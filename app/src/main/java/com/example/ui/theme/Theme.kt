@@ -47,8 +47,18 @@ class Palette(
     /** Cyan: progress and information, never a call to action. */
     val Info: Color,
     val Error: Color,
+    /** Amber: something is wrong but still working (reconnecting, little space left). */
+    val Warning: Color,
     val GradientStart: Color,
     val GradientEnd: Color,
+    /** The one veil under captions and round buttons drawn over a photo. */
+    val Scrim: Color,
+    /** Icons and text on top of a photo (white by day, dimmed at night). */
+    val OnPhoto: Color,
+    /** Histogram channels, shared by the viewer, the editor and the live view. */
+    val Red: Color,
+    val Green: Color,
+    val Blue: Color,
 )
 
 private val DayPalette = Palette(
@@ -62,8 +72,14 @@ private val DayPalette = Palette(
     OnAccent = Color(0xFF00261A),
     Info = Brand.Cyan,
     Error = Color(0xFFFF6B6B),
+    Warning = Color(0xFFFFB547),
     GradientStart = Brand.Mint,
     GradientEnd = Brand.Cyan,
+    Scrim = Color(0x8C000000),
+    OnPhoto = Color(0xFFFFFFFF),
+    Red = Color(0xFFE5484D),
+    Green = Color(0xFF46A758),
+    Blue = Color(0xFF3E63DD),
 )
 
 /** "Modo escuro total": for churches and night events, nothing on screen brighter than it needs to be. */
@@ -73,13 +89,20 @@ private val NightPalette = Palette(
     SurfaceHigh = Color(0xFF171717),
     Line = Color(0xFF222222),
     Text = Color(0xFFB5B5B5),
-    TextMuted = Color(0xFF6F6F6F),
+    // The darkest grey that still reads (4.9:1 on the night surfaces), so night stays dim but legible.
+    TextMuted = Color(0xFF858585),
     Accent = Color(0xFF00A870),
     OnAccent = Color(0xFF001A11),
     Info = Color(0xFF1290AA),
-    Error = Color(0xFFC75050),
+    Error = Color(0xFFD05E5E),
+    Warning = Color(0xFFB98235),
     GradientStart = Color(0xFF00A870),
     GradientEnd = Color(0xFF1290AA),
+    Scrim = Color(0xA6000000),
+    OnPhoto = Color(0xFFB5B5B5),
+    Red = Color(0xFFA8363A),
+    Green = Color(0xFF357A41),
+    Blue = Color(0xFF2F4BA6),
 )
 
 private val LocalPalette = staticCompositionLocalOf { DayPalette }
@@ -120,6 +143,16 @@ class TileShape(private val slant: Float = 0.28f, private val corner: Float = 0.
     }
 }
 
+/** The spacing scale: every gap and padding in the app is one of these. */
+object Space {
+    val xs = 4.dp
+    val s = 8.dp
+    val m = 12.dp
+    val l = 16.dp
+    val xl = 24.dp
+    val xxl = 32.dp
+}
+
 /** Exo 2, the typeface of the Jr_Tech_OFC wordmark. */
 val Exo2 = FontFamily(
     Font(R.font.exo2_regular, FontWeight.Normal),
@@ -131,6 +164,8 @@ private fun style(size: Int, line: Int, weight: FontWeight = FontWeight.Normal) 
     TextStyle(fontFamily = Exo2, fontSize = size.sp, lineHeight = line.sp, fontWeight = weight)
 
 private val typography = Typography(
+    // The camera state on the Session and the title of an empty screen: the only text this big.
+    displaySmall = style(28, 34, FontWeight.SemiBold),
     titleLarge = style(22, 28, FontWeight.SemiBold),
     titleMedium = style(16, 22, FontWeight.SemiBold),
     titleSmall = style(14, 20, FontWeight.SemiBold),

@@ -404,19 +404,7 @@ private fun MenuItem(icon: ImageVector, text: String, color: androidx.compose.ui
 
 @Composable
 private fun CategoryFilter(icon: ImageVector, text: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(text, maxLines = 1) },
-        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp)) },
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = Tone.SurfaceHigh,
-            selectedLabelColor = Tone.Accent,
-            selectedLeadingIconColor = Tone.Accent,
-            labelColor = Tone.TextMuted,
-            iconColor = Tone.TextMuted,
-        ),
-    )
+    com.example.ui.components.JrChip(text, selected, onClick, icon = icon)
 }
 
 /** Name input for a category. */
@@ -498,7 +486,7 @@ private fun sourceLabel(source: String) = when (source) {
     "xmp" -> "Importado de XMP"
     "lrtemplate" -> "Importado de LRTemplate"
     "jr_link" -> "Pack JR C50D Sync"
-    else -> "Criado no app"
+    else -> if (source.startsWith(com.example.core.shop.ShopItem.SOURCE_PREFIX)) "Da Loja de presets" else "Criado no app"
 }
 
 private fun displayName(context: android.content.Context, uri: Uri): String =

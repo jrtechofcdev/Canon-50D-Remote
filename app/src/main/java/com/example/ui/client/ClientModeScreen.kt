@@ -90,15 +90,24 @@ import androidx.compose.material.icons.outlined.Iso
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.ShutterSpeed
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.verticalScroll
+import com.example.ui.components.pressScale
+import androidx.compose.ui.platform.LocalContext
 
 /**
  * Full-screen photos for the client to follow along. No settings, no delete.
  * The photo has its own area; the info line and the icon bar sit below it, never over it.
- * Exit: the Sair button, or one finger held still for 3 s (plus the PIN when one is set).
+ * Exit: the Sair button, or one finger held still for 2 s (plus the PIN when one is set).
  */
 @Composable
 fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> Unit, onCrop: (Long) -> Unit = {}) {
-    val all by remember { app.database.photoDao().observeAll() }.collectAsState(initial = null)
+    val all by remember { app.photos }.collectAsState(initial = null)
     val presets by app.presets.presets.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     val s by app.settings.settings.collectAsState(initial = null)
@@ -112,10 +121,21 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
     val pager = rememberPagerState { photos.size }
 
     com.example.ui.components.ImmersiveMode()
+    // "Fixar a tela": Android's screen pinning, so Início and Recentes don't leave the app. It stays on
+    // through Calibrar and Recortar (same screen of the app) and comes off only through Sair.
+    val activity = LocalContext.current.findActivity()
+    LaunchedEffect(settings.clientPinScreen) {
+        if (settings.clientPinScreen) runCatching { activity?.startLockTask() }
+        else runCatching { activity?.stopLockTask() }
+    }
+    val leave = {
+        if (settings.clientPinScreen) runCatching { activity?.stopLockTask() }
+        onExit()
+    }
     // Back does nothing here, so a client can't leave by accident.
     BackHandler { }
 
-    val requestExit = { if (settings.clientPin.isEmpty()) onExit() else askPin = true }
+    val requestExit = { if (settings.clientPin.isEmpty()) leave() else askPin = true }
     // Calibrar and Recortar are the photographer's: both ask for the PIN when one is set.
     var cropAsk by remember { mutableStateOf<Long?>(null) }
     val guarded = settings.clientCalibratePin && settings.clientPin.isNotEmpty()
@@ -123,6 +143,16 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
     val requestCrop = { id: Long -> if (guarded) cropAsk = id else onCrop(id) }
     val holdToExit by rememberUpdatedState(settings.clientExitHold)
 
+    // Interface hidden: only the photo (and the watermark) stay; a tap on the photo brings it back.
+    var chrome by remember { mutableStateOf(true) }
+    // Hold-to-exit: its own timer (not the touch events, which stop coming while the finger is still),
+    // with a ring filling around the finger so the photographer sees it working.
+    val holdScope = rememberCoroutineScope()
+    var holdAt by remember { mutableStateOf<androidx.compose.ui.geometry.Offset?>(null) }
+    val holdProgress = remember { androidx.compose.animation.core.Animatable(0f) }
+    val exitNow by rememberUpdatedState(requestExit)
+
+    Box(Modifier.fillMaxSize()) {
     Column(
         Modifier
             .fillMaxSize()
@@ -131,32 +161,68 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     if (!holdToExit) return@awaitEachGesture
-                    // Hold-to-exit needs one finger held still for 3 s. A second finger (pinch to zoom),
-                    // a drag (swipe or pan) or lifting the finger all cancel it.
-                    var still = true
-                    val lifted = withTimeoutOrNull(3_000) {
-                        while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                            if (event.changes.size > 1 ||
-                                event.changes.any { (it.position - down.position).getDistance() > viewConfiguration.touchSlop }
-                            ) still = false
-                            if (event.changes.none { it.pressed }) break
+                    val tolerance = 24.dp.toPx()
+                    holdAt = down.position
+                    val timer = holdScope.launch {
+                        holdProgress.snapTo(0f)
+                        holdProgress.animateTo(1f, androidx.compose.animation.core.tween(HOLD_TO_EXIT_MS.toInt(), easing = androidx.compose.animation.core.LinearEasing))
+                        holdAt = null
+                        exitNow()
+                    }
+                    // A second finger (pinch), a drag (swipe or pan) or lifting the finger cancels it.
+                    while (timer.isActive) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val moved = event.changes.any { (it.position - down.position).getDistance() > tolerance }
+                        if (event.changes.size > 1 || moved || event.changes.none { it.pressed }) {
+                            timer.cancel()
+                            break
                         }
                     }
-                    if (lifted == null && still) requestExit()
+                    holdAt = null
+                    holdScope.launch { holdProgress.snapTo(0f) }
                 }
             },
     ) {
         val current = photos.getOrNull(pager.currentPage)
+        // The client's actions, used as a bottom row standing and as a side column lying down.
+        val actions: @Composable (com.example.core.data.Photo, Modifier) -> Unit = { photo, mod ->
+            if (settings.clientPicksEnabled) {
+                ClientAction(
+                    modifier = mod,
+                    icon = if (photo.clientPick) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    label = if (photo.clientPick) "Escolhida" else "Escolher",
+                    tint = if (photo.clientPick) Tone.Accent else Tone.OnPhoto,
+                ) { scope.launch { app.database.photoDao().setClientPick(photo.id, !photo.clientPick) } }
+            }
+            if (settings.clientWhatsApp) {
+                ClientAction(Icons.AutoMirrored.Outlined.Send, "WhatsApp", mod, tint = Tone.Accent) { whatsFor = photo }
+            }
+            if (settings.clientCropEnabled) {
+                ClientAction(Icons.Outlined.Crop, "Recortar", mod, locked = guarded) { requestCrop(photo.id) }
+            }
+            if (settings.clientPresetsEnabled && presets.isNotEmpty()) {
+                ClientAction(Icons.Outlined.Tune, "Calibrar", mod, locked = guarded) { requestCalibrate(photo.id) }
+            }
+        }
+        // Vertical photos fill a standing screen, horizontal ones a lying screen.
+        // The screen keeps its position; the photo turns with how the client holds the phone.
+        val phoneTurn = com.example.ui.components.rememberPhoneTurn(settings.photoFollowsPhone && settings.screenOrientation != "auto")
 
-        // Top: leave on the left, position and brand on the right.
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp).heightIn(min = 48.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+        // Top: three balanced zones. Leave on the left, the brand in the true centre, position and the
+        // two screen buttons on the right, all the same height and the same quiet style.
+        if (chrome) Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp).heightIn(min = 48.dp)) {
             if (settings.clientExitButton) {
-                TextButton(onClick = requestExit) {
-                    Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null, tint = Muted, modifier = Modifier.size(20.dp))
+                androidx.compose.material3.Button(
+                    onClick = requestExit,
+                    shape = MaterialTheme.shapes.small,
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Tone.Scrim, contentColor = Tone.OnPhoto),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp),
+                    modifier = Modifier.align(Alignment.CenterStart).heightIn(min = 48.dp),
+                ) {
+                    Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null, tint = Muted, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Sair", color = Muted, style = MaterialTheme.typography.labelLarge)
                     if (settings.clientPin.isNotEmpty()) {
@@ -165,21 +231,40 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
                     }
                 }
             }
-            Spacer(Modifier.weight(1f))
-            if (photos.isNotEmpty()) {
-                Text("${pager.currentPage + 1} / ${photos.size}", style = MaterialTheme.typography.labelMedium, color = Muted)
-                Spacer(Modifier.width(12.dp))
-            }
             if (settings.clientShowBrand) {
-                Row(Modifier.padding(end = 12.dp).alpha(0.8f), verticalAlignment = Alignment.CenterVertically) {
-                    BrandSymbol(18.dp)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Jr_Tech_OFC", style = WordmarkStyle.copy(fontSize = 13.sp), color = Color.White)
+                // The name only where it fits between the two sides; the symbol alone on a narrow phone.
+                val wide = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 560
+                Row(Modifier.align(Alignment.Center).alpha(0.85f), verticalAlignment = Alignment.CenterVertically) {
+                    BrandSymbol(if (wide) 18.dp else 22.dp)
+                    if (wide) {
+                        Spacer(Modifier.width(8.dp))
+                        Text("Jr_Tech_OFC", style = WordmarkStyle.copy(fontSize = 13.sp), color = Tone.OnPhoto)
+                    }
+                }
+            }
+            Row(
+                Modifier.align(Alignment.CenterEnd),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (photos.isNotEmpty()) {
+                    Text(
+                        "${pager.currentPage + 1} / ${photos.size}",
+                        style = MaterialTheme.typography.labelLarge, color = Muted,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Tone.OnPhoto.copy(alpha = 0.08f)).padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                }
+                TopIcon { com.example.ui.components.RotateButton(app, settings.screenOrientation, tint = Muted) }
+                TopIcon {
+                    IconButton(onClick = { chrome = false }) {
+                        Icon(Icons.Outlined.VisibilityOff, contentDescription = "Ocultar a interface", tint = Muted)
+                    }
                 }
             }
         }
 
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+        Row(Modifier.weight(1f).fillMaxWidth()) {
+        Box(Modifier.weight(1f).fillMaxHeight()) {
             if (photos.isEmpty()) {
                 Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Outlined.PhotoCamera, contentDescription = null, tint = Muted, modifier = Modifier.size(40.dp))
@@ -187,13 +272,38 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
                     Text("As fotos aparecem aqui assim que forem feitas.", color = Muted)
                 }
             } else {
-                ClientPager(app, pager, photos, presets, settings)
+                ClientPager(app, pager, photos, presets, settings, turn = phoneTurn, onTap = { if (!chrome) chrome = true })
+                if (settings.clientWatermark) ClientWatermark(app, settings)
             }
         }
+        // Lying down, the actions and the presets share a column on the side, so the photo keeps the
+        // whole height instead of losing it to a strip of presets underneath.
+        if (landscape && current != null && chrome) {
+            val sideWidth = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.34f).dp.coerceIn(200.dp, 320.dp)
+            Column(
+                Modifier.fillMaxHeight().width(sideWidth).background(Tone.OnPhoto.copy(alpha = 0.06f)).navigationBarsPadding()
+                    .verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(Modifier.fillMaxWidth()) { actions(current, Modifier.weight(1f)) }
+                if (settings.clientPresetsEnabled && presets.isNotEmpty()) {
+                    PresetPicker(
+                        app = app,
+                        presets = presets,
+                        selectedId = current.presetId,
+                        sourceUri = current.displayUri,
+                        onPick = { picked -> scope.launch { app.looks.setLook(current, picked?.id, null) } },
+                        onDark = true,
+                    )
+                }
+                if (settings.clientShowInfo) PhotoInfo(current)
+            }
+        }
+        }
 
-        if (current != null) {
-            if (settings.clientShowInfo) PhotoInfo(current)
-            if (settings.clientPresetsEnabled && presets.isNotEmpty()) {
+        if (current != null && chrome) {
+            if (settings.clientShowInfo && !landscape) PhotoInfo(current)
+            if (settings.clientPresetsEnabled && presets.isNotEmpty() && !landscape) {
                 PresetPicker(
                     app = app,
                     presets = presets,
@@ -203,33 +313,30 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
                     onDark = true,
                 )
             }
-            // Big icons with a short name under each: readable at a glance, even at arm's length.
-            Row(
-                Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.06f)).navigationBarsPadding().padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                if (settings.clientPicksEnabled) {
-                    ClientAction(
-                        if (current.clientPick) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        if (current.clientPick) "Escolhida" else "Escolher",
-                        tint = if (current.clientPick) Tone.Accent else Color.White,
-                    ) { scope.launch { app.database.photoDao().setClientPick(current.id, !current.clientPick) } }
-                }
-                if (settings.clientWhatsApp) {
-                    ClientAction(Icons.AutoMirrored.Outlined.Send, "WhatsApp", tint = Tone.Accent) { whatsFor = current }
-                }
-                if (settings.clientCropEnabled) {
-                    ClientAction(Icons.Outlined.Crop, "Recortar", locked = guarded) { requestCrop(current.id) }
-                }
-                if (settings.clientPresetsEnabled && presets.isNotEmpty()) {
-                    ClientAction(Icons.Outlined.Tune, "Calibrar", locked = guarded) { requestCalibrate(current.id) }
-                }
-            }
+            // Big icons with a short name under each, all the same width so they line up.
+            if (!landscape) Row(
+                Modifier.fillMaxWidth().background(Tone.OnPhoto.copy(alpha = 0.06f)).navigationBarsPadding().padding(vertical = 4.dp),
+            ) { actions(current, Modifier.weight(1f)) }
         }
     }
 
+    // The ring that fills while the finger is held to leave.
+    holdAt?.let { at ->
+        val ringColor = Tone.Accent
+        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+            val r = 44.dp.toPx()
+            drawCircle(Color.Black.copy(alpha = 0.55f), r, at)
+            drawArc(
+                ringColor, -90f, 360f * holdProgress.value, false,
+                topLeft = at - androidx.compose.ui.geometry.Offset(r, r), size = androidx.compose.ui.geometry.Size(r * 2, r * 2),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round),
+            )
+        }
+    }
+    }
+
     if (askPin) {
-        PinDialog(settings.clientPin, "PIN para sair", "Sair", onOk = { askPin = false; onExit() }, onCancel = { askPin = false })
+        PinDialog(settings.clientPin, "PIN para sair", "Sair", onOk = { askPin = false; leave() }, onCancel = { askPin = false })
     }
     whatsFor?.let { photo ->
         WhatsAppSheet(app, remember { PhotoActions(app, app.store, app.export, app.looks) }, settings, listOf(photo), forClient = true, onDismiss = { whatsFor = null })
@@ -243,6 +350,35 @@ fun ClientModeScreen(app: TetherApp, onExit: () -> Unit, onCalibrate: (Long) -> 
 }
 
 private val Muted = Color(0xFFBDBDBD)
+
+/** One round, equal-size slot for a top-bar button, so the icons line up whatever they are. */
+@Composable
+private fun TopIcon(content: @Composable () -> Unit) {
+    Box(Modifier.size(48.dp).clip(CircleShape).background(Tone.OnPhoto.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) { content() }
+}
+
+/** How long one finger stays still on the screen to leave client mode. */
+const val HOLD_TO_EXIT_MS = 2_000L
+
+/**
+ * The watermark over the photo, only on the screen: a photo taken of the phone with another phone
+ * carries the brand. Uses the logo chosen in Envio e cliente → Marca d'água.
+ */
+@Composable
+private fun ClientWatermark(app: TetherApp, settings: Settings) {
+    val logo by androidx.compose.runtime.produceState<android.graphics.Bitmap?>(null, settings.watermarkSource, settings.watermarkPath) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { app.export.loadLogo(settings) }
+    }
+    val bmp = logo ?: return
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        androidx.compose.foundation.Image(
+            bmp.asImageBitmap(),
+            contentDescription = null,
+            alpha = settings.clientWatermarkOpacity.coerceIn(10, 90) / 100f,
+            modifier = Modifier.fillMaxWidth(0.6f).graphicsLayer { rotationZ = -20f },
+        )
+    }
+}
 
 /** File name and exposure, each with its own icon, on a line of its own under the photo. */
 @Composable
@@ -269,18 +405,28 @@ private fun InfoItem(icon: ImageVector, text: String) {
 }
 
 @Composable
-private fun ClientAction(icon: ImageVector, label: String, tint: Color = Color.White, locked: Boolean = false, onClick: () -> Unit) {
+private fun ClientAction(icon: ImageVector, label: String, modifier: Modifier = Modifier, tint: Color = Tone.OnPhoto, locked: Boolean = false, onClick: () -> Unit) {
+    // When the icon changes (the heart filling in), it pops and settles: the client sees the choice was taken.
+    val pop = remember { androidx.compose.animation.core.Animatable(1f) }
+    val first = remember { mutableStateOf(true) }
+    LaunchedEffect(icon) {
+        if (first.value) { first.value = false; return@LaunchedEffect }
+        pop.snapTo(1.4f)
+        pop.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.35f, stiffness = 360f))
+    }
+    val shade by androidx.compose.animation.animateColorAsState(tint, label = "action")
     Column(
-        Modifier.clip(MaterialTheme.shapes.small).clickable(onClick = onClick).widthIn(min = 72.dp).padding(horizontal = 8.dp, vertical = 6.dp),
+        modifier.pressScale().clip(MaterialTheme.shapes.small).clickable(onClick = onClick).heightIn(min = 56.dp).padding(horizontal = 4.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(28.dp))
+        // The lock sits inside the icon's own square, so a locked button lines up with the others.
+        Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = shade, modifier = Modifier.size(26.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value })
             if (locked) {
-                Icon(
-                    Icons.Outlined.Lock, contentDescription = null, tint = Muted,
-                    modifier = Modifier.align(Alignment.BottomEnd).offset(x = 6.dp, y = 4.dp).size(12.dp),
-                )
+                Box(
+                    Modifier.align(Alignment.BottomEnd).size(14.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color.Black),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Outlined.Lock, contentDescription = "Pede PIN", tint = Muted, modifier = Modifier.size(10.dp)) }
             }
         }
         Spacer(Modifier.height(2.dp))
@@ -295,6 +441,8 @@ private fun ClientPager(
     entries: List<Photo>,
     presets: List<Preset>,
     settings: Settings,
+    turn: Int = 0,
+    onTap: () -> Unit = {},
 ) {
     // While the client looks closely at a photo, nothing moves it away.
     var zoomed by remember { mutableStateOf(false) }
@@ -314,15 +462,18 @@ private fun ClientPager(
             if (!isZoomed) pager.animateScrollToPage((pager.currentPage + 1) % entries.size)
         }
     }
+    val latest by rememberUpdatedState(entries)
     HorizontalPager(
         state = pager,
-        key = { entries[it].id },
+        key = { com.example.ui.photos.pagerKey(latest, it) },
         userScrollEnabled = !zoomed,
         modifier = Modifier.fillMaxSize(),
     ) { page ->
-        val photo = entries[page]
-        Zoomable(key = photo.id, onZoomChanged = { zoomed = it }) {
-            LookImage(app, photo, presets, Modifier.fillMaxSize())
+        val photo = latest.getOrNull(page) ?: return@HorizontalPager
+        com.example.ui.components.PhoneTurned(turn) {
+            Zoomable(key = photo.id, onZoomChanged = { zoomed = it }, onTap = { _, _ -> onTap() }) {
+                LookImage(app, photo, presets, Modifier.fillMaxSize())
+            }
         }
     }
 }
@@ -349,4 +500,10 @@ private fun PinDialog(expected: String, title: String, action: String, onOk: () 
         confirmButton = { TextButton(onClick = { if (pin == expected) onOk() else wrong = true }) { Text(action) } },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancelar") } },
     )
+}
+
+private tailrec fun android.content.Context.findActivity(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

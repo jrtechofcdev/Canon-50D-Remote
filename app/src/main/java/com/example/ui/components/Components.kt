@@ -28,6 +28,9 @@ import com.example.core.ptp.EosValues
 import com.example.ui.theme.ReadoutStyle
 import com.example.ui.theme.TileShape
 import com.example.ui.theme.Tone
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 
 /** Section title used across screens. */
 @Composable
@@ -53,7 +56,16 @@ fun Readout(label: String, value: String, enabled: Boolean, onClick: () -> Unit,
         verticalArrangement = Arrangement.Center,
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = Tone.TextMuted)
-        Text(value, style = ReadoutStyle, color = if (enabled) Tone.Text else Tone.TextMuted, maxLines = 1)
+        // Long names ("Fluorescente", "Personalizado") get a smaller size instead of being cut, and with big
+        // system text whatever still doesn't fit ends in "…".
+        Text(
+            value,
+            style = if (value.length > 8) ReadoutStyle.copy(fontSize = ReadoutStyle.fontSize * 0.72f) else ReadoutStyle,
+            color = if (enabled) Tone.Text else Tone.TextMuted,
+            maxLines = 1,
+            softWrap = false,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -70,7 +82,7 @@ fun ValuePickerSheet(
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Tone.Surface) {
         Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding()) {
-            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 12.dp))
+            SheetHeader(title)
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(76.dp),
                 contentPadding = PaddingValues(bottom = 16.dp),
@@ -80,19 +92,25 @@ fun ValuePickerSheet(
             ) {
                 items(options.distinctBy { EosValues.label(prop, it) }) { value ->
                     val selected = value == current
-                    Box(
+                    // The current value marked like every choice in the app: raised, with the mint block.
+                    Row(
                         Modifier
                             .clip(MaterialTheme.shapes.small)
-                            .background(if (selected) Tone.Accent else Tone.SurfaceHigh)
+                            .background(if (selected) Tone.SurfaceHigh else Tone.Background)
                             .clickable { onPick(value) }
                             .heightIn(min = 48.dp)
                             .fillMaxWidth(),
-                        contentAlignment = Alignment.Center,
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        if (selected) {
+                            StatusMark(Tone.Accent, height = 12.dp)
+                            Spacer(Modifier.width(6.dp))
+                        }
                         Text(
                             EosValues.label(prop, value),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (selected) Tone.OnAccent else Tone.Text,
+                            style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
+                            color = if (selected) Tone.Text else Tone.TextMuted,
                             textAlign = TextAlign.Center,
                         )
                     }
@@ -110,13 +128,13 @@ fun FormatTag(hasRaw: Boolean, hasJpg: Boolean, modifier: Modifier = Modifier) {
         hasRaw -> "RAW"
         else -> "JPG"
     }
-    Text(
-        text,
-        style = MaterialTheme.typography.labelSmall,
-        color = Tone.Text,
-        modifier = modifier
-            .clip(TileShape(slant = 0.3f, corner = 0.15f))
-            .background(Color.Black.copy(alpha = 0.65f))
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-    )
+    // The brand block before the text, on the same veil as every caption over a photo.
+    Row(
+        modifier.clip(MaterialTheme.shapes.extraSmall).background(Tone.Scrim).padding(start = 5.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        StatusMark(Tone.OnPhoto, height = 8.dp)
+        Spacer(Modifier.width(4.dp))
+        Text(text, style = MaterialTheme.typography.labelSmall, color = Tone.OnPhoto)
+    }
 }

@@ -61,7 +61,22 @@ class PtpSession(
         dataIn: PtpDataSink? = null,
         timeoutMs: Int = DEFAULT_TIMEOUT_MS,
     ): IntArray = lock.withLock {
-        withContext(Dispatchers.IO) { transactBlocking(op, params, dataOut, dataIn, timeoutMs) }
+        withContext(Dispatchers.IO) {
+            if (!com.example.core.log.AppLog.verbose) return@withContext transactBlocking(op, params, dataOut, dataIn, timeoutMs)
+            // Modo desenvolvedor → log detalhado: every operation with its answer and time.
+            val started = System.currentTimeMillis()
+            try {
+                transactBlocking(op, params, dataOut, dataIn, timeoutMs).also {
+                    com.example.core.log.AppLog.i("PTP", "0x%04X %s → OK em %d ms".format(op, params.joinToString(","), System.currentTimeMillis() - started))
+                }
+            } catch (e: PtpResponseException) {
+                com.example.core.log.AppLog.w("PTP", "0x%04X %s → resposta 0x%04X em %d ms".format(op, params.joinToString(","), e.code, System.currentTimeMillis() - started))
+                throw e
+            } catch (e: PtpException) {
+                com.example.core.log.AppLog.w("PTP", "0x%04X %s → ${e.message}".format(op, params.joinToString(",")))
+                throw e
+            }
+        }
     }
 
     /** Convenience for operations that return a dataset. */

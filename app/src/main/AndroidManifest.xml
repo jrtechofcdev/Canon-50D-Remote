@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-feature android:name="android.hardware.usb.host" android:required="true" />
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <!-- Android 14 requires one "connected device" prerequisite permission for the tether service.
-         This one is a normal permission (no prompt); the app does not use the network. -->
+         This one is a normal permission (no prompt). -->
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <!-- Only the Loja tab goes online (the preset catalogue); capture and everything else stay offline. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -16,6 +19,15 @@
     <!-- Optional GPS in the edited copies; asked only when the option is turned on. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Entrega local: asked only when the photographer turns it on. Wi-Fi Direct needs "Dispositivos
+         por perto" on Android 13+ (never used for location) and location before that. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission
+        android:name="android.permission.NEARBY_WIFI_DEVICES"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="33" />
 
     <queries>
         <package android:name="com.adobe.lrmobile" />
@@ -29,6 +41,7 @@
 
     <application
         android:name=".TetherApp"
+        android:largeHeap="true"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -59,6 +72,11 @@
 
         <service
             android:name="com.example.core.service.CameraForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <service
+            android:name="com.example.core.delivery.DeliveryService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 

@@ -71,6 +71,7 @@ import com.example.ui.components.SectionLabel
 import com.example.ui.components.ValuePickerSheet
 import com.example.core.data.SettingKeys
 import com.example.ui.PhotoActions
+import com.example.ui.ShareSet
 import com.example.ui.theme.Tone
 import com.example.ui.preset.LookImage
 import com.example.ui.preset.SessionLookSheet
@@ -82,6 +83,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import kotlinx.coroutines.launch
+import androidx.compose.animation.togetherWith
+import com.example.ui.components.shutterFlash
+import androidx.compose.material.icons.outlined.Videocam
+import androidx.compose.material.icons.outlined.Usb
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.heightIn
+import com.example.ui.components.pressScale
+import com.example.ui.theme.Space
+import com.example.ui.components.StatusMark
 
 @Composable
 fun SessionScreen(
@@ -94,7 +106,22 @@ fun SessionScreen(
     onOpenTools: () -> Unit = {},
     onOpenLive: () -> Unit = {},
     onOpenProfiles: () -> Unit = {},
+    onEditPhoto: (Long) -> Unit = {},
+    onCropPhoto: (Long) -> Unit = {},
+    onOpenShop: (() -> Unit)? = null,
+    onOpenPresets: () -> Unit = {},
+    onOpenCull: () -> Unit = {},
+    onOpenSection: (com.example.ui.settings.SettingsSection) -> Unit = {},
+    onOpenDelivery: () -> Unit = {},
+    onOpenExpress: () -> Unit = {},
 ) {
+    var deliverFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
+    val deliveryStatus by app.delivery.status.collectAsState()
+    val deliveryOnline by app.delivery.online.collectAsState()
+    val expressStatus by app.express.status.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var whatsFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
+    var noteFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
     val state by app.camera.state.collectAsState()
     val shutter by app.camera.shutter.collectAsState()
     val activeProfile by app.settings.activeProfile.collectAsState(initial = "")
@@ -104,7 +131,7 @@ fun SessionScreen(
     val transfer by app.tether.transfer.collectAsState()
     val received by app.tether.receivedThisSession.collectAsState()
     val settings by app.settings.settings.collectAsState(initial = Settings())
-    val photos by remember { app.database.photoDao().observeAll() }.collectAsState(initial = emptyList())
+    val photos by remember { app.photos }.collectAsState(initial = emptyList())
     val looks by app.presets.presets.collectAsState(initial = emptyList())
     var showLooks by remember { mutableStateOf(false) }
     var showMoments by remember { mutableStateOf(false) }
@@ -118,6 +145,13 @@ fun SessionScreen(
     var showInterval by remember { mutableStateOf(false) }
     var showPresets by remember { mutableStateOf(false) }
     var showSummary by remember { mutableStateOf(false) }
+    // null: closed; false: rename or go back to a session; true: a new session for the next client.
+    var sessionSheet by remember { mutableStateOf<Boolean?>(null) }
+    var follow by remember { mutableStateOf<Pair<String, String>?>(null) }
+    val sessionCount = remember(photos, settings.sessionKey) { photos.count { it.session == settings.sessionKey } }
+    val activeClient by androidx.compose.runtime.produceState<String?>(null, settings.deliveryActiveSession, settings.deliveryEnabled, deliveryStatus) {
+        value = app.delivery.activeClient()?.client
+    }
 
     val currentSettings by rememberUpdatedState(settings)
     LaunchedEffect(Unit) {
@@ -125,73 +159,140 @@ fun SessionScreen(
     }
 
     BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
-        val wide = maxWidth >= 720.dp
-        val preview: @Composable (Modifier) -> Unit = { mod ->
-            Column(mod) {
-                LatestPhoto(photos.firstOrNull(), transfer, onOpenPhoto) { photo, mod ->
-                    LookImage(app, photo, looks, mod)
-                }
-                if (photos.size > 1) {
-                    Spacer(Modifier.height(12.dp))
-                    RecentStrip(photos.drop(1).take(20), onOpenPhoto)
-                }
+        // Lying down (a phone on its side, a tablet): the photo, the controls and the shutter side by side.
+        val lying = maxWidth > maxHeight && maxWidth >= 600.dp
+        val top: @Composable () -> Unit = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                BrandMark(Modifier.weight(1f), subtitle = "Captura vinculada · Canon 50D")
+                RotateButton(app, settings.screenOrientation)
+            }
+            Spacer(Modifier.height(12.dp))
+            SessionChip(settings.sessionName, sessionCount, Modifier.fillMaxWidth()) { sessionSheet = false }
+            Spacer(Modifier.height(16.dp))
+            ConnectionHeader(state, received, status, settings.showBattery, onConnect = app.camera::findAndConnect)
+            // Camera warnings while it is connected; the phone's free space whenever it runs low.
+            val phoneLow by app.phoneLowGb.collectAsState()
+            com.example.ui.components.CameraWarningChips(
+                com.example.ui.components.cameraWarnings(if (connected) status else CameraStatus(), settings, phoneLow),
+                Modifier.padding(top = 10.dp),
+            )
+            FolderNotice(settings, app.store.lostFolders.collectAsState().value, onOpenSettings)
+            PendingBanner(pending.size, onDownload = app.tether::downloadPending, onDismiss = app.tether::dismissPending)
+            FirstStepsCard(
+                settings,
+                onDone = { scope.launch { app.settings.set(SettingKeys.firstStepsDone, true) } },
+            )
+            SaveProblemBanner(
+                app.tether.saveProblem.collectAsState().value,
+                onOpenSettings = { onOpenSection(com.example.ui.settings.SettingsSection.Save) },
+                onDismiss = app.tether::dismissSaveProblem,
+            )
+        }
+        // The photo is what the photographer checks between shots, so it comes right after the status.
+        val photo: @Composable () -> Unit = {
+            LatestPhoto(photos.firstOrNull(), transfer, onOpenPhoto) { p, mod -> LookImage(app, p, looks, mod) }
+            if (photos.size > 1) {
+                Spacer(Modifier.height(10.dp))
+                RecentStrip(photos.drop(1).take(20), onOpenPhoto)
             }
         }
-        val controls: @Composable (Modifier) -> Unit = { mod ->
-            Column(mod) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    BrandMark(Modifier.weight(1f), subtitle = "Captura vinculada · Canon 50D")
-                    RotateButton(app, settings.screenOrientation)
-                }
-                Spacer(Modifier.height(20.dp))
-                ConnectionHeader(state, received, status, settings.showBattery, onConnect = app.camera::findAndConnect)
-                FolderNotice(settings, onOpenSettings)
-                PendingBanner(pending.size, onDownload = app.tether::downloadPending, onDismiss = app.tether::dismissPending)
-                Spacer(Modifier.height(16.dp))
-                ExposureBar(status, connected) { title, prop -> picker = title to prop }
-                Spacer(Modifier.height(20.dp))
-                ShutterRow(
-                    connected = connected,
-                    interval = interval,
-                    latest = photos.firstOrNull(),
-                    shutter = shutter,
-                    onShoot = { app.camera.capture(settings.shutterWait) },
-                    onInterval = { if (interval.running) app.camera.stopInterval() else showInterval = true },
-                    onOpenLatest = onOpenPhoto,
-                )
-                Spacer(Modifier.height(16.dp))
-                ToolsRow(
-                    settings = settings,
-                    connected = connected,
-                    bracket = bracket,
-                    hasSessionPhotos = photos.any { it.session == settings.sessionKey },
-                    onPresets = { showPresets = true },
-                    onBracket = { app.camera.startBracket(settings.aebShots, settings.aebStepThirds) },
-                    onCard = onOpenCard,
-                    onClient = onOpenClient,
-                    onNight = { scope.launch { app.settings.set(SettingKeys.nightMode, !settings.nightMode) } },
-                    onSummary = { showSummary = true },
-                    sessionLook = looks.firstOrNull { it.id == settings.sessionPresetId && settings.applyPresetToNew }?.name,
-                    onLook = { showLooks = true },
-                    onMoment = { showMoments = true },
-                    onTools = onOpenTools,
-                    onLive = onOpenLive,
-                    profile = activeProfile,
-                    onProfile = { showProfiles = true },
-                )
-            }
+        val controls: @Composable () -> Unit = {
+            ExposureBar(status, connected) { title, prop -> picker = title to prop }
+            Spacer(Modifier.height(16.dp))
+            ToolsRow(
+                settings = settings,
+                connected = connected,
+                bracket = bracket,
+                hasSessionPhotos = photos.any { it.session == settings.sessionKey },
+                onPresets = { showPresets = true },
+                onBracket = { app.camera.startBracket(settings.aebShots, settings.aebStepThirds) },
+                onCard = onOpenCard,
+                onClient = onOpenClient,
+                onNight = { scope.launch { app.settings.set(SettingKeys.nightMode, !settings.nightMode) } },
+                onSummary = { showSummary = true },
+                sessionLook = looks.firstOrNull { it.id == settings.sessionPresetId && settings.applyPresetToNew }?.name,
+                onLook = { showLooks = true },
+                onMoment = { showMoments = true },
+                onTools = onOpenTools,
+                onLive = onOpenLive,
+                profile = activeProfile,
+                onProfile = { showProfiles = true },
+                hasLatest = photos.firstOrNull() != null,
+                latestName = photos.firstOrNull()?.savedBase,
+                onEditLatest = { photos.firstOrNull()?.let { onEditPhoto(it.id) } },
+                onCropLatest = { photos.firstOrNull()?.let { onCropPhoto(it.id) } },
+                onWhatsAppLatest = { whatsFor = photos.firstOrNull() },
+                onLightroomLatest = {
+                    photos.firstOrNull()?.let { p ->
+                        val set = if (p.editedUri != null) ShareSet.EDITED else if (p.jpgUri != null) ShareSet.JPG else ShareSet.RAW
+                        scope.launch { actions.openInLightroom(listOf(p), set, settings) }
+                    }
+                },
+                onNoteLatest = { noteFor = photos.firstOrNull() },
+                onShop = onOpenShop?.takeIf { settings.shopEnabled },
+                onPresetsTab = onOpenPresets,
+                onCull = onOpenCull,
+                onFolders = { onOpenSection(com.example.ui.settings.SettingsSection.Save) },
+                onMessages = { onOpenSection(com.example.ui.settings.SettingsSection.Messages) },
+                onLog = { onOpenSection(com.example.ui.settings.SettingsSection.Diagnostics) },
+                // Capturar → Selecionar → Editar → Entregar: the last step one tap away.
+                onDelivery = onOpenDelivery,
+                deliveryState = when (val d = deliveryStatus) {
+                    // "→ Ana": who gets the photos that go by themselves, so the next client's never go to the last one.
+                    is com.example.core.delivery.DeliveryStatus.Running -> buildString {
+                        append(if (deliveryOnline > 0) "no ar · $deliveryOnline" else "no ar")
+                        activeClient?.let { append(" → $it") }
+                    }
+                    else -> null
+                },
+                onDeliverLatest = if (settings.deliveryEnabled) ({ deliverFor = photos.firstOrNull() }) else null,
+                onExpressLatest = if (settings.expressEnabled) ({
+                    photos.firstOrNull()?.let { com.example.ui.delivery.sendToExpress(app, context, scope, listOf(it.id), onOpenExpress) }
+                }) else null,
+                onExpress = onOpenExpress,
+                expressState = if (settings.expressEnabled && expressStatus is com.example.core.delivery.DeliveryStatus.Running) {
+                    if (settings.expressPreview) "no ar · prévia" else "no ar · liberado"
+                } else null,
+            )
+        }
+        val capture: @Composable (Boolean) -> Unit = { vertical ->
+            CaptureBar(
+                vertical = vertical,
+                connected = connected,
+                interval = interval,
+                shutter = shutter,
+                live = settings.liveViewEnabled,
+                latest = photos.firstOrNull(),
+                onShoot = { app.camera.capture(settings.shutterWait, settings.shutterFocusFirst) },
+                onInterval = { if (interval.running) app.camera.stopInterval() else showInterval = true },
+                onLive = onOpenLive,
+                onOpenLatest = onOpenPhoto,
+            )
         }
 
-        if (wide) {
-            Row(Modifier.fillMaxSize().padding(24.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                preview(Modifier.weight(1.4f).verticalScroll(rememberScrollState()))
-                controls(Modifier.weight(1f).verticalScroll(rememberScrollState()))
+        if (lying) {
+            Row(Modifier.fillMaxSize()) {
+                Column(Modifier.weight(1.15f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(16.dp)) { photo() }
+                Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(top = 16.dp, bottom = 16.dp, end = 12.dp)) {
+                    top()
+                    Spacer(Modifier.height(16.dp))
+                    controls()
+                    Spacer(Modifier.height(16.dp))
+                }
+                // The shutter rail sits under the right thumb, like the grip of a camera.
+                capture(true)
             }
         } else {
-            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-                controls(Modifier)
-                Spacer(Modifier.height(20.dp))
-                preview(Modifier)
+            Column(Modifier.fillMaxSize()) {
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp)) {
+                    top()
+                    Spacer(Modifier.height(16.dp))
+                    photo()
+                    Spacer(Modifier.height(16.dp))
+                    controls()
+                }
+                // Docked at the bottom: the shutter is always under the thumb, wherever the page is scrolled.
+                capture(false)
             }
         }
     }
@@ -248,12 +349,53 @@ fun SessionScreen(
             app = app,
             actions = actions,
             settings = settings,
-            onEnd = {
+            connected = connected,
+            onDisconnect = {
                 showSummary = false
-                if (connected) app.camera.disconnect()
+                app.camera.disconnect()
+            },
+            onNewSession = {
+                showSummary = false
+                sessionSheet = true
             },
             onDismiss = { showSummary = false },
         )
+    }
+
+    sessionSheet?.let { startNew ->
+        SessionNameSheet(
+            app = app,
+            current = settings.sessionName,
+            startNew = startNew,
+            onStarted = { name ->
+                sessionSheet = null
+                if (name.isNotBlank()) scope.launch {
+                    val active = app.delivery.activeClient()
+                    if (active != null && !active.client.equals(name, ignoreCase = true)) follow = name to active.client
+                }
+            },
+            onDismiss = { sessionSheet = null },
+        )
+    }
+
+    follow?.let { (name, previous) ->
+        FollowSessionDialog(
+            session = name,
+            previousClient = previous,
+            onFollow = {
+                follow = null
+                scope.launch { app.delivery.followSession(name) }
+            },
+            onKeep = { follow = null },
+        )
+    }
+
+    deliverFor?.let { p -> com.example.ui.delivery.DeliverSheet(app, listOf(p.id), onDismiss = { deliverFor = null }, onOpenDelivery = onOpenDelivery) }
+    whatsFor?.let { p ->
+        com.example.ui.photos.WhatsAppSheet(app, actions, settings, listOf(p), onDismiss = { whatsFor = null })
+    }
+    noteFor?.let { p ->
+        com.example.ui.photos.NoteSheet(app, p, onDismiss = { noteFor = null })
     }
 
     if (showInterval) {
@@ -269,61 +411,104 @@ fun SessionScreen(
 
 @Composable
 private fun ConnectionHeader(state: ConnectionState, received: Int, status: CameraStatus, showBattery: Boolean, onConnect: () -> Unit) {
-    val (title, detail) = when (state) {
-        is ConnectionState.Connected -> state.model to buildString {
-            append(if (received == 1) "1 foto recebida" else "$received fotos recebidas")
-            status.shotsLeft?.let { append(" · cartão: $it disparos") }
-            if (showBattery) status.value(EosProp.BATTERY_POWER)?.let { append(" · bateria: ${EosValues.batteryLabel(it)}") }
-        }
-        ConnectionState.Connecting -> "Conectando…" to "Abrindo sessão com a câmera"
-        ConnectionState.WaitingPermission -> "Permissão USB" to "Toque em Permitir no aviso do Android"
-        ConnectionState.NoCamera -> "Câmera não conectada" to "Ligue a 50D e conecte pelo cabo USB OTG"
-        is ConnectionState.Failed -> "Falha na conexão" to state.message
+    // One line for the state, with the brand block in the state's colour; the details below it.
+    val mark by androidx.compose.animation.animateColorAsState(
+        when (state) {
+            is ConnectionState.Connected -> Tone.Accent
+            is ConnectionState.Failed -> Tone.Error
+            is ConnectionState.Reconnecting -> Tone.Warning
+            else -> Tone.Line
+        },
+        androidx.compose.animation.core.tween(com.example.ui.components.Motion.LONG),
+        label = "state",
+    )
+    val title = when (state) {
+        is ConnectionState.Connected -> "Conectada · ${state.model.removePrefix("Canon ")}"
+        ConnectionState.Connecting -> "Conectando…"
+        ConnectionState.WaitingPermission -> "Permissão USB"
+        ConnectionState.NoCamera -> "Desconectada"
+        is ConnectionState.Failed -> "Falha na conexão"
+        is ConnectionState.Reconnecting -> "Reconectando ${state.attempt}/${com.example.core.camera.Reconnect.TRIES}"
     }
-    val live = state is ConnectionState.Connected
-
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        StateTile(
-            when (state) {
-                is ConnectionState.Connected -> Tone.Accent
-                is ConnectionState.Failed -> Tone.Error
-                else -> Tone.Line
-            },
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleLarge)
-            Text(detail, style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted)
+    val detail = when (state) {
+        is ConnectionState.Connected -> null
+        ConnectionState.Connecting -> "Abrindo sessão com a câmera"
+        ConnectionState.WaitingPermission -> "Toque em Permitir no aviso do Android"
+        ConnectionState.NoCamera -> "Ligue a 50D e conecte o cabo USB OTG"
+        is ConnectionState.Failed -> state.message
+        is ConnectionState.Reconnecting -> "${state.reason}. As fotos feitas agora chegam depois."
+    }
+    val stateLine: @Composable () -> Unit = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (state == ConnectionState.Connecting) com.example.ui.components.BrandLoader(22.dp) else StatusMark(mark, height = 20.dp)
+            Spacer(Modifier.width(Space.m))
+            Column(Modifier.weight(1f)) {
+                androidx.compose.animation.AnimatedContent(
+                    targetState = title,
+                    transitionSpec = {
+                        (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(com.example.ui.components.Motion.SHORT, 80)) +
+                            androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(com.example.ui.components.Motion.MEDIUM, 80, com.example.ui.components.Motion.Emphasized)) { it / 2 }) togetherWith
+                            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(100))
+                    },
+                    label = "title",
+                ) { Text(it, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                detail?.let { com.example.ui.components.RollingText(it, style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted) }
+            }
         }
-        if (!live && state != ConnectionState.Connecting) {
-            OutlinedButton(onClick = onConnect) { Text("Conectar") }
+    }
+    when (state) {
+        is ConnectionState.Connected -> Column(verticalArrangement = Arrangement.spacedBy(Space.s)) {
+            stateLine()
+            // The brand's mint → cyan line: one of the two places the gradient appears (the other is the shutter).
+            Box(Modifier.fillMaxWidth().height(2.dp).clip(MaterialTheme.shapes.extraSmall).background(com.example.ui.theme.BrandGradient))
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.l)) {
+                if (showBattery) status.value(EosProp.BATTERY_POWER)?.let { MiniReadout("Bateria", EosValues.batteryLabel(it)) }
+                status.shotsLeft?.let { MiniReadout("Cartão", "$it") }
+                MiniReadout("Recebidas", "$received")
+            }
+        }
+        ConnectionState.Connecting, is ConnectionState.Reconnecting -> stateLine()
+        // Not connected: connecting is the one thing to do here, so it is the screen's mint button.
+        else -> com.example.ui.components.JrCard {
+            stateLine()
+            com.example.ui.components.JrButton("Conectar câmera", onConnect, Modifier.fillMaxWidth(), icon = Icons.Outlined.Usb)
         }
     }
 }
 
+/** A small label and its value side by side, the value with steady digits. */
 @Composable
-private fun FolderNotice(settings: Settings, onOpenSettings: () -> Unit) {
+private fun MiniReadout(label: String, value: String) {
+    Row(verticalAlignment = Alignment.Bottom) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = Tone.TextMuted)
+        Spacer(Modifier.width(Space.xs + 2.dp))
+        Text(value, style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"), color = Tone.Text)
+    }
+}
+
+@Composable
+private fun FolderNotice(settings: Settings, lost: Set<com.example.core.storage.FileKind>, onOpenSettings: () -> Unit) {
     val missing = buildList {
         if (settings.downloadMode.jpg && settings.jpgFolder == null) add("JPG")
         if (settings.downloadMode.raw && settings.rawFolder == null) add("RAW")
     }
-    if (missing.isEmpty()) return
-    Spacer(Modifier.height(12.dp))
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.small)
-            .background(Tone.Surface)
-            .clickable(onClick = onOpenSettings)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.Outlined.FolderOpen, contentDescription = null, tint = Tone.TextMuted)
-        Spacer(Modifier.width(12.dp))
-        Text(
-            "Pasta ${missing.joinToString(" e ")} não escolhida: as fotos vão para a pasta interna do app. Toque para escolher.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Tone.TextMuted,
+    val gone = lost.filter { it == com.example.core.storage.FileKind.JPG || it == com.example.core.storage.FileKind.RAW }.map { it.folderName }
+    if (missing.isEmpty() && gone.isEmpty()) return
+    Spacer(Modifier.height(Space.m))
+    if (gone.isNotEmpty()) {
+        // The folder that was working stopped (deleted, card out, permission gone): nothing is lost, but say so.
+        com.example.ui.components.JrBanner(
+            com.example.ui.components.BannerKind.Error,
+            "A pasta ${gone.joinToString(" e ")} parou de responder",
+            text = "As fotos estão indo para a pasta interna do app. Toque para escolher a pasta de novo.",
+            onClick = onOpenSettings,
+        )
+    } else {
+        com.example.ui.components.JrBanner(
+            com.example.ui.components.BannerKind.Info,
+            "Pasta ${missing.joinToString(" e ")} não escolhida",
+            text = "As fotos vão para a pasta interna do app. Toque para escolher.",
+            onClick = onOpenSettings,
         )
     }
 }
@@ -356,66 +541,94 @@ private fun ExposureBar(status: CameraStatus, connected: Boolean, onPick: (Strin
     }
 }
 
-/** Camera-app layout: interval timer left, shutter centred, latest frame right (tap to review). */
+/**
+ * The capture controls, fixed where the thumb is: a bar across the bottom when standing, a rail on the
+ * right when lying down. Interval on one side, the shutter in the middle, live view (or the last frame)
+ * on the other.
+ */
 @Composable
-private fun ShutterRow(
+private fun CaptureBar(
+    vertical: Boolean,
     connected: Boolean,
     interval: IntervalState,
-    latest: Photo?,
     shutter: ShutterState,
+    live: Boolean,
+    latest: Photo?,
     onShoot: () -> Unit,
     onInterval: () -> Unit,
+    onLive: () -> Unit,
     onOpenLatest: (Long) -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-            Column(
-                Modifier.clip(MaterialTheme.shapes.small).clickable(enabled = connected, onClick = onInterval).padding(6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Box(
-                    Modifier.size(52.dp).clip(CircleShape).background(if (interval.running) Tone.Accent else Tone.Surface).border(1.dp, Tone.Line, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Outlined.Timer,
-                        contentDescription = null,
-                        tint = if (interval.running) Tone.OnAccent else if (connected) Tone.Text else Tone.TextMuted,
-                    )
-                }
-                Text(
-                    if (interval.running) "${interval.done}/${interval.total}" else "Intervalo",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (connected) Tone.TextMuted else Tone.Line,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
-        }
+    val hint = when (shutter) {
+        is ShutterState.Focusing -> "Focando…"
+        ShutterState.Fired -> "Disparou"
+        is ShutterState.Failed -> "Não disparou"
+        ShutterState.Idle -> if (connected) null else "Conecte a câmera"
+    }
+    val shutterBlock: @Composable () -> Unit = {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            ShutterButton(shutter, connected, 80.dp, Modifier.semantics { contentDescription = "Disparar" }, onShoot)
-            val hint = when (shutter) {
-                is ShutterState.Focusing -> "Focando…"
-                ShutterState.Fired -> "Disparou"
-                is ShutterState.Failed -> "Não disparou"
-                ShutterState.Idle -> null
-            }
-            Text(hint ?: " ", style = MaterialTheme.typography.labelSmall, color = if (shutter is ShutterState.Failed) Tone.Error else Tone.TextMuted)
+            // Smaller and grey until there is a camera to fire: the shutter is the biggest thing on screen only when it works.
+            ShutterButton(shutter, connected, if (connected) 72.dp else 60.dp, Modifier.semantics { contentDescription = "Disparar" }, onShoot)
+            Text(
+                hint ?: " ", style = MaterialTheme.typography.labelSmall, maxLines = 1,
+                color = if (shutter is ShutterState.Failed) Tone.Error else Tone.TextMuted,
+                modifier = Modifier.padding(top = 2.dp),
+            )
         }
-        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-            Box(
-                Modifier
-                    .size(56.dp)
-                    .clip(MaterialTheme.shapes.small)
-                    .background(Tone.Surface)
-                    .border(1.dp, Tone.Line, MaterialTheme.shapes.small)
-                    .clickable(enabled = latest != null) { latest?.let { onOpenLatest(it.id) } },
-            ) {
-                latest?.lookUri?.let {
-                    AsyncImage(model = it, contentDescription = "Última foto", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+    }
+    val intervalBlock: @Composable () -> Unit = {
+        CaptureSide(
+            icon = Icons.Outlined.Timer,
+            label = if (interval.running) "${interval.done}/${interval.total}" else "Intervalo",
+            on = interval.running,
+            enabled = connected,
+            onClick = onInterval,
+        )
+    }
+    val otherBlock: @Composable () -> Unit = {
+        if (live) {
+            CaptureSide(Icons.Outlined.Videocam, "Live view", on = false, enabled = connected, onClick = onLive)
+        } else {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier.size(52.dp).clip(MaterialTheme.shapes.small).background(Tone.SurfaceHigh)
+                        .shutterFlash(latest?.id)
+                        .clickable(enabled = latest != null) { latest?.let { onOpenLatest(it.id) } },
+                ) {
+                    latest?.lookUri?.let {
+                        AsyncImage(model = it, contentDescription = "Última foto", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    }
                 }
+                Text("Última", style = MaterialTheme.typography.labelSmall, color = Tone.TextMuted, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }
+    if (vertical) {
+        Column(
+            Modifier.fillMaxHeight().width(104.dp).background(Tone.Surface).navigationBarsPadding().padding(vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            otherBlock()
+            shutterBlock()
+            intervalBlock()
+        }
+    } else {
+        Row(
+            Modifier.fillMaxWidth().background(Tone.Surface).padding(horizontal = 24.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) { intervalBlock() }
+            shutterBlock()
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { otherBlock() }
+        }
+    }
+}
+
+/** A control beside the shutter: the app's tool tile, mint while it runs (the interval timer). */
+@Composable
+private fun CaptureSide(icon: ImageVector, label: String, on: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    com.example.ui.components.JrTile(icon, label, onClick, enabled = enabled, active = on)
 }
 
 @Composable
@@ -430,8 +643,10 @@ private fun LatestPhoto(
         Modifier
             .fillMaxWidth()
             .aspectRatio(3f / 2f)
-            .clip(MaterialTheme.shapes.large)
+            .clip(MaterialTheme.shapes.medium)
             .background(Tone.Surface)
+            // Every new frame lands with a shutter blink: the photographer sees it arrived without reading.
+            .shutterFlash(photo?.id)
             .clickable(enabled = photo != null) { photo?.let { onOpen(it.id) } },
     ) {
         Crossfade(targetState = photo?.takeIf { it.displayUri != null }, label = "latest") { shown ->
@@ -443,8 +658,8 @@ private fun LatestPhoto(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    BrandSymbol(40.dp, tint = Tone.Line)
-                    Spacer(Modifier.height(12.dp))
+                    com.example.ui.components.BrandLoader(48.dp, still = true)
+                    Spacer(Modifier.height(Space.m))
                     Text(
                         "Cada foto feita pelo botão da câmera ou pelo disparador aparece aqui e é salva sozinha no celular.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -456,33 +671,30 @@ private fun LatestPhoto(
         }
         if (photo != null) {
             Row(
-                Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Tone.Background.copy(alpha = 0.7f)).padding(horizontal = 12.dp, vertical = 8.dp),
+                Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Tone.Scrim).padding(horizontal = Space.m, vertical = Space.s),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(photo.savedBase, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text(photo.savedBase, style = MaterialTheme.typography.labelLarge, color = Tone.OnPhoto, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 Text(
-                    listOfNotNull(photo.shutter, photo.aperture, photo.iso).joinToString("  "),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Tone.TextMuted,
+                    listOfNotNull(photo.shutter, photo.aperture, photo.iso).joinToString("   "),
+                    style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
+                    color = Tone.OnPhoto,
                 )
             }
-            FormatTag(photo.rawUri != null, photo.jpgUri != null, Modifier.align(Alignment.TopEnd).padding(8.dp))
+            FormatTag(photo.rawUri != null, photo.jpgUri != null, Modifier.align(Alignment.TopEnd).padding(Space.s))
         }
     }
     if (transfer != null) {
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Recebendo ${transfer.fileName}" + if (transfer.queued > 0) " · mais ${transfer.queued} na fila" else "",
-            style = MaterialTheme.typography.bodySmall,
-            color = Tone.TextMuted,
-        )
-        Spacer(Modifier.height(4.dp))
-        LinearProgressIndicator(
-            progress = { transfer.progress },
-            modifier = Modifier.fillMaxWidth(),
-            color = Tone.Info,
-            trackColor = Tone.SurfaceHigh,
-        )
+        // The file coming in, with the brand loader filling a block per quarter.
+        Row(Modifier.padding(top = Space.s), verticalAlignment = Alignment.CenterVertically) {
+            com.example.ui.components.BrandLoader(20.dp, progress = transfer.progress)
+            Spacer(Modifier.width(Space.s))
+            Text(
+                "Recebendo ${transfer.fileName}" + if (transfer.queued > 0) " · mais ${transfer.queued} na fila" else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = Tone.TextMuted,
+            )
+        }
     }
 }
 
@@ -495,6 +707,7 @@ private fun RecentStrip(photos: List<Photo>, onOpen: (Long) -> Unit) {
                 contentDescription = photo.savedBase,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
+                    .animateItem()
                     .size(width = 84.dp, height = 56.dp)
                     .clip(MaterialTheme.shapes.extraSmall)
                     .background(Tone.Surface)

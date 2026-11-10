@@ -1,0 +1,119 @@
+/* Fotografia Express: what this page adds to brand.css. */
+
+body { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+main { max-width: 1120px; margin: 0 auto; padding: 0 var(--gutter); }
+
+/* Live status in the top bar: mint while the photographer's phone answers. */
+#live .mark.on { background: var(--mint); }
+#live.lost { color: var(--amber); }
+
+.hello { padding: var(--s5) 0 var(--s4); }
+.eyebrow { margin: 0; font-size: 18px; color: var(--muted); font-weight: 500; }
+.hello h1 { margin: 0; font-size: clamp(34px, 10vw, 52px); line-height: 1.05; font-weight: 600; letter-spacing: -.015em; overflow-wrap: anywhere; }
+.sub { margin: var(--s3) 0 0; font-size: 15px; }
+
+/* How it works, said once: the heart is the whole interaction. */
+.howto { display: flex; gap: var(--s4); align-items: flex-start; background: var(--surface); border-radius: var(--r); padding: var(--s4); margin: 0 0 var(--s4); }
+.howto-icon { flex: none; width: 44px; height: 44px; border-radius: var(--r); background: var(--high); color: var(--text); display: flex; align-items: center; justify-content: center; }
+.howto-icon svg { width: 24px; height: 24px; }
+.howto > div { max-width: 68ch; }
+.howto p { margin: 0; font-size: 14px; }
+.howto .howto-title { font-size: 16px; font-weight: 600; margin-bottom: var(--s1); }
+.price { margin-top: var(--s2) !important; font-size: 15px !important; font-weight: 600; color: var(--text); }
+
+main > .waiting { margin: 0 0 var(--s4); }
+
+/* Newest first, each photo whole: this is a live feed of what was just taken. */
+.feed { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s5); }
+.card { background: var(--surface); border-radius: var(--r); overflow: hidden; animation: rise var(--long) var(--ease) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } }
+.card.new { box-shadow: 0 0 0 2px var(--mint); }
+.shot { position: relative; display: block; width: 100%; border: 0; padding: 0; background: #000; cursor: zoom-in; }
+.shot img { display: block; width: 100%; height: auto; max-height: 78vh; max-height: 78dvh; object-fit: contain; }
+.card-foot { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s3) var(--s3) var(--s4); min-height: 72px; }
+.card-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.card-label b { font-weight: 600; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-label .state { color: var(--muted); font-size: 13px; }
+.card.released .card-label .state { color: var(--text); }
+/* The moment a photo is released: its tag lights up. */
+.card.just .card-label .mark { animation: unlock 700ms var(--ease); }
+@keyframes unlock { 30% { transform: skewX(-16deg) scale(1.8); } }
+
+.empty { text-align: center; padding: var(--s6) var(--s4); max-width: 360px; margin: var(--s4) auto 0; }
+.empty .symbol { width: 72px; height: 72px; margin: 0 auto var(--s4); }
+#closedArt .symbol path { fill: none; stroke: rgba(242, 242, 242, .35); stroke-width: 1.4; }
+.empty-title { font-size: 20px; font-weight: 600; margin: 0 0 var(--s2); }
+.empty .muted { margin: 0; }
+
+/* ---------- Dock ---------- */
+.dock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 9;
+  display: flex; align-items: center; gap: var(--s3); justify-content: space-between;
+  padding: var(--s3) var(--gutter) calc(var(--s3) + env(safe-area-inset-bottom));
+  background: rgba(41, 41, 41, .96); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line); animation: dock-in var(--medium) var(--ease);
+}
+@keyframes dock-in { from { transform: translateY(100%); } }
+.dock-text { margin: 0; display: flex; align-items: center; gap: var(--s2); font-weight: 600; min-width: 0; }
+.dock-text svg { width: 20px; height: 20px; flex: none; color: var(--mint); }
+.dock-text svg .fill { fill: var(--mint); }
+.dock-text span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Name ---------- */
+.welcome { position: fixed; inset: 0; z-index: 35; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: var(--gutter);
+  animation: fade var(--medium) var(--ease); }
+.welcome-card { width: 100%; max-width: 380px; text-align: center; animation: rise var(--long) var(--ease) both; }
+.welcome-art .symbol { width: 64px; height: 64px; margin: 0 auto; }
+.welcome h2 { margin: var(--s5) 0 var(--s2); font-size: 28px; line-height: 1.15; font-weight: 600; }
+.welcome .muted { margin: 0; }
+.welcome form { display: grid; gap: var(--s3); margin-top: var(--s5); }
+.welcome input {
+  font-size: 20px; text-align: center; padding: var(--s3) var(--s4); min-height: 56px; border-radius: var(--r);
+  border: 1.5px solid var(--line); background: var(--surface); color: var(--text); width: 100%;
+}
+.welcome input:focus { outline: none; border-color: var(--mint); }
+.welcome input::placeholder { color: #9a9a9a; }
+.welcome .btn.ghost { margin-top: var(--s2); width: 100%; }
+
+/* ---------- Payment sheet ---------- */
+.sheet { position: fixed; inset: 0; z-index: 32; background: rgba(0, 0, 0, .6); display: flex; align-items: flex-end; justify-content: center; animation: fade var(--medium) var(--ease); }
+.sheet-card {
+  width: 100%; max-width: 520px; max-height: 92vh; max-height: 92dvh; overflow-y: auto;
+  background: var(--surface); border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  padding: var(--s2) var(--s5) calc(var(--s5) + env(safe-area-inset-bottom));
+  animation: up var(--medium) var(--ease) both;
+}
+@keyframes up { from { transform: translateY(48px); opacity: 0; } }
+.grip { display: block; width: 36px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto var(--s3); }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; }
+.sheet-title { margin: 0; font-weight: 600; font-size: 18px; }
+.pay-total { margin: var(--s2) 0 0; font-size: 40px; line-height: 1.1; font-weight: 600; }
+.sheet-card > .muted { margin: var(--s1) 0 0; }
+/* The QR on white, as on the printed plate: bank apps read black on white best. */
+.pix { display: grid; justify-items: center; gap: var(--s3); margin: var(--s5) 0 var(--s2); }
+.pix-plate { background: #fff; border-radius: var(--r); padding: var(--s3); }
+.pix-plate img { display: block; width: 208px; height: 208px; image-rendering: pixelated; }
+.pix .btn { width: 100%; }
+.steps { margin: var(--s4) 0 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: var(--s3); }
+.steps li { counter-increment: step; display: grid; grid-template-columns: 28px 1fr; gap: var(--s3); align-items: start; font-size: 15px; }
+.steps li::before {
+  /* The tilted block cut out with clip-path, so the number inside stays upright. */
+  content: counter(step); width: 30px; height: 24px; clip-path: polygon(23% 0, 100% 0, 77% 100%, 0 100%);
+  background: var(--high); color: var(--text); font-weight: 600; font-size: 13px; display: flex; align-items: center; justify-content: center;
+}
+.steps b { font-weight: 600; }
+.small { font-size: 14px; margin: var(--s3) 0 0; }
+.small:empty { display: none; }
+
+@media (min-width: 720px) {
+  .feed { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .sheet { align-items: center; }
+  .sheet-card { border-radius: var(--r-sheet); }
+}
+@media (min-width: 1100px) { .feed { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (orientation: landscape) and (max-height: 520px) {
+  .hello { padding: var(--s3) 0 var(--s3); }
+  .hello h1 { font-size: 30px; }
+  .feed { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .shot img { max-height: calc(100dvh - 140px); }
+}

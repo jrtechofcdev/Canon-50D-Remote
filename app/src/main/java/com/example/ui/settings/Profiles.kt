@@ -77,6 +77,7 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.material.icons.outlined.Lock
 
 fun ProfileIcon.vector(): ImageVector = when (this) {
     ProfileIcon.Church -> Icons.Outlined.Church
@@ -98,6 +99,7 @@ fun ProfilesSettings(app: TetherApp) {
     var naming by remember { mutableStateOf<SettingsProfile?>(null) }
     var creating by remember { mutableStateOf(false) }
     var restoreAsk by remember { mutableStateOf<String?>(null) }
+    var withSecrets by remember { mutableStateOf(false) }
 
     fun apply(p: SettingsProfile) = scope.launch {
         app.settings.applyProfile(p)
@@ -107,10 +109,10 @@ fun ProfilesSettings(app: TetherApp) {
     val exportFile = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) scope.launch {
             val ok = runCatching {
-                val text = app.appBackup.export(BuildConfig.VERSION_NAME)
+                val text = app.appBackup.export(BuildConfig.VERSION_NAME, includeSecrets = withSecrets)
                 withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(text.toByteArray()) } }
             }.isSuccess
-            Toast.makeText(context, if (ok) "Backup dos ajustes salvo" else "Não deu para salvar o backup", Toast.LENGTH_LONG).show()
+            app.notice(if (ok) "Backup dos ajustes salvo" else "Não deu para salvar o backup. Escolha outra pasta ou confira o espaço do celular.")
         }
     }
     val importFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -118,7 +120,7 @@ fun ProfilesSettings(app: TetherApp) {
             restoreAsk = withContext(Dispatchers.IO) {
                 runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() } }.getOrNull()
             }
-            if (restoreAsk == null) Toast.makeText(context, "Não deu para abrir o arquivo", Toast.LENGTH_LONG).show()
+            if (restoreAsk == null) app.notice("Não deu para abrir o arquivo. Escolha um backup .json salvo pelo app.")
         }
     }
 
@@ -158,6 +160,12 @@ fun ProfilesSettings(app: TetherApp) {
 
     SettingsGroup("Backup dos ajustes", Icons.Outlined.Download) {
         InfoText("Um arquivo .json com todos os ajustes, seus perfis e seus presets (com categorias e favoritos). Guarde no Drive, no pendrive ou mande para outro celular.")
+        ToggleRow(
+            Icons.Outlined.Lock,
+            "Incluir senhas e chave Pix",
+            "Senhas do Wi-Fi, PIN do modo cliente, chave Pix e contatos recentes. Deixe desligado se o arquivo for passar por outras mãos.",
+            withSecrets,
+        ) { withSecrets = it }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
             OutlinedButton(onClick = {
                 val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
@@ -208,7 +216,7 @@ fun ProfilesSettings(app: TetherApp) {
                             onSuccess = { "Restaurado: ${it.settings} ajustes, ${it.profiles} perfis, ${it.presets} presets novos" },
                             onFailure = { it.message ?: "Arquivo inválido" },
                         )
-                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                        app.notice(message)
                     }
                 }) { Text("Restaurar") }
             },

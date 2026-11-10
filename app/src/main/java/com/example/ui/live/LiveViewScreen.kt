@@ -99,6 +99,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.withContext
 import kotlin.math.min
+import androidx.compose.animation.togetherWith
+import com.example.ui.components.pressScale
+import androidx.compose.ui.draw.drawBehind
+import kotlinx.coroutines.launch
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.unit.sp
 
 /** Framing guides drawn over the live picture. */
 enum class LiveGrid(val id: String, val label: String) {
@@ -158,10 +169,14 @@ fun LiveViewScreen(
 
     // Start when the screen opens (and after a reconnect or a change of output); stop when it closes.
     val connected = connection is ConnectionState.Connected
-    LaunchedEffect(connected, settings.liveOnCamera, settings.liveSilentAf, settings.liveFps) {
+    // Started only with the real options: the defaults shown for a moment while they load would start
+    // it once and restart it right away, which the 50D answered with no picture at all.
+    val loaded by remember { app.settings.settings }.collectAsState(initial = null)
+    LaunchedEffect(connected, loaded?.liveOnCamera, loaded?.liveSilentAf, loaded?.liveFps) {
+        val real = loaded ?: return@LaunchedEffect
         if (connected) {
             app.camera.stopLiveView()
-            app.camera.startLiveView(alsoOnCamera = settings.liveOnCamera, silentAf = settings.liveSilentAf, fps = settings.liveFps)
+            app.camera.startLiveView(alsoOnCamera = real.liveOnCamera, silentAf = real.liveSilentAf, fps = real.liveFps)
         }
     }
     DisposableEffect(Unit) {
@@ -186,6 +201,9 @@ fun LiveViewScreen(
     BackHandler { onBack() }
 
     val fire = { app.camera.capture(settings.shutterWait, settings.shutterFocusFirst) }
+    // The 50D turns the depth of field preview down over USB: once it does, the button goes away.
+    val dofSupported by app.camera.dofSupported.collectAsState()
+    val dofAction: ((Boolean) -> Unit)? = if (dofSupported) { on -> app.camera.depthOfFieldPreview(on) } else null
     val onTapPicture = { px: Float, py: Float, mark: Offset ->
         val cx = if (settings.liveMirror) 1f - px else px
         if (settings.liveTapToFocus) {
@@ -203,13 +221,19 @@ fun LiveViewScreen(
         val picture: @Composable (Modifier) -> Unit = { m ->
             Box(m) {
                 LivePicture(frame, settings, live, connected, focusMark, onTapPicture)
+                // Battery and card stay in sight while framing, not only in a notification that came once.
+                com.example.ui.components.CameraWarningChips(
+                    com.example.ui.components.cameraWarnings(status, settings),
+                    Modifier.align(Alignment.BottomStart).padding(8.dp),
+                    onDark = true,
+                )
                 if (controls) HistogramOverlay(frame, Modifier.align(Alignment.TopEnd).padding(8.dp).size(width = 112.dp, height = 52.dp))
                 if (!controls) {
                     // Clean monitor: a small button brings the controls back, and the shutter stays at hand.
                     IconButton(
                         onClick = { controls = true },
-                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(Color.Black.copy(alpha = 0.4f), CircleShape),
-                    ) { Icon(Icons.Outlined.Visibility, contentDescription = "Mostrar controles", tint = Color.White) }
+                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(Tone.Scrim, CircleShape),
+                    ) { Icon(Icons.Outlined.Visibility, contentDescription = "Mostrar controles", tint = Tone.OnPhoto) }
                     ShutterButton(shutter, connected, 60.dp, Modifier.align(if (landscape) Alignment.CenterEnd else Alignment.BottomCenter).padding(16.dp), fire)
                 }
             }
@@ -222,7 +246,7 @@ fun LiveViewScreen(
                     Modifier.fillMaxHeight().width(84.dp).background(Panel).padding(vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Color.White) }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Tone.OnPhoto) }
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         ExposureValues(status) { title, prop -> picker = title to prop }
                     }
@@ -241,13 +265,13 @@ fun LiveViewScreen(
                     ZoomPills(zoom, compact = true) { app.camera.setLiveZoom(it) }
                     ShutterButton(shutter, connected, 76.dp, Modifier, fire)
                     ShutterHint(shutter)
-                    FocusGrid(onAf = { app.camera.liveAutofocus() }, onDrive = { app.camera.driveLens(it) }, onDof = { app.camera.depthOfFieldPreview(it) })
+                    FocusGrid(onAf = { app.camera.liveAutofocus() }, onDrive = { app.camera.driveLens(it) }, onDof = dofAction)
                 }
             }
             else -> Column(Modifier.fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().background(Panel).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Color.White) }
-                    Text(status1, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.8f), maxLines = 1, modifier = Modifier.weight(1f))
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Tone.OnPhoto) }
+                    Text(status1, style = MaterialTheme.typography.labelMedium, color = Tone.OnPhoto.copy(alpha = 0.8f), maxLines = 1, modifier = Modifier.weight(1f))
                     TopActions(app, settings, vertical = false, onOptions = { showOptions = true }, onHide = { controls = false })
                 }
                 picture(Modifier.weight(1f).fillMaxWidth())
@@ -258,7 +282,7 @@ fun LiveViewScreen(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         ExposureValues(status) { title, prop -> picker = title to prop }
                     }
-                    FocusPad(onAf = { app.camera.liveAutofocus() }, onDrive = { app.camera.driveLens(it) }, onDof = { app.camera.depthOfFieldPreview(it) })
+                    FocusPad(onAf = { app.camera.liveAutofocus() }, onDrive = { app.camera.driveLens(it) }, onDof = dofAction)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) { ZoomPills(zoom, compact = false) { app.camera.setLiveZoom(it) } }
                         ShutterButton(shutter, connected, 72.dp, Modifier, fire)
@@ -348,18 +372,18 @@ private fun StatusChip(text: String, modifier: Modifier) {
     Text(
         text,
         style = MaterialTheme.typography.labelSmall,
-        color = Color.White.copy(alpha = 0.85f),
+        color = Tone.OnPhoto.copy(alpha = 0.85f),
         maxLines = 1,
-        modifier = modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.5f)).padding(horizontal = 10.dp, vertical = 4.dp),
+        modifier = modifier.clip(CircleShape).background(Tone.Scrim).padding(horizontal = 10.dp, vertical = 4.dp),
     )
 }
 
 @Composable
 private fun TopActions(app: TetherApp, settings: Settings, vertical: Boolean, onOptions: () -> Unit, onHide: () -> Unit) {
     val items: @Composable () -> Unit = {
-        RotateButton(app, settings.screenOrientation, tint = Color.White)
-        IconButton(onClick = onOptions) { Icon(Icons.Outlined.Layers, contentDescription = "Preset, guias e ajustes do monitor", tint = Color.White) }
-        IconButton(onClick = onHide) { Icon(Icons.Outlined.Fullscreen, contentDescription = "Só a imagem", tint = Color.White) }
+        RotateButton(app, settings.screenOrientation, tint = Tone.OnPhoto)
+        IconButton(onClick = onOptions) { Icon(Icons.Outlined.Layers, contentDescription = "Preset, guias e ajustes do monitor", tint = Tone.OnPhoto) }
+        IconButton(onClick = onHide) { Icon(Icons.Outlined.Fullscreen, contentDescription = "Só a imagem", tint = Tone.OnPhoto) }
     }
     if (vertical) Column(horizontalAlignment = Alignment.CenterHorizontally) { items() } else Row { items() }
 }
@@ -367,27 +391,65 @@ private fun TopActions(app: TetherApp, settings: Settings, vertical: Boolean, on
 /** The app's shutter: a ring that spins while the camera focuses, and flashes when it fires or fails. */
 @Composable
 fun ShutterButton(state: ShutterState, enabled: Boolean, size: androidx.compose.ui.unit.Dp, modifier: Modifier, onClick: () -> Unit) {
-    val ring = when {
-        !enabled -> Tone.Line
-        state is ShutterState.Failed -> Tone.Error
-        state == ShutterState.Fired -> Color.White
-        else -> Tone.Accent
+    val ring by androidx.compose.animation.animateColorAsState(
+        when {
+            !enabled -> Tone.Line
+            state is ShutterState.Failed -> Tone.Error
+            state == ShutterState.Fired -> Tone.OnPhoto
+            else -> Tone.Accent
+        },
+        androidx.compose.animation.core.tween(180),
+        label = "ring",
+    )
+    // On each shot: the disc closes like the shutter curtain and a ring spreads out from the button.
+    val burst = remember { androidx.compose.animation.core.Animatable(1f) }
+    val curtain = remember { androidx.compose.animation.core.Animatable(1f) }
+    LaunchedEffect(state) {
+        if (state == ShutterState.Fired) {
+            launch { burst.snapTo(0f); burst.animateTo(1f, androidx.compose.animation.core.tween(520, easing = androidx.compose.animation.core.LinearOutSlowInEasing)) }
+            curtain.snapTo(0.82f)
+            curtain.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 380f))
+        }
     }
-    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+    Box(
+        modifier.size(size).drawBehind {
+            if (burst.value < 1f) {
+                drawCircle(
+                    Color.White.copy(alpha = 0.6f * (1f - burst.value)),
+                    radius = this.size.minDimension / 2f * (1f + 0.45f * burst.value),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(3.dp.toPx() * (1f - burst.value) + 1f),
+                )
+            }
+        },
+        contentAlignment = Alignment.Center,
+    ) {
         if (state is ShutterState.Focusing) {
             CircularProgressIndicator(color = Tone.Accent, strokeWidth = 3.dp, modifier = Modifier.fillMaxSize())
         }
         Box(
-            Modifier.fillMaxSize().clip(CircleShape).border(3.dp, if (state is ShutterState.Focusing) Color.Transparent else ring, CircleShape).padding(7.dp).clip(CircleShape)
+            Modifier.fillMaxSize().graphicsLayer { scaleX = curtain.value; scaleY = curtain.value }
+                .then(if (enabled) Modifier.pressScale(0.9f) else Modifier)
+                .clip(CircleShape).border(3.dp, if (state is ShutterState.Focusing) Color.Transparent else ring, CircleShape).padding(7.dp).clip(CircleShape)
                 .background(if (enabled) BrandGradient else androidx.compose.ui.graphics.SolidColor(Color.Gray))
                 .clickable(enabled = enabled && state !is ShutterState.Focusing, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            when (state) {
-                is ShutterState.Focusing -> Icon(Icons.Outlined.CenterFocusWeak, contentDescription = "Focando", tint = Color.Black.copy(alpha = 0.7f))
-                ShutterState.Fired -> Icon(Icons.Outlined.Check, contentDescription = "Disparou", tint = Color.Black.copy(alpha = 0.7f))
-                is ShutterState.Failed -> Icon(Icons.Outlined.ErrorOutline, contentDescription = "Não disparou", tint = Color.Black.copy(alpha = 0.7f))
-                ShutterState.Idle -> Icon(Icons.Outlined.PhotoCamera, contentDescription = "Disparar", tint = Color.Black.copy(alpha = 0.55f))
+            androidx.compose.animation.AnimatedContent(
+                targetState = state,
+                contentKey = { it::class },
+                transitionSpec = {
+                    (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(160)) +
+                        androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(220), initialScale = 0.6f)) togetherWith
+                        androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(90))
+                },
+                label = "shutterIcon",
+            ) { st ->
+                when (st) {
+                    is ShutterState.Focusing -> Icon(Icons.Outlined.CenterFocusWeak, contentDescription = "Focando", tint = Tone.Scrim)
+                    ShutterState.Fired -> Icon(Icons.Outlined.Check, contentDescription = "Disparou", tint = Tone.Scrim)
+                    is ShutterState.Failed -> Icon(Icons.Outlined.ErrorOutline, contentDescription = "Não disparou", tint = Tone.Scrim)
+                    ShutterState.Idle -> Icon(Icons.Outlined.PhotoCamera, contentDescription = "Disparar", tint = Tone.Scrim)
+                }
             }
         }
     }
@@ -401,7 +463,7 @@ private fun ShutterHint(state: ShutterState) {
         is ShutterState.Failed -> "Não disparou"
         ShutterState.Idle -> ""
     }
-    Text(text, style = MaterialTheme.typography.labelMedium, color = if (state is ShutterState.Failed) Tone.Error else Color.White.copy(alpha = 0.8f), maxLines = 1)
+    Text(text, style = MaterialTheme.typography.labelMedium, color = if (state is ShutterState.Failed) Tone.Error else Tone.OnPhoto.copy(alpha = 0.8f), maxLines = 1)
 }
 
 @Composable
@@ -413,27 +475,27 @@ private fun ZoomPills(zoom: Int, compact: Boolean, onZoom: (Int) -> Unit) {
 
 /**
  * Focus by hand with the lens in AF: far on the left (mountain), near on the right (flower), like the
- * camera's own symbols; AF in the middle; DOF works while held.
+ * camera's own symbols; AF in the middle; DOF works while held (only where the camera does it).
  */
 @Composable
-private fun FocusPad(onAf: () -> Unit, onDrive: (Int) -> Unit, onDof: (Boolean) -> Unit) {
+private fun FocusPad(onAf: () -> Unit, onDrive: (Int) -> Unit, onDof: ((Boolean) -> Unit)?) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
         FocusIcon(Icons.Outlined.Landscape, "Longe", -3, onDrive)
         FocusIcon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "Um pouco mais longe", -1, onDrive)
         AfButton(onAf)
         FocusIcon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "Um pouco mais perto", 1, onDrive)
         FocusIcon(Icons.Outlined.LocalFlorist, "Perto", 3, onDrive)
-        HoldIcon(Icons.Outlined.Deblur, "Profundidade de campo (segure)", onDof)
+        onDof?.let { HoldIcon(Icons.Outlined.Deblur, "Profundidade de campo (segure)", it) }
     }
 }
 
 /** The same controls in two short rows, for the side rail when the phone lies down. */
 @Composable
-private fun FocusGrid(onAf: () -> Unit, onDrive: (Int) -> Unit, onDof: (Boolean) -> Unit) {
+private fun FocusGrid(onAf: () -> Unit, onDrive: (Int) -> Unit, onDof: ((Boolean) -> Unit)?) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             AfButton(onAf)
-            HoldIcon(Icons.Outlined.Deblur, "Profundidade de campo (segure)", onDof)
+            onDof?.let { HoldIcon(Icons.Outlined.Deblur, "Profundidade de campo (segure)", it) }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             FocusIcon(Icons.Outlined.Landscape, "Longe", -3, onDrive, small = true)
@@ -447,15 +509,16 @@ private fun FocusGrid(onAf: () -> Unit, onDrive: (Int) -> Unit, onDof: (Boolean)
 @Composable
 private fun AfButton(onAf: () -> Unit) {
     Box(
-        Modifier.size(44.dp).clip(CircleShape).background(Tone.Accent.copy(alpha = 0.2f)).border(1.dp, Tone.Accent, CircleShape).clickable(onClick = onAf),
+        Modifier.size(48.dp).clip(CircleShape).background(Tone.Accent.copy(alpha = 0.2f)).border(1.dp, Tone.Accent, CircleShape).clickable(onClick = onAf),
         contentAlignment = Alignment.Center,
     ) { Icon(Icons.Outlined.CenterFocusStrong, contentDescription = "Focar (AF)", tint = Tone.Accent) }
 }
 
 @Composable
 private fun FocusIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, step: Int, onDrive: (Int) -> Unit, small: Boolean = false) {
-    IconButton(onClick = { onDrive(step) }, modifier = if (small) Modifier.size(32.dp) else Modifier) {
-        Icon(icon, contentDescription = label, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(if (small) 20.dp else 24.dp))
+    // Always a full 48 dp target, even where the icon is drawn small.
+    IconButton(onClick = { onDrive(step) }) {
+        Icon(icon, contentDescription = label, tint = Tone.OnPhoto.copy(alpha = 0.85f), modifier = Modifier.size(if (small) 20.dp else 24.dp))
     }
 }
 
@@ -463,8 +526,18 @@ private fun FocusIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
 @Composable
 private fun HoldIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onHold: (Boolean) -> Unit) {
     var held by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     Box(
-        Modifier.size(44.dp).clip(CircleShape).background(if (held) Tone.Accent else Color.White.copy(alpha = 0.1f))
+        Modifier.size(48.dp).clip(CircleShape).background(if (held) Tone.Accent else Tone.OnPhoto.copy(alpha = 0.1f))
+            // TalkBack can't hold a button: a double tap shows the depth of field for 3 seconds instead.
+            .semantics {
+                contentDescription = label
+                role = androidx.compose.ui.semantics.Role.Button
+                onClick(label) {
+                    scope.launch { held = true; onHold(true); kotlinx.coroutines.delay(3_000); held = false; onHold(false) }
+                    true
+                }
+            }
             .pointerInput(Unit) {
                 detectTapGestures(onPress = {
                     held = true
@@ -475,7 +548,7 @@ private fun HoldIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, labe
                 })
             },
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, contentDescription = label, tint = if (held) Tone.OnAccent else Color.White) }
+    ) { Icon(icon, contentDescription = label, tint = if (held) Tone.OnAccent else Tone.OnPhoto) }
 }
 
 private fun statusLine(live: LiveState, hasLook: Boolean, lookName: String?): String = when (live) {
@@ -493,11 +566,11 @@ private fun statusLine(live: LiveState, hasLook: Boolean, lookName: String?): St
 private fun LiveWaiting(live: LiveState, connected: Boolean, modifier: Modifier) {
     Column(modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         when {
-            !connected -> Text("Conecte a 50D pelo cabo para ver a imagem ao vivo.", color = Color.White.copy(alpha = 0.8f))
-            live is LiveState.Failed -> Text(live.message, color = Color.White.copy(alpha = 0.85f))
+            !connected -> Text("Conecte a 50D pelo cabo para ver a imagem ao vivo.", color = Tone.OnPhoto.copy(alpha = 0.8f))
+            live is LiveState.Failed -> Text(live.message, color = Tone.OnPhoto.copy(alpha = 0.85f))
             else -> {
-                CircularProgressIndicator(color = Tone.Info)
-                Text("Ligando o live view da câmera…", color = Color.White.copy(alpha = 0.8f))
+                com.example.ui.components.BrandLoader(64.dp)
+                Text("Ligando o live view da câmera…", color = Tone.OnPhoto.copy(alpha = 0.8f))
             }
         }
     }
@@ -518,29 +591,24 @@ private fun ExposureValues(status: com.example.core.camera.CameraStatus, onPick:
 @Composable
 private fun Value(label: String, value: String, enabled: Boolean, onClick: () -> Unit) {
     Column(
-        Modifier.clip(MaterialTheme.shapes.small).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 8.dp, vertical = 2.dp),
+        Modifier.clip(MaterialTheme.shapes.small).clickable(enabled = enabled, onClick = onClick).heightIn(min = 48.dp).padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
-        Text(value, style = MaterialTheme.typography.labelLarge, color = if (enabled) Color.White else Color.White.copy(alpha = 0.5f))
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Tone.OnPhoto.copy(alpha = 0.6f))
+        Text(value, style = com.example.ui.theme.ReadoutStyle.copy(fontSize = 16.sp), color = if (enabled) Tone.OnPhoto else Tone.OnPhoto.copy(alpha = 0.5f))
     }
 }
 
 @Composable
 private fun Pill(label: String, selected: Boolean, compact: Boolean = false, onClick: () -> Unit) {
-    Text(
-        label,
-        style = MaterialTheme.typography.labelLarge,
-        color = if (selected) Tone.OnAccent else Color.White,
-        modifier = Modifier.clip(CircleShape).background(if (selected) Tone.Accent else Color.White.copy(alpha = 0.14f))
-            .clickable(onClick = onClick).padding(horizontal = if (compact) 9.dp else 14.dp, vertical = 8.dp),
-    )
+    com.example.ui.components.PhotoChip(label, selected, onClick, compact = compact)
 }
 
 @Composable
 private fun Histogram(bins: List<IntArray>, modifier: Modifier) {
-    val colors = listOf(Color(0x66FFFFFF), Color(0xFFE5484D), Color(0xFF46A758), Color(0xFF3E63DD))
-    Canvas(modifier.clip(MaterialTheme.shapes.extraSmall).background(Color.Black.copy(alpha = 0.5f))) {
+    val colors = listOf(Color(0x66FFFFFF), Tone.Red, Tone.Green, Tone.Blue)
+    Canvas(modifier.clip(MaterialTheme.shapes.extraSmall).background(Tone.Scrim)) {
         val max = bins.drop(1).maxOf { it.max() }.coerceAtLeast(1)
         bins.forEachIndexed { c, b ->
             if (c == 0) return@forEachIndexed
@@ -574,7 +642,7 @@ private fun DrawScope.drawGuides(r: Rect, grid: LiveGrid) {
         if (r.width / r.height > aspect) { fh = r.height; fw = fh * aspect } else { fw = r.width; fh = fw / aspect }
         val left = r.left + (r.width - fw) / 2
         val top = r.top + (r.height - fh) / 2
-        val dim = Color.Black.copy(alpha = 0.45f)
+        val dim = Color.Black.copy(alpha = 0.55f)
         drawRect(dim, r.topLeft, Size(left - r.left, r.height))
         drawRect(dim, Offset(left + fw, r.top), Size(r.right - left - fw, r.height))
         drawRect(dim, r.topLeft, Size(r.width, top - r.top))

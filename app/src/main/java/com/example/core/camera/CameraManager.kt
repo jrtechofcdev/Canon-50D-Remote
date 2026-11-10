@@ -13,6 +13,7 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import com.example.core.data.ExposurePreset
+import com.example.core.log.AppLog
 import com.example.core.ptp.DeviceInfo
 import com.example.core.ptp.EosValues
 import com.example.core.ptp.ObjectInfo
@@ -47,9 +48,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.sync.withLock
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.async
 
 sealed interface ConnectionState {
     data object NoCamera : ConnectionState
@@ -57,6 +60,19 @@ sealed interface ConnectionState {
     data object Connecting : ConnectionState
     data class Connected(val model: String, val serial: String) : ConnectionState
     data class Failed(val message: String) : ConnectionState
+
+    /**
+     * The link dropped with the cable still in (a USB hiccup, the camera's auto power off): the app is
+     * trying again on its own, [attempt] of [Reconnect.TRIES].
+     */
+    data class Reconnecting(val attempt: Int, val reason: String) : ConnectionState
+}
+
+/** How long to wait before each new try after the link drops: 1, 2, 4, 8, 16 and then 30 s. */
+object Reconnect {
+    const val TRIES = 10
+
+    fun delayMs(attempt: Int): Long = (1_000L shl (attempt - 1).coerceIn(0, 5)).coerceAtMost(30_000L)
 }
 
 /** Live view: off, starting, streaming (with measured frame rate and camera zoom), or failed with a hint. */
@@ -94,7 +110,7 @@ class CameraManager(
     private val syncClock: suspend () -> Boolean = { false },
     private val onClockRefused: suspend () -> Unit = {},
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + AppLog.handler("CAMERA"))
     private val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
 
     private val _state = MutableStateFlow<ConnectionState>(ConnectionState.NoCamera)
@@ -103,7 +119,8 @@ class CameraManager(
     private val _status = MutableStateFlow(CameraStatus())
     val status: StateFlow<CameraStatus> = _status.asStateFlow()
 
-    private val _newObjects = MutableSharedFlow<EosEventRecord.ObjectAdded>(extraBufferCapacity = 64)
+    // Room for a long burst (RAW + JPG of every frame) while the download side is busy.
+    private val _newObjects = MutableSharedFlow<EosEventRecord.ObjectAdded>(extraBufferCapacity = 1024)
     val newObjects: SharedFlow<EosEventRecord.ObjectAdded> = _newObjects.asSharedFlow()
 
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 8)
@@ -129,19 +146,35 @@ class CameraManager(
     private val _liveFrames = MutableSharedFlow<ByteArray>(replay = 1, extraBufferCapacity = 0, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val liveFrames: SharedFlow<ByteArray> = _liveFrames.asSharedFlow()
     private var liveJob: Job? = null
+    /** The "turn live view off" still on its way to the camera; a new start waits for it. */
+    private var liveStopJob: Job? = null
     @Volatile private var liveZoom = 1
     /** Set while the shutter works, so live view stops asking for frames and the camera can focus and fire. */
     @Volatile private var liveHold = false
+    /** Live view AF runs on the sensor ("Modo Live"): slower, so every wait around it is longer. */
+    @Volatile private var liveSilentAf = false
+    private var afJob: kotlinx.coroutines.Job? = null
     @Volatile private var liveFrameMs = 50L
 
     private val _shutter = MutableStateFlow<ShutterState>(ShutterState.Idle)
     val shutter: StateFlow<ShutterState> = _shutter.asStateFlow()
+    /** One shot at a time: the intervalometer and the button never send RemoteRelease together. */
+    private val shotLock = kotlinx.coroutines.sync.Mutex()
+    /** Live view ran in this session: a camera stuck "busy" afterwards gets live view turned off again. */
+    @Volatile private var liveUsed = false
+
+    /** False once the camera turns down the depth of field preview (the 50D does over USB): the button goes away. */
+    private val _dofSupported = MutableStateFlow(true)
+    val dofSupported: StateFlow<Boolean> = _dofSupported.asStateFlow()
 
     private var session: PtpSession? = null
     private var device: UsbDevice? = null
     private var deviceInfo: DeviceInfo? = null
     private var sessionJob: Job? = null
     private var intervalJob: Job? = null
+    private var retryJob: Job? = null
+    /** How each try during a reconnect ended: true = connected, false = failed. */
+    private val attemptEnded = MutableSharedFlow<Boolean>(extraBufferCapacity = 4)
 
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
@@ -155,8 +188,9 @@ class CameraManager(
                     }
                 }
                 UsbManager.ACTION_USB_DEVICE_ATTACHED -> findAndConnect()
-                UsbManager.ACTION_USB_DEVICE_DETACHED -> if (dev != null && dev.deviceName == device?.deviceName) {
+                UsbManager.ACTION_USB_DEVICE_DETACHED -> if (dev != null && (dev.deviceName == device?.deviceName || _state.value is ConnectionState.Reconnecting)) {
                     log("Cabo desconectado")
+                    retryJob?.cancel()
                     val wasConnected = _state.value is ConnectionState.Connected
                     closeSession()
                     _state.value = ConnectionState.NoCamera
@@ -178,10 +212,9 @@ class CameraManager(
     /** Looks for a Canon still-image device and connects, asking for USB permission if needed. */
     fun findAndConnect() {
         if (_state.value is ConnectionState.Connected || _state.value == ConnectionState.Connecting) return
-        val camera = usbManager.deviceList.values
-            .filter { stillImageInterface(it) != null }
-            .sortedByDescending { it.vendorId == CANON_VENDOR_ID }
-            .firstOrNull()
+        // Tapping Conectar while the app is already retrying: the tap takes over right now.
+        retryJob?.cancel()
+        val camera = attachedCamera()
         if (camera == null) {
             _state.value = ConnectionState.NoCamera
             return
@@ -197,20 +230,61 @@ class CameraManager(
         }
     }
 
-    private fun open(dev: UsbDevice) {
-        if (_state.value is ConnectionState.Connected) return
-        _state.value = ConnectionState.Connecting
+    private fun attachedCamera(): UsbDevice? = usbManager.deviceList.values
+        .filter { stillImageInterface(it) != null }
+        .sortedByDescending { it.vendorId == CANON_VENDOR_ID }
+        .firstOrNull()
+
+    /**
+     * The link dropped while the cable is still in: try again on our own, waiting a little longer each
+     * time, until the camera answers, the cable comes out or [Reconnect.TRIES] are used up.
+     */
+    private fun reconnect(reason: String) {
+        retryJob?.cancel()
+        retryJob = scope.launch {
+            for (attempt in 1..Reconnect.TRIES) {
+                _state.value = ConnectionState.Reconnecting(attempt, reason)
+                kotlinx.coroutines.delay(Reconnect.delayMs(attempt))
+                val dev = attachedCamera()
+                if (dev == null) {
+                    _state.value = ConnectionState.NoCamera
+                    return@launch
+                }
+                if (!usbManager.hasPermission(dev)) break
+                log("Reconectando (tentativa $attempt de ${Reconnect.TRIES})")
+                // The session opens on its own coroutine: listen before opening, then wait for how it ended.
+                val ended = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                    withTimeoutOrNull(20_000) { attemptEnded.first() }
+                }
+                open(dev, retrying = true)
+                if (ended.await() == true) {
+                    log("Câmera reconectada")
+                    _messages.tryEmit("Câmera reconectada")
+                    return@launch
+                }
+                if (session != null) closeSession()
+                _state.value = ConnectionState.Reconnecting(attempt, reason)
+            }
+            _state.value = ConnectionState.Failed("$reason. Confira a câmera e toque em Conectar.")
+        }
+    }
+
+    private fun open(dev: UsbDevice, retrying: Boolean = false) {
+        // Two "permission granted" answers (two taps on Conectar) must not open the camera twice: the
+        // second connection would replace the first without ever closing it.
+        if (_state.value is ConnectionState.Connected || session != null) return
+        if (!retrying) _state.value = ConnectionState.Connecting
         val iface = stillImageInterface(dev)
         val endpoints = iface?.let { UsbPtpTransport.endpointsOf(it) }
         val connection = usbManager.openDevice(dev)
         if (iface == null || endpoints == null || connection == null) {
             connection?.close()
-            _state.value = ConnectionState.Failed("Não foi possível abrir a câmera pela USB.")
+            if (retrying) attemptEnded.tryEmit(false) else _state.value = ConnectionState.Failed("Não foi possível abrir a câmera pela USB.")
             return
         }
         if (!connection.claimInterface(iface, true)) {
             connection.close()
-            _state.value = ConnectionState.Failed("Outro app está usando a câmera. Feche-o e tente de novo.")
+            if (retrying) attemptEnded.tryEmit(false) else _state.value = ConnectionState.Failed("Outro app está usando a câmera. Feche-o e tente de novo.")
             return
         }
         val transport = UsbPtpTransport(connection, iface, endpoints.first, endpoints.second)
@@ -226,6 +300,8 @@ class CameraManager(
             ptp.openSession()
             val info = DeviceInfo.parse(ptp.transactForData(PtpOp.GET_DEVICE_INFO))
             deviceInfo = info
+            liveUsed = false
+            _dofSupported.value = info.supports(PtpOp.EOS_DOF_PREVIEW)
             log("Câmera: ${info.manufacturer} ${info.model} (firmware ${info.version})")
 
             // Remote mode + event mode is what EOS Utility uses for tethering. No UI lock is sent,
@@ -246,6 +322,7 @@ class CameraManager(
             if (syncClock()) setCameraClock(ptp)
 
             _state.value = ConnectionState.Connected(info.model.ifBlank { "Canon EOS" }, info.serial)
+            attemptEnded.tryEmit(true)
             log("Pronto: captura vinculada ativa")
             eventLoop(ptp, info)
         } catch (e: Exception) {
@@ -253,8 +330,23 @@ class CameraManager(
                 log("Erro: ${e.message}")
                 val wasConnected = _state.value is ConnectionState.Connected
                 closeSession()
-                _state.value = ConnectionState.Failed(e.message ?: "Falha na comunicação com a câmera")
-                if (wasConnected) _lostConnection.tryEmit("Conexão com a câmera perdida")
+                val reason = e.message ?: "Falha na comunicação com a câmera"
+                when {
+                    // A try inside a reconnect: the screen keeps saying "Reconectando", the loop decides.
+                    retryJob?.isActive == true -> attemptEnded.tryEmit(false)
+                    // A link that was working drops with the cable still in: try again on our own.
+                    wasConnected && attachedCamera() != null -> {
+                        _lostConnection.tryEmit("Conexão com a câmera perdida")
+                        reconnect("Conexão perdida")
+                    }
+                    else -> {
+                        _state.value = ConnectionState.Failed(reason)
+                        if (wasConnected) _lostConnection.tryEmit("Conexão com a câmera perdida")
+                    }
+                }
+            } else {
+                // A session that was already replaced still holds the USB interface: let it go.
+                runCatching { ptp.close() }
             }
         }
     }
@@ -288,7 +380,8 @@ class CameraManager(
                 _status.update { it.copy(options = it.options + (record.prop to record.values)) }
             is EosEventRecord.ObjectAdded -> if (announceObjects && !record.isFolder) {
                 log("Nova foto: ${record.filename} (${record.size / 1024} KB)")
-                _newObjects.tryEmit(record)
+                // Never silent: a frame that couldn't be announced is found again by the search for missed frames.
+                if (!_newObjects.tryEmit(record)) AppLog.w("CAMERA", "Fila de fotos novas cheia: ${record.filename} fica para a busca de fotos perdidas")
             }
         }
     }
@@ -307,25 +400,44 @@ class CameraManager(
     fun capture(waitSeconds: Int = 5, focusFirst: Boolean = false) {
         val ptp = session ?: return
         val info = deviceInfo ?: return
-        if (_shutter.value is ShutterState.Focusing) return
+        // A log showed the button and the intervalometer firing together: both got "busy" and neither fired.
+        if (_interval.value.running) {
+            _messages.tryEmit("O intervalômetro está disparando. Pare o intervalômetro para usar o botão.")
+            return
+        }
+        if (_bracketing.value != null) {
+            _messages.tryEmit("O bracketing está disparando. Espere a série terminar.")
+            return
+        }
+        // Marked busy before anything starts, so a double tap fires once.
+        val before = _shutter.value
+        if (before is ShutterState.Focusing || !_shutter.compareAndSet(before, ShutterState.Focusing(0))) return
         scope.launch {
-            _shutter.value = ShutterState.Focusing(0)
             val inLive = liveJob?.isActive == true
             liveHold = true
             try {
-                if (focusFirst && inLive) {
-                    runCatching { ptp.transact(PtpOp.EOS_DO_AF) }
-                    delay(AF_SETTLE_MS)
-                }
-                ShutterRelease.fire(ptp, info.supports(PtpOp.EOS_REMOTE_RELEASE), waitSeconds.coerceIn(1, 15) * 1000L) {
-                    _shutter.value = ShutterState.Focusing(it)
+                shotLock.withLock {
+                    if (inLive) {
+                        // A tap-AF still running (or never closed) makes the next release come back busy or do
+                        // nothing: finish it first, the way the camera expects.
+                        afJob?.cancel()
+                        cancelAf(ptp, "antes do disparo")
+                        if (focusFirst) {
+                            runAf(ptp, "antes do disparo")
+                            cancelAf(ptp, "depois do foco")
+                        }
+                    }
+                    // Contrast AF ("Modo Live") can take a few seconds per try; give the release more room.
+                    val wait = (waitSeconds.coerceIn(1, 15) + if (inLive && liveSilentAf) 4 else 0) * 1000L
+                    AppLog.i("DISPARO", "Disparando${if (inLive) " no live view (AF ${if (liveSilentAf) "Live" else "rápido"})" else ""}, espera até ${wait / 1000} s${evfNote()}")
+                    fireLogged(ptp, info, wait, inLive) { _shutter.value = ShutterState.Focusing(it) }
                 }
                 _shutter.value = ShutterState.Fired
                 log("Disparo feito")
             } catch (e: PtpException) {
                 _shutter.value = ShutterState.Failed(e.message ?: "A câmera não disparou")
                 _messages.tryEmit("Não disparou: ${e.message}")
-                log("Disparo falhou: ${e.message}")
+                AppLog.e("DISPARO", "Disparo falhou: ${e.message}")
             } finally {
                 // In live view the mirror cycles after the shot; give it a moment before asking for frames.
                 if (inLive) delay(LIVE_AFTER_SHOT_MS)
@@ -336,8 +448,51 @@ class CameraManager(
         }
     }
 
-    private suspend fun releaseShutter(ptp: PtpSession, info: DeviceInfo) =
-        ShutterRelease.fire(ptp, info.supports(PtpOp.EOS_REMOTE_RELEASE), 5_000)
+    /**
+     * RemoteRelease with every answer of the camera written to the log, so the next log says whether
+     * it was "busy", "not ready" or "no focus". When the camera stays busy, the AF is closed and, after
+     * live view was used, live view is turned off once more before the next tries.
+     */
+    private suspend fun fireLogged(ptp: PtpSession, info: DeviceInfo, waitMs: Long, inLive: Boolean, onWaiting: (Long) -> Unit = {}) =
+        ShutterRelease.fire(
+            ptp,
+            info.supports(PtpOp.EOS_REMOTE_RELEASE),
+            waitMs,
+            onStuck = {
+                val closeLive = !inLive && liveUsed
+                AppLog.w("DISPARO", "Câmera ocupada há ${ShutterRelease.STUCK_MS / 1000.0} s: fechando o AF${if (closeLive) " e o live view" else ""}")
+                cancelAf(ptp, "câmera ocupada")
+                if (closeLive) {
+                    runCatching { setPropertyNow(ptp, EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_OFF) }
+                        .onFailure { AppLog.w("DISPARO", "A câmera não aceitou desligar o live view: ${it.message}") }
+                }
+            },
+            report = { AppLog.i("DISPARO", "Respostas da câmera: $it") },
+            onWaiting = onWaiting,
+        )
+
+    /** Where the camera says live view is going, for the log: tells a camera left in live view apart. */
+    private fun evfNote(): String = _status.value.value(EosProp.EVF_OUTPUT_DEVICE)?.let { " · saída do live view na câmera: $it" } ?: ""
+
+    /** Starts AF and waits the time the chosen live view AF needs; the answer code goes to the log. */
+    private suspend fun runAf(ptp: PtpSession, why: String): Boolean = try {
+        ptp.transact(PtpOp.EOS_DO_AF)
+        AppLog.i("FOCO", "AF iniciado ($why)")
+        delay(if (liveSilentAf) AF_WAIT_LIVE_MS else AF_WAIT_QUICK_MS)
+        true
+    } catch (e: PtpResponseException) {
+        AppLog.w("FOCO", "AF recusado ($why): código 0x%04X".format(e.code))
+        false
+    } catch (e: PtpException) {
+        AppLog.w("FOCO", "AF falhou ($why): ${e.message}")
+        false
+    }
+
+    /** Ends the AF operation (the lens keeps its focus). Without it the 50D may refuse what comes next. */
+    private suspend fun cancelAf(ptp: PtpSession, why: String) {
+        runCatching { ptp.transact(PtpOp.EOS_AF_CANCEL) }
+            .onFailure { AppLog.w("FOCO", "Fim do AF ($why) não aceito: ${it.message}") }
+    }
 
     fun setProperty(prop: Int, value: Int) {
         val ptp = session ?: return
@@ -385,7 +540,15 @@ class CameraManager(
         val ptp = session ?: return
         if (liveJob?.isActive == true) return
         liveFrameMs = 1000L / fps.coerceIn(5, 30)
-        liveJob = scope.launch { runLiveView(ptp, alsoOnCamera, silentAf) }
+        // No picture from an earlier session: the screen waits for this camera's first frame.
+        _liveFrames.resetReplayCache()
+        val pendingStop = liveStopJob
+        liveJob = scope.launch {
+            // A stop sent just before (reopening the screen, a changed option) must reach the camera
+            // first; otherwise its "off" lands after this "on" and no frame ever comes.
+            pendingStop?.join()
+            runLiveView(ptp, alsoOnCamera, silentAf)
+        }
     }
 
     fun stopLiveView() {
@@ -393,22 +556,44 @@ class CameraManager(
         liveJob = null
         job.cancel()
         _live.value = LiveState.Off
+        _liveFrames.resetReplayCache()
         val ptp = session ?: return
-        scope.launch {
+        liveStopJob = scope.launch {
+            job.join()
             runCatching { if (liveZoom != 1) ptp.transact(PtpOp.EOS_ZOOM, 1) }
             runCatching { setPropertyNow(ptp, EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_OFF) }
+                .onFailure { log("A câmera não aceitou desligar o live view: ${it.message}") }
+            // An AF left open in live view kept every later shot "busy" in a 5.0 log; close it on the way out.
+            cancelAf(ptp, "ao sair do live view")
             liveZoom = 1
+            log("Live view desligado")
+            // The camera reports its live view output by event; write what it says, for the next log.
+            // Apart from the stop itself, so reopening live view doesn't wait for it.
+            scope.launch {
+                delay(800)
+                _status.value.value(EosProp.EVF_OUTPUT_DEVICE)?.let { log("Saída do live view na câmera depois de desligar: $it") }
+            }
         }
     }
 
     private suspend fun runLiveView(ptp: PtpSession, alsoOnCamera: Boolean, silentAf: Boolean) {
         _live.value = LiveState.Starting
+        liveUsed = true
+        liveSilentAf = silentAf
+        if (!silentAf) {
+            // Quick mode (the mirror drops for AF): the most reliable on the 50D, and the one that also
+            // undoes a "Modo Live" left set by an earlier version.
+            runCatching { setPropertyNow(ptp, EosProp.LV_AF_SYSTEM, EosProp.LV_AF_QUICK) }
+                .onSuccess { log("AF do live view: Modo rápido") }
+                .onFailure { log("A câmera não aceitou o AF rápido pelo cabo: ${it.message}") }
+        }
         if (silentAf) {
             // "Modo Live" (contrast AF on the sensor) focuses without dropping the mirror; "Modo rápido"
             // drops it for every AF, which is the clack-clack. Not every firmware takes it over USB.
             runCatching { setPropertyNow(ptp, EosProp.LV_AF_SYSTEM, EosProp.LV_AF_LIVE) }
                 .onSuccess { log("AF do live view: Modo Live (silencioso)") }
                 .onFailure {
+                    liveSilentAf = false
                     log("A câmera não aceitou trocar o AF do live view: ${it.message}")
                     _messages.tryEmit("Para focar sem o barulho do espelho, na 50D escolha Menu → Live View → Modo AF: Modo Live.")
                 }
@@ -420,12 +605,13 @@ class CameraManager(
             _live.value = LiveState.Failed("A câmera recusou o live view (${e.message}). $LIVE_HINT")
             return
         }
-        log("Live view ligado")
+        log("Live view ligado (saída ${if (alsoOnCamera) "celular e câmera" else "celular"}), esperando a primeira imagem")
         var lastFrame = System.currentTimeMillis()
         var windowStart = lastFrame
         var windowFrames = 0
         var fps = 0f
-        while (scope.isActive && session === ptp && liveJob?.isActive == true) {
+        var firstFrame = false
+        while (kotlinx.coroutines.currentCoroutineContext().isActive && session === ptp) {
             if (liveHold) {
                 // The shutter has the camera: no frames, and the pause doesn't count as silence.
                 delay(50)
@@ -445,7 +631,22 @@ class CameraManager(
                 delay(60)
                 continue
             }
-            val jpeg = LiveViewParser.jpeg(data) ?: continue
+            val jpeg = LiveViewParser.jpeg(data)
+            if (jpeg == null) {
+                // A frame without a picture (the camera still starting): count it as silence, not as life.
+                if (started - lastFrame > LIVE_GIVE_UP_MS) {
+                    log("Live view: ${data.size} bytes sem imagem por ${LIVE_GIVE_UP_MS / 1000} s")
+                    _live.value = LiveState.Failed("A 50D não mandou imagem. $LIVE_HINT")
+                    runCatching { setPropertyNow(ptp, EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_OFF) }
+                    return
+                }
+                delay(60)
+                continue
+            }
+            if (!firstFrame) {
+                firstFrame = true
+                log("Live view: primeira imagem em ${System.currentTimeMillis() - windowStart} ms")
+            }
             _liveFrames.tryEmit(jpeg)
             lastFrame = System.currentTimeMillis()
             windowFrames++
@@ -472,9 +673,18 @@ class CameraManager(
         it.transact(PtpOp.EOS_ZOOM_POSITION, (x.coerceIn(0f, 1f) * SENSOR_W).toInt(), (y.coerceIn(0f, 1f) * SENSOR_H).toInt())
     }
 
-    /** Autofocus now (like half-pressing with AF-ON), using the camera's live view AF mode. */
-    fun liveAutofocus() = liveCommand("Não focou: confira se a lente está em AF") {
-        it.transact(PtpOp.EOS_DO_AF)
+    /**
+     * Autofocus now (like AF-ON), with the camera's live view AF mode. Always closed with AF cancel,
+     * so the next focus or shot finds the camera ready; a second tap while focusing is ignored.
+     */
+    fun liveAutofocus() {
+        val ptp = session ?: return
+        if (afJob?.isActive == true || _shutter.value is ShutterState.Focusing) return
+        afJob = scope.launch {
+            val ok = runAf(ptp, "toque")
+            cancelAf(ptp, "toque")
+            if (!ok) _messages.tryEmit("Não focou. Confira a chave da lente em AF e, na 50D, Menu → Live View → Modo AF.")
+        }
     }
 
     /** Nudges focus with the lens in AF: [step] 1…3 towards near, −1…−3 towards far. */
@@ -483,9 +693,31 @@ class CameraManager(
         it.transact(PtpOp.EOS_DRIVE_LENS, if (step < 0) 0x8000 or size else size)
     }
 
-    /** Stops the lens down to the chosen aperture on the live picture (depth of field preview). */
-    fun depthOfFieldPreview(on: Boolean) = liveCommand("A câmera não fez a prévia de profundidade") {
-        it.transact(PtpOp.EOS_DOF_PREVIEW, if (on) 1 else 0)
+    /**
+     * Stops the lens down to the chosen aperture on the live picture (depth of field preview). The 50D
+     * answers "operation not supported" over USB: the button then goes away, with one message.
+     */
+    fun depthOfFieldPreview(on: Boolean) {
+        val ptp = session ?: return
+        if (!_dofSupported.value) return
+        scope.launch {
+            try {
+                ptp.transact(PtpOp.EOS_DOF_PREVIEW, if (on) 1 else 0)
+            } catch (e: PtpResponseException) {
+                if (e.code == PtpResponse.OPERATION_NOT_SUPPORTED) {
+                    if (_dofSupported.compareAndSet(true, false)) {
+                        log("A câmera não faz a prévia de profundidade pelo cabo (0x9156 não suportada)")
+                        _messages.tryEmit("A 50D não faz a prévia de profundidade pelo cabo. Use o botão de profundidade na câmera.")
+                    }
+                } else {
+                    _messages.tryEmit("A câmera não fez a prévia de profundidade")
+                    log("A câmera não fez a prévia de profundidade: ${e.message}")
+                }
+            } catch (e: PtpException) {
+                _messages.tryEmit("A câmera não fez a prévia de profundidade")
+                log("A câmera não fez a prévia de profundidade: ${e.message}")
+            }
+        }
     }
 
     private fun liveCommand(failure: String, block: suspend (PtpSession) -> Unit) {
@@ -532,7 +764,8 @@ class CameraManager(
     fun startBracket(shots: Int, stepThirds: Int) {
         val ptp = session ?: return
         val info = deviceInfo ?: return
-        if (_bracketing.value != null) return
+        // Taken before anything starts, so a double tap runs one bracket.
+        if (!_bracketing.compareAndSet(null, BracketState(0, shots))) return
         scope.launch {
             val mode = _status.value.value(EosProp.SHOOTING_MODE)
             val useShutter = mode == MODE_M
@@ -540,6 +773,7 @@ class CameraManager(
             val base = _status.value.value(prop)
             if (base == null || (useShutter && !EosValues.isKnownShutter(base))) {
                 _messages.tryEmit("Bracketing indisponível: a câmera ainda não informou a exposição")
+                _bracketing.value = null
                 return@launch
             }
             val offsets = Bracket.offsets(shots, stepThirds)
@@ -553,7 +787,7 @@ class CameraManager(
                     val arrived = scope.launch(start = CoroutineStart.UNDISPATCHED) {
                         withTimeoutOrNull((seconds * 1000).toLong() + 6_000) { newObjects.first() }
                     }
-                    releaseShutter(ptp, info)
+                    shotLock.withLock { fireLogged(ptp, info, INTERVAL_WAIT_MS, liveJob?.isActive == true) }
                     arrived.join()
                 }
             } catch (e: PtpException) {
@@ -567,7 +801,16 @@ class CameraManager(
     }
 
     /** All files on the card (folders excluded), newest name last. Uses standard PTP listing. */
-    suspend fun listCardFiles(onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): List<ObjectInfo> {
+    /**
+     * [newestFirst] reads from the last handle back (the camera numbers them in the order it wrote the
+     * files) and, with [isOld], stops after [stopAfterOld] files in a row it says are old.
+     */
+    suspend fun listCardFiles(
+        newestFirst: Boolean = false,
+        stopAfterOld: Int = 0,
+        isOld: (ObjectInfo) -> Boolean = { false },
+        onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
+    ): List<ObjectInfo> {
         val ptp = session ?: throw PtpException("Câmera desconectada")
         val info = deviceInfo ?: throw PtpException("Câmera desconectada")
         if (!info.supports(PtpOp.GET_OBJECT_HANDLES) || !info.supports(PtpOp.GET_OBJECT_INFO)) {
@@ -577,11 +820,18 @@ class CameraManager(
         val files = mutableListOf<ObjectInfo>()
         for (storage in storages) {
             // Parent 0 = every object in the storage, flat, whatever folder it is in.
-            val handles = PtpDataReader(ptp.transactForData(PtpOp.GET_OBJECT_HANDLES, storage, 0, 0)).u32Array()
-            handles.forEachIndexed { i, handle ->
+            val all = PtpDataReader(ptp.transactForData(PtpOp.GET_OBJECT_HANDLES, storage, 0, 0)).u32Array()
+            val handles = if (newestFirst) all.reversed() else all.toList()
+            var oldInARow = 0
+            for ((i, handle) in handles.withIndex()) {
                 val obj = ObjectInfo.parse(handle, ptp.transactForData(PtpOp.GET_OBJECT_INFO, handle))
-                if (!obj.isFolder) files += obj
                 onProgress(i + 1, handles.size)
+                if (obj.isFolder) continue
+                files += obj
+                if (stopAfterOld > 0) {
+                    oldInARow = if (isOld(obj)) oldInARow + 1 else 0
+                    if (oldInARow >= stopAfterOld) break
+                }
             }
         }
         return files.sortedBy { it.filename }
@@ -600,11 +850,41 @@ class CameraManager(
         intervalJob?.cancel()
         intervalJob = scope.launch {
             _interval.value = IntervalState(running = true, done = 0, total = shots, seconds = seconds)
+            AppLog.i("INTERVALO", "Início: $shots foto(s), uma a cada $seconds s")
+            var failures = 0
             for (i in 1..shots) {
-                val ptp = session ?: break
-                val info = deviceInfo ?: break
-                runCatching { releaseShutter(ptp, info) }.onFailure { _messages.tryEmit("Intervalômetro: ${it.message}") }
+                // The camera went away mid-series: say so, instead of the counter just stopping.
+                val ptp = session
+                val info = deviceInfo
+                if (ptp == null || info == null) {
+                    _messages.tryEmit("Intervalômetro parou na foto ${i - 1} de $shots: a câmera desconectou")
+                    break
+                }
+                val result = shotLock.withLock {
+                    // Same care as the button: live view pauses, and an AF left open is closed first.
+                    val inLive = liveJob?.isActive == true
+                    liveHold = true
+                    try {
+                        if (inLive) cancelAf(ptp, "antes do intervalo")
+                        AppLog.i("DISPARO", "Intervalômetro: foto $i de $shots${evfNote()}")
+                        runCatching { fireLogged(ptp, info, INTERVAL_WAIT_MS, inLive) }
+                            .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+                    } finally {
+                        if (inLive) delay(LIVE_AFTER_SHOT_MS)
+                        liveHold = false
+                    }
+                }
                 _interval.update { it.copy(done = i) }
+                failures = if (result.isSuccess) 0 else failures + 1
+                result.exceptionOrNull()?.let { e ->
+                    AppLog.e("INTERVALO", "Foto $i de $shots não disparou: ${e.message}")
+                    // A camera that refuses three in a row won't fire the fourth: stop and say why, once.
+                    if (failures >= INTERVAL_MAX_FAILURES) {
+                        _messages.tryEmit("Intervalômetro parado: $failures disparos seguidos falharam. ${e.message}")
+                        break
+                    }
+                    _messages.tryEmit("Intervalômetro: ${e.message}")
+                }
                 if (i < shots) delay(seconds * 1000L)
             }
             _interval.update { it.copy(running = false) }
@@ -618,6 +898,8 @@ class CameraManager(
 
     /** Ends the session politely so the camera leaves PC mode and goes back to normal. */
     fun disconnect() {
+        retryJob?.cancel()
+        if (_state.value is ConnectionState.Reconnecting) _state.value = ConnectionState.NoCamera
         val ptp = session ?: return
         // Detach first so the event loop stops and its error handler ignores this session.
         closeSession(closeTransport = false)
@@ -656,7 +938,7 @@ class CameraManager(
             .firstOrNull { it.interfaceClass == UsbConstants.USB_CLASS_STILL_IMAGE }
 
     private fun log(message: String) {
-        Log.d(TAG, message)
+        AppLog.i("USB", message)
         val line = "${timeFormat.format(Date())}  $message"
         _log.update { (it + line).takeLast(300) }
     }
@@ -673,8 +955,13 @@ class CameraManager(
         private const val LIVE_VIEW_PARAM = 0x00100000
         private const val LIVE_TIMEOUT_MS = 3_000
         private const val LIVE_GIVE_UP_MS = 6_000L
-        private const val AF_SETTLE_MS = 700L
+        /** Quick mode: the mirror drops, the AF sensor focuses, the mirror comes back. */
+        private const val AF_WAIT_QUICK_MS = 1_200L
+        /** "Modo Live": contrast AF on the sensor, slower in low light. */
+        private const val AF_WAIT_LIVE_MS = 2_800L
         private const val LIVE_AFTER_SHOT_MS = 600L
+        private const val INTERVAL_WAIT_MS = 5_000L
+        private const val INTERVAL_MAX_FAILURES = 3
         /** Zoom position coordinates use the sensor's pixel grid (50D: 4752 × 3168). */
         private const val SENSOR_W = 4752
         private const val SENSOR_H = 3168
