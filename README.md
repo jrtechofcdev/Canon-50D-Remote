@@ -81,6 +81,8 @@ A captura usa só a USB, sem FTP e sem internet. Na hora de entregar, o celular 
 | **Ferramentas** | Calculadora de flash Yongnuo e de profundidade de campo, GPS nas cópias e acerto do relógio da câmera. Tudo offline. |
 | **Campo** | Vibração a cada foto, alerta se o cabo soltar, aviso de cartão e memória cheios, modo escuro total para igreja e evento noturno. |
 
+**Visual:** a marca Jr_Tech_OFC está no próprio jeito de usar. O bloco inclinado do símbolo marca o que está escolhido e o estado da câmera, e o carregador é o símbolo com um bloco aceso girando.
+
 Cada função tem um liga/desliga em **Ajustes**, com busca no topo: digite "pix" ou "marca" e veja em que página está.
 
 **Um cliente depois do outro:** o nome da sessão fica no topo da Sessão. No fim, **Finalizar → Encerrar e começar nova** pede o nome do próximo cliente, e as fotos dele vão para outra pasta e, se a Entrega estiver no automático, para o novo cliente.
