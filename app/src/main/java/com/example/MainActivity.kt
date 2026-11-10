@@ -120,7 +120,7 @@ class MainActivity : ComponentActivity() {
         val screenPrefs = getSharedPreferences("screen", MODE_PRIVATE)
         val animationsOn = android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
         val intro = androidx.compose.runtime.mutableStateOf(savedInstanceState == null && animationsOn && screenPrefs.getBoolean("intro", true))
-        askNotificationPermissionOnce()
+        // Notifications are asked for in the Session's "Primeiros passos", with the reason, not at launch.
         app.camera.findAndConnect()
         if (intent?.action == ACTION_DELIVERY) pendingRoute.value = intent.getStringExtra(EXTRA_ROUTE) ?: "delivery"
 
@@ -152,11 +152,13 @@ class MainActivity : ComponentActivity() {
                 com.example.ui.intro.IntroRequests.replay.collect { if (!first) intro.value = true; first = false }
             }
             JrLinkTheme(night = settings.nightMode) {
+              val cameraLost by app.cameraLost.collectAsState()
               val sessionDot = when (cameraState) {
                   is ConnectionState.Connected -> Tone.Accent
                   is ConnectionState.Reconnecting -> Tone.Info
                   is ConnectionState.Failed -> Tone.Error
-                  else -> null
+                  // The cable came out during a shoot: red until the camera is back or deliberately let go.
+                  else -> if (cameraLost) Tone.Error else null
               }
               androidx.compose.runtime.CompositionLocalProvider(LocalSessionDot provides sessionDot) {
               androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
@@ -204,12 +206,28 @@ class MainActivity : ComponentActivity() {
                         "${w.photo.savedBase}: ${problems.joinToString(", ")}"
                     }
                     val messages = this
-                    merge(app.camera.messages, app.tether.errors, cullMessages).collect {
-                        AppLog.i("AVISO", it)
+                    // Errors (a photo not saved, the camera) outrank the culling hints: a burst of "tremida"
+                    // warnings used to wipe a save failure off the screen before anyone read it.
+                    var importantUntil = 0L
+                    merge(
+                        app.camera.messages.map { it to true },
+                        app.tether.errors.map { it to true },
+                        cullMessages.map { it to false },
+                    ).collect { (text, important) ->
+                        AppLog.i("AVISO", text)
+                        val now = System.currentTimeMillis()
+                        if (!important && now < importantUntil) return@collect
+                        if (important) importantUntil = now + 10_000
                         // The newest message replaces the one on screen: a burst of warnings used to queue up
                         // and keep showing old news for minutes.
                         snackbar.currentSnackbarData?.dismiss()
-                        messages.launch { snackbar.showSnackbar(it) }
+                        messages.launch {
+                            snackbar.showSnackbar(
+                                text,
+                                withDismissAction = important,
+                                duration = if (important) androidx.compose.material3.SnackbarDuration.Long else androidx.compose.material3.SnackbarDuration.Short,
+                            )
+                        }
                     }
                 }
 
@@ -425,13 +443,6 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val ACTION_DELIVERY = "com.example.OPEN_DELIVERY"
         const val EXTRA_ROUTE = "route"
-    }
-
-    private fun askNotificationPermissionOnce() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
-        if (!granted) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
     }
 }
 

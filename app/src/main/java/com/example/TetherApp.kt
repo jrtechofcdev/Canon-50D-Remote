@@ -89,6 +89,7 @@ class TetherApp : Application() {
         settings.set(SettingKeys.sessionName, name.trim())
         tether.resetSessionCounter()
         backup.dismiss()
+        _cameraLost.value = false
         AppLog.i("SESSAO", "Sessão: ${name.trim().ifEmpty { "Geral" }}")
     }
 
@@ -101,6 +102,20 @@ class TetherApp : Application() {
 
     // A failure in one of these collectors is written to the log instead of closing the app.
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main + AppLog.handler("APP"))
+
+    private val _cameraLost = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+    /** The camera dropped during a session (not a deliberate Desconectar), for the red dot on the Sessão tab. */
+    val cameraLost: kotlinx.coroutines.flow.StateFlow<Boolean> = _cameraLost
+
+    private val _phoneLowGb = kotlinx.coroutines.flow.MutableStateFlow<Double?>(null)
+
+    /** Free space on the phone when it is under the warning level, else null: a chip on the Session. */
+    val phoneLowGb: kotlinx.coroutines.flow.StateFlow<Double?> = _phoneLowGb
+
+    fun forgetLostCamera() {
+        _cameraLost.value = false
+    }
 
     // Each warning fires once per connection, not on every event.
     private var warnedCard = false
@@ -183,6 +198,7 @@ class TetherApp : Application() {
                     warnedBattery = false
                     warnedPhone = false
                 }
+                if (state is ConnectionState.Connected) _cameraLost.value = false
                 if (state is ConnectionState.Connected) CameraForegroundService.start(this@TetherApp)
                 before = state
                 if (state is ConnectionState.Connected && settings.current().gpsEnabled) location.start() else location.stop()
@@ -190,7 +206,13 @@ class TetherApp : Application() {
         }
 
         appScope.launch {
+            // The backup runs under the foreground service too: the screen going off used to be able to stop it.
+            backup.state.collect { if (it is com.example.core.backup.BackupState.Running) CameraForegroundService.start(this@TetherApp) }
+        }
+
+        appScope.launch {
             camera.lostConnection.collect { reason ->
+                _cameraLost.value = true
                 if (settings.current().alertOnDisconnect) alerts.warn("Câmera desconectada", "$reason. Confira o cabo e a câmera.")
             }
         }
@@ -202,12 +224,15 @@ class TetherApp : Application() {
                 val s = settings.current()
                 if (s.blurAlert || s.eyesCheck || s.cullSuggestions) culler.enqueue(it.id)
                 if (s.vibrateOnReceive) alerts.photoReceived()
-                if (s.phoneLowWarning && !warnedPhone) {
+                if (s.phoneLowWarning) {
                     val free = withContext(Dispatchers.IO) { alerts.phoneFreeGb() }
-                    if (free < s.phoneLowGb) {
+                    _phoneLowGb.value = free.takeIf { it < s.phoneLowGb }
+                    if (free < s.phoneLowGb && !warnedPhone) {
                         warnedPhone = true
                         alerts.warn("Memória do celular acabando", "Restam %.1f GB livres.".format(free))
                     }
+                } else {
+                    _phoneLowGb.value = null
                 }
             }
         }

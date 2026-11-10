@@ -168,14 +168,24 @@ fun SessionScreen(
             SessionChip(settings.sessionName, sessionCount, Modifier.fillMaxWidth()) { sessionSheet = false }
             Spacer(Modifier.height(16.dp))
             ConnectionHeader(state, received, status, settings.showBattery, onConnect = app.camera::findAndConnect)
-            if (state is ConnectionState.Connected) {
-                com.example.ui.components.CameraWarningChips(
-                    com.example.ui.components.cameraWarnings(status, settings),
-                    Modifier.padding(top = 10.dp),
-                )
-            }
+            // Camera warnings while it is connected; the phone's free space whenever it runs low.
+            val phoneLow by app.phoneLowGb.collectAsState()
+            com.example.ui.components.CameraWarningChips(
+                com.example.ui.components.cameraWarnings(if (connected) status else CameraStatus(), settings, phoneLow),
+                Modifier.padding(top = 10.dp),
+            )
             FolderNotice(settings, app.store.lostFolders.collectAsState().value, onOpenSettings)
             PendingBanner(pending.size, onDownload = app.tether::downloadPending, onDismiss = app.tether::dismissPending)
+            FirstStepsCard(
+                settings,
+                onFolders = { onOpenSection(com.example.ui.settings.SettingsSection.Save) },
+                onDone = { scope.launch { app.settings.set(SettingKeys.firstStepsDone, true) } },
+            )
+            SaveProblemBanner(
+                app.tether.saveProblem.collectAsState().value,
+                onOpenSettings = { onOpenSection(com.example.ui.settings.SettingsSection.Save) },
+                onDismiss = app.tether::dismissSaveProblem,
+            )
         }
         // The photo is what the photographer checks between shots, so it comes right after the status.
         val photo: @Composable () -> Unit = {

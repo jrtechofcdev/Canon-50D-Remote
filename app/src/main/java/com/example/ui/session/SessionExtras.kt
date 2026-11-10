@@ -104,6 +104,7 @@ import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.ui.graphics.graphicsLayer
 import com.example.ui.components.pressScale
+import androidx.compose.foundation.border
 
 /** Shown when the card has frames shot while the cable was out and "perguntar antes" is on. */
 @Composable
@@ -123,6 +124,36 @@ fun PendingBanner(count: Int, onDownload: () -> Unit, onDismiss: () -> Unit) {
                 colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
             ) { Text("Baixar agora") }
             TextButton(onClick = onDismiss) { Text("Ignorar") }
+        }
+    }
+}
+
+/**
+ * A save failure that stays on screen: the message at the bottom used to be replaced by the next blurry
+ * photo warning in a burst, and the photographer kept shooting into a full phone.
+ */
+@Composable
+fun SaveProblemBanner(problem: com.example.core.tether.SaveProblem?, onOpenSettings: () -> Unit, onDismiss: () -> Unit) {
+    if (problem == null) return
+    Spacer(Modifier.height(12.dp))
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.small)
+            .background(Tone.Surface)
+            .border(1.dp, Tone.Error, MaterialTheme.shapes.small)
+            .padding(12.dp),
+    ) {
+        Text(problem.reason.title, style = MaterialTheme.typography.titleSmall, color = Tone.Error)
+        Text(
+            (if (problem.count == 1) "${problem.lastFile} não foi salva no celular. " else "${problem.count} fotos não foram salvas (a última: ${problem.lastFile}). ") +
+                problem.reason.action,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+            OutlinedButton(onClick = onOpenSettings, modifier = Modifier.heightIn(min = 48.dp)) { Text("Abrir Salvamento") }
+            TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) { Text("Fechar") }
         }
     }
 }
@@ -507,7 +538,7 @@ private fun BackupPanel(app: TetherApp, settings: Settings) {
                 color = Tone.Info,
                 trackColor = Tone.SurfaceHigh,
             )
-            Text("Deixe o app aberto até terminar.", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+            Text("Continua com a tela apagada; o andamento fica na notificação.", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
         }
         is BackupState.Finished -> {
             val ok = s.failed.isEmpty()

@@ -157,6 +157,8 @@ data class Settings(
     val photoFollowsPhone: Boolean = true,
     /** The brand opening when the app starts. */
     val introEnabled: Boolean = true,
+    /** The Session's "Primeiros passos" card was closed. */
+    val firstStepsDone: Boolean = false,
     /** Live view: a tap also runs AF. Off, a tap only moves the focus point and AF waits for the AF button. */
     val liveTapAf: Boolean = false,
     /** Live view: ask the 50D for its silent contrast AF ("Modo Live") instead of Quick mode (mirror flips). */
@@ -438,6 +440,7 @@ object SettingKeys {
     val screenOrientation = stringPreferencesKey("screen_orientation")
     val rotateWithPhoto = booleanPreferencesKey("rotate_with_photo")
     val introEnabled = booleanPreferencesKey("intro_enabled")
+    val firstStepsDone = booleanPreferencesKey("first_steps_done")
     val photoFollowsPhone = booleanPreferencesKey("photo_follows_phone")
     val liveTapAf = booleanPreferencesKey("live_tap_af")
     val liveSilentAf = booleanPreferencesKey("live_silent_af")
@@ -686,6 +689,7 @@ class SettingsRepository(private val context: Context) {
             screenOrientation = this[k.screenOrientation] ?: d.screenOrientation,
             rotateWithPhoto = this[k.rotateWithPhoto] ?: d.rotateWithPhoto,
             introEnabled = this[k.introEnabled] ?: d.introEnabled,
+            firstStepsDone = this[k.firstStepsDone] ?: d.firstStepsDone,
             photoFollowsPhone = this[k.photoFollowsPhone] ?: d.photoFollowsPhone,
             liveTapAf = this[k.liveTapAf] ?: d.liveTapAf,
             liveSilentAf = this[k.liveSilentAf] ?: d.liveSilentAf,

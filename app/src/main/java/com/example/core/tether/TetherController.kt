@@ -76,6 +76,15 @@ class TetherController(
     private val _errors = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val errors: SharedFlow<String> = _errors.asSharedFlow()
 
+    private val _saveProblem = MutableStateFlow<SaveProblem?>(null)
+
+    /** The last save failure, kept on the Session screen until a photo saves again or it is dismissed. */
+    val saveProblem: StateFlow<SaveProblem?> = _saveProblem.asStateFlow()
+
+    fun dismissSaveProblem() {
+        _saveProblem.value = null
+    }
+
     /** Frames found on the card after a reconnect, waiting for the user to confirm (when "perguntar antes" is on). */
     private val _pendingOnCard = MutableStateFlow<List<ObjectInfo>>(emptyList())
     val pendingOnCard: StateFlow<List<ObjectInfo>> = _pendingOnCard.asStateFlow()
@@ -111,7 +120,9 @@ class TetherController(
                         retried = true
                         queue.send(Job(job.obj, job.force, job.attempt + 1))
                     } else {
-                        _errors.tryEmit("Falha ao salvar ${job.obj.filename}: ${e.message}")
+                        val reason = SaveReason.of(e)
+                        _saveProblem.update { SaveProblem(reason, job.obj.filename, (it?.count ?: 0) + 1) }
+                        _errors.tryEmit("${job.obj.filename} não foi salva: ${reason.title.lowercase()}")
                     }
                 } finally {
                     queued.decrementAndGet()
@@ -262,6 +273,8 @@ class TetherController(
 
         val id = if (photo.id == 0L) dao.insert(photo) else photo.id.also { dao.update(photo) }
         _received.update { it + 1 }
+        // Saving works again (space freed, folder picked again): the warning has done its job.
+        _saveProblem.value = null
         _saved.tryEmit(photo.copy(id = id))
 
         // Edited copy from the JPG (or from the RAW's embedded preview when no JPG is coming).

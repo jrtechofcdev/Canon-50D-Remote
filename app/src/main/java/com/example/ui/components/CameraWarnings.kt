@@ -31,6 +31,8 @@ import com.example.core.data.Settings
 import com.example.core.ptp.EosProp
 import com.example.core.ptp.EosValues
 import com.example.ui.theme.Tone
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material.icons.outlined.PhoneAndroid
 
 /** A problem with the camera that stays on screen while it lasts. */
 data class CameraWarning(val icon: ImageVector, val text: String)
@@ -39,16 +41,18 @@ data class CameraWarning(val icon: ImageVector, val text: String)
  * Low battery and an almost full card, for as long as they last. The notification only comes once;
  * these stay where the photographer is looking (Sessão and live view) until the battery or card changes.
  */
-fun cameraWarnings(status: CameraStatus, settings: Settings): List<CameraWarning> = buildList {
+fun cameraWarnings(status: CameraStatus, settings: Settings, phoneLowGb: Double? = null): List<CameraWarning> = buildList {
     status.value(EosProp.BATTERY_POWER)?.takeIf { EosValues.batteryIsLow(it) }?.let {
         add(CameraWarning(Icons.Outlined.BatteryAlert, "Bateria ${EosValues.batteryLabel(it)}"))
     }
     status.shotsLeft?.takeIf { settings.cardLowWarning && it < settings.cardLowShots }?.let {
         add(CameraWarning(Icons.Outlined.SdCardAlert, if (it == 1) "Cartão: 1 disparo" else "Cartão: $it disparos"))
     }
+    phoneLowGb?.let { add(CameraWarning(Icons.Outlined.PhoneAndroid, "Celular: %.1f GB livres".format(it))) }
 }
 
 /** The warnings as small red chips; they slide in and out as the problem starts and ends. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun CameraWarningChips(warnings: List<CameraWarning>, modifier: Modifier = Modifier, onDark: Boolean = false) {
     AnimatedVisibility(
@@ -57,7 +61,8 @@ fun CameraWarningChips(warnings: List<CameraWarning>, modifier: Modifier = Modif
         exit = fadeOut() + shrinkVertically(),
         modifier = modifier,
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        // Wraps to a second line with large text instead of running off the screen.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             warnings.forEach { w ->
                 Row(
                     Modifier.clip(CircleShape)
