@@ -234,7 +234,7 @@ fun EditorScreen(app: TetherApp, target: EditTarget, onDone: () -> Unit) {
                     Text("Original", style = MaterialTheme.typography.labelMedium, color = Color.White,
                         modifier = Modifier.align(Alignment.TopStart).padding(12.dp).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 8.dp, vertical = 2.dp))
                 }
-                if (!loaded || (busy && rendered == null)) CircularProgressIndicator(color = Tone.Info, modifier = Modifier.size(32.dp))
+                if (!loaded || (busy && rendered == null)) com.example.ui.components.BrandLoader(40.dp)
             }
 
         }

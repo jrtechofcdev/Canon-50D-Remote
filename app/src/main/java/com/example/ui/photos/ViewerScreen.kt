@@ -121,6 +121,14 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.semantics.stateDescription
+import com.example.ui.components.PhotoButton
+import com.example.ui.components.JrTile
+import com.example.ui.components.SheetHeader
+import com.example.ui.theme.Space
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3Api
 
 @Composable
 fun ViewerScreen(
@@ -153,6 +161,8 @@ fun ViewerScreen(
     var whatsFor by remember { mutableStateOf<Photo?>(null) }
     var deliverFor by remember { mutableStateOf<Photo?>(null) }
     var versionsFor by remember { mutableStateOf<Photo?>(null) }
+    var moreOpen by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
 
     // Slide to a frame that just arrived. New photos are inserted at index 0; the pager keeps the
     // current photo in place by key, so "was on the latest" means we were on index 0 before it.
@@ -211,49 +221,63 @@ fun ViewerScreen(
             chrome, enter = fadeIn(), exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopStart).padding(end = if (landscape) panelWidth else 0.dp),
         ) {
+            // Round white buttons straight over the photo, on a veil that fades out downwards. Mint only on
+            // a favourite that is marked; the rest (estouro, apagar) sit in the "Mais" menu.
             Row(
-                Modifier.fillMaxWidth().background(Tone.Background.copy(alpha = 0.75f)).statusBarsPadding().padding(4.dp),
+                Modifier.fillMaxWidth()
+                    .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Tone.Scrim, Color.Transparent)))
+                    .statusBarsPadding().padding(horizontal = Space.m, vertical = Space.s),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Space.s),
             ) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar") }
+                PhotoButton(Icons.AutoMirrored.Outlined.ArrowBack, "Voltar", onBack)
                 Column(Modifier.weight(1f)) {
-                    Text(current.savedBase, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(current.savedBase, style = MaterialTheme.typography.titleMedium, color = Tone.OnPhoto, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
                         SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(current.capturedAt)) + " · " + current.session,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Tone.TextMuted,
+                        color = Tone.OnPhoto.copy(alpha = 0.8f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                RotateButton(app, settings.screenOrientation)
-                IconButton(onClick = { showClipping = !showClipping }) {
-                    Icon(
-                        Icons.Outlined.WbSunny,
-                        contentDescription = if (showClipping) "Esconder alerta de estouro" else "Mostrar alerta de estouro",
-                        tint = if (showClipping) Tone.Info else Tone.TextMuted,
-                    )
+                // The rotate button on the same round veil as the others.
+                Box(Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Tone.Scrim), contentAlignment = Alignment.Center) {
+                    RotateButton(app, settings.screenOrientation, tint = Tone.OnPhoto)
                 }
-                IconButton(onClick = { scope.launch { app.database.photoDao().setFavorite(current.id, !current.favorite) } }) {
-                    Icon(
-                        if (current.favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = if (current.favorite) "Tirar das favoritas" else "Marcar como favorita",
-                        tint = if (current.favorite) Tone.Accent else Tone.Text,
-                    )
+                PhotoButton(
+                    if (current.favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    if (current.favorite) "Tirar das favoritas" else "Marcar como favorita",
+                    onClick = { scope.launch { app.database.photoDao().setFavorite(current.id, !current.favorite) } },
+                    active = current.favorite,
+                )
+                Box {
+                    PhotoButton(Icons.Outlined.MoreVert, "Mais opções", onClick = { menuOpen = true }, active = showClipping)
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, containerColor = Tone.SurfaceHigh) {
+                        DropdownMenuItem(
+                            text = { Text(if (showClipping) "Esconder alerta de estouro" else "Mostrar alerta de estouro") },
+                            leadingIcon = { Icon(Icons.Outlined.WbSunny, contentDescription = null, tint = if (showClipping) Tone.Accent else Tone.Text) },
+                            onClick = { menuOpen = false; showClipping = !showClipping },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Apagar do celular", color = Tone.Error) },
+                            leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null, tint = Tone.Error) },
+                            onClick = { menuOpen = false; confirmDelete = current },
+                        )
+                    }
                 }
-                IconButton(onClick = { confirmDelete = current }) { Icon(Icons.Outlined.Delete, contentDescription = "Apagar do celular") }
             }
         }
 
         val panel: @Composable (Modifier) -> Unit = { m ->
-            Column(m.background(if (landscape) Tone.Background else Tone.Background.copy(alpha = 0.88f)).padding(vertical = 10.dp)) {
+            Column(m.background(Tone.Surface).padding(vertical = Space.m)) {
                 // Info: badges, exposure, file and histogram.
                 Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         com.example.ui.cull.Badges(current, settings, Modifier.padding(bottom = 4.dp))
                         Text(
                             listOfNotNull(current.shutter, current.aperture, current.iso).joinToString("   ").ifEmpty { "Sem dados EXIF" },
-                            style = MaterialTheme.typography.labelLarge,
+                            style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
                         )
                         Text(
                             listOfNotNull(fileSummary(current), current.moment).joinToString(" · "),
@@ -277,73 +301,28 @@ fun ViewerScreen(
                 }
                 if (settings.viewerPresets && presets.isNotEmpty()) {
                     // Presets and Calibrar on one line, same tile size, so nothing sits out of step.
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        PresetPicker(
-                            app, presets, current.presetId, current.displayUri,
-                            onPick = { picked -> scope.launch { app.looks.setLook(current, picked?.id, null) } },
-                            modifier = Modifier.weight(1f),
-                        )
-                        ActionTile(Icons.Outlined.Tune, if (current.adjust != null) "Calibrada" else "Calibrar", accent = true, box = 64.dp, modifier = Modifier.padding(end = 4.dp)) {
-                            onCalibrate(current.id)
-                        }
-                    }
+                    PresetPicker(
+                        app, presets, current.presetId, current.displayUri,
+                        onPick = { picked -> scope.launch { app.looks.setLook(current, picked?.id, null) } },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
                 HorizontalDivider(color = Tone.Line, modifier = Modifier.padding(vertical = 6.dp))
-                // What to do with the photo, as icons with their names. With many tools on, the row slides
-                // sideways (a fade on the edge shows there is more) instead of cutting the last ones off.
-                val actionScroll = rememberScrollState()
-                val edge = Tone.Background
-                androidx.compose.foundation.layout.BoxWithConstraints(
-                    Modifier.fillMaxWidth().drawWithContent {
-                        drawContent()
-                        val w = 32.dp.toPx()
-                        if (actionScroll.canScrollForward) {
-                            drawRect(
-                                androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Color.Transparent, edge), startX = size.width - w, endX = size.width),
-                                topLeft = androidx.compose.ui.geometry.Offset(size.width - w, 0f),
-                            )
-                        }
-                        if (actionScroll.canScrollBackward) {
-                            drawRect(
-                                androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(edge, Color.Transparent), startX = 0f, endX = w),
-                                size = androidx.compose.ui.geometry.Size(w, size.height),
-                            )
-                        }
-                    },
-                ) {
-                Row(
-                    Modifier.horizontalScroll(actionScroll).widthIn(min = maxWidth).padding(horizontal = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                ) {
-                    SetMenuTile(
-                        label = "Lightroom",
-                        sets = actions.availableSets(current, settings, includeLight = false),
-                        icon = { LightroomMark() },
-                    ) { scope.launch { actions.openInLightroom(listOf(current), it, settings) } }
-                    ActionTile(Icons.AutoMirrored.Outlined.Send, "WhatsApp", accent = true) { whatsFor = current }
-                    if (settings.deliveryEnabled) ActionTile(Icons.Outlined.WifiTethering, "Entregar") { deliverFor = current }
-                    if (settings.expressEnabled) ActionTile(Icons.Outlined.Collections, "Express") {
-                        com.example.ui.delivery.sendToExpress(app, context, scope, listOf(current.id), onOpenExpress)
+                // The four things done most to a photo, and the rest in "Mais": nothing slides off the edge.
+                Row(Modifier.fillMaxWidth().padding(horizontal = Space.s), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    ActionTile(Icons.Outlined.Tune, if (current.adjust != null) "Editada" else "Editar", selected = current.adjust != null) { onCalibrate(current.id) }
+                    ActionTile(Icons.AutoMirrored.Outlined.Send, "WhatsApp") { whatsFor = current }
+                    if (settings.deliveryEnabled) {
+                        ActionTile(Icons.Outlined.WifiTethering, "Entregar") { deliverFor = current }
+                    } else {
+                        SetMenuTile(
+                            label = "Enviar",
+                            sets = actions.availableSets(current, settings),
+                            icon = { Icon(Icons.Outlined.Share, contentDescription = null, tint = Tone.Text) },
+                        ) { scope.launch { actions.share(listOf(current), it, settings) } }
                     }
-                    // The same photo once more with another preset: each version is its own file for the client.
-                    if (settings.deliveryEnabled || settings.expressEnabled) {
-                        ActionTile(Icons.Outlined.FilterNone, "Versões") { versionsFor = current }
-                    }
-                    SetMenuTile(
-                        label = "Enviar",
-                        sets = actions.availableSets(current, settings),
-                        icon = { Icon(Icons.Outlined.Share, contentDescription = null, tint = Tone.Text) },
-                    ) { scope.launch { actions.share(listOf(current), it, settings) } }
                     ActionTile(Icons.Outlined.Crop, "Recortar", selected = current.crop != null) { onCrop(current.id) }
-                    // A quarter turn of the photo itself (for frames the camera saved lying down).
-                    ActionTile(Icons.Outlined.RotateRight, "Girar") {
-                        scope.launch { app.looks.setCrop(current, com.example.core.render.PhotoShape.turnedClockwise(app.looks.cropOf(current))) }
-                    }
-                    if (settings.notesEnabled) {
-                        ActionTile(Icons.AutoMirrored.Outlined.StickyNote2, "Nota", selected = current.note != null || current.audioNote != null) { noteFor = current }
-                    }
-                    ActionTile(Icons.AutoMirrored.Outlined.OpenInNew, "Abrir com") { actions.openWith(current) }
-                }
+                    ActionTile(Icons.Outlined.MoreHoriz, "Mais") { moreOpen = true }
                 }
             }
         }
@@ -363,6 +342,39 @@ fun ViewerScreen(
     }
 
     noteFor?.let { photo -> NoteSheet(app, photo, onDismiss = { noteFor = null }) }
+    if (moreOpen) list.getOrNull(pager.currentPage)?.let { current ->
+        MoreSheet(onDismiss = { moreOpen = false }) {
+            SetMenuTile(
+                label = "Lightroom",
+                sets = actions.availableSets(current, settings, includeLight = false),
+                icon = { LightroomMark() },
+            ) { moreOpen = false; scope.launch { actions.openInLightroom(listOf(current), it, settings) } }
+            if (settings.deliveryEnabled) {
+                SetMenuTile(
+                    label = "Enviar",
+                    sets = actions.availableSets(current, settings),
+                    icon = { Icon(Icons.Outlined.Share, contentDescription = null, tint = Tone.Text) },
+                ) { moreOpen = false; scope.launch { actions.share(listOf(current), it, settings) } }
+            }
+            if (settings.expressEnabled) ActionTile(Icons.Outlined.Collections, "Express") {
+                moreOpen = false
+                com.example.ui.delivery.sendToExpress(app, context, scope, listOf(current.id), onOpenExpress)
+            }
+            // The same photo once more with another preset: each version is its own file for the client.
+            if (settings.deliveryEnabled || settings.expressEnabled) {
+                ActionTile(Icons.Outlined.FilterNone, "Versões") { moreOpen = false; versionsFor = current }
+            }
+            // A quarter turn of the photo itself (for frames the camera saved lying down).
+            ActionTile(Icons.Outlined.RotateRight, "Girar") {
+                scope.launch { app.looks.setCrop(current, com.example.core.render.PhotoShape.turnedClockwise(app.looks.cropOf(current))) }
+            }
+            if (settings.notesEnabled) {
+                ActionTile(Icons.AutoMirrored.Outlined.StickyNote2, "Nota", selected = current.note != null || current.audioNote != null) { moreOpen = false; noteFor = current }
+            }
+            ActionTile(Icons.AutoMirrored.Outlined.OpenInNew, "Abrir com") { moreOpen = false; actions.openWith(current) }
+            ActionTile(Icons.Outlined.Delete, "Apagar") { moreOpen = false; confirmDelete = current }
+        }
+    }
     versionsFor?.let { photo ->
         com.example.ui.delivery.VersionSheet(app, photo, onDismiss = { versionsFor = null }, onOpenDelivery = onOpenDelivery, onOpenExpress = onOpenExpress)
     }
@@ -424,33 +436,37 @@ private fun rememberAnalysis(uri: String?, threshold: Int): Analysis? {
     return analysis
 }
 
-/** An icon with its name under it: the viewer's actions, readable at a glance. */
+/** An icon with its name under it: the viewer's actions, in the app's tile. Mint only while it is on ([selected]). */
 @Composable
 private fun ActionTile(
     icon: ImageVector,
     label: String,
     modifier: Modifier = Modifier,
-    accent: Boolean = false,
     selected: Boolean = false,
     enabled: Boolean = true,
-    box: androidx.compose.ui.unit.Dp = 44.dp,
+    box: androidx.compose.ui.unit.Dp = 48.dp,
     onClick: () -> Unit,
 ) {
-    val tint by androidx.compose.animation.animateColorAsState(if (accent || selected) Tone.Accent else Tone.Text, label = "tile")
-    ActionTileBase(label, modifier, enabled, onClick, box) {
-        Icon(icon, contentDescription = null, tint = tint)
-    }
+    JrTile(icon, label, onClick, modifier, enabled = enabled, active = selected, box = box)
 }
 
 @Composable
-private fun ActionTileBase(label: String, modifier: Modifier, enabled: Boolean, onClick: () -> Unit, box: androidx.compose.ui.unit.Dp = 44.dp, icon: @Composable () -> Unit) {
-    Column(
-        modifier.pressScale().clip(MaterialTheme.shapes.small).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 4.dp, vertical = 4.dp)
-            .alpha(if (enabled) 1f else 0.4f),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(Modifier.size(box).clip(MaterialTheme.shapes.medium).background(Tone.SurfaceHigh), contentAlignment = Alignment.Center) { icon() }
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Tone.TextMuted, maxLines = 1, modifier = Modifier.padding(top = 4.dp))
+private fun ActionTileBase(label: String, modifier: Modifier, enabled: Boolean, onClick: () -> Unit, box: androidx.compose.ui.unit.Dp = 48.dp, icon: @Composable () -> Unit) {
+    JrTile(Icons.Outlined.MoreHoriz, label, onClick, modifier, enabled = enabled, box = box, mark = icon)
+}
+
+/** The viewer's other actions in a sheet, as tiles in rows. */
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun MoreSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Tone.Surface) {
+        Column(Modifier.padding(horizontal = Space.l).navigationBarsPadding().padding(bottom = Space.l)) {
+            SheetHeader("Mais ações")
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Space.s),
+                verticalArrangement = Arrangement.spacedBy(Space.m),
+            ) { content() }
+        }
     }
 }
 
@@ -458,9 +474,9 @@ private fun ActionTileBase(label: String, modifier: Modifier, enabled: Boolean, 
 @Composable
 internal fun LightroomMark() {
     Box(
-        Modifier.size(24.dp).clip(MaterialTheme.shapes.extraSmall).border(1.5.dp, Tone.Info, MaterialTheme.shapes.extraSmall),
+        Modifier.size(24.dp).clip(MaterialTheme.shapes.extraSmall).border(1.5.dp, Tone.Text, MaterialTheme.shapes.extraSmall),
         contentAlignment = Alignment.Center,
-    ) { Text("Lr", style = MaterialTheme.typography.labelMedium, color = Tone.Info) }
+    ) { Text("Lr", style = MaterialTheme.typography.labelMedium, color = Tone.Text) }
 }
 
 /** An action tile that asks which files to use when there is more than one option. */
@@ -503,10 +519,6 @@ private fun PhotoPage(
         offset = if (scale == 1f) Offset.Zero else offset + pan
         onZoomChanged(scale > 1f)
     }
-    val blink by rememberInfiniteTransition(label = "blink").animateFloat(
-        initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(450), RepeatMode.Reverse), label = "blinkAlpha",
-    )
     val edited = photo.presetId != null || photo.adjust != null || photo.crop != null
 
     Box(Modifier.fillMaxSize()) {
@@ -548,15 +560,7 @@ private fun PhotoPage(
             } else {
                 LookImage(app, photo, presets, Modifier.fillMaxSize())
             }
-            if (mask != null && !before) {
-                val image = remember(mask) { mask.asImageBitmap() }
-                Image(
-                    bitmap = image,
-                    contentDescription = "Áreas estouradas",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = blink },
-                )
-            }
+            if (mask != null && !before) BlinkingMask(mask)
         }
         if (before) {
             Text(
@@ -599,4 +603,20 @@ private fun Histogram(analysis: Analysis?, rgb: Boolean, modifier: Modifier) {
             }
         }
     }
+}
+
+/** The blown highlights, blinking. The animation exists only while there is a mask: no frames spent otherwise. */
+@Composable
+private fun BlinkingMask(mask: android.graphics.Bitmap) {
+    val blink by rememberInfiniteTransition(label = "blink").animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(450), RepeatMode.Reverse), label = "blinkAlpha",
+    )
+    val image = remember(mask) { mask.asImageBitmap() }
+    Image(
+        bitmap = image,
+        contentDescription = "Áreas estouradas",
+        contentScale = ContentScale.Fit,
+        modifier = Modifier.fillMaxSize().graphicsLayer { alpha = blink },
+    )
 }

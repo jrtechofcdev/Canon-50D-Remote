@@ -217,7 +217,7 @@ fun CropScreen(app: TetherApp, photoId: Long, onDone: () -> Unit) {
             // Clipped: a straightened (turned) picture would otherwise draw over the top bar.
             Box(mod.clipToBounds(), contentAlignment = Alignment.Center) {
                 if (image == null) {
-                    CircularProgressIndicator(color = Tone.Info)
+                    com.example.ui.components.BrandLoader(56.dp)
                 } else {
                     CropCanvas(
                         image = image,

@@ -271,19 +271,8 @@ class MainActivity : ComponentActivity() {
                     if (landscape && onTab) {
                         NavigationRail(containerColor = Tone.Surface, modifier = Modifier.fillMaxHeight()) {
                           val railItem: @Composable (Tab) -> Unit = { tab ->
-                              NavigationRailItem(
-                                  selected = route == tab.route,
-                                  onClick = { goTo(tab) },
-                                  icon = { TabIcon(tab, route == tab.route) },
-                                  label = { Text(tab.label, maxLines = 1) },
-                                  colors = NavigationRailItemDefaults.colors(
-                                      selectedIconColor = Tone.Accent,
-                                      selectedTextColor = Tone.Text,
-                                      indicatorColor = Tone.SurfaceHigh,
-                                      unselectedIconColor = Tone.TextMuted,
-                                      unselectedTextColor = Tone.TextMuted,
-                                  ),
-                              )
+                              // The same tab as the bottom bar: the mint brand block over the one that is open.
+                              BarTab(tab, route == tab.route, 80.dp) { goTo(tab) }
                           }
                           // The tools scroll when they don't fit the height of a phone lying down; Ajustes stays
                           // pinned at the bottom, never cut off.
@@ -560,14 +549,18 @@ private fun BarTab(tab: Tab, on: Boolean, width: androidx.compose.ui.unit.Dp, on
             .width(width)
             .heightIn(min = 80.dp)
             .selectable(selected = on, role = androidx.compose.ui.semantics.Role.Tab, onClick = onClick)
-            .padding(top = 12.dp, bottom = 8.dp),
+            .padding(top = 6.dp, bottom = 8.dp),
         horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
     ) {
+        // The open tab: the brand's slanted block in mint over a light icon (the app's one sign of "chosen").
         androidx.compose.foundation.layout.Box(
-            Modifier.size(width = 64.dp, height = 32.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-                .background(if (on) Tone.SurfaceHigh else androidx.compose.ui.graphics.Color.Transparent),
+            Modifier.size(width = 18.dp, height = 4.dp).clip(com.example.ui.theme.TileShape(slant = 0.9f, corner = 0.2f))
+                .background(if (on) Tone.Accent else androidx.compose.ui.graphics.Color.Transparent),
+        )
+        androidx.compose.foundation.layout.Box(
+            Modifier.padding(top = 6.dp).size(width = 64.dp, height = 28.dp),
             contentAlignment = androidx.compose.ui.Alignment.Center,
-        ) { TabIcon(tab, on, tint = if (on) Tone.Accent else Tone.TextMuted) }
+        ) { TabIcon(tab, on, tint = if (on) Tone.Text else Tone.TextMuted) }
         Text(
             tab.label,
             style = MaterialTheme.typography.labelMedium,

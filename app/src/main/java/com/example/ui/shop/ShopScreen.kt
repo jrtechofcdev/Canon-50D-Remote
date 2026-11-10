@@ -311,7 +311,7 @@ private fun ShopHeader(total: Int, categories: Int, loading: Boolean, query: Str
             }
             if (wide) search(Modifier.weight(1f))
             if (loading) {
-                CircularProgressIndicator(Modifier.padding(12.dp).size(24.dp), color = Tone.Info, strokeWidth = 2.dp)
+                com.example.ui.components.BrandLoader(24.dp, Modifier.padding(12.dp))
             } else {
                 IconButton(onClick = onRefresh) { Icon(Icons.Outlined.Refresh, contentDescription = "Atualizar a lista", tint = Tone.Text) }
             }
@@ -349,7 +349,7 @@ private fun SelectionBar(count: Int, progress: Pair<String, Float>?, modifier: M
     ) {
         if (progress != null) {
             Text("${progress.first}… ${(progress.second * count).toInt()} de $count", style = MaterialTheme.typography.bodySmall, color = Tone.Info)
-            LinearProgressIndicator(progress = { progress.second }, modifier = Modifier.fillMaxWidth(), color = Tone.Info, trackColor = Tone.SurfaceHigh)
+            com.example.ui.components.BrandLoader(28.dp, progress = progress.second)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onDownload, enabled = progress == null, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) {
@@ -487,7 +487,7 @@ private fun EmptyShop(status: ShopStatus, onRetry: () -> Unit) {
                 ) { Text("Tentar de novo") }
             }
             else -> {
-                CircularProgressIndicator(color = Tone.Info)
+                com.example.ui.components.BrandLoader(64.dp)
                 Text("Carregando a lista de presets…", color = Tone.TextMuted, modifier = Modifier.padding(top = 12.dp))
             }
         }

@@ -494,12 +494,7 @@ private fun BackupPanel(app: TetherApp, settings: Settings) {
     when (val s = mine) {
         is BackupState.Running -> {
             Text("Copiando ${s.done + 1} de ${s.total}…", style = MaterialTheme.typography.bodySmall)
-            LinearProgressIndicator(
-                progress = { if (s.total == 0) 0f else (s.done + 1f) / s.total },
-                modifier = Modifier.fillMaxWidth(),
-                color = Tone.Info,
-                trackColor = Tone.SurfaceHigh,
-            )
+            com.example.ui.components.BrandLoader(32.dp, progress = if (s.total == 0) 0f else (s.done + 1f) / s.total)
             Text("Continua com a tela apagada; o andamento fica na notificação.", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
         }
         is BackupState.Finished -> {

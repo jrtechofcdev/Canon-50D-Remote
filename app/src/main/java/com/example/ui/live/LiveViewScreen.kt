@@ -565,7 +565,7 @@ private fun LiveWaiting(live: LiveState, connected: Boolean, modifier: Modifier)
             !connected -> Text("Conecte a 50D pelo cabo para ver a imagem ao vivo.", color = Color.White.copy(alpha = 0.8f))
             live is LiveState.Failed -> Text(live.message, color = Color.White.copy(alpha = 0.85f))
             else -> {
-                CircularProgressIndicator(color = Tone.Info)
+                com.example.ui.components.BrandLoader(64.dp)
                 Text("Ligando o live view da câmera…", color = Color.White.copy(alpha = 0.8f))
             }
         }

@@ -126,7 +126,7 @@ fun ShopDetailScreen(
     val item = items.firstOrNull { it.id == itemId }
     if (item == null) {
         Box(Modifier.fillMaxSize().statusBarsPadding(), contentAlignment = Alignment.Center) {
-            if (items.isEmpty()) CircularProgressIndicator(color = Tone.Info)
+            if (items.isEmpty()) com.example.ui.components.BrandLoader(56.dp)
             else Text("Este preset não está mais na loja.", color = Tone.TextMuted)
         }
         return
@@ -264,7 +264,7 @@ private fun ShopDetail(
                 mode == 1 && holding -> AsyncImage(model = samplePhoto?.displayUri, contentDescription = "Original", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
                 showing != null -> Image(showing.asImageBitmap(), contentDescription = item.name, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
                 mode == 1 && presetError != null -> Text(presetError!!, color = Tone.Error, modifier = Modifier.padding(24.dp))
-                else -> CircularProgressIndicator(color = Tone.Info)
+                else -> com.example.ui.components.BrandLoader(56.dp)
             }
             // Where the eye goes while comparing: which side of the before/after is on screen.
             val label = when {
@@ -444,7 +444,7 @@ private fun PhotoChooser(
             }
             val list = photos?.filter { it.displayUri != null }
             when {
-                list == null -> Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Tone.Info) }
+                list == null -> Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { com.example.ui.components.BrandLoader(56.dp) }
                 list.isEmpty() -> Text(
                     "Nenhuma foto no app ainda. As fotos da câmera aparecem aqui assim que chegam pelo cabo.",
                     color = Tone.TextMuted,

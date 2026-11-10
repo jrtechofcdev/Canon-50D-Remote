@@ -107,11 +107,7 @@ fun CardScreen(app: TetherApp, onBack: () -> Unit) {
                     if (l.total == 0) "Lendo o cartão…" else "Lendo o cartão… ${l.done} de ${l.total}",
                     color = Tone.TextMuted,
                 )
-                LinearProgressIndicator(
-                    progress = { if (l.total > 0) l.done.toFloat() / l.total else 0f },
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    color = Tone.Info, trackColor = Tone.SurfaceHigh,
-                )
+                com.example.ui.components.BrandLoader(32.dp, Modifier.padding(top = 8.dp), progress = if (l.total > 0) l.done.toFloat() / l.total else 0f)
             }
             is CardLoad.Error -> Text(l.message, color = Tone.Error, modifier = Modifier.padding(24.dp))
             is CardLoad.Ready -> {

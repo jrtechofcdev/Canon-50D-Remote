@@ -90,6 +90,15 @@ import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.layout.heightIn
+import com.example.ui.components.ScreenHeader
+import com.example.ui.components.ChipRow
+import com.example.ui.components.JrChip
+import com.example.ui.components.JrTile
+import com.example.ui.components.EmptyState
+import com.example.ui.components.JrButton
+import com.example.ui.components.JrButtonKind
+import com.example.ui.components.SheetHeader
+import com.example.ui.theme.Space
 
 enum class PhotoFilter(val label: String) {
     All("Todas"), Session("Sessão atual"), Favorites("Favoritas"), ClientPicks("Escolhidas pelo cliente"),
@@ -154,10 +163,8 @@ fun PhotosScreen(
                 }) { Icon(Icons.Outlined.SelectAll, contentDescription = "Selecionar tudo") }
             }
         } else {
-            Row(
-                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
+            ScreenHeader("Fotos", count = photos.size)
+            ChipRow(Modifier.padding(bottom = Space.m)) {
                 PhotoFilter.entries.filter { it != PhotoFilter.ClientPicks || settings.clientPicksEnabled }.forEach {
                     GalleryChip(it.label, filter == it) { filter = it }
                 }
@@ -167,10 +174,7 @@ fun PhotosScreen(
             }
             val moments = all.mapNotNull { it.moment }.distinct()
             if (settings.momentsEnabled && moments.isNotEmpty()) {
-                Row(
-                    Modifier.horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
+                ChipRow(Modifier.padding(bottom = Space.m)) {
                     GalleryChip("Todos os momentos", moment == null) { moment = null }
                     moments.forEach { m -> GalleryChip(m, moment == m) { moment = if (moment == m) null else m } }
                 }
@@ -180,27 +184,26 @@ fun PhotosScreen(
         if (photos.isEmpty()) {
             // Photos there, but the stars, the moment or hidden rejects leave none: say so, with a way out.
             val narrowed = all.filtered(filter, 0, null, settings).isNotEmpty()
-            Column(
-                Modifier.fillMaxSize().padding(32.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                EmptyState(
                     when {
-                        narrowed -> "Nenhuma foto com esses filtros."
-                        filter == PhotoFilter.Favorites -> "Nenhuma favorita ainda. Toque no coração ao ver uma foto."
-                        filter == PhotoFilter.ClientPicks -> "O cliente ainda não escolheu fotos. No modo cliente, ele toca no coração."
-                        filter == PhotoFilter.Session && all.isNotEmpty() -> "Nenhuma foto nesta sessão ainda."
-                        else -> "Nenhuma foto recebida. Conecte a 50D e dispare."
+                        narrowed -> "Nenhuma foto com esses filtros"
+                        filter == PhotoFilter.Favorites -> "Nenhuma favorita ainda"
+                        filter == PhotoFilter.ClientPicks -> "O cliente ainda não escolheu"
+                        filter == PhotoFilter.Session && all.isNotEmpty() -> "Nenhuma foto nesta sessão"
+                        else -> "Nenhuma foto ainda"
                     },
-                    color = Tone.TextMuted,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    text = when {
+                        narrowed -> "As estrelas, o momento ou as rejeitadas escondidas deixaram a galeria vazia."
+                        filter == PhotoFilter.Favorites -> "Toque no coração ao ver uma foto."
+                        filter == PhotoFilter.ClientPicks -> "No modo cliente, ele toca no coração das fotos que quer."
+                        filter == PhotoFilter.Session && all.isNotEmpty() -> "As fotos desta sessão aparecem aqui assim que chegam."
+                        else -> "Conecte a 50D pelo cabo e dispare. Cada foto aparece aqui em segundos."
+                    },
+                    action = if (narrowed || (filter != PhotoFilter.All && all.isNotEmpty())) {
+                        { JrButton("Mostrar todas", { filter = PhotoFilter.All; minStars = 0; moment = null }, kind = JrButtonKind.Secondary) }
+                    } else null,
                 )
-                if (narrowed || (filter != PhotoFilter.All && all.isNotEmpty())) {
-                    OutlinedButton(onClick = { filter = PhotoFilter.All; minStars = 0; moment = null }, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text("Mostrar todas", color = Tone.Accent)
-                    }
-                }
             }
             return@Column
         }
@@ -243,20 +246,24 @@ fun PhotosScreen(
                         modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = inset; scaleY = inset },
                     )
                     FormatTag(photo.rawUri != null, photo.jpgUri != null, Modifier.align(Alignment.BottomStart).padding(4.dp))
-                    Row(Modifier.align(Alignment.TopEnd).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(
+                        Modifier.align(Alignment.TopEnd).padding(4.dp).clip(MaterialTheme.shapes.extraSmall).background(Tone.Scrim).padding(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
                         if (photo.blurry) TileIcon(Icons.Outlined.BlurOn, "Tremida", Tone.Error)
                         if (settings.eyesCheck && photo.eyesClosed > 0) TileIcon(Icons.Outlined.VisibilityOff, "Olhos fechados", Tone.Error)
                         if (settings.cullSuggestions && photo.suggested) TileIcon(Icons.Outlined.ThumbUp, "Sugerida", Tone.Accent)
-                        if (photo.note != null || photo.audioNote != null) TileIcon(Icons.AutoMirrored.Outlined.StickyNote2, "Tem nota", Tone.Text)
+                        if (photo.note != null || photo.audioNote != null) TileIcon(Icons.AutoMirrored.Outlined.StickyNote2, "Tem nota", Tone.OnPhoto)
                         if (photo.clientPick && settings.clientPicksEnabled) TileIcon(Icons.Filled.Favorite, "Escolhida pelo cliente", Tone.Accent)
-                        else if (photo.favorite) TileIcon(Icons.Filled.Favorite, "Favorita", Tone.Text)
+                        else if (photo.favorite) TileIcon(Icons.Filled.Favorite, "Favorita", Tone.OnPhoto)
                     }
                     if (settings.ratingEnabled && photo.rating > 0) {
                         Text(
                             "★".repeat(photo.rating),
                             style = MaterialTheme.typography.labelSmall,
-                            color = Tone.Text,
-                            modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp),
+                            color = Tone.OnPhoto,
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp)
+                                .clip(MaterialTheme.shapes.extraSmall).background(Tone.Scrim).padding(horizontal = 5.dp, vertical = 1.dp),
                         )
                     }
                     androidx.compose.animation.AnimatedVisibility(
@@ -347,12 +354,7 @@ fun PhotosScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("${p.done + 1} de ${p.total}", color = Tone.TextMuted)
-                    LinearProgressIndicator(
-                        progress = { (p.done + 1f) / p.total },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = Tone.Info,
-                        trackColor = Tone.SurfaceHigh,
-                    )
+                    com.example.ui.components.BrandLoader(40.dp, progress = (p.done + 1f) / p.total)
                 }
             },
             confirmButton = {},
@@ -413,13 +415,7 @@ private fun BatchBar(
 
 @Composable
 private fun BarAction(icon: ImageVector, label: String, onClick: () -> Unit) {
-    Column(
-        Modifier.widthIn(min = 64.dp).clip(MaterialTheme.shapes.small).clickable(onClick = onClick).padding(vertical = 6.dp, horizontal = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(icon, contentDescription = null, tint = Tone.Text)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Tone.TextMuted)
-    }
+    JrTile(icon, label, onClick, box = 44.dp)
 }
 
 @Composable
@@ -440,16 +436,7 @@ private fun TileIcon(icon: ImageVector, description: String, tint: androidx.comp
 
 @Composable
 private fun GalleryChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label) },
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = Tone.SurfaceHigh,
-            selectedLabelColor = Tone.Text,
-            labelColor = Tone.TextMuted,
-        ),
-    )
+    JrChip(label, selected, onClick)
 }
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -457,7 +444,7 @@ private fun GalleryChip(label: String, selected: Boolean, onClick: () -> Unit) {
 private fun BatchPresetSheet(presets: List<Preset>, onDismiss: () -> Unit, onPick: (Preset?) -> Unit) {
     androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Tone.Surface) {
         androidx.compose.foundation.lazy.LazyColumn(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
-            item { Text("Aplicar preset nas selecionadas", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp)) }
+            item { SheetHeader("Aplicar preset nas selecionadas") }
             item { TextButton(onClick = { onPick(null) }) { Text("Sem preset (voltar ao original)", color = Tone.TextMuted) } }
             items(presets.size) { i ->
                 val p = presets[i]
