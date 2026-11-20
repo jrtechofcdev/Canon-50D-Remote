@@ -2,6 +2,27 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [5.2] · 2026-11-20
+
+O disparador do app passa a apertar o botão da 50D em duas etapas, como o dedo faz.
+
+- **Meio curso e completo (0x9128/0x9129):**
+  - quando a câmera anuncia esses comandos, o app manda meio curso, depois completo, e solta os dois;
+  - se ela não anunciar ou recusar, o app volta para o disparo direto (0x910F) sozinho;
+  - o botão é solto sempre, mesmo com erro ou cabo puxado, e de novo a cada conexão: a câmera não fica mais "presa" respondendo ocupada.
+- **Botão que segue o dedo:**
+  - encostar faz o meio curso (a câmera foca) e soltar dispara;
+  - segurar faz sequência, se a câmera estiver num modo contínuo;
+  - arrastar o dedo para fora cancela sem foto.
+- **Foto confirmada pela câmera:** o app marca "Disparou" quando o arquivo novo chega, e não mais quando a câmera responde "OK". Sem foto no tempo, ele avisa e explica.
+- **Sem AF extra antes do disparo:** no meio curso, a câmera já foca. O "Focar antes de disparar" fica só para câmeras sem as duas etapas.
+- **Intervalômetro e bracketing** usam o mesmo caminho. Exposições longas e o temporizador ganham tempo de espera.
+- **Modo desenvolvedor → Disparo pelo cabo:**
+  - mostra o que a câmera anuncia;
+  - permite forçar o método e trocar o segundo parâmetro (1 ou 0) para testar na 50D;
+  - o log grava a sequência de cada disparo e o modo de avanço.
+- **`ShutterPressTest`:** testa a ordem dos comandos, a soltura em caso de erro, o cancelamento e a sequência.
+
 ## [5.1] · 2026-11-10
 
 As páginas que o cliente abre no celular (Entrega local e Fotografia Express) foram refeitas do zero. É o primeiro contato dele com a marca.

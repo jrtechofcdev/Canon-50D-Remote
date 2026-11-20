@@ -264,6 +264,7 @@ fun SessionScreen(
                 live = settings.liveViewEnabled,
                 latest = photos.firstOrNull(),
                 onShoot = { app.camera.capture(settings.shutterWait, settings.shutterFocusFirst) },
+                finger = com.example.ui.live.shutterFinger(app, settings),
                 onInterval = { if (interval.running) app.camera.stopInterval() else showInterval = true },
                 onLive = onOpenLive,
                 onOpenLatest = onOpenPhoto,
@@ -555,6 +556,7 @@ private fun CaptureBar(
     live: Boolean,
     latest: Photo?,
     onShoot: () -> Unit,
+    finger: com.example.ui.live.ShutterFinger?,
     onInterval: () -> Unit,
     onLive: () -> Unit,
     onOpenLatest: (Long) -> Unit,
@@ -568,7 +570,7 @@ private fun CaptureBar(
     val shutterBlock: @Composable () -> Unit = {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             // Smaller and grey until there is a camera to fire: the shutter is the biggest thing on screen only when it works.
-            ShutterButton(shutter, connected, if (connected) 72.dp else 60.dp, Modifier.semantics { contentDescription = "Disparar" }, onShoot)
+            ShutterButton(shutter, connected, if (connected) 72.dp else 60.dp, Modifier.semantics { contentDescription = "Disparar" }, finger, onShoot)
             Text(
                 hint ?: " ", style = MaterialTheme.typography.labelSmall, maxLines = 1,
                 color = if (shutter is ShutterState.Failed) Tone.Error else Tone.TextMuted,

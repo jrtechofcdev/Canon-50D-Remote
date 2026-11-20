@@ -28,6 +28,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -103,7 +105,17 @@ fun LiveOptionsSheet(app: TetherApp, s: Settings, presets: List<Preset>, onDismi
                 style = MaterialTheme.typography.bodySmall,
                 color = Tone.TextMuted,
             )
-            Toggle(Icons.Outlined.CenterFocusStrong, "Focar antes de disparar", s.shutterFocusFirst) { set(SettingKeys.shutterFocusFirst, it) }
+            val twoStep by app.camera.releaseMethod.collectAsState()
+            // With the two-step press the touch on the shutter already focuses (half press): a separate AF first only got in the way.
+            if (twoStep == com.example.core.camera.ReleaseMethod.PRESS_RELEASE) {
+                Text(
+                    "O botão de disparo funciona como o da câmera: encostar foca, soltar dispara, segurar faz sequência (no modo contínuo). Arraste o dedo para fora para cancelar.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Tone.TextMuted,
+                )
+            } else {
+                Toggle(Icons.Outlined.CenterFocusStrong, "Focar antes de disparar", s.shutterFocusFirst) { set(SettingKeys.shutterFocusFirst, it) }
+            }
             Label("Esperar o foco antes de desistir")
             ChipLine {
                 listOf(3, 5, 8, 12).forEach { v -> SheetChip("$v s", s.shutterWait == v) { set(SettingKeys.shutterWait, v) } }

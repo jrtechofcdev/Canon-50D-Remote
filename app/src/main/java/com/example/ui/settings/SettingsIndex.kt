@@ -213,6 +213,9 @@ val settingsIndex: Map<SettingsSection, List<String>> = mapOf(
     ),
     SettingsSection.Developer to listOf(
         "Câmera",
+        "Disparo pelo cabo",
+        "Método",
+        "Segundo parâmetro do 0x9128",
         "Log detalhado",
         "Cada comando da câmera no log",
         "Testes sem a câmera",

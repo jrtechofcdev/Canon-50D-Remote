@@ -4,6 +4,7 @@ import android.app.Application
 import com.example.core.alerts.Alerts
 import com.example.core.camera.CameraManager
 import com.example.core.camera.ConnectionState
+import com.example.core.camera.ReleasePrefs
 import com.example.core.data.AppBackup
 import com.example.core.log.AppLog
 import com.example.core.data.PhotoDatabase
@@ -149,6 +150,7 @@ class TetherApp : Application() {
             keepCameraAwake = { settings.current().keepCameraAwake },
             syncClock = { settings.current().syncCameraClock },
             onClockRefused = { settings.set(SettingKeys.syncCameraClock, false) },
+            releasePrefs = { settings.current().let { ReleasePrefs(if (it.developerMode) it.devShutterMethod else ReleasePrefs.AUTO, it.devReleaseFlag) } },
         )
         presets = PresetRepository(this, database.presetDao(), settings)
         engine = PresetEngine()

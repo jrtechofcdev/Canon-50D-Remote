@@ -16,6 +16,7 @@ import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Photo
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Usb
 import androidx.compose.material.icons.outlined.WifiTethering
@@ -38,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.example.TetherApp
 import com.example.core.camera.ConnectionState
+import com.example.core.camera.ReleasePrefs
 import com.example.core.data.SettingKeys
 import com.example.core.data.Settings
 import com.example.core.log.AppLog
@@ -59,6 +61,7 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
     val status by app.camera.status.collectAsState()
     val state by app.camera.state.collectAsState()
     val recent by AppLog.recent.collectAsState()
+    val releaseInfo by app.camera.releaseInfo.collectAsState()
     var crashAsk by remember { mutableStateOf(false) }
     val connected = state is ConnectionState.Connected
     fun toast(t: String) = Toast.makeText(context, t, Toast.LENGTH_LONG).show()
@@ -80,6 +83,19 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
                 Text("0x%04X = 0x%X (%d)".format(prop, value, value), style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), color = Tone.Text)
             }
         }
+    }
+
+    SettingsGroup("Disparo pelo cabo", Icons.Outlined.PhotoCamera) {
+        InfoText(releaseInfo?.let { "Na conexão: $it" } ?: "Conecte a câmera para ver quais comandos de disparo ela anuncia.")
+        ChoiceRow(
+            "Método",
+            listOf(ReleasePrefs.AUTO to "Automático", ReleasePrefs.PRESS to "Meio curso + completo", ReleasePrefs.LEGACY to "Disparo direto"),
+            s.devShutterMethod,
+        ) { scope.launch { app.settings.set(SettingKeys.devShutterMethod, it) } }
+        ChoiceRow("Segundo parâmetro do 0x9128", listOf(1 to "1 (padrão)", 0 to "0"), s.devReleaseFlag, enabled = s.devShutterMethod != ReleasePrefs.LEGACY) {
+            scope.launch { app.settings.set(SettingKeys.devReleaseFlag, it) }
+        }
+        InfoText("Vale a partir do próximo disparo. Cada disparo grava no log as respostas da câmera, o parâmetro e o modo de avanço.")
     }
 
     SettingsGroup("Log detalhado", Icons.Outlined.Code) {
@@ -146,6 +162,8 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
                 app.settings.set(SettingKeys.developerMode, false)
                 app.settings.set(SettingKeys.devVerboseLog, false)
                 app.settings.set(SettingKeys.devRender, "auto")
+                app.settings.set(SettingKeys.devShutterMethod, ReleasePrefs.AUTO)
+                app.settings.set(SettingKeys.devReleaseFlag, 1)
             }
             toast("Modo desenvolvedor desligado")
         }

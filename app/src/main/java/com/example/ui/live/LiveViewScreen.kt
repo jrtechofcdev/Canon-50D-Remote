@@ -201,6 +201,7 @@ fun LiveViewScreen(
     BackHandler { onBack() }
 
     val fire = { app.camera.capture(settings.shutterWait, settings.shutterFocusFirst) }
+    val finger = shutterFinger(app, settings)
     // The 50D turns the depth of field preview down over USB: once it does, the button goes away.
     val dofSupported by app.camera.dofSupported.collectAsState()
     val dofAction: ((Boolean) -> Unit)? = if (dofSupported) { on -> app.camera.depthOfFieldPreview(on) } else null
@@ -234,7 +235,7 @@ fun LiveViewScreen(
                         onClick = { controls = true },
                         modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(Tone.Scrim, CircleShape),
                     ) { Icon(Icons.Outlined.Visibility, contentDescription = "Mostrar controles", tint = Tone.OnPhoto) }
-                    ShutterButton(shutter, connected, 60.dp, Modifier.align(if (landscape) Alignment.CenterEnd else Alignment.BottomCenter).padding(16.dp), fire)
+                    ShutterButton(shutter, connected, 60.dp, Modifier.align(if (landscape) Alignment.CenterEnd else Alignment.BottomCenter).padding(16.dp), finger, fire)
                 }
             }
         }
@@ -263,7 +264,7 @@ fun LiveViewScreen(
                     verticalArrangement = Arrangement.SpaceEvenly,
                 ) {
                     ZoomPills(zoom, compact = true) { app.camera.setLiveZoom(it) }
-                    ShutterButton(shutter, connected, 76.dp, Modifier, fire)
+                    ShutterButton(shutter, connected, 76.dp, Modifier, finger, fire)
                     ShutterHint(shutter)
                     FocusGrid(onAf = { app.camera.liveAutofocus() }, onDrive = { app.camera.driveLens(it) }, onDof = dofAction)
                 }
@@ -285,7 +286,7 @@ fun LiveViewScreen(
                     FocusPad(onAf = { app.camera.liveAutofocus() }, onDrive = { app.camera.driveLens(it) }, onDof = dofAction)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) { ZoomPills(zoom, compact = false) { app.camera.setLiveZoom(it) } }
-                        ShutterButton(shutter, connected, 72.dp, Modifier, fire)
+                        ShutterButton(shutter, connected, 72.dp, Modifier, finger, fire)
                         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { ShutterHint(shutter) }
                     }
                 }
@@ -388,9 +389,36 @@ private fun TopActions(app: TetherApp, settings: Settings, vertical: Boolean, on
     if (vertical) Column(horizontalAlignment = Alignment.CenterHorizontally) { items() } else Row { items() }
 }
 
-/** The app's shutter: a ring that spins while the camera focuses, and flashes when it fires or fails. */
+/**
+ * The finger on the app's shutter, sent to the camera as it happens: [down] half-presses (the camera
+ * focuses), [up] takes the photo, [hold] (finger still down after [HOLD_MS]) starts a burst in a
+ * continuous drive mode, [cancel] (finger slid off the button) lets go without a photo.
+ */
+class ShutterFinger(val down: () -> Unit, val hold: () -> Unit, val up: () -> Unit, val cancel: () -> Unit) {
+    companion object {
+        const val HOLD_MS = 400L
+    }
+}
+
+/** The camera's shutter driven by the finger, with the user's wait and focus settings. */
+fun shutterFinger(app: TetherApp, settings: Settings) = ShutterFinger(
+    down = { app.camera.shutterDown(settings.shutterWait, settings.shutterFocusFirst) },
+    hold = app.camera::shutterHold,
+    up = app.camera::shutterUp,
+    cancel = app.camera::shutterCancel,
+)
+
+/**
+ * The app's shutter: a ring that spins while the camera focuses, and flashes when it fires or fails.
+ * With [finger] it works like the camera's button (press, hold, lift, slide off to cancel); a screen
+ * reader's double tap still goes to [onClick], one complete shot.
+ */
 @Composable
-fun ShutterButton(state: ShutterState, enabled: Boolean, size: androidx.compose.ui.unit.Dp, modifier: Modifier, onClick: () -> Unit) {
+fun ShutterButton(state: ShutterState, enabled: Boolean, size: androidx.compose.ui.unit.Dp, modifier: Modifier, finger: ShutterFinger? = null, onClick: () -> Unit) {
+    val ready by rememberUpdatedState(enabled && state !is ShutterState.Focusing)
+    val holdScope = rememberCoroutineScope()
+    // The latest lambdas, read at each touch: the screens build a new finger on every recomposition.
+    val currentFinger by rememberUpdatedState(finger)
     val ring by androidx.compose.animation.animateColorAsState(
         when {
             !enabled -> Tone.Line
@@ -431,7 +459,39 @@ fun ShutterButton(state: ShutterState, enabled: Boolean, size: androidx.compose.
                 .then(if (enabled) Modifier.pressScale(0.9f) else Modifier)
                 .clip(CircleShape).border(3.dp, if (state is ShutterState.Focusing) Color.Transparent else ring, CircleShape).padding(7.dp).clip(CircleShape)
                 .background(if (enabled) BrandGradient else androidx.compose.ui.graphics.SolidColor(Color.Gray))
-                .clickable(enabled = enabled && state !is ShutterState.Focusing, onClick = onClick),
+                .then(
+                    if (finger == null) Modifier.clickable(enabled = enabled && state !is ShutterState.Focusing, onClick = onClick)
+                    else Modifier
+                        .semantics {
+                            role = androidx.compose.ui.semantics.Role.Button
+                            onClick { if (ready) onClick(); ready }
+                        }
+                        // Not keyed on the state or the finger: a restart mid-press (the press itself turns the
+                        // state to Focusing) would lose the lift.
+                        .pointerInput(Unit) {
+                            detectTapGestures(onPress = {
+                                val finger = currentFinger
+                                if (!ready || finger == null) return@detectTapGestures
+                                finger.down()
+                                val holding = holdScope.launch {
+                                    kotlinx.coroutines.delay(ShutterFinger.HOLD_MS)
+                                    finger.hold()
+                                }
+                                var ended = false
+                                try {
+                                    // False when the finger slid off the button or the gesture was taken over.
+                                    val lifted = tryAwaitRelease()
+                                    ended = true
+                                    holding.cancel()
+                                    if (lifted) finger.up() else finger.cancel()
+                                } finally {
+                                    holding.cancel()
+                                    // The screen went away mid-press: the camera is never left pressed.
+                                    if (!ended) finger.cancel()
+                                }
+                            })
+                        },
+                ),
             contentAlignment = Alignment.Center,
         ) {
             androidx.compose.animation.AnimatedContent(

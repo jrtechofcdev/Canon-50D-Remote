@@ -53,6 +53,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 
 sealed interface ConnectionState {
     data object NoCamera : ConnectionState
@@ -109,6 +110,8 @@ class CameraManager(
     private val keepCameraAwake: suspend () -> Boolean,
     private val syncClock: suspend () -> Boolean = { false },
     private val onClockRefused: suspend () -> Unit = {},
+    /** Modo desenvolvedor: which release to use and RemoteReleaseOn's second parameter. */
+    private val releasePrefs: suspend () -> ReleasePrefs = { ReleasePrefs() },
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + AppLog.handler("CAMERA"))
     private val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
@@ -160,6 +163,18 @@ class CameraManager(
     val shutter: StateFlow<ShutterState> = _shutter.asStateFlow()
     /** One shot at a time: the intervalometer and the button never send RemoteRelease together. */
     private val shotLock = kotlinx.coroutines.sync.Mutex()
+    /** The finger on the app's shutter for the shot in progress; null for a tap, the intervalometer and bracketing. */
+    @Volatile private var gestures: Channel<Gesture>? = null
+    /** Set when the camera answers "unknown command" to the two-step press: the rest of the session uses 0x910F. */
+    @Volatile private var pressRejected = false
+
+    /** What the camera announces for the shutter and what the app uses, for the Desenvolvedor screen. */
+    private val _releaseInfo = MutableStateFlow<String?>(null)
+    val releaseInfo: StateFlow<String?> = _releaseInfo.asStateFlow()
+    /** How the app's button presses the connected camera's shutter; null without a camera. */
+    private val _releaseMethod = MutableStateFlow<ReleaseMethod?>(null)
+    val releaseMethod: StateFlow<ReleaseMethod?> = _releaseMethod.asStateFlow()
+
     /** Live view ran in this session: a camera stuck "busy" afterwards gets live view turned off again. */
     @Volatile private var liveUsed = false
 
@@ -301,6 +316,13 @@ class CameraManager(
             val info = DeviceInfo.parse(ptp.transactForData(PtpOp.GET_DEVICE_INFO))
             deviceInfo = info
             liveUsed = false
+            pressRejected = false
+            val method = ShutterPress.methodFor(info, releasePrefs().method)
+            _releaseInfo.value = ShutterPress.describe(info, method)
+            _releaseMethod.value = method
+            AppLog.i("DISPARO", "Disparo pelo cabo: ${ShutterPress.describe(info, method)}")
+            AppLog.i("DISPARO", "Operações Canon anunciadas: " +
+                info.operations.filter { it in 0x9100..0x91FF }.sorted().joinToString(" ") { "%04X".format(it) })
             _dofSupported.value = info.supports(PtpOp.EOS_DOF_PREVIEW)
             log("Câmera: ${info.manufacturer} ${info.model} (firmware ${info.version})")
 
@@ -308,6 +330,8 @@ class CameraManager(
             // so the shutter button, dials and menus on the camera stay usable.
             if (info.supports(PtpOp.EOS_SET_REMOTE_MODE)) ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, 1)
             if (info.supports(PtpOp.EOS_SET_EVENT_MODE)) ptp.transact(PtpOp.EOS_SET_EVENT_MODE, 1)
+            // A cable pulled while the app's button was held leaves the camera "pressed": let go first.
+            if (info.supports(PtpOp.EOS_REMOTE_RELEASE_OFF)) ShutterPress.releaseAll(ptp)
             runCatching { setPropertyNow(ptp, EosProp.CAPTURE_DESTINATION, EosProp.DESTINATION_CARD) }
                 .onFailure { log("Destino de captura mantido pela câmera: ${it.message}") }
 
@@ -393,11 +417,28 @@ class CameraManager(
     }
 
     /**
-     * Fires from the app. The camera gets up to [waitSeconds] to focus: while it answers "not focused"
-     * or "busy" the app asks again. With [focusFirst] and live view on, AF runs first and the shot
-     * follows once it settles. Live view pauses meanwhile so the camera isn't interrupted.
+     * Fires from the app with a tap. The camera gets up to [waitSeconds] to focus and fire.
+     * See [shutterDown] for the button held down.
      */
     fun capture(waitSeconds: Int = 5, focusFirst: Boolean = false) {
+        startShot(waitSeconds, focusFirst, null)
+    }
+
+    /**
+     * The finger touched the app's shutter. With the two-step press the camera half-presses now (it
+     * focuses, like a finger resting on the button); [shutterUp] takes the photo, [shutterHold] starts a
+     * burst in a continuous drive mode, and [shutterCancel] (finger slid off) lets go without a photo.
+     * With the one-step release nothing reaches the camera until the finger lifts.
+     */
+    fun shutterDown(waitSeconds: Int = 5, focusFirst: Boolean = false) {
+        startShot(waitSeconds, focusFirst, Channel(Channel.UNLIMITED))
+    }
+
+    fun shutterUp() { gestures?.trySend(Gesture.UP) }
+    fun shutterHold() { gestures?.trySend(Gesture.HOLD) }
+    fun shutterCancel() { gestures?.trySend(Gesture.CANCEL) }
+
+    private fun startShot(waitSeconds: Int, focusFirst: Boolean, finger: Channel<Gesture>?) {
         val ptp = session ?: return
         val info = deviceInfo ?: return
         // A log showed the button and the intervalometer firing together: both got "busy" and neither fired.
@@ -412,17 +453,21 @@ class CameraManager(
         // Marked busy before anything starts, so a double tap fires once.
         val before = _shutter.value
         if (before is ShutterState.Focusing || !_shutter.compareAndSet(before, ShutterState.Focusing(0))) return
+        gestures = finger
         scope.launch {
             val inLive = liveJob?.isActive == true
             liveHold = true
+            var fired = false
             try {
                 shotLock.withLock {
+                    val twoStep = methodNow(info) == ReleaseMethod.PRESS_RELEASE
                     if (inLive) {
                         // A tap-AF still running (or never closed) makes the next release come back busy or do
                         // nothing: finish it first, the way the camera expects.
                         afJob?.cancel()
                         cancelAf(ptp, "antes do disparo")
-                        if (focusFirst) {
+                        // The half press focuses by itself; a separate AF before it only made the camera busy.
+                        if (focusFirst && !twoStep) {
                             runAf(ptp, "antes do disparo")
                             cancelAf(ptp, "depois do foco")
                         }
@@ -430,21 +475,108 @@ class CameraManager(
                     // Contrast AF ("Modo Live") can take a few seconds per try; give the release more room.
                     val wait = (waitSeconds.coerceIn(1, 15) + if (inLive && liveSilentAf) 4 else 0) * 1000L
                     AppLog.i("DISPARO", "Disparando${if (inLive) " no live view (AF ${if (liveSilentAf) "Live" else "rápido"})" else ""}, espera até ${wait / 1000} s${evfNote()}")
-                    fireLogged(ptp, info, wait, inLive) { _shutter.value = ShutterState.Focusing(it) }
+                    val next: (suspend () -> Gesture)? = finger?.let { ch ->
+                        { withTimeoutOrNull(ShutterPress.MAX_HALF_HOLD_MS) { ch.receive() } ?: Gesture.CANCEL }
+                    }
+                    fired = shootOnce(ptp, info, wait, inLive, next) { _shutter.value = ShutterState.Focusing(it) }
                 }
-                _shutter.value = ShutterState.Fired
-                log("Disparo feito")
+                if (fired) {
+                    _shutter.value = ShutterState.Fired
+                    log("Disparo feito")
+                } else {
+                    _shutter.value = ShutterState.Idle
+                    AppLog.i("DISPARO", "Disparo cancelado: o dedo saiu do botão")
+                }
             } catch (e: PtpException) {
                 _shutter.value = ShutterState.Failed(e.message ?: "A câmera não disparou")
                 _messages.tryEmit("Não disparou: ${e.message}")
                 AppLog.e("DISPARO", "Disparo falhou: ${e.message}")
             } finally {
+                if (gestures === finger) gestures = null
                 // In live view the mirror cycles after the shot; give it a moment before asking for frames.
                 if (inLive) delay(LIVE_AFTER_SHOT_MS)
                 liveHold = false
             }
+            if (!fired && _shutter.value is ShutterState.Idle) return@launch
             delay(1_200)
             if (_shutter.value !is ShutterState.Focusing) _shutter.value = ShutterState.Idle
+        }
+    }
+
+    /** The release this shot gets: the developer choice, else what the camera announces (0x910F after a refusal). */
+    private suspend fun methodNow(info: DeviceInfo): ReleaseMethod {
+        val prefs = releasePrefs()
+        val method = ShutterPress.methodFor(info, prefs.method)
+        return if (method == ReleaseMethod.PRESS_RELEASE && pressRejected && prefs.method == ReleasePrefs.AUTO) ReleaseMethod.LEGACY else method
+    }
+
+    /**
+     * One photo, by the method this camera gets. Returns false when the finger slid off (no photo);
+     * throws [PtpException] with the reason when the camera did not make the photo. With the two-step
+     * press the photo counts only when the camera announces the new file, not on its "OK".
+     */
+    private suspend fun shootOnce(
+        ptp: PtpSession,
+        info: DeviceInfo,
+        waitMs: Long,
+        inLive: Boolean,
+        nextGesture: (suspend () -> Gesture)? = null,
+        onWaiting: (Long) -> Unit = {},
+    ): Boolean {
+        val prefs = releasePrefs()
+        // Long exposures: the file comes after the shutter closes.
+        val exposureMs = _status.value.value(EosProp.SHUTTER_SPEED)
+            ?.takeIf { EosValues.isKnownShutter(it) }?.let { (EosValues.shutterSeconds(it) * 1000).toLong() } ?: 0L
+
+        suspend fun legacy(): Boolean {
+            // The one-step release can't half-press: it waits for the finger, as the button always did.
+            if (nextGesture != null) {
+                while (true) when (nextGesture()) {
+                    Gesture.CANCEL -> return false
+                    Gesture.UP -> break
+                    Gesture.HOLD -> Unit
+                }
+            }
+            fireLogged(ptp, waitMs + exposureMs, inLive, onWaiting)
+            return true
+        }
+
+        when (methodNow(info)) {
+            ReleaseMethod.NONE -> throw PtpException("Esta câmera não aceita disparo pelo cabo.")
+            ReleaseMethod.LEGACY -> return legacy()
+            ReleaseMethod.PRESS_RELEASE -> Unit
+        }
+        val drive = _status.value.value(EosProp.DRIVE_MODE)
+        val wait = waitMs + exposureMs + ShutterPress.timerExtraMs(drive)
+        // Listening before the press, so the new-file event can't slip past.
+        val photo = scope.async(start = CoroutineStart.UNDISPATCHED) { newObjects.first() }
+        try {
+            val outcome = ShutterPress.shoot(
+                ptp, prefs.flag, ShutterPress.isContinuous(drive), wait,
+                photoArrived = { ms -> withTimeoutOrNull(ms) { photo.await() } != null },
+                nextGesture = nextGesture,
+                report = { AppLog.i("DISPARO", "Respostas da câmera (flag ${prefs.flag}${drive?.let { d -> ", drive 0x%02X".format(d) } ?: ""}): $it") },
+            )
+            return when (outcome) {
+                PressOutcome.FIRED -> true
+                PressOutcome.CANCELLED -> false
+                PressOutcome.NO_PHOTO -> throw PtpException(ShutterPress.noPhotoMessage(wait))
+            }
+        } catch (e: PtpResponseException) {
+            if (ShutterPress.unsupported(e)) {
+                if (prefs.method != ReleasePrefs.AUTO) throw PtpException(ShutterPress.UNSUPPORTED_MESSAGE)
+                pressRejected = true
+                _releaseInfo.value = ShutterPress.describe(info, ReleaseMethod.LEGACY) + " (0x9128 recusado)"
+                _releaseMethod.value = ReleaseMethod.LEGACY
+                AppLog.w("DISPARO", "A câmera recusou 0x9128: o resto da sessão usa 0x910F")
+                return legacy()
+            }
+            throw PtpException(
+                if (e.code == PtpResponse.DEVICE_BUSY || e.code == PtpResponse.NOT_READY) "A câmera ficou ocupada e não aceitou o botão. Tente de novo."
+                else "A câmera recusou o disparo (${PtpResponse.name(e.code)})."
+            )
+        } finally {
+            photo.cancel()
         }
     }
 
@@ -453,10 +585,9 @@ class CameraManager(
      * it was "busy", "not ready" or "no focus". When the camera stays busy, the AF is closed and, after
      * live view was used, live view is turned off once more before the next tries.
      */
-    private suspend fun fireLogged(ptp: PtpSession, info: DeviceInfo, waitMs: Long, inLive: Boolean, onWaiting: (Long) -> Unit = {}) =
+    private suspend fun fireLogged(ptp: PtpSession, waitMs: Long, inLive: Boolean, onWaiting: (Long) -> Unit = {}) =
         ShutterRelease.fire(
             ptp,
-            info.supports(PtpOp.EOS_REMOTE_RELEASE),
             waitMs,
             onStuck = {
                 val closeLive = !inLive && liveUsed
@@ -787,7 +918,7 @@ class CameraManager(
                     val arrived = scope.launch(start = CoroutineStart.UNDISPATCHED) {
                         withTimeoutOrNull((seconds * 1000).toLong() + 6_000) { newObjects.first() }
                     }
-                    shotLock.withLock { fireLogged(ptp, info, INTERVAL_WAIT_MS, liveJob?.isActive == true) }
+                    shotLock.withLock { shootOnce(ptp, info, INTERVAL_WAIT_MS + (seconds * 1000).toLong(), liveJob?.isActive == true) }
                     arrived.join()
                 }
             } catch (e: PtpException) {
@@ -867,7 +998,7 @@ class CameraManager(
                     try {
                         if (inLive) cancelAf(ptp, "antes do intervalo")
                         AppLog.i("DISPARO", "Intervalômetro: foto $i de $shots${evfNote()}")
-                        runCatching { fireLogged(ptp, info, INTERVAL_WAIT_MS, inLive) }
+                        runCatching { shootOnce(ptp, info, INTERVAL_WAIT_MS, inLive) }
                             .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
                     } finally {
                         if (inLive) delay(LIVE_AFTER_SHOT_MS)
@@ -927,6 +1058,8 @@ class CameraManager(
         session = null
         device = null
         deviceInfo = null
+        _releaseInfo.value = null
+        _releaseMethod.value = null
         sessionJob?.cancel()
         sessionJob = null
         if (closeTransport) ptp?.close()

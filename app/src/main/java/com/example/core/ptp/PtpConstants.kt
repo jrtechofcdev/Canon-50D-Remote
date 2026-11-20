@@ -71,6 +71,8 @@ object EosProp {
     const val AVAILABLE_SHOTS = 0xD11B
     const val CAPTURE_DESTINATION = 0xD11C
     const val BATTERY_POWER = 0xD111
+    /** Drive mode (single, continuous, self-timer…): decides what holding the app's shutter does. */
+    const val DRIVE_MODE = 0xD106
     /** Where live view goes: bit 1 = camera screen, bit 2 = computer (here, the phone). */
     const val EVF_OUTPUT_DEVICE = 0xD1B0
     const val EVF_OFF = 0

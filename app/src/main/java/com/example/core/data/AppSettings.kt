@@ -197,6 +197,10 @@ data class Settings(
     val devVerboseLog: Boolean = false,
     /** "auto" or "cpu": which engine renders the presets (cpu to compare when the GPU looks wrong). */
     val devRender: String = "auto",
+    /** Shutter over USB: "auto" (what the camera announces), "press" (0x9128/0x9129) or "legacy" (0x910F). */
+    val devShutterMethod: String = "auto",
+    /** RemoteReleaseOn's second parameter, 1 or 0, to compare on the camera. */
+    val devReleaseFlag: Int = 1,
 
     // Entrega local: the phone serves the photos on its own Wi-Fi, the client saves them on theirs.
     /** Off by default: with it off nothing starts and no new permission is asked. */
@@ -460,6 +464,8 @@ object SettingKeys {
     val developerMode = booleanPreferencesKey("developer_mode")
     val devVerboseLog = booleanPreferencesKey("dev_verbose_log")
     val devRender = stringPreferencesKey("dev_render")
+    val devShutterMethod = stringPreferencesKey("dev_shutter_method")
+    val devReleaseFlag = intPreferencesKey("dev_release_flag")
     val deliveryEnabled = booleanPreferencesKey("delivery_enabled")
     val deliveryNetwork = stringPreferencesKey("delivery_network")
     val deliverySsid = stringPreferencesKey("delivery_ssid")
@@ -708,6 +714,8 @@ class SettingsRepository(private val context: Context) {
             developerMode = this[k.developerMode] ?: d.developerMode,
             devVerboseLog = this[k.devVerboseLog] ?: d.devVerboseLog,
             devRender = this[k.devRender] ?: d.devRender,
+            devShutterMethod = this[k.devShutterMethod] ?: d.devShutterMethod,
+            devReleaseFlag = this[k.devReleaseFlag] ?: d.devReleaseFlag,
             deliveryEnabled = this[k.deliveryEnabled] ?: d.deliveryEnabled,
             deliveryNetwork = this[k.deliveryNetwork] ?: d.deliveryNetwork,
             deliverySsid = this[k.deliverySsid]?.takeIf { it.isNotBlank() } ?: d.deliverySsid,
