@@ -496,7 +496,7 @@ class CameraManager(
     val currentDeviceInfo: DeviceInfo? get() = deviceInfo
 
     /** What a raw command got back: the response code, its parameters and how many data bytes came. */
-    data class CommandResult(val code: Int, val params: IntArray, val dataBytes: Int, val millis: Long) {
+    data class CommandResult(val code: Int, val params: IntArray, val dataBytes: Int, val millis: Long, val data: ByteArray = ByteArray(0)) {
         val ok get() = code == PtpResponse.OK
         fun describe() = "resposta 0x%04X (%s)%s%s em %d ms".format(
             code, PtpResponse.name(code),
@@ -514,7 +514,8 @@ class CameraManager(
             if (readData) {
                 val sink = com.example.core.ptp.ByteArraySink()
                 val answer = ptp.transact(op, *params, dataIn = sink)
-                CommandResult(PtpResponse.OK, answer, sink.bytes().size, System.currentTimeMillis() - started)
+                val bytes = sink.bytes()
+                CommandResult(PtpResponse.OK, answer, bytes.size, System.currentTimeMillis() - started, bytes)
             } else {
                 CommandResult(PtpResponse.OK, ptp.transact(op, *params), 0, System.currentTimeMillis() - started)
             }
@@ -551,12 +552,23 @@ class CameraManager(
         runCatching { if (liveZoom != 1) ptp.transact(PtpOp.EOS_ZOOM, 1) }
         liveZoom = 1
         cancelAf(ptp, "ao passar o live view para a câmera")
-        log("Live view devolvido à tela da câmera")
-        val result = rawSetProperty(EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_CAMERA)
-        // Remote mode 0 → on gives the body's buttons back (the 50D stayed BUSY after the app's live view),
-        // so SET can start the movie.
+        // Buttons first (remote mode 0 → on), then the camera's live view: in the other order the reset
+        // switched the camera's live view off again (event 0xD1B0 = 0 in the 5.3.4 log) and SET did nothing.
         resetRemoteMode(ptp, "ao passar o live view para a câmera")
-        return result
+        log("Live view devolvido à tela da câmera")
+        return rawSetProperty(EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_CAMERA)
+    }
+
+    /**
+     * Leaves the camera to the photographer, session still open: the app's live view stops and the
+     * body's buttons come back. The camera's own live view button and SET then work as without the cable.
+     */
+    suspend fun freeCameraBody() {
+        stopLiveView()
+        liveStopJob?.join()
+        val ptp = session ?: throw PtpException("Câmera desconectada")
+        cancelAf(ptp, "ao soltar a câmera")
+        resetRemoteMode(ptp, "ao soltar a câmera")
     }
 
     /**

@@ -176,9 +176,8 @@ fun LiveViewScreen(
     val loaded by remember { app.settings.settings }.collectAsState(initial = null)
     LaunchedEffect(connected, loaded?.liveOnCamera, loaded?.liveSilentAf, loaded?.liveFps) {
         val real = loaded ?: return@LaunchedEffect
-        // In SET mode (camera only) the camera keeps its live view: restarting ours would take it back mid-take.
-        val setMode = app.video.filming.value as? com.example.core.video.CameraFilming.Waiting
-        if (setMode?.variant == com.example.core.video.SetVariant.CameraOnly) return@LaunchedEffect
+        // In SET mode the camera keeps its live view: restarting ours would take it back mid-take.
+        if (app.video.filming.value is com.example.core.video.CameraFilming.Waiting) return@LaunchedEffect
         if (connected) {
             app.camera.stopLiveView()
             app.camera.startLiveView(alsoOnCamera = real.liveOnCamera, silentAf = real.liveSilentAf, fps = real.liveFps)

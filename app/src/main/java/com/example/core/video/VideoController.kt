@@ -46,13 +46,13 @@ sealed interface PhoneRecording {
 
 /** How the camera's own SET button gets live view while the app stays connected (method A). */
 enum class SetVariant(val label: String, val detail: String) {
-    PhoneAndCamera(
-        "Live view no celular e na câmera",
-        "A câmera mostra o live view na tela dela e o celular continua vendo. Tente o SET assim primeiro.",
+    FreeCamera(
+        "Câmera livre (recomendado)",
+        "O app desliga o live view dele e solta os botões da câmera. Na câmera, ligue o live view no botão dela e aperte SET para filmar.",
     ),
     CameraOnly(
-        "Só na tela da câmera",
-        "O app para de receber a imagem e devolve o live view para a câmera. Use se o SET não responder no outro modo.",
+        "O app liga o live view na câmera",
+        "O app solta os botões e liga o live view na tela da câmera. Aperte SET para filmar.",
     ),
 }
 
@@ -118,7 +118,6 @@ class VideoController(
     private var recordings = 0
     @Volatile private var lastStats: LiveRecorder.Stats? = null
     @Volatile private var cancelDownload = false
-    private var liveOnCameraBefore: Boolean? = null
     private var monitorByFilming = false
     private var knownOnCard: Set<String> = emptySet()
 
@@ -287,11 +286,10 @@ class VideoController(
         knownOnCard = runCatching { scanCardQuiet() }.getOrDefault(emptyList()).map { it.filename }.toSet()
         VideoLog.i("SET", "Vídeos já no cartão antes de filmar: ${knownOnCard.size}")
         when (variant) {
-            SetVariant.PhoneAndCamera -> {
-                val s = settings.current()
-                liveOnCameraBefore = s.liveOnCamera
-                if (!s.liveOnCamera) settings.set(SettingKeys.liveOnCamera, true)
-                VideoLog.i("SET", "Saída do live view: celular + câmera. Estava ${if (s.liveOnCamera) "já ligada na câmera" else "só no celular"}; o live view reinicia sozinho se a tela dele estiver aberta")
+            SetVariant.FreeCamera -> {
+                val result = runCatching { camera.freeCameraBody() }
+                result.onSuccess { VideoLog.i("SET", "Live view do app desligado e botões da câmera soltos; ligue o live view na câmera") }
+                    .onFailure { VideoLog.e("SET", "Não deu para soltar a câmera", it) }
             }
             SetVariant.CameraOnly -> {
                 val result = runCatching { camera.handLiveViewToCamera() }
@@ -304,7 +302,8 @@ class VideoController(
             monitorByFilming = true
         }
         _filming.value = CameraFilming.Waiting(variant, System.currentTimeMillis())
-        say("Agora aperte SET na câmera para filmar e SET de novo para parar.")
+        say(if (variant == SetVariant.FreeCamera) "Na câmera, ligue o live view no botão dela e aperte SET para filmar (SET de novo para parar)."
+            else "Agora aperte SET na câmera para filmar e SET de novo para parar.")
     }
 
     /** Back to normal. With [searchCard], looks for the new video files and downloads them. */
@@ -316,10 +315,8 @@ class VideoController(
             setMonitor(false)
             monitorByFilming = false
         }
-        liveOnCameraBefore?.let { before -> if (!before) settings.set(SettingKeys.liveOnCamera, false) }
-        liveOnCameraBefore = null
         _filming.value = CameraFilming.Off
-        if (restartLive && waiting.variant == SetVariant.CameraOnly && camera.state.value is ConnectionState.Connected) {
+        if (restartLive && camera.state.value is ConnectionState.Connected) {
             val s = settings.current()
             camera.startLiveView(alsoOnCamera = s.liveOnCamera, silentAf = s.liveSilentAf, fps = s.liveFps)
             VideoLog.i("SET", "Live view do celular religado")
