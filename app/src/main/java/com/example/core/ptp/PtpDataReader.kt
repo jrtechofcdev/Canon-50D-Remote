@@ -64,6 +64,8 @@ data class DeviceInfo(
     val version: String,
     val serial: String,
     val operations: Set<Int>,
+    val properties: Set<Int> = emptySet(),
+    val events: Set<Int> = emptySet(),
 ) {
     fun supports(op: Int) = op in operations
 
@@ -76,8 +78,8 @@ data class DeviceInfo(
             r.string() // vendor extension description
             r.u16() // functional mode
             val ops = r.u16Array().toSet()
-            r.u16Array() // events
-            r.u16Array() // device properties
+            val events = r.u16Array().toSet()
+            val props = r.u16Array().toSet()
             r.u16Array() // capture formats
             r.u16Array() // image formats
             return DeviceInfo(
@@ -86,6 +88,8 @@ data class DeviceInfo(
                 version = r.string(),
                 serial = r.string(),
                 operations = ops,
+                properties = props,
+                events = events,
             )
         }
     }
@@ -105,6 +109,7 @@ data class ObjectInfo(
     val isFolder get() = format == PtpFormat.ASSOCIATION
     val isRaw get() = format == PtpFormat.CANON_CR2 || format == PtpFormat.CANON_CRW || filename.endsWith(".CR2", true)
     val isJpeg get() = format == PtpFormat.EXIF_JPEG || filename.endsWith(".JPG", true)
+    val isVideo get() = PtpFormat.isVideo(format, filename)
 
     /** Same shape as a capture event, so the downloader treats both alike. */
     fun asObjectAdded() = EosEventRecord.ObjectAdded(handle, storageId, format, size, parent, filename)

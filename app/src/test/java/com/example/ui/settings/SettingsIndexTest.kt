@@ -16,6 +16,7 @@ class SettingsIndexTest {
         "PresetSettingsSection" to SettingsSection.Presets, "MessageSettings" to SettingsSection.Messages,
         "AlertSettings" to SettingsSection.Alerts, "DisplaySettings" to SettingsSection.Display,
         "DiagnosticsSettings" to SettingsSection.Diagnostics, "DeveloperSettings" to SettingsSection.Developer,
+        "VideoSettings" to SettingsSection.Video,
     )
 
     @Test

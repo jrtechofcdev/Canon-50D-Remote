@@ -13,6 +13,7 @@ sealed interface EosEventRecord {
         val isRaw get() = format == PtpFormat.CANON_CR2 || format == PtpFormat.CANON_CRW ||
             filename.endsWith(".CR2", ignoreCase = true)
         val isJpeg get() = format == PtpFormat.EXIF_JPEG || filename.endsWith(".JPG", ignoreCase = true)
+        val isVideo get() = PtpFormat.isVideo(format, filename)
     }
 
     data class PropertyChanged(val prop: Int, val value: Int) : EosEventRecord
@@ -40,6 +41,29 @@ object EosEventParser {
             val type = PtpDataReader.u32At(data, pos + 4)
             if (size < 8 || type == 0 || pos + size > data.size) break
             parseRecord(data, pos, size, type)?.let(out::add)
+            pos += size
+        }
+        return out
+    }
+
+    /**
+     * Every record as "0xC189(16): 1BD10000 05000000…", unknown types included, for the video module's
+     * event monitor: it shows whatever the camera reports while it films.
+     */
+    fun describe(data: ByteArray, maxRecords: Int = 40): List<String> {
+        val out = mutableListOf<String>()
+        var pos = 0
+        while (pos + 8 <= data.size && out.size < maxRecords) {
+            val size = PtpDataReader.u32At(data, pos)
+            val type = PtpDataReader.u32At(data, pos + 4)
+            if (size < 8 || type == 0 || pos + size > data.size) break
+            val body = (pos + 8 until minOf(pos + size, pos + 8 + 24)).joinToString("") { "%02X".format(data[it]) }
+            val known = when (type) {
+                EosEvent.PROP_VALUE_CHANGED -> if (size >= 16) " prop 0x%04X = %d".format(PtpDataReader.u32At(data, pos + 8), PtpDataReader.u32At(data, pos + 12)) else ""
+                EosEvent.OBJECT_ADDED_EX -> if (size > OA_NAME) " arquivo ${PtpDataReader.asciiAt(data, pos + OA_NAME, pos + size)}" else ""
+                else -> ""
+            }
+            out += "0x%04X(%d):%s %s".format(type, size, known, body)
             pos += size
         }
         return out

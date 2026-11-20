@@ -80,6 +80,9 @@ class TetherApp : Application() {
     /** Deleted photos wait here a few seconds so Desfazer can bring them back. */
     lateinit var trash: com.example.core.data.PhotoTrash
         private set
+    /** Experimental: films with the 50D (SET button) or records the live view on the phone. */
+    lateinit var video: com.example.core.video.VideoController
+        private set
 
     /**
      * Switches the session new photos go to (folder, name, delivery): the name, the photo counter
@@ -155,6 +158,7 @@ class TetherApp : Application() {
         looks = Looks(this, engine, presets, database.photoDao(), store, settings)
         location = LocationTracker(this)
         tether = TetherController(this, camera, settings, store, database.photoDao(), looks, { id -> presets.get(id)?.name }, location::recent)
+        video = com.example.core.video.VideoController(this, camera, settings, com.example.core.video.VideoLibrary(this, settings))
         export = ExportService(this)
         alerts = Alerts(this)
         notes = VoiceNotes(this)
@@ -217,6 +221,11 @@ class TetherApp : Application() {
         appScope.launch {
             // The backup runs under the foreground service too: the screen going off used to be able to stop it.
             backup.state.collect { if (it is com.example.core.backup.BackupState.Running) CameraForegroundService.start(this@TetherApp) }
+        }
+
+        appScope.launch {
+            // The video module's messages show at the bottom on any screen (live view, Ajustes, galeria).
+            video.messages.collect { notice(it) }
         }
 
         appScope.launch {

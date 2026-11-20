@@ -49,6 +49,25 @@ class AppLogTest {
     }
 
     @Test
+    fun videoLinesAreTaggedWrittenWhenLogIsOffAndRepeatedInTheBundle() {
+        AppLog.init(ApplicationProvider.getApplicationContext<Context>())
+        AppLog.configure(false, null)
+        AppLog.i("FOTO", "foto que não deve aparecer")
+        AppLog.videoBanner("gravação de teste")
+        AppLog.video("I", "CELULAR", "quadro 10 gravado")
+        val content = waitFor("quadro 10 gravado")
+        assertTrue(content.contains("I/VIDEO-CELULAR: quadro 10 gravado"))
+        assertTrue(content.contains("VÍDEO · gravação de teste"))
+        assertFalse(content.contains("foto que não deve aparecer"))
+        val bundle = AppLog.bundle().readText()
+        val videoPart = bundle.substringAfter("Só o módulo de vídeo")
+        assertTrue(videoPart.contains("quadro 10 gravado"))
+        assertTrue(AppLog.isVideoLine("10:00:00.000 I/VIDEO-SET: modo SET"))
+        assertFalse(AppLog.isVideoLine("10:00:00.000 I/FOTO: IMG_0001 salva"))
+        AppLog.configure(true, null)
+    }
+
+    @Test
     fun memoryLineIsReadable() {
         assertTrue(AppLog.memory().matches(Regex("memória \\d+/\\d+ MB, nativa \\d+ MB")))
     }

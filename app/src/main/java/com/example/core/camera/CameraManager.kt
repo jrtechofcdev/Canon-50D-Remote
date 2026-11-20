@@ -354,13 +354,15 @@ class CameraManager(
     private suspend fun eventLoop(ptp: PtpSession, info: DeviceInfo) {
         var lastKeepAlive = System.currentTimeMillis()
         while (scope.isActive && session === ptp) {
-            val records = try {
-                EosEventParser.parse(ptp.transactForData(PtpOp.EOS_GET_EVENT))
+            val raw = try {
+                ptp.transactForData(PtpOp.EOS_GET_EVENT)
             } catch (e: PtpResponseException) {
                 // Busy while the camera writes to the card: just ask again shortly.
                 delay(300)
                 continue
             }
+            val records = EosEventParser.parse(raw)
+            if (raw.size > 8) eventTap?.let { tap -> runCatching { tap(raw) } }
             applyRecords(records, announceObjects = true)
 
             val now = System.currentTimeMillis()
@@ -379,7 +381,7 @@ class CameraManager(
             is EosEventRecord.AvailableValues ->
                 _status.update { it.copy(options = it.options + (record.prop to record.values)) }
             is EosEventRecord.ObjectAdded -> if (announceObjects && !record.isFolder) {
-                log("Nova foto: ${record.filename} (${record.size / 1024} KB)")
+                log("${if (record.isVideo) "Novo vídeo" else "Nova foto"}: ${record.filename} (${record.size / 1024} KB)")
                 // Never silent: a frame that couldn't be announced is found again by the search for missed frames.
                 if (!_newObjects.tryEmit(record)) AppLog.w("CAMERA", "Fila de fotos novas cheia: ${record.filename} fica para a busca de fotos perdidas")
             }
@@ -390,6 +392,107 @@ class CameraManager(
     suspend fun download(handle: Int, sink: PtpDataSink) {
         val ptp = session ?: throw PtpException("Câmera desconectada")
         ptp.transact(PtpOp.GET_OBJECT, handle, dataIn = sink, timeoutMs = DOWNLOAD_TIMEOUT_MS)
+    }
+
+    /**
+     * Raw GetEvent data, for the video module's monitor. Called on the event loop with every
+     * non-empty answer; a failure in it is ignored so the loop never stops.
+     */
+    @Volatile var eventTap: ((ByteArray) -> Unit)? = null
+
+    /** The camera's DeviceInfo of the current session, null when disconnected. */
+    val currentDeviceInfo: DeviceInfo? get() = deviceInfo
+
+    /** What a raw command got back: the response code, its parameters and how many data bytes came. */
+    data class CommandResult(val code: Int, val params: IntArray, val dataBytes: Int, val millis: Long) {
+        val ok get() = code == PtpResponse.OK
+        fun describe() = "resposta 0x%04X (%s)%s%s em %d ms".format(
+            code, PtpResponse.name(code),
+            if (params.isNotEmpty()) " · parâmetros " + params.joinToString(",") { "0x%X".format(it) } else "",
+            if (dataBytes > 0) " · $dataBytes bytes de dados" else "",
+            millis,
+        )
+    }
+
+    /** Sends any operation and reports the answer instead of throwing: the video lab's test commands. */
+    suspend fun rawCommand(op: Int, vararg params: Int, readData: Boolean = false): CommandResult {
+        val ptp = session ?: throw PtpException("Câmera desconectada")
+        val started = System.currentTimeMillis()
+        return try {
+            if (readData) {
+                val sink = com.example.core.ptp.ByteArraySink()
+                val answer = ptp.transact(op, *params, dataIn = sink)
+                CommandResult(PtpResponse.OK, answer, sink.bytes().size, System.currentTimeMillis() - started)
+            } else {
+                CommandResult(PtpResponse.OK, ptp.transact(op, *params), 0, System.currentTimeMillis() - started)
+            }
+        } catch (e: PtpResponseException) {
+            CommandResult(e.code, IntArray(0), 0, System.currentTimeMillis() - started)
+        }
+    }
+
+    /** SetDevicePropValueEx with the answer reported, for the video lab. */
+    suspend fun rawSetProperty(prop: Int, value: Int): CommandResult {
+        val ptp = session ?: throw PtpException("Câmera desconectada")
+        val started = System.currentTimeMillis()
+        return try {
+            ptp.transact(PtpOp.EOS_SET_DEVICE_PROP_VALUE_EX, dataOut = PtpContainer.eosPropValue(prop, value))
+            CommandResult(PtpResponse.OK, IntArray(0), 0, System.currentTimeMillis() - started)
+        } catch (e: PtpResponseException) {
+            CommandResult(e.code, IntArray(0), 0, System.currentTimeMillis() - started)
+        }
+    }
+
+    /**
+     * Stops sending live view to the phone and gives the picture back to the camera's screen, keeping
+     * the session open. Magic Lantern's movie mode on the 50D needs live view on the camera itself.
+     */
+    suspend fun handLiveViewToCamera(): CommandResult {
+        val job = liveJob
+        liveJob = null
+        job?.cancel()
+        job?.join()
+        liveStopJob?.join()
+        _live.value = LiveState.Off
+        _liveFrames.resetReplayCache()
+        val ptp = session ?: throw PtpException("Câmera desconectada")
+        runCatching { if (liveZoom != 1) ptp.transact(PtpOp.EOS_ZOOM, 1) }
+        liveZoom = 1
+        cancelAf(ptp, "ao passar o live view para a câmera")
+        log("Live view devolvido à tela da câmera")
+        return rawSetProperty(EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_CAMERA)
+    }
+
+    /**
+     * Downloads [size] bytes in pieces of [chunk] with GetPartialObject, so live view, events and the
+     * shutter get the USB between pieces. Falls back to one GetObject when the camera lacks it.
+     * [keepGoing] is asked before each piece: false stops with an exception and the file is dropped.
+     */
+    suspend fun downloadInChunks(
+        handle: Int,
+        size: Long,
+        sink: PtpDataSink,
+        chunk: Int = 1 shl 20,
+        keepGoing: () -> Boolean = { true },
+    ) {
+        val ptp = session ?: throw PtpException("Câmera desconectada")
+        val info = deviceInfo ?: throw PtpException("Câmera desconectada")
+        if (!info.supports(PtpOp.GET_PARTIAL_OBJECT) || size <= 0 || size > 0xFFFF_FFFFL) {
+            ptp.transact(PtpOp.GET_OBJECT, handle, dataIn = sink, timeoutMs = DOWNLOAD_TIMEOUT_MS)
+            return
+        }
+        sink.begin(size)
+        // The total is announced once; each piece only writes, so the progress keeps adding up.
+        val pieces = object : PtpDataSink {
+            override fun write(buffer: ByteArray, offset: Int, length: Int) = sink.write(buffer, offset, length)
+        }
+        var offset = 0L
+        while (offset < size) {
+            if (!keepGoing()) throw PtpException("Download cancelado")
+            val length = minOf(chunk.toLong(), size - offset).toInt()
+            ptp.transact(PtpOp.GET_PARTIAL_OBJECT, handle, offset.toInt(), length, dataIn = pieces, timeoutMs = DOWNLOAD_TIMEOUT_MS)
+            offset += length
+        }
     }
 
     /**

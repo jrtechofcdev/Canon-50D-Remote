@@ -13,6 +13,8 @@ object PtpOp {
     const val GET_OBJECT_INFO = 0x1008
     const val GET_OBJECT = 0x1009
     const val GET_THUMB = 0x100A
+    /** GetPartialObject(handle, offset, max bytes): big files in pieces, so the USB is free between them. */
+    const val GET_PARTIAL_OBJECT = 0x101B
 
     const val EOS_SET_DEVICE_PROP_VALUE_EX = 0x9110
     const val EOS_REMOTE_RELEASE = 0x910F
@@ -31,6 +33,9 @@ object PtpOp {
     const val EOS_AF_CANCEL = 0x9160
     const val EOS_REMOTE_RELEASE_ON = 0x9128
     const val EOS_REMOTE_RELEASE_OFF = 0x9129
+    /** Movie switch of bodies that film (libgphoto2: MovieSelectSWOn/Off). Experimental on the 50D. */
+    const val EOS_MOVIE_SELECT_SW_ON = 0x9133
+    const val EOS_MOVIE_SELECT_SW_OFF = 0x9134
 }
 
 object PtpResponse {
@@ -85,6 +90,11 @@ object EosProp {
     /** Camera clock, seconds since 1970 in the camera's local time (no time zone on the 50D). */
     const val CAMERA_TIME = 0xD113
 
+    /** Movie recording on bodies that film (libgphoto2 EVFRecordStatus): 4 starts, 0 stops. Experimental on the 50D. */
+    const val EVF_RECORD_STATUS = 0xD1B8
+    const val EVF_RECORD_START = 4
+    const val EVF_RECORD_STOP = 0
+
     /** Capture destination values: the card keeps a backup, the phone gets a copy via ObjectAddedEx. */
     const val DESTINATION_CARD = 2
 }
@@ -94,4 +104,21 @@ object PtpFormat {
     const val EXIF_JPEG = 0x3801
     const val CANON_CRW = 0xB101
     const val CANON_CR2 = 0xB103
+    const val AVI = 0x300A
+    const val MPEG = 0x300B
+    const val QUICKTIME = 0x300D
+    /** Canon's MOV (libgphoto2 PTP_OFC_CANON_MOV). Videos are recognised by extension too. */
+    const val CANON_MOV = 0xB982
+
+    val VIDEO_FORMATS = setOf(AVI, MPEG, QUICKTIME, CANON_MOV)
+    val VIDEO_EXTENSIONS = setOf("MOV", "MP4", "M4V", "AVI", "MPG", "MPEG", "3GP", "MKV", "MLV", "RAW")
+
+    /** A movie file, by PTP format or by name (Magic Lantern writes .MOV and, in RAW mode, .MLV). */
+    fun isVideo(format: Int, filename: String): Boolean {
+        if (format in VIDEO_FORMATS) return true
+        val ext = filename.substringAfterLast('.', "").uppercase()
+        // ".RAW" alone could be anything; only M00-style names from Magic Lantern's old raw recorder count.
+        if (ext == "RAW") return filename.startsWith("M", ignoreCase = true)
+        return ext in VIDEO_EXTENSIONS
+    }
 }

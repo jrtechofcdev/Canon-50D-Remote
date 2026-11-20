@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material.icons.outlined.WifiTethering
 import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.automirrored.outlined.Chat
@@ -153,6 +154,13 @@ fun PhotosScreen(
         selected.clear()
     }
 
+    var videosOpen by rememberSaveable { mutableStateOf(false) }
+    if (videosOpen) {
+        com.example.ui.video.VideoGallery(app, onBack = { videosOpen = false })
+        return
+    }
+    val videoCount by app.video.library.items.collectAsState()
+
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         if (selecting) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -163,7 +171,14 @@ fun PhotosScreen(
                 }) { Icon(Icons.Outlined.SelectAll, contentDescription = "Selecionar tudo") }
             }
         } else {
-            ScreenHeader("Fotos", count = photos.size)
+            ScreenHeader("Fotos", count = photos.size) {
+                IconButton(onClick = { videosOpen = true }) {
+                    Icon(
+                        Icons.Outlined.VideoLibrary,
+                        contentDescription = if (videoCount.isEmpty()) "Vídeos" else "Vídeos (${videoCount.size})",
+                    )
+                }
+            }
             ChipRow(Modifier.padding(bottom = Space.m)) {
                 PhotoFilter.entries.filter { it != PhotoFilter.ClientPicks || settings.clientPicksEnabled }.forEach {
                     GalleryChip(it.label, filter == it) { filter = it }
