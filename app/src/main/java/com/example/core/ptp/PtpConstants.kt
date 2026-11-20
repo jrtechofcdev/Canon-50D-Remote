@@ -81,8 +81,6 @@ object EosProp {
     const val EVF_OFF = 0
     const val EVF_CAMERA = 1
     const val EVF_PHONE = 2
-    /** Live view mode (gphoto2's EVFMode): some cameras turn it on with the output and keep it on after. */
-    const val EVF_MODE = 0xD1B3
 
     /** Live view AF system (gphoto2's LvAfSystem): 0 Quick mode (mirror drops), 1 Live mode (silent), 2 face. */
     const val LV_AF_SYSTEM = 0xD1BA

@@ -2,12 +2,22 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [5.3.2] · 2026-11-20
+
+Correção a partir do log da 5.3.1 na 50D: depois do live view, a câmera parava de responder até tirar o cabo.
+
+- **Despedida antes de soltar a USB:**
+  - ao desconectar (no botão, no Reconectar a USB e na reconexão depois do live view), o app soltava a USB antes de avisar a câmera;
+  - os avisos "sair do modo remoto" e "fechar a sessão" não chegavam, e a câmera recusava a sessão nova (`0x1002` sem resposta);
+  - agora a USB só é solta depois que a câmera recebe os quatro avisos, e o log mostra a resposta de cada um ("Despedida da câmera: …").
+- **`0xD1B3` intocado:** a 5.3.1 desligava essa propriedade ao sair do live view, mas ela já valia 1 antes do live view. Era um ajuste da câmera, não do live view.
+- **Reconexão rápida com novas tentativas:** se a câmera demorar a responder depois de fechar a sessão, o app tenta de novo mais duas vezes, com pausas maiores.
+
 ## [5.3.1] · 2026-11-20
 
 Correção a partir do log da 5.3 na 50D: depois de sair do live view, o corpo da câmera ficava em BUSY (botões e dials sem resposta) até tirar o cabo.
 
 - **Saída do live view na ordem certa:** o fim do AF (0x9160) vai enquanto o live view ainda está ligado. Antes ele chegava depois, numa câmera que já tinha saído do live view.
-- **Modo do live view (0xD1B3):** se a câmera informar esse modo ligado, ele é desligado junto.
 - **Câmera liberada sem tirar o cabo:**
   - depois do live view, o app fecha e abre a sessão USB sozinho, como tirar e pôr o cabo;
   - espera os downloads em andamento terminarem;

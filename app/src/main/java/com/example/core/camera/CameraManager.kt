@@ -180,6 +180,9 @@ class CameraManager(
     private val _releaseMethod = MutableStateFlow<ReleaseMethod?>(null)
     val releaseMethod: StateFlow<ReleaseMethod?> = _releaseMethod.asStateFlow()
 
+    /** The session [disconnect] is saying goodbye on: its USB must stay open until the camera got it. */
+    @Volatile private var closingPolitely: PtpSession? = null
+
     /** The camera's values when live view opened, to log what live view left changed. */
     @Volatile private var valuesBeforeLive: Map<Int, Int> = emptyMap()
     /** Files being downloaded right now: the reconnection after live view waits for them. */
@@ -397,8 +400,10 @@ class CameraManager(
                         if (wasConnected) _lostConnection.tryEmit("Conexão com a câmera perdida")
                     }
                 }
-            } else {
+            } else if (closingPolitely !== ptp) {
                 // A session that was already replaced still holds the USB interface: let it go.
+                // Not while [disconnect] is still saying goodbye on it: closing the USB first (as up to 5.3.1)
+                // left the camera with its old session open, and it then answered nothing until the cable came out.
                 runCatching { ptp.close() }
             }
         }
@@ -774,12 +779,6 @@ class CameraManager(
             runCatching { if (liveZoom != 1) ptp.transact(PtpOp.EOS_ZOOM, 1) }
             runCatching { setPropertyNow(ptp, EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_OFF) }
                 .onFailure { log("A câmera não aceitou desligar o live view: ${it.message}") }
-            // Cameras that report a live view mode switch it on by themselves with the output; switch it off too.
-            if ((_status.value.value(EosProp.EVF_MODE) ?: 0) != 0) {
-                runCatching { setPropertyNow(ptp, EosProp.EVF_MODE, 0) }
-                    .onSuccess { log("Modo do live view (0xD1B3) desligado") }
-                    .onFailure { log("A câmera não aceitou desligar o modo do live view: ${it.message}") }
-            }
             liveZoom = 1
             log("Live view desligado")
             // Apart from the stop itself, so reopening live view doesn't wait for it.
@@ -826,14 +825,24 @@ class CameraManager(
         reconnectQuietly()
     }
 
-    /** Closes the session politely and opens it again, without the cable. Also used by the Desenvolvedor screen. */
+    /**
+     * Closes the session politely and opens it again, without the cable. Also used by the Desenvolvedor
+     * screen. A camera slow to answer after closing gets two more tries, each after a longer pause.
+     */
     fun reconnectQuietly() {
         scope.launch {
             disconnect()
-            withTimeoutOrNull(3_000) { _state.first { it is ConnectionState.NoCamera } }
-            // The same pause as pulling and plugging the cable: the camera leaves PC mode before the new session.
-            delay(800)
-            findAndConnect()
+            withTimeoutOrNull(4_000) { _state.first { it is ConnectionState.NoCamera } }
+            for (attempt in 1..3) {
+                // The same pause as pulling and plugging the cable: the camera leaves PC mode before the new session.
+                delay(1_000L * attempt)
+                findAndConnect()
+                val end = withTimeoutOrNull(20_000) {
+                    _state.first { it is ConnectionState.Connected || it is ConnectionState.Failed || it == ConnectionState.NoCamera }
+                }
+                if (end is ConnectionState.Connected || end == ConnectionState.NoCamera) return@launch
+                log("Reconexão rápida: tentativa $attempt sem resposta")
+            }
         }
     }
 
@@ -1167,17 +1176,26 @@ class CameraManager(
         retryJob?.cancel()
         if (_state.value is ConnectionState.Reconnecting) _state.value = ConnectionState.NoCamera
         val ptp = session ?: return
-        // Detach first so the event loop stops and its error handler ignores this session.
+        // Detach first so the event loop stops and its error handler ignores this session; the USB stays
+        // open until the camera has been told to leave remote mode and close its session.
+        closingPolitely = ptp
         closeSession(closeTransport = false)
         scope.launch {
-            withTimeoutOrNull(2_000) {
-                // Hand the picture back to the camera's screen before leaving remote mode.
-                runCatching { ptp.transact(PtpOp.EOS_SET_DEVICE_PROP_VALUE_EX, dataOut = PtpContainer.eosPropValue(EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_OFF), timeoutMs = 1_000) }
-                runCatching { ptp.transact(PtpOp.EOS_SET_EVENT_MODE, 0, timeoutMs = 1_000) }
-                runCatching { ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, 0, timeoutMs = 1_000) }
-                runCatching { ptp.transact(PtpOp.CLOSE_SESSION, timeoutMs = 1_000) }
+            // What the camera answered to each goodbye, for the log: a camera that missed them keeps its old session.
+            val answers = mutableListOf<String>()
+            suspend fun bye(name: String, call: suspend () -> Unit) {
+                answers += name + if (runCatching { call() }.isSuccess) " ok" else " falhou"
             }
+            withTimeoutOrNull(4_000) {
+                // Hand the picture back to the camera's screen before leaving remote mode.
+                bye("live view") { ptp.transact(PtpOp.EOS_SET_DEVICE_PROP_VALUE_EX, dataOut = PtpContainer.eosPropValue(EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_OFF), timeoutMs = 1_000) }
+                bye("eventos") { ptp.transact(PtpOp.EOS_SET_EVENT_MODE, 0, timeoutMs = 1_000) }
+                bye("modo remoto") { ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, 0, timeoutMs = 1_000) }
+                bye("sessão") { ptp.transact(PtpOp.CLOSE_SESSION, timeoutMs = 1_000) }
+            }
+            log("Despedida da câmera: ${answers.joinToString(", ").ifEmpty { "sem resposta" }}")
             ptp.close()
+            if (closingPolitely === ptp) closingPolitely = null
             _state.value = ConnectionState.NoCamera
             log("Sessão encerrada")
         }
