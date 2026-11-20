@@ -86,7 +86,7 @@ sealed interface LiveState {
 
 /** Exposure values as last reported by the camera, keyed by EOS property code. */
 /** Modo desenvolvedor, to compare on the camera: SetRemoteMode's value and whether the capture destination is written. */
-data class ConnectionPrefs(val remoteMode: Int = 1, val writeDestination: Boolean = true)
+data class ConnectionPrefs(val remoteMode: Int = 1, val writeDestination: Boolean = true, val reconnectAfterLive: Boolean = true)
 
 data class CameraStatus(
     val values: Map<Int, Int> = emptyMap(),
@@ -179,6 +179,11 @@ class CameraManager(
     /** How the app's button presses the connected camera's shutter; null without a camera. */
     private val _releaseMethod = MutableStateFlow<ReleaseMethod?>(null)
     val releaseMethod: StateFlow<ReleaseMethod?> = _releaseMethod.asStateFlow()
+
+    /** The camera's values when live view opened, to log what live view left changed. */
+    @Volatile private var valuesBeforeLive: Map<Int, Int> = emptyMap()
+    /** Files being downloaded right now: the reconnection after live view waits for them. */
+    private val downloadsActive = java.util.concurrent.atomic.AtomicInteger(0)
 
     /** Live view ran in this session: a camera stuck "busy" afterwards gets live view turned off again. */
     @Volatile private var liveUsed = false
@@ -440,6 +445,15 @@ class CameraManager(
      * while the shutter works; in one GetObject otherwise (that one always starts from the beginning).
      */
     suspend fun download(handle: Int, size: Long, sink: PtpDataSink, startAt: Long = 0L) {
+        downloadsActive.incrementAndGet()
+        try {
+            downloadNow(handle, size, sink, startAt)
+        } finally {
+            downloadsActive.decrementAndGet()
+        }
+    }
+
+    private suspend fun downloadNow(handle: Int, size: Long, sink: PtpDataSink, startAt: Long) {
         val ptp = session ?: throw PtpException("Câmera desconectada")
         if (!_capabilities.value.partialObject || size <= 0) {
             require(startAt == 0L) { "GetObject não retoma do meio" }
@@ -754,24 +768,78 @@ class CameraManager(
         val ptp = session ?: return
         liveStopJob = scope.launch {
             job.join()
+            // Everything that belongs to live view is closed while live view is still on: an AF cancel sent
+            // after it (as up to 5.3) reached a camera no longer in live view, and the 50D body stayed "BUSY".
+            cancelAf(ptp, "ao sair do live view")
             runCatching { if (liveZoom != 1) ptp.transact(PtpOp.EOS_ZOOM, 1) }
             runCatching { setPropertyNow(ptp, EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_OFF) }
                 .onFailure { log("A câmera não aceitou desligar o live view: ${it.message}") }
-            // An AF left open in live view kept every later shot "busy" in a 5.0 log; close it on the way out.
-            cancelAf(ptp, "ao sair do live view")
+            // Cameras that report a live view mode switch it on by themselves with the output; switch it off too.
+            if ((_status.value.value(EosProp.EVF_MODE) ?: 0) != 0) {
+                runCatching { setPropertyNow(ptp, EosProp.EVF_MODE, 0) }
+                    .onSuccess { log("Modo do live view (0xD1B3) desligado") }
+                    .onFailure { log("A câmera não aceitou desligar o modo do live view: ${it.message}") }
+            }
             liveZoom = 1
             log("Live view desligado")
-            // The camera reports its live view output by event; write what it says, for the next log.
             // Apart from the stop itself, so reopening live view doesn't wait for it.
             scope.launch {
                 delay(800)
-                _status.value.value(EosProp.EVF_OUTPUT_DEVICE)?.let { log("Saída do live view na câmera depois de desligar: $it") }
+                logLiveChanges()
+                if (connectionPrefs().reconnectAfterLive) releaseAfterLive(ptp)
             }
+        }
+    }
+
+    /** What changed on the camera between opening and closing live view: the evidence when the body stays BUSY. */
+    private fun logLiveChanges() {
+        val before = valuesBeforeLive
+        val now = _status.value.values
+        val changed = (before.keys + now.keys).filter { before[it] != now[it] }.sorted()
+        log("Saída do live view na câmera depois de desligar: ${now[EosProp.EVF_OUTPUT_DEVICE]}")
+        AppLog.i("CAMERA", "Propriedades que mudaram com o live view: " +
+            if (changed.isEmpty()) "nenhuma" else changed.joinToString(", ") { "%04X: %s → %s".format(it, before[it]?.toString() ?: "-", now[it]?.toString() ?: "-") })
+    }
+
+    /**
+     * After live view the 50D body could stay "BUSY" (buttons and dials dead) until the cable came out,
+     * while the app itself still worked. Pulling the cable ends the remote session on the camera side;
+     * this does the same without the cable: the session is closed and opened again. It waits for the
+     * downloads in progress, and gives up when live view, a shot, the intervalometer or bracketing starts.
+     */
+    private suspend fun releaseAfterLive(ptp: PtpSession) {
+        val busyUntil = System.currentTimeMillis() + RELEASE_WAIT_MS
+        var quietSince = System.currentTimeMillis()
+        while (true) {
+            if (session !== ptp || liveJob?.isActive == true) return
+            val now = System.currentTimeMillis()
+            if (downloadsActive.get() > 0 || _shutter.value is ShutterState.Focusing) quietSince = now
+            if (now - quietSince >= 1_500) break
+            if (now > busyUntil) {
+                AppLog.w("CAMERA", "Câmera ainda ocupada com downloads: a reconexão depois do live view ficou para depois")
+                return
+            }
+            delay(250)
+        }
+        if (_interval.value.running || _bracketing.value != null) return
+        log("Liberando a câmera depois do live view (reconexão rápida, como tirar e pôr o cabo)")
+        reconnectQuietly()
+    }
+
+    /** Closes the session politely and opens it again, without the cable. Also used by the Desenvolvedor screen. */
+    fun reconnectQuietly() {
+        scope.launch {
+            disconnect()
+            withTimeoutOrNull(3_000) { _state.first { it is ConnectionState.NoCamera } }
+            // The same pause as pulling and plugging the cable: the camera leaves PC mode before the new session.
+            delay(800)
+            findAndConnect()
         }
     }
 
     private suspend fun runLiveView(ptp: PtpSession, alsoOnCamera: Boolean, silentAf: Boolean) {
         _live.value = LiveState.Starting
+        valuesBeforeLive = _status.value.values
         liveUsed = true
         liveSilentAf = silentAf
         if (!silentAf) {
@@ -1162,6 +1230,8 @@ class CameraManager(
         private const val AF_WAIT_LIVE_MS = 2_800L
         private const val LIVE_AFTER_SHOT_MS = 600L
         private const val INTERVAL_WAIT_MS = 5_000L
+        /** How long the reconnection after live view waits for downloads to finish. */
+        private const val RELEASE_WAIT_MS = 120_000L
         /** What the screens and the shutter read from the camera; asked for when an event left one out. */
         private val REQUESTED_PROPS = listOf(
             EosProp.DRIVE_MODE, EosProp.SHOOTING_MODE, EosProp.ISO, EosProp.SHUTTER_SPEED, EosProp.APERTURE,

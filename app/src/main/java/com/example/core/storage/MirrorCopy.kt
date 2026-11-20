@@ -12,11 +12,19 @@ import java.io.IOException
  */
 class MirrorCopy(private val context: Context) {
 
-    /** Copies [source] to [treeUri]/[path]/[fileName]; an existing file of the same size is kept. */
-    fun copy(source: String, treeUri: String, path: List<String>, fileName: String): Uri {
+    /**
+     * Copies [source] to [treeUri]/[path]/[fileName]; an existing file of the same size is kept.
+     * [noAccess] is the message when the folder lost its permission (it names the folder the user picked).
+     */
+    fun copy(source: String, treeUri: String, path: List<String>, fileName: String, noAccess: String = NO_ACCESS_MIRROR): Uri {
         val root = DocumentFile.fromTreeUri(context, Uri.parse(treeUri))?.takeIf { it.canWrite() }
-            ?: throw IOException("Sem permissão na pasta do 2º cartão. Escolha de novo em Ajustes → Salvamento.")
+            ?: throw IOException(noAccess)
         return copyInto(root, source, path, fileName)
+    }
+
+    companion object {
+        const val NO_ACCESS_MIRROR = "Sem permissão na pasta do 2º cartão. Escolha de novo em Ajustes → Salvamento."
+        const val NO_ACCESS_DELIVERY = "Sem permissão na pasta de cópias da entrega. Escolha de novo em Ajustes → Entrega local ou Express."
     }
 
     /** The part that works on any folder, also a plain one in tests. */

@@ -219,6 +219,7 @@ val settingsIndex: Map<SettingsSection, List<String>> = mapOf(
         "Conexão",
         "Modo remoto (0x9114)",
         "Gravar destino: cartão",
+        "Reconectar ao sair do live view",
         "Log detalhado",
         "Cada comando da câmera no log",
         "Testes sem a câmera",

@@ -74,8 +74,7 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
             DevButton("Testar disparo", connected, Modifier.weight(1f)) { app.camera.capture(s.shutterWait, focusFirst = false) }
         }
         DevButton("Reconectar a USB", true, Modifier.fillMaxWidth()) {
-            app.camera.disconnect()
-            scope.launch { kotlinx.coroutines.delay(800); app.camera.findAndConnect() }
+            app.camera.reconnectQuietly()
         }
         Text("Propriedades lidas (${status.values.size})", style = MaterialTheme.typography.labelMedium, color = Tone.TextMuted, modifier = Modifier.padding(top = 10.dp))
         Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -106,6 +105,9 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
         }
         ToggleRow(Icons.Outlined.Storage, "Gravar destino: cartão", "Ao conectar, manda a 50D salvar no cartão (0xD11C = 2). Desligado, fica o que a câmera já usa", s.devWriteDestination) {
             scope.launch { app.settings.set(SettingKeys.devWriteDestination, it) }
+        }
+        ToggleRow(Icons.Outlined.Usb, "Reconectar ao sair do live view", "Fecha e abre a sessão USB depois do live view, como tirar e pôr o cabo, para a câmera não ficar em BUSY", s.devReconnectAfterLive) {
+            scope.launch { app.settings.set(SettingKeys.devReconnectAfterLive, it) }
         }
         InfoText("Vale a partir da próxima conexão (use Reconectar a USB). Compare no log quantas vezes aparece \"ocupada (0x2019)\".")
     }
@@ -178,6 +180,7 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
                 app.settings.set(SettingKeys.devReleaseFlag, 1)
                 app.settings.set(SettingKeys.devRemoteMode, 1)
                 app.settings.set(SettingKeys.devWriteDestination, true)
+                app.settings.set(SettingKeys.devReconnectAfterLive, true)
             }
             toast("Modo desenvolvedor desligado")
         }

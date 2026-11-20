@@ -2,6 +2,20 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [5.3.1] · 2026-11-20
+
+Correção a partir do log da 5.3 na 50D: depois de sair do live view, o corpo da câmera ficava em BUSY (botões e dials sem resposta) até tirar o cabo.
+
+- **Saída do live view na ordem certa:** o fim do AF (0x9160) vai enquanto o live view ainda está ligado. Antes ele chegava depois, numa câmera que já tinha saído do live view.
+- **Modo do live view (0xD1B3):** se a câmera informar esse modo ligado, ele é desligado junto.
+- **Câmera liberada sem tirar o cabo:**
+  - depois do live view, o app fecha e abre a sessão USB sozinho, como tirar e pôr o cabo;
+  - espera os downloads em andamento terminarem;
+  - não faz nada se você voltar ao live view, estiver disparando ou com o intervalômetro ou o bracketing rodando;
+  - dá para desligar em Desenvolvedor → Conexão → Reconectar ao sair do live view.
+- **Log:** mostra as propriedades da câmera que mudaram entre a entrada e a saída do live view.
+- **Aviso certo:** quando a pasta de cópias da Entrega ou do Express perde a permissão, o aviso fala dessa pasta, e não mais do 2º cartão.
+
 ## [5.3] · 2026-11-20
 
 Download, conexão e live view revistos módulo a módulo, a partir da comparação com outro app que funciona na 50D.

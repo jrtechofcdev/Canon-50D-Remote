@@ -496,7 +496,7 @@ class LocalDelivery(
         // The page's grid is ready before the client asks for it.
         warmThumbs(target, session.express)
         c.folder?.let { folder ->
-            runCatching { MirrorCopy(context).copy(Uri.fromFile(target).toString(), folder, listOf(session.client), DeliveryRules.itemName(session.client, photo.savedBase)) }
+            runCatching { MirrorCopy(context).copy(Uri.fromFile(target).toString(), folder, listOf(session.client), DeliveryRules.itemName(session.client, photo.savedBase), MirrorCopy.NO_ACCESS_DELIVERY) }
                 .onFailure { AppLog.w(tag, "Cópia na pasta de entregas falhou", it) }
         }
         true
