@@ -164,6 +164,6 @@ class VideoLibrary(private val context: Context, private val settings: SettingsR
     fun freeBytes(): Long? = runCatching { workDir().usableSpace }.getOrNull()
 
     companion object {
-        const val FOLDER_NAME = "09 Vídeos"
+        const val FOLDER_NAME = "09 Videos"
     }
 }

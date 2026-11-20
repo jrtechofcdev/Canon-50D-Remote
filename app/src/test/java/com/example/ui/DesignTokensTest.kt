@@ -15,8 +15,8 @@ class DesignTokensTest {
         // Draw code (Canvas, crop frame, histograms, peaking, the opening animation) where Tone can't be read.
         "Color(0x" to 32,
         "Color.White" to 17,
-        // Full black behind a photo or the live view, on purpose (no grey cast around the picture).
-        "Color.Black" to 15,
+        // Full black behind a photo, a video or the live view, on purpose (no grey cast around the picture).
+        "Color.Black" to 16,
         // The rotation dial, QR plates and a few round handles.
         "RoundedCornerShape(" to 12,
     )

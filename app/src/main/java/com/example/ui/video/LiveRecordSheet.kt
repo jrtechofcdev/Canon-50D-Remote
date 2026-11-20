@@ -30,7 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import com.example.ui.theme.Tone
 import androidx.compose.ui.unit.dp
 import com.example.TetherApp
 import com.example.core.camera.LiveState
@@ -39,7 +39,6 @@ import com.example.core.video.PhoneRecording
 import com.example.core.video.SetVariant
 import kotlinx.coroutines.delay
 
-private val RecRed = Color(0xFFE53935)
 
 /**
  * Video in the live view: record on the phone what the camera sends (method B), or step aside so
@@ -71,7 +70,7 @@ fun LiveRecordSheet(app: TetherApp, onDismiss: () -> Unit) {
             when (val p = phone) {
                 is PhoneRecording.Recording -> Button(
                     onClick = { video.stopPhoneRecording() },
-                    colors = ButtonDefaults.buttonColors(containerColor = RecRed),
+                    colors = ButtonDefaults.buttonColors(containerColor = Tone.Error),
                     modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
                 ) { Text("Parar · ${elapsed(p.startedAt)} · ${p.size}") }
                 PhoneRecording.Saving -> OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("Salvando o vídeo…") }
@@ -124,12 +123,12 @@ fun RecordingChip(app: TetherApp, modifier: Modifier = Modifier) {
         else -> return
     }
     Row(
-        modifier.clip(CircleShape).background(Color(0xCC000000)).padding(horizontal = 10.dp, vertical = 4.dp),
+        modifier.clip(CircleShape).background(Tone.Scrim).padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Box(Modifier.size(10.dp).clip(CircleShape).background(RecRed))
-        Text(text, style = MaterialTheme.typography.labelMedium, color = Color.White)
+        Box(Modifier.size(10.dp).clip(CircleShape).background(Tone.Error))
+        Text(text, style = MaterialTheme.typography.labelMedium, color = Tone.OnPhoto)
     }
 }
 

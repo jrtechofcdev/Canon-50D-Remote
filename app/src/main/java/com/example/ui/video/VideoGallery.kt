@@ -25,7 +25,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
@@ -164,8 +164,8 @@ private fun VideoTile(app: TetherApp, item: VideoItem, onPlay: () -> Unit, onDel
         thumb = bitmap
         duration = ms
     }
-    Column(Modifier.clip(RoundedCornerShape(8.dp)).background(Tone.Surface)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(3f / 2f).background(Color.Black).clickable(onClick = onPlay), contentAlignment = Alignment.Center) {
+    Column(Modifier.clip(MaterialTheme.shapes.small).background(Tone.Surface)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(3f / 2f).background(Tone.SurfaceHigh).clickable(onClick = onPlay), contentAlignment = Alignment.Center) {
             thumb?.let { Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
             Icon(
                 if (item.playable) Icons.Outlined.PlayCircle else Icons.Outlined.OpenInNew,
@@ -220,7 +220,7 @@ private fun VideoPlayer(app: TetherApp, item: VideoItem, onClose: () -> Unit) {
                 },
                 onRelease = { it.stopPlayback() },
             )
-            IconButton(onClick = onClose, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).background(Tone.Scrim, RoundedCornerShape(50))) {
+            IconButton(onClick = onClose, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).background(Tone.Scrim, CircleShape)) {
                 Icon(Icons.Outlined.Close, contentDescription = "Fechar o vídeo", tint = Tone.OnPhoto)
             }
         }
