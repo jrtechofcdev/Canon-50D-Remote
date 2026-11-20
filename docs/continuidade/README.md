@@ -34,3 +34,11 @@ Compilado e com os testes passando (commit `a0ff9e9`). Ainda não testado na câ
 - O corpo da 50D ficava em BUSY depois do live view do app. A correção segue o libgphoto2: modo remoto 0 e de novo 1, na mesma sessão (`CameraManager.resetRemoteMode`). O mesmo reinício roda ao passar o live view para a câmera no modo SET.
 - A 50D não aceita uma sessão nova sem tirar o cabo depois de fechar a sessão: não usar reconexão automática.
 - `0xD1B3` é a nitidez do live view, não o modo: o app não grava essa propriedade.
+
+## Magic Lantern (pesquisa no código do ML, espelho reticulatedpines/magiclantern_simplified)
+
+- O ML registra a operação USB `0xA1E8`, com o subcomando no primeiro parâmetro: `0` versão do protocolo (resposta com 2 parâmetros, 0.1), `1` textos do build (segundo parâmetro de 0 a 3: versão, id, data, usuário; os dados vêm em ASCII), `4` nomes dos menus raiz.
+- `GetMenuStruct(s)` e `SetMenu` usam um ponteiro não inicializado no código atual (a busca do menu está comentada). Não enviar: pode mexer em memória aleatória da câmera.
+- O protocolo CHDK (`0x9999`) também existe no ML, mas `ExecuteScript` não está implementado. Não há comando USB para começar a filmar.
+- No ML da 50D: `FEATURE_MOVIE_RECORDING_50D`, sem áudio. O `movie.start()` do Lua exige o live view ligado na câmera.
+- Teste em aberto: `0xD1B8 = 4` (estado de gravação do EVF, comando da Canon) com o live view da câmera ligado.

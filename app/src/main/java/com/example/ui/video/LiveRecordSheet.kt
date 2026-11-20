@@ -52,6 +52,7 @@ fun LiveRecordSheet(app: TetherApp, onDismiss: () -> Unit) {
     val filming by video.filming.collectAsState()
     val live by app.camera.live.collectAsState()
     val liveRunning = live is LiveState.Running
+    val mlActive by app.magicLantern.active.collectAsState()
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = com.example.ui.theme.Tone.Surface) {
         Column(
@@ -82,7 +83,15 @@ fun LiveRecordSheet(app: TetherApp, onDismiss: () -> Unit) {
             }
 
             Text("Gravar pela câmera (botão SET)", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 12.dp))
-            when (val f = filming) {
+            // Only Magic Lantern films on the 50D; with Canon's firmware the camera section would do nothing.
+            if (!mlActive && filming == CameraFilming.Off) {
+                Text(
+                    "Com o firmware Canon original a 50D não filma. Ligue a câmera com o cartão do Magic Lantern " +
+                        "(ou escolha o firmware em Ajustes → Magic Lantern) para filmar pelo SET.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = com.example.ui.theme.Tone.TextMuted,
+                )
+            } else when (val f = filming) {
                 is CameraFilming.Waiting -> {
                     Text("Modo SET ativo (${f.variant.label}). Aperte SET na câmera para começar e de novo para parar.", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.Tone.Accent)
                     Button(onClick = { video.exitSetMode(searchCard = true, restartLive = true) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
@@ -90,6 +99,18 @@ fun LiveRecordSheet(app: TetherApp, onDismiss: () -> Unit) {
                     }
                     OutlinedButton(onClick = { video.exitSetMode(searchCard = false, restartLive = true) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                         Text("Sair do modo SET")
+                    }
+                    // Canon's movie start over USB (EVF record status 4): untested on a 50D running ML.
+                    Text("Teste: filmar pelo app, com o live view da câmera ligado", style = MaterialTheme.typography.bodySmall, color = com.example.ui.theme.Tone.TextMuted)
+                    androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { video.labCommand("Filmar pelo app (0xD1B8 = 4)") { it.rawSetProperty(com.example.core.ptp.EosProp.EVF_RECORD_STATUS, com.example.core.ptp.EosProp.EVF_RECORD_START) } },
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        ) { Text("Filmar") }
+                        OutlinedButton(
+                            onClick = { video.labCommand("Parar pelo app (0xD1B8 = 0)") { it.rawSetProperty(com.example.core.ptp.EosProp.EVF_RECORD_STATUS, com.example.core.ptp.EosProp.EVF_RECORD_STOP) } },
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        ) { Text("Parar") }
                     }
                 }
                 CameraFilming.Off -> SetVariant.entries.forEach { variant ->

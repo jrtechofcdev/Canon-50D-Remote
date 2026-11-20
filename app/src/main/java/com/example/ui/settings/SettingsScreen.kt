@@ -96,6 +96,7 @@ import androidx.compose.material.icons.outlined.UsbOff
 import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material.icons.outlined.Vibration
 import androidx.compose.material.icons.outlined.Videocam
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.WbSunny
@@ -199,6 +200,7 @@ enum class SettingsSection(val route: String, val title: String, val summary: St
     Review("review", "Revisão", "Slide automático, galeria, culling, histograma", Icons.Outlined.PhotoLibrary, SettingsModule.Photography),
     Camera("camera", "Câmera", "Bateria, cartão, exposições salvas, bracketing", Icons.Outlined.CameraAlt, SettingsModule.Camera),
     Video("video", "Vídeo (experimental)", "Filmar pelo botão SET, gravar o live view, testes e log do vídeo", Icons.Outlined.Videocam, SettingsModule.Camera),
+    MagicLantern("ml", "Magic Lantern", "Firmware da câmera: Canon original ou Magic Lantern", Icons.Outlined.AutoAwesome, SettingsModule.Camera),
     Share("share", "Envio e cliente", "WhatsApp, marca d'água, modo cliente", Icons.Outlined.Send, SettingsModule.Delivery),
     Delivery("delivery", "Entrega local", "Wi-Fi do fotógrafo, portal, códigos e QR", Icons.Outlined.WifiTethering, SettingsModule.Delivery),
     Payments("payments", "Pagamentos", "Pix copia e cola, valores, pacotes e formas de pagamento", Icons.Outlined.Payments, SettingsModule.Delivery),
@@ -341,6 +343,7 @@ fun SettingsSectionScreen(app: TetherApp, section: SettingsSection, onBack: () -
             SettingsSection.Diagnostics -> DiagnosticsSettings(app, settings)
             SettingsSection.Developer -> DeveloperSettings(app, settings)
             SettingsSection.Video -> VideoSettings(app, settings)
+            SettingsSection.MagicLantern -> MagicLanternSettings(app, settings)
             SettingsSection.Delivery -> DeliverySettings(app, settings)
             SettingsSection.Express -> ExpressSettings(app, settings)
             SettingsSection.Payments -> PaymentSettings(app, settings)

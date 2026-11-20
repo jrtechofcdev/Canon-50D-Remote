@@ -15,6 +15,12 @@ Para 50D que filmam com o botão SET (firmware extra; a 50D de fábrica não gra
 - **Pasta 09 Vídeos** na estrutura de pastas do app.
 - **Download em pedaços de 1 MB** para os vídeos: o live view e o disparo continuam respondendo durante o download.
 - **Ajustes → Vídeo (experimental):** busca no cartão, comandos de teste (0xD1B8, 0x9133/0x9134, saída do live view), monitor de eventos da câmera e o log só do vídeo.
+- **Magic Lantern (Ajustes → Magic Lantern):**
+  - escolha do firmware: Automático (o app pergunta à câmera a cada conexão), Canon original ou Magic Lantern;
+  - a detecção usa o comando USB do próprio Magic Lantern (0xA1E8) e mostra a versão e a data do build;
+  - com o ML ativo, aparecem "Gravar pela câmera (SET)" no live view e "Magic Lantern" na Sessão; com o firmware Canon, esse trecho explica que a câmera não filma;
+  - leitura dos menus do ML (só leitura) e teste de filmar pelo comando da Canon (0xD1B8).
+- **Método A corrigido:** "Câmera livre" solta os botões e deixa o live view para o botão da câmera; "O app liga o live view na câmera" agora solta os botões antes (antes desligava o live view da câmera de novo).
 - **Log do vídeo:** linhas VIDEO-… no mesmo arquivo do app, gravadas mesmo com o log completo desligado, com separadores no início e no fim de cada gravação. O envio do log traz no fim uma parte só com as linhas do vídeo. Se o app fechar por erro, o log diz o que o vídeo estava fazendo e se o erro passou pelo módulo de vídeo.
 ## [5.3.4] · 2026-11-20
 

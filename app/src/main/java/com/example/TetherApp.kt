@@ -84,6 +84,7 @@ class TetherApp : Application() {
         private set
     /** Experimental: films with the 50D (SET button) or records the live view on the phone. */
     lateinit var video: com.example.core.video.VideoController
+    lateinit var magicLantern: com.example.core.ml.MagicLanternController
         private set
 
     /**
@@ -163,6 +164,7 @@ class TetherApp : Application() {
         location = LocationTracker(this)
         tether = TetherController(this, camera, settings, store, database.photoDao(), looks, { id -> presets.get(id)?.name }, location::recent)
         video = com.example.core.video.VideoController(this, camera, settings, com.example.core.video.VideoLibrary(this, settings))
+        magicLantern = com.example.core.ml.MagicLanternController(camera, settings)
         export = ExportService(this)
         alerts = Alerts(this)
         notes = VoiceNotes(this)
