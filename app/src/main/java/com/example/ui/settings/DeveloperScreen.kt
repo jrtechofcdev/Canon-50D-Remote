@@ -62,6 +62,7 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
     val state by app.camera.state.collectAsState()
     val recent by AppLog.recent.collectAsState()
     val releaseInfo by app.camera.releaseInfo.collectAsState()
+    val caps by app.camera.capabilities.collectAsState()
     var crashAsk by remember { mutableStateOf(false) }
     val connected = state is ConnectionState.Connected
     fun toast(t: String) = Toast.makeText(context, t, Toast.LENGTH_LONG).show()
@@ -96,6 +97,17 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
             scope.launch { app.settings.set(SettingKeys.devReleaseFlag, it) }
         }
         InfoText("Vale a partir do próximo disparo. Cada disparo grava no log as respostas da câmera, o parâmetro e o modo de avanço.")
+    }
+
+    SettingsGroup("Conexão", Icons.Outlined.Usb) {
+        InfoText(if (connected) "Na conexão: ${caps.describe()}." else "Conecte a câmera para ver o que ela anuncia.")
+        ChoiceRow("Modo remoto (0x9114)", listOf(1 to "1 (padrão)", 5 to "5"), s.devRemoteMode) {
+            scope.launch { app.settings.set(SettingKeys.devRemoteMode, it) }
+        }
+        ToggleRow(Icons.Outlined.Storage, "Gravar destino: cartão", "Ao conectar, manda a 50D salvar no cartão (0xD11C = 2). Desligado, fica o que a câmera já usa", s.devWriteDestination) {
+            scope.launch { app.settings.set(SettingKeys.devWriteDestination, it) }
+        }
+        InfoText("Vale a partir da próxima conexão (use Reconectar a USB). Compare no log quantas vezes aparece \"ocupada (0x2019)\".")
     }
 
     SettingsGroup("Log detalhado", Icons.Outlined.Code) {
@@ -164,6 +176,8 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
                 app.settings.set(SettingKeys.devRender, "auto")
                 app.settings.set(SettingKeys.devShutterMethod, ReleasePrefs.AUTO)
                 app.settings.set(SettingKeys.devReleaseFlag, 1)
+                app.settings.set(SettingKeys.devRemoteMode, 1)
+                app.settings.set(SettingKeys.devWriteDestination, true)
             }
             toast("Modo desenvolvedor desligado")
         }

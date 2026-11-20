@@ -2,6 +2,30 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [5.3] · 2026-11-20
+
+Download, conexão e live view revistos módulo a módulo, a partir da comparação com outro app que funciona na 50D.
+
+- **Download em blocos (0x101B):**
+  - o RAW vem em pedaços de 1 MB, e não mais num pedido só;
+  - entre um pedaço e outro, o live view e o disparador entram na vez: a imagem não congela mais depois de cada foto;
+  - enquanto o disparador trabalha, o download espera;
+  - câmeras sem esse comando continuam com o download inteiro (0x1009).
+- **Download que continua de onde parou:**
+  - se o cabo falhar no meio de um RAW, a próxima tentativa (ou a busca de fotos perdidas depois de reconectar) continua do byte em que parou;
+  - se o pedaço salvo não bater com o tamanho esperado, o app baixa do início;
+  - um pedaço esquecido por mais de 30 minutos é apagado, para não ficar foto quebrada na pasta.
+- **Valores pedidos à câmera (0x9127):** o que a 50D não informa sozinha (modo de avanço, por exemplo) é pedido ao conectar e ao abrir o live view.
+- **Só o que a câmera tem:**
+  - ao conectar, o app lê a lista de comandos da câmera e grava no log o que falta;
+  - zoom, AF e mover a lente só aparecem no live view se a câmera anunciar o comando;
+  - comandos não anunciados nunca são enviados.
+- **Modo desenvolvedor → Conexão:**
+  - modo remoto 1 ou 5;
+  - gravar ou não o destino "cartão";
+  - o log mostra o destino que a câmera informa.
+- **`PartialDownloadTest`:** testa os blocos, a retomada, a câmera ocupada e o bloco vazio.
+
 ## [5.2] · 2026-11-20
 
 O disparador do app passa a apertar o botão da 50D em duas etapas, como o dedo faz.

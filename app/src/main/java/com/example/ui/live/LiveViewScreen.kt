@@ -205,6 +205,10 @@ fun LiveViewScreen(
     // The 50D turns the depth of field preview down over USB: once it does, the button goes away.
     val dofSupported by app.camera.dofSupported.collectAsState()
     val dofAction: ((Boolean) -> Unit)? = if (dofSupported) { on -> app.camera.depthOfFieldPreview(on) } else null
+    // Controls for commands the camera doesn't list are left out instead of failing on the first tap.
+    val caps by app.camera.capabilities.collectAsState()
+    val afAction: (() -> Unit)? = if (caps.af) { { app.camera.liveAutofocus() } } else null
+    val driveAction: ((Int) -> Unit)? = if (caps.driveLens) { step -> app.camera.driveLens(step) } else null
     val onTapPicture = { px: Float, py: Float, mark: Offset ->
         val cx = if (settings.liveMirror) 1f - px else px
         if (settings.liveTapToFocus) {
@@ -263,10 +267,10 @@ fun LiveViewScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.SpaceEvenly,
                 ) {
-                    ZoomPills(zoom, compact = true) { app.camera.setLiveZoom(it) }
+                    if (caps.zoom) ZoomPills(zoom, compact = true) { app.camera.setLiveZoom(it) }
                     ShutterButton(shutter, connected, 76.dp, Modifier, finger, fire)
                     ShutterHint(shutter)
-                    FocusGrid(onAf = { app.camera.liveAutofocus() }, onDrive = { app.camera.driveLens(it) }, onDof = dofAction)
+                    FocusGrid(onAf = afAction, onDrive = driveAction, onDof = dofAction)
                 }
             }
             else -> Column(Modifier.fillMaxSize()) {
@@ -283,9 +287,9 @@ fun LiveViewScreen(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         ExposureValues(status) { title, prop -> picker = title to prop }
                     }
-                    FocusPad(onAf = { app.camera.liveAutofocus() }, onDrive = { app.camera.driveLens(it) }, onDof = dofAction)
+                    FocusPad(onAf = afAction, onDrive = driveAction, onDof = dofAction)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.weight(1f)) { ZoomPills(zoom, compact = false) { app.camera.setLiveZoom(it) } }
+                        Box(Modifier.weight(1f)) { if (caps.zoom) ZoomPills(zoom, compact = false) { app.camera.setLiveZoom(it) } }
                         ShutterButton(shutter, connected, 72.dp, Modifier, finger, fire)
                         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { ShutterHint(shutter) }
                     }
@@ -538,26 +542,26 @@ private fun ZoomPills(zoom: Int, compact: Boolean, onZoom: (Int) -> Unit) {
  * camera's own symbols; AF in the middle; DOF works while held (only where the camera does it).
  */
 @Composable
-private fun FocusPad(onAf: () -> Unit, onDrive: (Int) -> Unit, onDof: ((Boolean) -> Unit)?) {
+private fun FocusPad(onAf: (() -> Unit)?, onDrive: ((Int) -> Unit)?, onDof: ((Boolean) -> Unit)?) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-        FocusIcon(Icons.Outlined.Landscape, "Longe", -3, onDrive)
-        FocusIcon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "Um pouco mais longe", -1, onDrive)
-        AfButton(onAf)
-        FocusIcon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "Um pouco mais perto", 1, onDrive)
-        FocusIcon(Icons.Outlined.LocalFlorist, "Perto", 3, onDrive)
+        onDrive?.let { FocusIcon(Icons.Outlined.Landscape, "Longe", -3, it) }
+        onDrive?.let { FocusIcon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "Um pouco mais longe", -1, it) }
+        onAf?.let { AfButton(it) }
+        onDrive?.let { FocusIcon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "Um pouco mais perto", 1, it) }
+        onDrive?.let { FocusIcon(Icons.Outlined.LocalFlorist, "Perto", 3, it) }
         onDof?.let { HoldIcon(Icons.Outlined.Deblur, "Profundidade de campo (segure)", it) }
     }
 }
 
 /** The same controls in two short rows, for the side rail when the phone lies down. */
 @Composable
-private fun FocusGrid(onAf: () -> Unit, onDrive: (Int) -> Unit, onDof: ((Boolean) -> Unit)?) {
+private fun FocusGrid(onAf: (() -> Unit)?, onDrive: ((Int) -> Unit)?, onDof: ((Boolean) -> Unit)?) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            AfButton(onAf)
+            onAf?.let { AfButton(it) }
             onDof?.let { HoldIcon(Icons.Outlined.Deblur, "Profundidade de campo (segure)", it) }
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        if (onDrive != null) Row(verticalAlignment = Alignment.CenterVertically) {
             FocusIcon(Icons.Outlined.Landscape, "Longe", -3, onDrive, small = true)
             FocusIcon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "Um pouco mais longe", -1, onDrive, small = true)
             FocusIcon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "Um pouco mais perto", 1, onDrive, small = true)

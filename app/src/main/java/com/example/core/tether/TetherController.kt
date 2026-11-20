@@ -133,6 +133,18 @@ class TetherController(
         }
     }
 
+    /** A file that broke off midway: where it is, under which name, and how much of it is saved. */
+    private class Partial(val uri: String, val savedBase: String, val bytes: Long, val at: Long)
+    private val partials = java.util.concurrent.ConcurrentHashMap<String, Partial>()
+
+    /** A piece nobody came back for (camera gone for good, card changed) is removed, never left as a broken photo. */
+    private fun dropStalePartials() {
+        val now = System.currentTimeMillis()
+        partials.entries.removeIf { (_, p) ->
+            (now - p.at > PARTIAL_KEEP_MS).also { stale -> if (stale) store.delete(p.uri) }
+        }
+    }
+
     /** Adds a frame to the download queue. [force] ignores the RAW/JPG filter (manual picks from the card). */
     fun enqueue(obj: EosEventRecord.ObjectAdded, force: Boolean) {
         if (!inFlight.add(obj.filename)) {
@@ -198,6 +210,15 @@ class TetherController(
             AppLog.i("DOWNLOAD", "${obj.filename} já foi salva nesta sessão")
             return
         }
+        // A file that broke off midway (cable, USB hiccup) continues from where it stopped, under the same name.
+        val partialKey = "${obj.filename}:${obj.size}"
+        dropStalePartials()
+        val partial = partials.remove(partialKey)
+        val resumed = partial?.takeIf { camera.canResumeDownloads }?.let { p -> store.reopenForAppend(p.uri, p.bytes)?.let { p to it } }
+        if (partial != null && resumed == null) {
+            store.delete(partial.uri)
+            AppLog.i("DOWNLOAD", "${obj.filename}: o pedaço salvo antes não serve mais, baixando do início")
+        }
         val cameraBase = obj.filename.substringBeforeLast('.').ifBlank { "IMG_${obj.handle}" }
         val extension = obj.filename.substringAfterLast('.', if (kind == FileKind.RAW) "CR2" else "JPG")
 
@@ -206,20 +227,23 @@ class TetherController(
             System.currentTimeMillis() - it.capturedAt < PAIR_WINDOW_MS &&
                 (if (kind == FileKind.RAW) it.rawUri == null else it.jpgUri == null)
         }
-        val savedBase = existing?.savedBase ?: if (settings.renameWithSession && settings.sessionName.isNotBlank()) {
+        val savedBase = resumed?.first?.savedBase ?: existing?.savedBase ?: if (settings.renameWithSession && settings.sessionName.isNotBlank()) {
             "%s_%04d".format(settings.sessionName.trim().replace(Regex("[\\\\/:*?\"<>|]"), "-"), dao.countInSession(session) + 1)
         } else cameraBase
         val fileName = "$savedBase.$extension"
 
         // RAW and JPG of one frame stay in the same moment even if it changed between the two files.
         val moment = existing?.moment ?: settings.currentMoment.takeIf { settings.momentsEnabled && it.isNotBlank() }
-        val target = store.create(kind, fileName, settings, moment)
+        val target = resumed?.second ?: store.create(kind, fileName, settings, moment)
+        val startAt = resumed?.first?.bytes ?: 0L
         val started = System.currentTimeMillis()
-        AppLog.i("DOWNLOAD", "Baixando ${obj.filename} (${obj.size / 1024} KB) como $fileName")
+        AppLog.i("DOWNLOAD", if (startAt > 0) "Continuando ${obj.filename} de ${startAt / 1024} KB de ${obj.size / 1024} KB"
+            else "Baixando ${obj.filename} (${obj.size / 1024} KB) como $fileName")
+        var sink: StreamSink? = null
         try {
             BufferedOutputStream(target.stream, 256 * 1024).use { out ->
                 var lastPercent = -1
-                camera.download(obj.handle, StreamSink(out) { received, total ->
+                camera.download(obj.handle, obj.size, StreamSink(out, startAt) { received, total ->
                     // Progress changes only once per percent: every USB chunk used to redraw the screen and the notification.
                     val size = if (total > 0) total else obj.size
                     val percent = if (size > 0) (received * 100 / size).toInt() else 0
@@ -227,10 +251,17 @@ class TetherController(
                         lastPercent = percent
                         _transfer.value = Transfer(fileName, received, size, queued.get() - 1)
                     }
-                })
+                }.also { sink = it }, startAt)
             }
         } catch (e: Exception) {
-            store.delete(target.uri.toString())
+            val got = sink?.received ?: 0L
+            if (got > 0 && got < obj.size && e !is kotlinx.coroutines.CancellationException) {
+                // Kept for the next try (the queue's, or the search for missed frames after a reconnect).
+                partials[partialKey] = Partial(target.uri.toString(), savedBase, got, System.currentTimeMillis())
+                AppLog.i("DOWNLOAD", "$fileName parou em ${got / 1024} de ${obj.size / 1024} KB: a próxima tentativa continua daí")
+            } else {
+                store.delete(target.uri.toString())
+            }
             throw e
         }
 
@@ -379,6 +410,8 @@ class TetherController(
     companion object {
         private const val TAG = "TetherController"
         private const val MAX_RETRIES = 2
+        /** How long a piece of a file waits for the camera to come back before it is thrown away. */
+        private const val PARTIAL_KEEP_MS = 30 * 60_000L
 
         /** 1234 from IMG_1234.CR2 or _MG_1234.JPG. */
         fun frameNumber(name: String): Int? = Regex("(\\d{4})\\.[A-Za-z0-9]+$").find(name)?.groupValues?.get(1)?.toIntOrNull()

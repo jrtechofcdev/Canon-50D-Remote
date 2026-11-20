@@ -13,6 +13,7 @@ object PtpOp {
     const val GET_OBJECT_INFO = 0x1008
     const val GET_OBJECT = 0x1009
     const val GET_THUMB = 0x100A
+    const val GET_PARTIAL_OBJECT = 0x101B
 
     const val EOS_SET_DEVICE_PROP_VALUE_EX = 0x9110
     const val EOS_REMOTE_RELEASE = 0x910F
@@ -31,6 +32,8 @@ object PtpOp {
     const val EOS_AF_CANCEL = 0x9160
     const val EOS_REMOTE_RELEASE_ON = 0x9128
     const val EOS_REMOTE_RELEASE_OFF = 0x9129
+    /** Asks the camera to send a property's current value in the next GetEvent. */
+    const val EOS_REQUEST_DEVICE_PROP_VALUE = 0x9127
 }
 
 object PtpResponse {

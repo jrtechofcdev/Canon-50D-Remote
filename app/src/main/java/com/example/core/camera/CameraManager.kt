@@ -85,6 +85,9 @@ sealed interface LiveState {
 }
 
 /** Exposure values as last reported by the camera, keyed by EOS property code. */
+/** Modo desenvolvedor, to compare on the camera: SetRemoteMode's value and whether the capture destination is written. */
+data class ConnectionPrefs(val remoteMode: Int = 1, val writeDestination: Boolean = true)
+
 data class CameraStatus(
     val values: Map<Int, Int> = emptyMap(),
     val options: Map<Int, List<Int>> = emptyMap(),
@@ -112,6 +115,8 @@ class CameraManager(
     private val onClockRefused: suspend () -> Unit = {},
     /** Modo desenvolvedor: which release to use and RemoteReleaseOn's second parameter. */
     private val releasePrefs: suspend () -> ReleasePrefs = { ReleasePrefs() },
+    /** Modo desenvolvedor: remote mode value and whether the capture destination is written. */
+    private val connectionPrefs: suspend () -> ConnectionPrefs = { ConnectionPrefs() },
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + AppLog.handler("CAMERA"))
     private val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
@@ -177,6 +182,10 @@ class CameraManager(
 
     /** Live view ran in this session: a camera stuck "busy" afterwards gets live view turned off again. */
     @Volatile private var liveUsed = false
+
+    /** What the connected camera lists as supported; everything true without a camera. */
+    private val _capabilities = MutableStateFlow(CameraCapabilities())
+    val capabilities: StateFlow<CameraCapabilities> = _capabilities.asStateFlow()
 
     /** False once the camera turns down the depth of field preview (the 50D does over USB): the button goes away. */
     private val _dofSupported = MutableStateFlow(true)
@@ -323,17 +332,28 @@ class CameraManager(
             AppLog.i("DISPARO", "Disparo pelo cabo: ${ShutterPress.describe(info, method)}")
             AppLog.i("DISPARO", "Operações Canon anunciadas: " +
                 info.operations.filter { it in 0x9100..0x91FF }.sorted().joinToString(" ") { "%04X".format(it) })
-            _dofSupported.value = info.supports(PtpOp.EOS_DOF_PREVIEW)
+            val caps = CameraCapabilities.of(info)
+            _capabilities.value = caps
+            _dofSupported.value = caps.dof
             log("Câmera: ${info.manufacturer} ${info.model} (firmware ${info.version})")
+            AppLog.i("CAMERA", "Capacidades: ${caps.describe()}")
+            val prefs = connectionPrefs()
 
             // Remote mode + event mode is what EOS Utility uses for tethering. No UI lock is sent,
             // so the shutter button, dials and menus on the camera stay usable.
-            if (info.supports(PtpOp.EOS_SET_REMOTE_MODE)) ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, 1)
+            if (info.supports(PtpOp.EOS_SET_REMOTE_MODE)) {
+                ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, prefs.remoteMode)
+                if (prefs.remoteMode != 1) AppLog.i("CAMERA", "Modo remoto ${prefs.remoteMode} (modo desenvolvedor)")
+            }
             if (info.supports(PtpOp.EOS_SET_EVENT_MODE)) ptp.transact(PtpOp.EOS_SET_EVENT_MODE, 1)
             // A cable pulled while the app's button was held leaves the camera "pressed": let go first.
             if (info.supports(PtpOp.EOS_REMOTE_RELEASE_OFF)) ShutterPress.releaseAll(ptp)
-            runCatching { setPropertyNow(ptp, EosProp.CAPTURE_DESTINATION, EosProp.DESTINATION_CARD) }
-                .onFailure { log("Destino de captura mantido pela câmera: ${it.message}") }
+            if (prefs.writeDestination) {
+                runCatching { setPropertyNow(ptp, EosProp.CAPTURE_DESTINATION, EosProp.DESTINATION_CARD) }
+                    .onFailure { log("Destino de captura mantido pela câmera: ${it.message}") }
+            } else {
+                AppLog.i("CAMERA", "Destino de captura não gravado (modo desenvolvedor)")
+            }
 
             // The first GetEvent calls describe the current state (and may list files already on the card).
             // Read them until the queue is empty and only then start treating new objects as new shots.
@@ -342,6 +362,10 @@ class CameraManager(
                 applyRecords(records, announceObjects = false)
                 if (records.isEmpty()) break
             }
+
+            // Values the camera left out of its first events (the drive mode, often) are asked for one by one.
+            requestMissingValues(ptp, "conexão")
+            _status.value.value(EosProp.CAPTURE_DESTINATION)?.let { AppLog.i("CAMERA", "Destino de captura na câmera: $it (2 = cartão)") }
 
             if (syncClock()) setCameraClock(ptp)
 
@@ -410,11 +434,27 @@ class CameraManager(
         }
     }
 
-    /** Streams one file from the camera. Runs inside the session lock, so polling pauses meanwhile. */
-    suspend fun download(handle: Int, sink: PtpDataSink) {
+    /**
+     * Streams one file from the camera, from byte [startAt] (a download resumed midway). In 1 MB blocks
+     * when the camera lists GetPartialObject, so live view and the shutter keep their turns, and paused
+     * while the shutter works; in one GetObject otherwise (that one always starts from the beginning).
+     */
+    suspend fun download(handle: Int, size: Long, sink: PtpDataSink, startAt: Long = 0L) {
         val ptp = session ?: throw PtpException("Câmera desconectada")
-        ptp.transact(PtpOp.GET_OBJECT, handle, dataIn = sink, timeoutMs = DOWNLOAD_TIMEOUT_MS)
+        if (!_capabilities.value.partialObject || size <= 0) {
+            require(startAt == 0L) { "GetObject não retoma do meio" }
+            ptp.transact(PtpOp.GET_OBJECT, handle, dataIn = sink, timeoutMs = DOWNLOAD_TIMEOUT_MS)
+            return
+        }
+        PartialDownload.run(ptp, handle, size, sink, startAt, beforeChunk = {
+            // The shutter goes first: the next block waits until the shot is done.
+            while (liveHold && session === ptp) delay(20)
+            if (session !== ptp) throw PtpException("Câmera desconectada")
+        })
     }
+
+    /** True when [download] can continue a file from the middle. */
+    val canResumeDownloads: Boolean get() = session != null && _capabilities.value.partialObject
 
     /**
      * Fires from the app with a tap. The camera gets up to [waitSeconds] to focus and fire.
@@ -602,11 +642,29 @@ class CameraManager(
             onWaiting = onWaiting,
         )
 
+    /**
+     * Asks the camera for the values it hasn't reported yet (RequestDevicePropValue, 0x9127). They come
+     * back through the next GetEvent, like any change made on the camera.
+     */
+    private suspend fun requestMissingValues(ptp: PtpSession, why: String) {
+        if (!_capabilities.value.requestProp) return
+        val missing = REQUESTED_PROPS.filter { _status.value.value(it) == null }
+        if (missing.isEmpty()) return
+        missing.forEach { prop -> runCatching { ptp.transact(PtpOp.EOS_REQUEST_DEVICE_PROP_VALUE, prop, timeoutMs = 2_000) } }
+        AppLog.i("CAMERA", "Valores pedidos à câmera ($why): ${missing.joinToString(" ") { "%04X".format(it) }}")
+        // Read the answers now, so the screen (and the drive mode for the shutter) has them right away.
+        for (i in 0 until 3) {
+            val records = runCatching { EosEventParser.parse(ptp.transactForData(PtpOp.EOS_GET_EVENT)) }.getOrDefault(emptyList())
+            applyRecords(records, announceObjects = why != "conexão")
+            if (records.isEmpty()) break
+        }
+    }
+
     /** Where the camera says live view is going, for the log: tells a camera left in live view apart. */
     private fun evfNote(): String = _status.value.value(EosProp.EVF_OUTPUT_DEVICE)?.let { " · saída do live view na câmera: $it" } ?: ""
 
     /** Starts AF and waits the time the chosen live view AF needs; the answer code goes to the log. */
-    private suspend fun runAf(ptp: PtpSession, why: String): Boolean = try {
+    private suspend fun runAf(ptp: PtpSession, why: String): Boolean = if (!_capabilities.value.af) false else try {
         ptp.transact(PtpOp.EOS_DO_AF)
         AppLog.i("FOCO", "AF iniciado ($why)")
         delay(if (liveSilentAf) AF_WAIT_LIVE_MS else AF_WAIT_QUICK_MS)
@@ -621,6 +679,7 @@ class CameraManager(
 
     /** Ends the AF operation (the lens keeps its focus). Without it the 50D may refuse what comes next. */
     private suspend fun cancelAf(ptp: PtpSession, why: String) {
+        if (!_capabilities.value.afCancel) return
         runCatching { ptp.transact(PtpOp.EOS_AF_CANCEL) }
             .onFailure { AppLog.w("FOCO", "Fim do AF ($why) não aceito: ${it.message}") }
     }
@@ -670,6 +729,10 @@ class CameraManager(
     fun startLiveView(alsoOnCamera: Boolean = false, silentAf: Boolean = true, fps: Int = 20) {
         val ptp = session ?: return
         if (liveJob?.isActive == true) return
+        if (!_capabilities.value.liveView) {
+            _live.value = LiveState.Failed("Esta câmera não manda a imagem ao vivo pelo cabo (0x9153 não anunciada).")
+            return
+        }
         liveFrameMs = 1000L / fps.coerceIn(5, 30)
         // No picture from an earlier session: the screen waits for this camera's first frame.
         _liveFrames.resetReplayCache()
@@ -737,6 +800,7 @@ class CameraManager(
             return
         }
         log("Live view ligado (saída ${if (alsoOnCamera) "celular e câmera" else "celular"}), esperando a primeira imagem")
+        requestMissingValues(ptp, "live view")
         var lastFrame = System.currentTimeMillis()
         var windowStart = lastFrame
         var windowFrames = 0
@@ -794,13 +858,13 @@ class CameraManager(
     }
 
     /** Camera zoom on the live picture: 1, 5 or 10 times. */
-    fun setLiveZoom(level: Int) = liveCommand("A câmera não aceitou o zoom") {
+    fun setLiveZoom(level: Int) = liveCommand("A câmera não aceitou o zoom", _capabilities.value.zoom) {
         it.transact(PtpOp.EOS_ZOOM, level)
         liveZoom = level
     }
 
     /** Moves the zoomed area / AF frame. [x], [y] are 0…1 across the picture. */
-    fun setLiveFocusPoint(x: Float, y: Float) = liveCommand("A câmera não aceitou a posição") {
+    fun setLiveFocusPoint(x: Float, y: Float) = liveCommand("A câmera não aceitou a posição", _capabilities.value.zoomPosition) {
         it.transact(PtpOp.EOS_ZOOM_POSITION, (x.coerceIn(0f, 1f) * SENSOR_W).toInt(), (y.coerceIn(0f, 1f) * SENSOR_H).toInt())
     }
 
@@ -810,6 +874,7 @@ class CameraManager(
      */
     fun liveAutofocus() {
         val ptp = session ?: return
+        if (!_capabilities.value.af) return
         if (afJob?.isActive == true || _shutter.value is ShutterState.Focusing) return
         afJob = scope.launch {
             val ok = runAf(ptp, "toque")
@@ -819,7 +884,7 @@ class CameraManager(
     }
 
     /** Nudges focus with the lens in AF: [step] 1…3 towards near, −1…−3 towards far. */
-    fun driveLens(step: Int) = liveCommand("A lente não se moveu: deixe a chave da lente em AF") {
+    fun driveLens(step: Int) = liveCommand("A lente não se moveu: deixe a chave da lente em AF", _capabilities.value.driveLens) {
         val size = kotlin.math.abs(step).coerceIn(1, 3)
         it.transact(PtpOp.EOS_DRIVE_LENS, if (step < 0) 0x8000 or size else size)
     }
@@ -851,8 +916,10 @@ class CameraManager(
         }
     }
 
-    private fun liveCommand(failure: String, block: suspend (PtpSession) -> Unit) {
+    /** Runs a live view command when the camera lists it ([supported]); nothing is sent otherwise. */
+    private fun liveCommand(failure: String, supported: Boolean, block: suspend (PtpSession) -> Unit) {
         val ptp = session ?: return
+        if (!supported) return
         scope.launch {
             try {
                 block(ptp)
@@ -1060,6 +1127,7 @@ class CameraManager(
         deviceInfo = null
         _releaseInfo.value = null
         _releaseMethod.value = null
+        _capabilities.value = CameraCapabilities()
         sessionJob?.cancel()
         sessionJob = null
         if (closeTransport) ptp?.close()
@@ -1094,6 +1162,12 @@ class CameraManager(
         private const val AF_WAIT_LIVE_MS = 2_800L
         private const val LIVE_AFTER_SHOT_MS = 600L
         private const val INTERVAL_WAIT_MS = 5_000L
+        /** What the screens and the shutter read from the camera; asked for when an event left one out. */
+        private val REQUESTED_PROPS = listOf(
+            EosProp.DRIVE_MODE, EosProp.SHOOTING_MODE, EosProp.ISO, EosProp.SHUTTER_SPEED, EosProp.APERTURE,
+            EosProp.EXPOSURE_COMPENSATION, EosProp.WHITE_BALANCE, EosProp.AVAILABLE_SHOTS, EosProp.BATTERY_POWER,
+            EosProp.CAPTURE_DESTINATION, EosProp.EVF_OUTPUT_DEVICE,
+        )
         private const val INTERVAL_MAX_FAILURES = 3
         /** Zoom position coordinates use the sensor's pixel grid (50D: 4752 × 3168). */
         private const val SENSOR_W = 4752

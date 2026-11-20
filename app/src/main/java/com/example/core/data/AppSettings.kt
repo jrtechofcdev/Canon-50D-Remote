@@ -201,6 +201,10 @@ data class Settings(
     val devShutterMethod: String = "auto",
     /** RemoteReleaseOn's second parameter, 1 or 0, to compare on the camera. */
     val devReleaseFlag: Int = 1,
+    /** SetRemoteMode's value at connection: 1 (always used) or 5 (what another tethering app sends). */
+    val devRemoteMode: Int = 1,
+    /** Writes "save to the card" as the capture destination at connection. */
+    val devWriteDestination: Boolean = true,
 
     // Entrega local: the phone serves the photos on its own Wi-Fi, the client saves them on theirs.
     /** Off by default: with it off nothing starts and no new permission is asked. */
@@ -466,6 +470,8 @@ object SettingKeys {
     val devRender = stringPreferencesKey("dev_render")
     val devShutterMethod = stringPreferencesKey("dev_shutter_method")
     val devReleaseFlag = intPreferencesKey("dev_release_flag")
+    val devRemoteMode = intPreferencesKey("dev_remote_mode")
+    val devWriteDestination = booleanPreferencesKey("dev_write_destination")
     val deliveryEnabled = booleanPreferencesKey("delivery_enabled")
     val deliveryNetwork = stringPreferencesKey("delivery_network")
     val deliverySsid = stringPreferencesKey("delivery_ssid")
@@ -716,6 +722,8 @@ class SettingsRepository(private val context: Context) {
             devRender = this[k.devRender] ?: d.devRender,
             devShutterMethod = this[k.devShutterMethod] ?: d.devShutterMethod,
             devReleaseFlag = this[k.devReleaseFlag] ?: d.devReleaseFlag,
+            devRemoteMode = this[k.devRemoteMode] ?: d.devRemoteMode,
+            devWriteDestination = this[k.devWriteDestination] ?: d.devWriteDestination,
             deliveryEnabled = this[k.deliveryEnabled] ?: d.deliveryEnabled,
             deliveryNetwork = this[k.deliveryNetwork] ?: d.deliveryNetwork,
             deliverySsid = this[k.deliverySsid]?.takeIf { it.isNotBlank() } ?: d.deliverySsid,
