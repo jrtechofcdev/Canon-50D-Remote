@@ -152,7 +152,7 @@ class TetherApp : Application() {
             syncClock = { settings.current().syncCameraClock },
             onClockRefused = { settings.set(SettingKeys.syncCameraClock, false) },
             releasePrefs = { settings.current().let { ReleasePrefs(if (it.developerMode) it.devShutterMethod else ReleasePrefs.AUTO, it.devReleaseFlag) } },
-            connectionPrefs = { settings.current().let { if (it.developerMode) ConnectionPrefs(it.devRemoteMode, it.devWriteDestination, it.devRestoreLiveOutput) else ConnectionPrefs() } },
+            connectionPrefs = { settings.current().let { if (it.developerMode) ConnectionPrefs(it.devRemoteMode, it.devWriteDestination, it.devRestoreLiveOutput, it.devResetRemoteAfterLive) else ConnectionPrefs() } },
         )
         presets = PresetRepository(this, database.presetDao(), settings)
         engine = PresetEngine()

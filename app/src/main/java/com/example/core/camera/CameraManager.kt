@@ -86,7 +86,12 @@ sealed interface LiveState {
 
 /** Exposure values as last reported by the camera, keyed by EOS property code. */
 /** Modo desenvolvedor, to compare on the camera: SetRemoteMode's value and whether the capture destination is written. */
-data class ConnectionPrefs(val remoteMode: Int = 1, val writeDestination: Boolean = true, val restoreLiveOutput: Boolean = false)
+data class ConnectionPrefs(
+    val remoteMode: Int = 1,
+    val writeDestination: Boolean = true,
+    val restoreLiveOutput: Boolean = false,
+    val resetRemoteAfterLive: Boolean = true,
+)
 
 data class CameraStatus(
     val values: Map<Int, Int> = emptyMap(),
@@ -782,11 +787,48 @@ class CameraManager(
                 .onFailure { log("A câmera não aceitou desligar o live view: ${it.message}") }
             liveZoom = 1
             log("Live view desligado")
+            if (connectionPrefs().resetRemoteAfterLive) resetRemoteMode(ptp, "ao sair do live view")
             // Apart from the stop itself, so reopening live view doesn't wait for it.
             scope.launch {
                 delay(800)
                 logLiveChanges()
             }
+        }
+    }
+
+    /**
+     * Gives the camera body back after live view, inside the same session. Up to 5.3.3 the 50D stayed
+     * "BUSY" (buttons and dials dead) until the cable came out. libgphoto2 ends an EOS capture the same
+     * way: read the pending events, remote mode 0 ("resets the camera state") and remote mode on again
+     * ("enables camera display"). The session, the event mode and the downloads stay as they are.
+     */
+    private suspend fun resetRemoteMode(ptp: PtpSession, why: String) {
+        if (deviceInfo?.supports(PtpOp.EOS_SET_REMOTE_MODE) != true) return
+        // Events the camera queued while leaving live view (a new photo among them) are taken first.
+        for (i in 0 until 5) {
+            val records = runCatching { EosEventParser.parse(ptp.transactForData(PtpOp.EOS_GET_EVENT)) }.getOrDefault(emptyList())
+            applyRecords(records, announceObjects = true)
+            if (records.isEmpty()) break
+        }
+        val mode = connectionPrefs().remoteMode
+        val off = runCatching { ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, 0, timeoutMs = 2_000) }
+        delay(150)
+        val on = runCatching { ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, mode, timeoutMs = 2_000) }
+        log("Modo remoto reiniciado $why (0 → $mode): ${if (off.isSuccess) "ok" else "0 recusado"}, ${if (on.isSuccess) "ok" else "$mode recusado"}")
+    }
+
+    /**
+     * Modo desenvolvedor → Liberar a câmera: the same reset by hand, for a body that stays BUSY.
+     * Live view closes first when it is open.
+     */
+    fun releaseCameraBody() {
+        val ptp = session ?: return
+        scope.launch {
+            liveStopJob?.join()
+            if (liveJob?.isActive == true) return@launch
+            cancelAf(ptp, "liberar a câmera")
+            resetRemoteMode(ptp, "pelo botão")
+            _messages.tryEmit("Câmera liberada. Teste os botões da 50D.")
         }
     }
 
@@ -1161,11 +1203,15 @@ class CameraManager(
             suspend fun bye(name: String, call: suspend () -> Unit) {
                 answers += name + if (runCatching { call() }.isSuccess) " ok" else " falhou"
             }
-            withTimeoutOrNull(4_000) {
-                // Hand the picture back to the camera's screen before leaving remote mode.
+            // The order libgphoto2 uses to end an EOS capture: AF cancel, live view off, remote mode 0 (resets
+            // the camera) and back on (gives the display back), event mode off, then close. Up to 5.3.3 the app
+            // ended on remote mode 0, and the 50D then answered no new session until the cable came out.
+            withTimeoutOrNull(5_000) {
+                bye("fim do AF") { ptp.transact(PtpOp.EOS_AF_CANCEL, timeoutMs = 1_000) }
                 bye("live view") { ptp.transact(PtpOp.EOS_SET_DEVICE_PROP_VALUE_EX, dataOut = PtpContainer.eosPropValue(EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_OFF), timeoutMs = 1_000) }
+                bye("modo remoto 0") { ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, 0, timeoutMs = 1_000) }
+                bye("modo remoto 1") { ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, 1, timeoutMs = 1_000) }
                 bye("eventos") { ptp.transact(PtpOp.EOS_SET_EVENT_MODE, 0, timeoutMs = 1_000) }
-                bye("modo remoto") { ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, 0, timeoutMs = 1_000) }
                 bye("sessão") { ptp.transact(PtpOp.CLOSE_SESSION, timeoutMs = 1_000) }
             }
             log("Despedida da câmera: ${answers.joinToString(", ").ifEmpty { "sem resposta" }}")

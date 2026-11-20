@@ -207,6 +207,8 @@ data class Settings(
     val devWriteDestination: Boolean = true,
     /** Leaving live view puts back the output the camera had before, instead of switching it off. */
     val devRestoreLiveOutput: Boolean = false,
+    /** Leaving live view resets the remote mode (0, then on again), as libgphoto2 does: gives the camera body back. */
+    val devResetRemoteAfterLive: Boolean = true,
     /** USB reset before a session: "full", "noclear" or "none" (to test reopening without replugging). */
     val devUsbReset: String = "full",
 
@@ -477,6 +479,7 @@ object SettingKeys {
     val devRemoteMode = intPreferencesKey("dev_remote_mode")
     val devWriteDestination = booleanPreferencesKey("dev_write_destination")
     val devRestoreLiveOutput = booleanPreferencesKey("dev_restore_live_output")
+    val devResetRemoteAfterLive = booleanPreferencesKey("dev_reset_remote_after_live")
     val devUsbReset = stringPreferencesKey("dev_usb_reset")
     val deliveryEnabled = booleanPreferencesKey("delivery_enabled")
     val deliveryNetwork = stringPreferencesKey("delivery_network")
@@ -731,6 +734,7 @@ class SettingsRepository(private val context: Context) {
             devRemoteMode = this[k.devRemoteMode] ?: d.devRemoteMode,
             devWriteDestination = this[k.devWriteDestination] ?: d.devWriteDestination,
             devRestoreLiveOutput = this[k.devRestoreLiveOutput] ?: d.devRestoreLiveOutput,
+            devResetRemoteAfterLive = this[k.devResetRemoteAfterLive] ?: d.devResetRemoteAfterLive,
             devUsbReset = this[k.devUsbReset] ?: d.devUsbReset,
             deliveryEnabled = this[k.deliveryEnabled] ?: d.deliveryEnabled,
             deliveryNetwork = this[k.deliveryNetwork] ?: d.deliveryNetwork,

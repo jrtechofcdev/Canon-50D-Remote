@@ -219,6 +219,7 @@ val settingsIndex: Map<SettingsSection, List<String>> = mapOf(
         "Conexão",
         "Modo remoto (0x9114)",
         "Gravar destino: cartão",
+        "Ao sair do live view, reiniciar o modo remoto",
         "Ao sair do live view, voltar a saída de antes",
         "Reset da USB ao abrir a sessão",
         "Log detalhado",

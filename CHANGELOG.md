@@ -2,6 +2,21 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [5.3.4] · 2026-11-20
+
+O BUSY depois do live view continuava na 50D. A correção segue o que o gphoto2 (software livre de controle de câmeras) faz para devolver a câmera ao fotógrafo.
+
+- **Ao sair do live view, o modo remoto é reiniciado:**
+  - o app lê os eventos pendentes e manda o modo remoto 0, que zera o estado da câmera;
+  - em seguida, manda o modo remoto 1 de novo, que devolve o display e os botões;
+  - tudo na mesma sessão: sem desconectar, sem tirar o cabo e sem perder downloads;
+  - o log mostra "Modo remoto reiniciado ao sair do live view".
+- **Liberar a câmera na mão:** Desenvolvedor → Câmera → "Liberar a câmera (modo remoto 0 → 1)", para quando a câmera ficar em BUSY por outro motivo.
+- **Despedida na ordem do gphoto2:**
+  - ao desconectar: fim do AF, desliga o live view, modo remoto 0 e 1, desliga os eventos e fecha a sessão;
+  - antes, o app terminava com o modo remoto em 0. Pode ser por isso que a 50D não aceitava uma sessão nova sem tirar o cabo.
+- **Modo desenvolvedor:** opção para ligar e desligar o reinício do modo remoto ao sair do live view (vem ligada).
+
 ## [5.3.3] · 2026-11-20
 
 O log da 5.3.2 mostrou que a 50D não abre uma sessão nova sem tirar o cabo: a despedida chega inteira ("live view ok, eventos ok, modo remoto ok, sessão ok"), e mesmo assim a sessão seguinte fica sem resposta.

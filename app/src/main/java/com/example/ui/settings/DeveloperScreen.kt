@@ -73,6 +73,7 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
             DevButton("Testar foco", connected, Modifier.weight(1f)) { app.camera.liveAutofocus(); toast("Foco pedido. Veja as linhas FOCO abaixo.") }
             DevButton("Testar disparo", connected, Modifier.weight(1f)) { app.camera.capture(s.shutterWait, focusFirst = false) }
         }
+        DevButton("Liberar a câmera (modo remoto 0 → 1)", connected, Modifier.fillMaxWidth()) { app.camera.releaseCameraBody() }
         DevButton("Reconectar a USB", true, Modifier.fillMaxWidth()) {
             app.camera.reconnectQuietly()
         }
@@ -105,6 +106,9 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
         }
         ToggleRow(Icons.Outlined.Storage, "Gravar destino: cartão", "Ao conectar, manda a 50D salvar no cartão (0xD11C = 2). Desligado, fica o que a câmera já usa", s.devWriteDestination) {
             scope.launch { app.settings.set(SettingKeys.devWriteDestination, it) }
+        }
+        ToggleRow(Icons.Outlined.Usb, "Ao sair do live view, reiniciar o modo remoto", "Modo remoto 0 e depois 1, na mesma sessão, como o gphoto2 faz para devolver os botões da câmera", s.devResetRemoteAfterLive) {
+            scope.launch { app.settings.set(SettingKeys.devResetRemoteAfterLive, it) }
         }
         ToggleRow(Icons.Outlined.Usb, "Ao sair do live view, voltar a saída de antes", "Em vez de desligar a saída do live view (D1B0 = 0), devolve o valor que a câmera tinha antes de abrir o live view do app", s.devRestoreLiveOutput) {
             scope.launch { app.settings.set(SettingKeys.devRestoreLiveOutput, it) }
@@ -185,6 +189,7 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
                 app.settings.set(SettingKeys.devRemoteMode, 1)
                 app.settings.set(SettingKeys.devWriteDestination, true)
                 app.settings.set(SettingKeys.devRestoreLiveOutput, false)
+                app.settings.set(SettingKeys.devResetRemoteAfterLive, true)
                 app.settings.set(SettingKeys.devUsbReset, "full")
             }
             toast("Modo desenvolvedor desligado")
