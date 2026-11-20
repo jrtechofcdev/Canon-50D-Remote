@@ -25,11 +25,22 @@ interface PtpTransport {
     fun close()
 }
 
+/** How much of the USB link [UsbPtpTransport.recover] resets before a new session (Desenvolvedor, to test on the camera). */
+enum class UsbReset {
+    /** PTP Device Reset, clear both endpoints, drain a leftover reply (always used up to 5.3.2). */
+    FULL,
+    /** Device Reset and drain, without clearing the endpoints. */
+    NO_CLEAR,
+    /** Nothing: the session opens straight away. */
+    NONE,
+}
+
 class UsbPtpTransport(
     private val connection: UsbDeviceConnection,
     private val usbInterface: UsbInterface,
     private val endpointIn: UsbEndpoint,
     private val endpointOut: UsbEndpoint,
+    private val reset: UsbReset = UsbReset.FULL,
 ) : PtpTransport {
 
     // Android documents larger bulk transfers from 9 on, but many phones' USB host drivers still reject
@@ -67,10 +78,15 @@ class UsbPtpTransport(
     }
 
     override fun recover() {
+        if (reset == UsbReset.NONE) return
         // PTP class request "Device Reset" (bmRequestType 0x21, bRequest 0x66) aborts any half-finished transaction.
         connection.controlTransfer(0x21, 0x66, 0, usbInterface.id, null, 0, 1_000)
-        clearHalt(endpointIn)
-        clearHalt(endpointOut)
+        // Clearing a halt from here resets the camera's side of the endpoint but maybe not the phone's:
+        // on a link used before (a second session without replugging) the two can then disagree.
+        if (reset == UsbReset.FULL) {
+            clearHalt(endpointIn)
+            clearHalt(endpointOut)
+        }
         // Drain a reply left over from an earlier attempt, so it isn't taken for the next command's answer.
         val scratch = ByteArray(readBufferSize)
         repeat(8) {

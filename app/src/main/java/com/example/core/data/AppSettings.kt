@@ -205,8 +205,10 @@ data class Settings(
     val devRemoteMode: Int = 1,
     /** Writes "save to the card" as the capture destination at connection. */
     val devWriteDestination: Boolean = true,
-    /** After live view, closes and opens the USB session again so the camera body is usable (the 50D stayed BUSY). */
-    val devReconnectAfterLive: Boolean = true,
+    /** Leaving live view puts back the output the camera had before, instead of switching it off. */
+    val devRestoreLiveOutput: Boolean = false,
+    /** USB reset before a session: "full", "noclear" or "none" (to test reopening without replugging). */
+    val devUsbReset: String = "full",
 
     // Entrega local: the phone serves the photos on its own Wi-Fi, the client saves them on theirs.
     /** Off by default: with it off nothing starts and no new permission is asked. */
@@ -474,7 +476,8 @@ object SettingKeys {
     val devReleaseFlag = intPreferencesKey("dev_release_flag")
     val devRemoteMode = intPreferencesKey("dev_remote_mode")
     val devWriteDestination = booleanPreferencesKey("dev_write_destination")
-    val devReconnectAfterLive = booleanPreferencesKey("dev_reconnect_after_live")
+    val devRestoreLiveOutput = booleanPreferencesKey("dev_restore_live_output")
+    val devUsbReset = stringPreferencesKey("dev_usb_reset")
     val deliveryEnabled = booleanPreferencesKey("delivery_enabled")
     val deliveryNetwork = stringPreferencesKey("delivery_network")
     val deliverySsid = stringPreferencesKey("delivery_ssid")
@@ -727,7 +730,8 @@ class SettingsRepository(private val context: Context) {
             devReleaseFlag = this[k.devReleaseFlag] ?: d.devReleaseFlag,
             devRemoteMode = this[k.devRemoteMode] ?: d.devRemoteMode,
             devWriteDestination = this[k.devWriteDestination] ?: d.devWriteDestination,
-            devReconnectAfterLive = this[k.devReconnectAfterLive] ?: d.devReconnectAfterLive,
+            devRestoreLiveOutput = this[k.devRestoreLiveOutput] ?: d.devRestoreLiveOutput,
+            devUsbReset = this[k.devUsbReset] ?: d.devUsbReset,
             deliveryEnabled = this[k.deliveryEnabled] ?: d.deliveryEnabled,
             deliveryNetwork = this[k.deliveryNetwork] ?: d.deliveryNetwork,
             deliverySsid = this[k.deliverySsid]?.takeIf { it.isNotBlank() } ?: d.deliverySsid,

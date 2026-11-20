@@ -106,9 +106,13 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
         ToggleRow(Icons.Outlined.Storage, "Gravar destino: cartão", "Ao conectar, manda a 50D salvar no cartão (0xD11C = 2). Desligado, fica o que a câmera já usa", s.devWriteDestination) {
             scope.launch { app.settings.set(SettingKeys.devWriteDestination, it) }
         }
-        ToggleRow(Icons.Outlined.Usb, "Reconectar ao sair do live view", "Fecha e abre a sessão USB depois do live view, como tirar e pôr o cabo, para a câmera não ficar em BUSY", s.devReconnectAfterLive) {
-            scope.launch { app.settings.set(SettingKeys.devReconnectAfterLive, it) }
+        ToggleRow(Icons.Outlined.Usb, "Ao sair do live view, voltar a saída de antes", "Em vez de desligar a saída do live view (D1B0 = 0), devolve o valor que a câmera tinha antes de abrir o live view do app", s.devRestoreLiveOutput) {
+            scope.launch { app.settings.set(SettingKeys.devRestoreLiveOutput, it) }
         }
+        ChoiceRow("Reset da USB ao abrir a sessão", listOf("full" to "Completo (padrão)", "noclear" to "Sem limpar endpoints", "none" to "Nenhum"), s.devUsbReset) {
+            scope.launch { app.settings.set(SettingKeys.devUsbReset, it) }
+        }
+        InfoText("Teste do reset: conecte, toque em Reconectar a USB (lá em cima) e veja se a sessão abre sem tirar o cabo. Repita com cada opção.")
         InfoText("Vale a partir da próxima conexão (use Reconectar a USB). Compare no log quantas vezes aparece \"ocupada (0x2019)\".")
     }
 
@@ -180,7 +184,8 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
                 app.settings.set(SettingKeys.devReleaseFlag, 1)
                 app.settings.set(SettingKeys.devRemoteMode, 1)
                 app.settings.set(SettingKeys.devWriteDestination, true)
-                app.settings.set(SettingKeys.devReconnectAfterLive, true)
+                app.settings.set(SettingKeys.devRestoreLiveOutput, false)
+                app.settings.set(SettingKeys.devUsbReset, "full")
             }
             toast("Modo desenvolvedor desligado")
         }

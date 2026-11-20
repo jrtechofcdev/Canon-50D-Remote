@@ -2,6 +2,17 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [5.3.3] · 2026-11-20
+
+O log da 5.3.2 mostrou que a 50D não abre uma sessão nova sem tirar o cabo: a despedida chega inteira ("live view ok, eventos ok, modo remoto ok, sessão ok"), e mesmo assim a sessão seguinte fica sem resposta.
+
+- **Sem reconexão automática depois do live view:** na 50D ela deixava a câmera sem resposta até tirar o cabo. Foi removida.
+- **Aviso claro:** quando a câmera não responde ao abrir a sessão, o app diz para tirar e pôr o cabo.
+- **Testes no modo desenvolvedor (Desenvolvedor → Conexão):**
+  - "Ao sair do live view, voltar a saída de antes": devolve à câmera a saída do live view que ela tinha antes, em vez de desligar;
+  - "Reset da USB ao abrir a sessão": completo, sem limpar endpoints ou nenhum, para descobrir se algum deles deixa reconectar sem tirar o cabo.
+- **Log:** mostra a saída do live view da câmera na conexão.
+
 ## [5.3.2] · 2026-11-20
 
 Correção a partir do log da 5.3.1 na 50D: depois do live view, a câmera parava de responder até tirar o cabo.
