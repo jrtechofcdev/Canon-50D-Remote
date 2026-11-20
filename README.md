@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img alt="Versão 5.1" src="https://img.shields.io/badge/vers%C3%A3o-5.1-00FCA8?labelColor=292929">
+  <img alt="Versão 5.3.4" src="https://img.shields.io/badge/vers%C3%A3o-5.3.4-00FCA8?labelColor=292929">
   <img alt="Android 7 ou mais novo" src="https://img.shields.io/badge/Android-7%2B-1CDAFF?labelColor=292929&logo=android&logoColor=white">
   <img alt="Canon EOS 50D" src="https://img.shields.io/badge/c%C3%A2mera-Canon%20EOS%2050D-00FCA8?labelColor=292929">
   <img alt="Kotlin e Jetpack Compose" src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-1CDAFF?labelColor=292929&logo=kotlin&logoColor=white">
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="release/JR_C50D_Sync-v5.1.apk"><b>⬇ Baixar o APK 5.1</b></a>
+  <a href="release/JR_C50D_Sync-v5.3.4.apk"><b>⬇ Baixar o APK 5.3.4</b></a>
   &nbsp;·&nbsp;
   <a href="#instalar">Instalar</a>
   &nbsp;·&nbsp;
@@ -47,7 +47,8 @@ Cada função do app responde a uma etapa do trabalho no evento.
 - **Captura vinculada:** fotos feitas pelo botão da câmera ou pelo disparador do app chegam sozinhas, e a câmera nunca trava.
 - **Auto-save:** só JPG, só RAW ou os dois, com pasta para cada formato, subpasta por sessão e nome do cliente no arquivo.
 - **Cartão:** navegue pelo CF, baixe só as escolhidas e recupere o que foi feito com o cabo solto.
-- **Reconexão automática:** se o cabo falhar, o app tenta de novo e baixa o que faltou, sem repetir.
+- **Reconexão automática:** se o cabo falhar, o app tenta de novo e baixa o que faltou, sem repetir. Um RAW que parou no meio continua de onde parou.
+- **Download em blocos:** o live view e o disparador não esperam o RAW inteiro chegar.
 
 </td>
     <td width="50%" valign="top">
@@ -58,7 +59,7 @@ Cada função do app responde a uma etapa do trabalho no evento.
   - toque para focar e foco fino;
   - zoom de 5× e 10×;
   - zebra, peaking, histograma e guias (terços, 4:5, 9:16).
-- **Disparo inteligente:** espera o foco e diz por que não disparou. Também tem intervalômetro e bracketing (AEB).
+- **Disparo como o botão da câmera:** encostar foca (meio curso), soltar dispara, segurar faz sequência no modo contínuo, e arrastar o dedo para fora cancela. A foto só conta quando chega da câmera. Também tem intervalômetro e bracketing (AEB).
 - **Campo:** vibra a cada foto, avisa cabo solto, cartão e celular cheios, e tem modo escuro total para igreja.
 
 </td>
@@ -138,7 +139,7 @@ Cada função do app responde a uma etapa do trabalho no evento.
 
 ## Instalar
 
-1. Baixe o **[APK 5.1](release/JR_C50D_Sync-v5.1.apk)** (ou pela aba *Releases*, ao lado).
+1. Baixe o **[APK 5.3.4](release/JR_C50D_Sync-v5.3.4.apk)** (ou pela aba *Releases*, ao lado).
 2. Abra o arquivo no celular e permita **instalar apps desconhecidos** quando o Android pedir.
 3. As atualizações instalam por cima e mantêm suas fotos e ajustes.
 
@@ -149,7 +150,7 @@ Cada função do app responde a uma etapa do trabalho no evento.
 4. Na primeira vez, vá em **Ajustes → Salvamento** e escolha as pastas dos JPG e dos RAW (ou **Criar e ligar todas as pastas**).
 5. Fotografe.
 
-> O disparador do app funciona como apertar o botão até o fim: com AF ligado, a câmera foca antes e, sem foco, não dispara. Em MF ou com AF-ON, o disparo é imediato.
+> O disparador do app funciona como o botão da câmera: encostar o dedo faz o meio curso (a câmera foca), soltar completa o disparo. Segurando com a câmera no modo contínuo, ela faz a sequência até você soltar. Com AF ligado e sem foco, a câmera não dispara; em MF ou com AF-ON, o disparo é imediato.
 
 ## Guias
 

@@ -53,6 +53,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 
 sealed interface ConnectionState {
     data object NoCamera : ConnectionState
@@ -84,6 +85,14 @@ sealed interface LiveState {
 }
 
 /** Exposure values as last reported by the camera, keyed by EOS property code. */
+/** Modo desenvolvedor, to compare on the camera: SetRemoteMode's value and whether the capture destination is written. */
+data class ConnectionPrefs(
+    val remoteMode: Int = 1,
+    val writeDestination: Boolean = true,
+    val restoreLiveOutput: Boolean = false,
+    val resetRemoteAfterLive: Boolean = true,
+)
+
 data class CameraStatus(
     val values: Map<Int, Int> = emptyMap(),
     val options: Map<Int, List<Int>> = emptyMap(),
@@ -109,6 +118,10 @@ class CameraManager(
     private val keepCameraAwake: suspend () -> Boolean,
     private val syncClock: suspend () -> Boolean = { false },
     private val onClockRefused: suspend () -> Unit = {},
+    /** Modo desenvolvedor: which release to use and RemoteReleaseOn's second parameter. */
+    private val releasePrefs: suspend () -> ReleasePrefs = { ReleasePrefs() },
+    /** Modo desenvolvedor: remote mode value and whether the capture destination is written. */
+    private val connectionPrefs: suspend () -> ConnectionPrefs = { ConnectionPrefs() },
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + AppLog.handler("CAMERA"))
     private val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
@@ -160,8 +173,32 @@ class CameraManager(
     val shutter: StateFlow<ShutterState> = _shutter.asStateFlow()
     /** One shot at a time: the intervalometer and the button never send RemoteRelease together. */
     private val shotLock = kotlinx.coroutines.sync.Mutex()
+    /** The finger on the app's shutter for the shot in progress; null for a tap, the intervalometer and bracketing. */
+    @Volatile private var gestures: Channel<Gesture>? = null
+    /** Set when the camera answers "unknown command" to the two-step press: the rest of the session uses 0x910F. */
+    @Volatile private var pressRejected = false
+
+    /** What the camera announces for the shutter and what the app uses, for the Desenvolvedor screen. */
+    private val _releaseInfo = MutableStateFlow<String?>(null)
+    val releaseInfo: StateFlow<String?> = _releaseInfo.asStateFlow()
+    /** How the app's button presses the connected camera's shutter; null without a camera. */
+    private val _releaseMethod = MutableStateFlow<ReleaseMethod?>(null)
+    val releaseMethod: StateFlow<ReleaseMethod?> = _releaseMethod.asStateFlow()
+
+    /** The session [disconnect] is saying goodbye on: its USB must stay open until the camera got it. */
+    @Volatile private var closingPolitely: PtpSession? = null
+
+    /** The camera's values when live view opened, to log what live view left changed. */
+    @Volatile private var valuesBeforeLive: Map<Int, Int> = emptyMap()
+    /** Modo desenvolvedor: how much of the USB link is reset before a session opens. */
+    @Volatile var usbReset: com.example.core.ptp.UsbReset = com.example.core.ptp.UsbReset.FULL
+
     /** Live view ran in this session: a camera stuck "busy" afterwards gets live view turned off again. */
     @Volatile private var liveUsed = false
+
+    /** What the connected camera lists as supported; everything true without a camera. */
+    private val _capabilities = MutableStateFlow(CameraCapabilities())
+    val capabilities: StateFlow<CameraCapabilities> = _capabilities.asStateFlow()
 
     /** False once the camera turns down the depth of field preview (the 50D does over USB): the button goes away. */
     private val _dofSupported = MutableStateFlow(true)
@@ -287,7 +324,8 @@ class CameraManager(
             if (retrying) attemptEnded.tryEmit(false) else _state.value = ConnectionState.Failed("Outro app está usando a câmera. Feche-o e tente de novo.")
             return
         }
-        val transport = UsbPtpTransport(connection, iface, endpoints.first, endpoints.second)
+        val transport = UsbPtpTransport(connection, iface, endpoints.first, endpoints.second, usbReset)
+        if (usbReset != com.example.core.ptp.UsbReset.FULL) log("Reset da USB antes da sessão: $usbReset (modo desenvolvedor)")
         val ptp = PtpSession(transport, ::log)
         session = ptp
         device = dev
@@ -301,15 +339,35 @@ class CameraManager(
             val info = DeviceInfo.parse(ptp.transactForData(PtpOp.GET_DEVICE_INFO))
             deviceInfo = info
             liveUsed = false
-            _dofSupported.value = info.supports(PtpOp.EOS_DOF_PREVIEW)
+            pressRejected = false
+            val method = ShutterPress.methodFor(info, releasePrefs().method)
+            _releaseInfo.value = ShutterPress.describe(info, method)
+            _releaseMethod.value = method
+            AppLog.i("DISPARO", "Disparo pelo cabo: ${ShutterPress.describe(info, method)}")
+            AppLog.i("DISPARO", "Operações Canon anunciadas: " +
+                info.operations.filter { it in 0x9100..0x91FF }.sorted().joinToString(" ") { "%04X".format(it) })
+            val caps = CameraCapabilities.of(info)
+            _capabilities.value = caps
+            _dofSupported.value = caps.dof
             log("Câmera: ${info.manufacturer} ${info.model} (firmware ${info.version})")
+            AppLog.i("CAMERA", "Capacidades: ${caps.describe()}")
+            val prefs = connectionPrefs()
 
             // Remote mode + event mode is what EOS Utility uses for tethering. No UI lock is sent,
             // so the shutter button, dials and menus on the camera stay usable.
-            if (info.supports(PtpOp.EOS_SET_REMOTE_MODE)) ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, 1)
+            if (info.supports(PtpOp.EOS_SET_REMOTE_MODE)) {
+                ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, prefs.remoteMode)
+                if (prefs.remoteMode != 1) AppLog.i("CAMERA", "Modo remoto ${prefs.remoteMode} (modo desenvolvedor)")
+            }
             if (info.supports(PtpOp.EOS_SET_EVENT_MODE)) ptp.transact(PtpOp.EOS_SET_EVENT_MODE, 1)
-            runCatching { setPropertyNow(ptp, EosProp.CAPTURE_DESTINATION, EosProp.DESTINATION_CARD) }
-                .onFailure { log("Destino de captura mantido pela câmera: ${it.message}") }
+            // A cable pulled while the app's button was held leaves the camera "pressed": let go first.
+            if (info.supports(PtpOp.EOS_REMOTE_RELEASE_OFF)) ShutterPress.releaseAll(ptp)
+            if (prefs.writeDestination) {
+                runCatching { setPropertyNow(ptp, EosProp.CAPTURE_DESTINATION, EosProp.DESTINATION_CARD) }
+                    .onFailure { log("Destino de captura mantido pela câmera: ${it.message}") }
+            } else {
+                AppLog.i("CAMERA", "Destino de captura não gravado (modo desenvolvedor)")
+            }
 
             // The first GetEvent calls describe the current state (and may list files already on the card).
             // Read them until the queue is empty and only then start treating new objects as new shots.
@@ -318,6 +376,11 @@ class CameraManager(
                 applyRecords(records, announceObjects = false)
                 if (records.isEmpty()) break
             }
+
+            // Values the camera left out of its first events (the drive mode, often) are asked for one by one.
+            requestMissingValues(ptp, "conexão")
+            _status.value.value(EosProp.CAPTURE_DESTINATION)?.let { AppLog.i("CAMERA", "Destino de captura na câmera: $it (2 = cartão)") }
+            AppLog.i("CAMERA", "Live view na conexão: saída D1B0=${_status.value.value(EosProp.EVF_OUTPUT_DEVICE) ?: "-"}, D1B8=${_status.value.value(0xD1B8) ?: "-"}")
 
             if (syncClock()) setCameraClock(ptp)
 
@@ -340,12 +403,17 @@ class CameraManager(
                         reconnect("Conexão perdida")
                     }
                     else -> {
-                        _state.value = ConnectionState.Failed(reason)
+                        // The 50D answers nothing to a new session on a link it already closed: only replugging helps.
+                        _state.value = ConnectionState.Failed(
+                            if (!wasConnected && reason.startsWith("Sem resposta da câmera")) "A câmera não respondeu. Tire e ponha o cabo USB de novo." else reason,
+                        )
                         if (wasConnected) _lostConnection.tryEmit("Conexão com a câmera perdida")
                     }
                 }
-            } else {
+            } else if (closingPolitely !== ptp) {
                 // A session that was already replaced still holds the USB interface: let it go.
+                // Not while [disconnect] is still saying goodbye on it: closing the USB first (as up to 5.3.1)
+                // left the camera with its old session open, and it then answered nothing until the cable came out.
                 runCatching { ptp.close() }
             }
         }
@@ -388,10 +456,34 @@ class CameraManager(
         }
     }
 
-    /** Streams one file from the camera. Runs inside the session lock, so polling pauses meanwhile. */
-    suspend fun download(handle: Int, sink: PtpDataSink) {
+    /**
+     * Streams one file from the camera, from byte [startAt] (a download resumed midway). In 1 MB blocks
+     * when the camera lists GetPartialObject, so live view and the shutter keep their turns, and paused
+     * while the shutter works; in one GetObject otherwise (that one always starts from the beginning).
+     */
+    suspend fun download(handle: Int, size: Long, sink: PtpDataSink, startAt: Long = 0L) {
         val ptp = session ?: throw PtpException("Câmera desconectada")
-        ptp.transact(PtpOp.GET_OBJECT, handle, dataIn = sink, timeoutMs = DOWNLOAD_TIMEOUT_MS)
+        if (!_capabilities.value.partialObject || size <= 0) {
+            require(startAt == 0L) { "GetObject não retoma do meio" }
+            ptp.transact(PtpOp.GET_OBJECT, handle, dataIn = sink, timeoutMs = DOWNLOAD_TIMEOUT_MS)
+            return
+        }
+        PartialDownload.run(ptp, handle, size, sink, startAt, beforeChunk = {
+            // The shutter goes first: the next block waits until the shot is done.
+            while (liveHold && session === ptp) delay(20)
+            if (session !== ptp) throw PtpException("Câmera desconectada")
+        })
+    }
+
+    /** True when [download] can continue a file from the middle. */
+    val canResumeDownloads: Boolean get() = session != null && _capabilities.value.partialObject
+
+    /**
+     * Fires from the app with a tap. The camera gets up to [waitSeconds] to focus and fire.
+     * See [shutterDown] for the button held down.
+     */
+    fun capture(waitSeconds: Int = 5, focusFirst: Boolean = false) {
+        startShot(waitSeconds, focusFirst, null)
     }
 
     /**
@@ -460,47 +552,52 @@ class CameraManager(
         liveZoom = 1
         cancelAf(ptp, "ao passar o live view para a câmera")
         log("Live view devolvido à tela da câmera")
-        return rawSetProperty(EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_CAMERA)
+        val result = rawSetProperty(EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_CAMERA)
+        // Remote mode 0 → on gives the body's buttons back (the 50D stayed BUSY after the app's live view),
+        // so SET can start the movie.
+        resetRemoteMode(ptp, "ao passar o live view para a câmera")
+        return result
     }
 
     /**
-     * Downloads [size] bytes in pieces of [chunk] with GetPartialObject, so live view, events and the
-     * shutter get the USB between pieces. Falls back to one GetObject when the camera lacks it.
-     * [keepGoing] is asked before each piece: false stops with an exception and the file is dropped.
+     * Downloads a video in 1 MB pieces ([PartialDownload], the same code as the photos): live view,
+     * events and the shutter get the USB between pieces. [keepGoing] false stops it with an exception.
      */
     suspend fun downloadInChunks(
         handle: Int,
         size: Long,
         sink: PtpDataSink,
-        chunk: Int = 1 shl 20,
+        chunk: Int = PartialDownload.CHUNK,
         keepGoing: () -> Boolean = { true },
     ) {
         val ptp = session ?: throw PtpException("Câmera desconectada")
-        val info = deviceInfo ?: throw PtpException("Câmera desconectada")
-        if (!info.supports(PtpOp.GET_PARTIAL_OBJECT) || size <= 0 || size > 0xFFFF_FFFFL) {
+        // GetPartialObject takes a 32-bit offset; bigger files (and cameras without it) go in one GetObject.
+        if (!_capabilities.value.partialObject || size <= 0 || size > 0xFFFF_FFFFL) {
             ptp.transact(PtpOp.GET_OBJECT, handle, dataIn = sink, timeoutMs = DOWNLOAD_TIMEOUT_MS)
             return
         }
-        sink.begin(size)
-        // The total is announced once; each piece only writes, so the progress keeps adding up.
-        val pieces = object : PtpDataSink {
-            override fun write(buffer: ByteArray, offset: Int, length: Int) = sink.write(buffer, offset, length)
-        }
-        var offset = 0L
-        while (offset < size) {
+        PartialDownload.run(ptp, handle, size, sink, chunk = chunk, beforeChunk = {
             if (!keepGoing()) throw PtpException("Download cancelado")
-            val length = minOf(chunk.toLong(), size - offset).toInt()
-            ptp.transact(PtpOp.GET_PARTIAL_OBJECT, handle, offset.toInt(), length, dataIn = pieces, timeoutMs = DOWNLOAD_TIMEOUT_MS)
-            offset += length
-        }
+            while (liveHold && session === ptp) delay(20)
+            if (session !== ptp) throw PtpException("Câmera desconectada")
+        })
     }
 
     /**
-     * Fires from the app. The camera gets up to [waitSeconds] to focus: while it answers "not focused"
-     * or "busy" the app asks again. With [focusFirst] and live view on, AF runs first and the shot
-     * follows once it settles. Live view pauses meanwhile so the camera isn't interrupted.
+     * The finger touched the app's shutter. With the two-step press the camera half-presses now (it
+     * focuses, like a finger resting on the button); [shutterUp] takes the photo, [shutterHold] starts a
+     * burst in a continuous drive mode, and [shutterCancel] (finger slid off) lets go without a photo.
+     * With the one-step release nothing reaches the camera until the finger lifts.
      */
-    fun capture(waitSeconds: Int = 5, focusFirst: Boolean = false) {
+    fun shutterDown(waitSeconds: Int = 5, focusFirst: Boolean = false) {
+        startShot(waitSeconds, focusFirst, Channel(Channel.UNLIMITED))
+    }
+
+    fun shutterUp() { gestures?.trySend(Gesture.UP) }
+    fun shutterHold() { gestures?.trySend(Gesture.HOLD) }
+    fun shutterCancel() { gestures?.trySend(Gesture.CANCEL) }
+
+    private fun startShot(waitSeconds: Int, focusFirst: Boolean, finger: Channel<Gesture>?) {
         val ptp = session ?: return
         val info = deviceInfo ?: return
         // A log showed the button and the intervalometer firing together: both got "busy" and neither fired.
@@ -515,17 +612,21 @@ class CameraManager(
         // Marked busy before anything starts, so a double tap fires once.
         val before = _shutter.value
         if (before is ShutterState.Focusing || !_shutter.compareAndSet(before, ShutterState.Focusing(0))) return
+        gestures = finger
         scope.launch {
             val inLive = liveJob?.isActive == true
             liveHold = true
+            var fired = false
             try {
                 shotLock.withLock {
+                    val twoStep = methodNow(info) == ReleaseMethod.PRESS_RELEASE
                     if (inLive) {
                         // A tap-AF still running (or never closed) makes the next release come back busy or do
                         // nothing: finish it first, the way the camera expects.
                         afJob?.cancel()
                         cancelAf(ptp, "antes do disparo")
-                        if (focusFirst) {
+                        // The half press focuses by itself; a separate AF before it only made the camera busy.
+                        if (focusFirst && !twoStep) {
                             runAf(ptp, "antes do disparo")
                             cancelAf(ptp, "depois do foco")
                         }
@@ -533,21 +634,108 @@ class CameraManager(
                     // Contrast AF ("Modo Live") can take a few seconds per try; give the release more room.
                     val wait = (waitSeconds.coerceIn(1, 15) + if (inLive && liveSilentAf) 4 else 0) * 1000L
                     AppLog.i("DISPARO", "Disparando${if (inLive) " no live view (AF ${if (liveSilentAf) "Live" else "rápido"})" else ""}, espera até ${wait / 1000} s${evfNote()}")
-                    fireLogged(ptp, info, wait, inLive) { _shutter.value = ShutterState.Focusing(it) }
+                    val next: (suspend () -> Gesture)? = finger?.let { ch ->
+                        { withTimeoutOrNull(ShutterPress.MAX_HALF_HOLD_MS) { ch.receive() } ?: Gesture.CANCEL }
+                    }
+                    fired = shootOnce(ptp, info, wait, inLive, next) { _shutter.value = ShutterState.Focusing(it) }
                 }
-                _shutter.value = ShutterState.Fired
-                log("Disparo feito")
+                if (fired) {
+                    _shutter.value = ShutterState.Fired
+                    log("Disparo feito")
+                } else {
+                    _shutter.value = ShutterState.Idle
+                    AppLog.i("DISPARO", "Disparo cancelado: o dedo saiu do botão")
+                }
             } catch (e: PtpException) {
                 _shutter.value = ShutterState.Failed(e.message ?: "A câmera não disparou")
                 _messages.tryEmit("Não disparou: ${e.message}")
                 AppLog.e("DISPARO", "Disparo falhou: ${e.message}")
             } finally {
+                if (gestures === finger) gestures = null
                 // In live view the mirror cycles after the shot; give it a moment before asking for frames.
                 if (inLive) delay(LIVE_AFTER_SHOT_MS)
                 liveHold = false
             }
+            if (!fired && _shutter.value is ShutterState.Idle) return@launch
             delay(1_200)
             if (_shutter.value !is ShutterState.Focusing) _shutter.value = ShutterState.Idle
+        }
+    }
+
+    /** The release this shot gets: the developer choice, else what the camera announces (0x910F after a refusal). */
+    private suspend fun methodNow(info: DeviceInfo): ReleaseMethod {
+        val prefs = releasePrefs()
+        val method = ShutterPress.methodFor(info, prefs.method)
+        return if (method == ReleaseMethod.PRESS_RELEASE && pressRejected && prefs.method == ReleasePrefs.AUTO) ReleaseMethod.LEGACY else method
+    }
+
+    /**
+     * One photo, by the method this camera gets. Returns false when the finger slid off (no photo);
+     * throws [PtpException] with the reason when the camera did not make the photo. With the two-step
+     * press the photo counts only when the camera announces the new file, not on its "OK".
+     */
+    private suspend fun shootOnce(
+        ptp: PtpSession,
+        info: DeviceInfo,
+        waitMs: Long,
+        inLive: Boolean,
+        nextGesture: (suspend () -> Gesture)? = null,
+        onWaiting: (Long) -> Unit = {},
+    ): Boolean {
+        val prefs = releasePrefs()
+        // Long exposures: the file comes after the shutter closes.
+        val exposureMs = _status.value.value(EosProp.SHUTTER_SPEED)
+            ?.takeIf { EosValues.isKnownShutter(it) }?.let { (EosValues.shutterSeconds(it) * 1000).toLong() } ?: 0L
+
+        suspend fun legacy(): Boolean {
+            // The one-step release can't half-press: it waits for the finger, as the button always did.
+            if (nextGesture != null) {
+                while (true) when (nextGesture()) {
+                    Gesture.CANCEL -> return false
+                    Gesture.UP -> break
+                    Gesture.HOLD -> Unit
+                }
+            }
+            fireLogged(ptp, waitMs + exposureMs, inLive, onWaiting)
+            return true
+        }
+
+        when (methodNow(info)) {
+            ReleaseMethod.NONE -> throw PtpException("Esta câmera não aceita disparo pelo cabo.")
+            ReleaseMethod.LEGACY -> return legacy()
+            ReleaseMethod.PRESS_RELEASE -> Unit
+        }
+        val drive = _status.value.value(EosProp.DRIVE_MODE)
+        val wait = waitMs + exposureMs + ShutterPress.timerExtraMs(drive)
+        // Listening before the press, so the new-file event can't slip past.
+        val photo = scope.async(start = CoroutineStart.UNDISPATCHED) { newObjects.first() }
+        try {
+            val outcome = ShutterPress.shoot(
+                ptp, prefs.flag, ShutterPress.isContinuous(drive), wait,
+                photoArrived = { ms -> withTimeoutOrNull(ms) { photo.await() } != null },
+                nextGesture = nextGesture,
+                report = { AppLog.i("DISPARO", "Respostas da câmera (flag ${prefs.flag}${drive?.let { d -> ", drive 0x%02X".format(d) } ?: ""}): $it") },
+            )
+            return when (outcome) {
+                PressOutcome.FIRED -> true
+                PressOutcome.CANCELLED -> false
+                PressOutcome.NO_PHOTO -> throw PtpException(ShutterPress.noPhotoMessage(wait))
+            }
+        } catch (e: PtpResponseException) {
+            if (ShutterPress.unsupported(e)) {
+                if (prefs.method != ReleasePrefs.AUTO) throw PtpException(ShutterPress.UNSUPPORTED_MESSAGE)
+                pressRejected = true
+                _releaseInfo.value = ShutterPress.describe(info, ReleaseMethod.LEGACY) + " (0x9128 recusado)"
+                _releaseMethod.value = ReleaseMethod.LEGACY
+                AppLog.w("DISPARO", "A câmera recusou 0x9128: o resto da sessão usa 0x910F")
+                return legacy()
+            }
+            throw PtpException(
+                if (e.code == PtpResponse.DEVICE_BUSY || e.code == PtpResponse.NOT_READY) "A câmera ficou ocupada e não aceitou o botão. Tente de novo."
+                else "A câmera recusou o disparo (${PtpResponse.name(e.code)})."
+            )
+        } finally {
+            photo.cancel()
         }
     }
 
@@ -556,10 +744,9 @@ class CameraManager(
      * it was "busy", "not ready" or "no focus". When the camera stays busy, the AF is closed and, after
      * live view was used, live view is turned off once more before the next tries.
      */
-    private suspend fun fireLogged(ptp: PtpSession, info: DeviceInfo, waitMs: Long, inLive: Boolean, onWaiting: (Long) -> Unit = {}) =
+    private suspend fun fireLogged(ptp: PtpSession, waitMs: Long, inLive: Boolean, onWaiting: (Long) -> Unit = {}) =
         ShutterRelease.fire(
             ptp,
-            info.supports(PtpOp.EOS_REMOTE_RELEASE),
             waitMs,
             onStuck = {
                 val closeLive = !inLive && liveUsed
@@ -574,11 +761,29 @@ class CameraManager(
             onWaiting = onWaiting,
         )
 
+    /**
+     * Asks the camera for the values it hasn't reported yet (RequestDevicePropValue, 0x9127). They come
+     * back through the next GetEvent, like any change made on the camera.
+     */
+    private suspend fun requestMissingValues(ptp: PtpSession, why: String) {
+        if (!_capabilities.value.requestProp) return
+        val missing = REQUESTED_PROPS.filter { _status.value.value(it) == null }
+        if (missing.isEmpty()) return
+        missing.forEach { prop -> runCatching { ptp.transact(PtpOp.EOS_REQUEST_DEVICE_PROP_VALUE, prop, timeoutMs = 2_000) } }
+        AppLog.i("CAMERA", "Valores pedidos à câmera ($why): ${missing.joinToString(" ") { "%04X".format(it) }}")
+        // Read the answers now, so the screen (and the drive mode for the shutter) has them right away.
+        for (i in 0 until 3) {
+            val records = runCatching { EosEventParser.parse(ptp.transactForData(PtpOp.EOS_GET_EVENT)) }.getOrDefault(emptyList())
+            applyRecords(records, announceObjects = why != "conexão")
+            if (records.isEmpty()) break
+        }
+    }
+
     /** Where the camera says live view is going, for the log: tells a camera left in live view apart. */
     private fun evfNote(): String = _status.value.value(EosProp.EVF_OUTPUT_DEVICE)?.let { " · saída do live view na câmera: $it" } ?: ""
 
     /** Starts AF and waits the time the chosen live view AF needs; the answer code goes to the log. */
-    private suspend fun runAf(ptp: PtpSession, why: String): Boolean = try {
+    private suspend fun runAf(ptp: PtpSession, why: String): Boolean = if (!_capabilities.value.af) false else try {
         ptp.transact(PtpOp.EOS_DO_AF)
         AppLog.i("FOCO", "AF iniciado ($why)")
         delay(if (liveSilentAf) AF_WAIT_LIVE_MS else AF_WAIT_QUICK_MS)
@@ -593,6 +798,7 @@ class CameraManager(
 
     /** Ends the AF operation (the lens keeps its focus). Without it the 50D may refuse what comes next. */
     private suspend fun cancelAf(ptp: PtpSession, why: String) {
+        if (!_capabilities.value.afCancel) return
         runCatching { ptp.transact(PtpOp.EOS_AF_CANCEL) }
             .onFailure { AppLog.w("FOCO", "Fim do AF ($why) não aceito: ${it.message}") }
     }
@@ -642,6 +848,10 @@ class CameraManager(
     fun startLiveView(alsoOnCamera: Boolean = false, silentAf: Boolean = true, fps: Int = 20) {
         val ptp = session ?: return
         if (liveJob?.isActive == true) return
+        if (!_capabilities.value.liveView) {
+            _live.value = LiveState.Failed("Esta câmera não manda a imagem ao vivo pelo cabo (0x9153 não anunciada).")
+            return
+        }
         liveFrameMs = 1000L / fps.coerceIn(5, 30)
         // No picture from an earlier session: the screen waits for this camera's first frame.
         _liveFrames.resetReplayCache()
@@ -663,24 +873,98 @@ class CameraManager(
         val ptp = session ?: return
         liveStopJob = scope.launch {
             job.join()
-            runCatching { if (liveZoom != 1) ptp.transact(PtpOp.EOS_ZOOM, 1) }
-            runCatching { setPropertyNow(ptp, EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_OFF) }
-                .onFailure { log("A câmera não aceitou desligar o live view: ${it.message}") }
-            // An AF left open in live view kept every later shot "busy" in a 5.0 log; close it on the way out.
+            // Everything that belongs to live view is closed while live view is still on: an AF cancel sent
+            // after it (as up to 5.3) reached a camera no longer in live view, and the 50D body stayed "BUSY".
             cancelAf(ptp, "ao sair do live view")
+            runCatching { if (liveZoom != 1) ptp.transact(PtpOp.EOS_ZOOM, 1) }
+            // Modo desenvolvedor can put back the output the camera had before (its own screen, for example)
+            // instead of switching it off, to compare which one leaves the body usable.
+            val before = valuesBeforeLive[EosProp.EVF_OUTPUT_DEVICE]
+            val output = if (connectionPrefs().restoreLiveOutput && before != null && before in 0..1) before else EosProp.EVF_OFF
+            runCatching { setPropertyNow(ptp, EosProp.EVF_OUTPUT_DEVICE, output) }
+                .onSuccess { if (output != EosProp.EVF_OFF) log("Saída do live view devolvida para $output (como estava antes)") }
+                .onFailure { log("A câmera não aceitou desligar o live view: ${it.message}") }
             liveZoom = 1
             log("Live view desligado")
-            // The camera reports its live view output by event; write what it says, for the next log.
+            if (connectionPrefs().resetRemoteAfterLive) resetRemoteMode(ptp, "ao sair do live view")
             // Apart from the stop itself, so reopening live view doesn't wait for it.
             scope.launch {
                 delay(800)
-                _status.value.value(EosProp.EVF_OUTPUT_DEVICE)?.let { log("Saída do live view na câmera depois de desligar: $it") }
+                logLiveChanges()
+            }
+        }
+    }
+
+    /**
+     * Gives the camera body back after live view, inside the same session. Up to 5.3.3 the 50D stayed
+     * "BUSY" (buttons and dials dead) until the cable came out. libgphoto2 ends an EOS capture the same
+     * way: read the pending events, remote mode 0 ("resets the camera state") and remote mode on again
+     * ("enables camera display"). The session, the event mode and the downloads stay as they are.
+     */
+    private suspend fun resetRemoteMode(ptp: PtpSession, why: String) {
+        if (deviceInfo?.supports(PtpOp.EOS_SET_REMOTE_MODE) != true) return
+        // Events the camera queued while leaving live view (a new photo among them) are taken first.
+        for (i in 0 until 5) {
+            val records = runCatching { EosEventParser.parse(ptp.transactForData(PtpOp.EOS_GET_EVENT)) }.getOrDefault(emptyList())
+            applyRecords(records, announceObjects = true)
+            if (records.isEmpty()) break
+        }
+        val mode = connectionPrefs().remoteMode
+        val off = runCatching { ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, 0, timeoutMs = 2_000) }
+        delay(150)
+        val on = runCatching { ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, mode, timeoutMs = 2_000) }
+        log("Modo remoto reiniciado $why (0 → $mode): ${if (off.isSuccess) "ok" else "0 recusado"}, ${if (on.isSuccess) "ok" else "$mode recusado"}")
+    }
+
+    /**
+     * Modo desenvolvedor → Liberar a câmera: the same reset by hand, for a body that stays BUSY.
+     * Live view closes first when it is open.
+     */
+    fun releaseCameraBody() {
+        val ptp = session ?: return
+        scope.launch {
+            liveStopJob?.join()
+            if (liveJob?.isActive == true) return@launch
+            cancelAf(ptp, "liberar a câmera")
+            resetRemoteMode(ptp, "pelo botão")
+            _messages.tryEmit("Câmera liberada. Teste os botões da 50D.")
+        }
+    }
+
+    /** What changed on the camera between opening and closing live view: the evidence when the body stays BUSY. */
+    private fun logLiveChanges() {
+        val before = valuesBeforeLive
+        val now = _status.value.values
+        val changed = (before.keys + now.keys).filter { before[it] != now[it] }.sorted()
+        log("Saída do live view na câmera depois de desligar: ${now[EosProp.EVF_OUTPUT_DEVICE]}")
+        AppLog.i("CAMERA", "Propriedades que mudaram com o live view: " +
+            if (changed.isEmpty()) "nenhuma" else changed.joinToString(", ") { "%04X: %s → %s".format(it, before[it]?.toString() ?: "-", now[it]?.toString() ?: "-") })
+    }
+
+    /**
+     * Closes the session politely and opens it again, without the cable. Also used by the Desenvolvedor
+     * screen. A camera slow to answer after closing gets two more tries, each after a longer pause.
+     */
+    fun reconnectQuietly() {
+        scope.launch {
+            disconnect()
+            withTimeoutOrNull(4_000) { _state.first { it is ConnectionState.NoCamera } }
+            for (attempt in 1..3) {
+                // The same pause as pulling and plugging the cable: the camera leaves PC mode before the new session.
+                delay(1_000L * attempt)
+                findAndConnect()
+                val end = withTimeoutOrNull(20_000) {
+                    _state.first { it is ConnectionState.Connected || it is ConnectionState.Failed || it == ConnectionState.NoCamera }
+                }
+                if (end is ConnectionState.Connected || end == ConnectionState.NoCamera) return@launch
+                log("Reconexão rápida: tentativa $attempt sem resposta")
             }
         }
     }
 
     private suspend fun runLiveView(ptp: PtpSession, alsoOnCamera: Boolean, silentAf: Boolean) {
         _live.value = LiveState.Starting
+        valuesBeforeLive = _status.value.values
         liveUsed = true
         liveSilentAf = silentAf
         if (!silentAf) {
@@ -709,6 +993,7 @@ class CameraManager(
             return
         }
         log("Live view ligado (saída ${if (alsoOnCamera) "celular e câmera" else "celular"}), esperando a primeira imagem")
+        requestMissingValues(ptp, "live view")
         var lastFrame = System.currentTimeMillis()
         var windowStart = lastFrame
         var windowFrames = 0
@@ -766,13 +1051,13 @@ class CameraManager(
     }
 
     /** Camera zoom on the live picture: 1, 5 or 10 times. */
-    fun setLiveZoom(level: Int) = liveCommand("A câmera não aceitou o zoom") {
+    fun setLiveZoom(level: Int) = liveCommand("A câmera não aceitou o zoom", _capabilities.value.zoom) {
         it.transact(PtpOp.EOS_ZOOM, level)
         liveZoom = level
     }
 
     /** Moves the zoomed area / AF frame. [x], [y] are 0…1 across the picture. */
-    fun setLiveFocusPoint(x: Float, y: Float) = liveCommand("A câmera não aceitou a posição") {
+    fun setLiveFocusPoint(x: Float, y: Float) = liveCommand("A câmera não aceitou a posição", _capabilities.value.zoomPosition) {
         it.transact(PtpOp.EOS_ZOOM_POSITION, (x.coerceIn(0f, 1f) * SENSOR_W).toInt(), (y.coerceIn(0f, 1f) * SENSOR_H).toInt())
     }
 
@@ -782,6 +1067,7 @@ class CameraManager(
      */
     fun liveAutofocus() {
         val ptp = session ?: return
+        if (!_capabilities.value.af) return
         if (afJob?.isActive == true || _shutter.value is ShutterState.Focusing) return
         afJob = scope.launch {
             val ok = runAf(ptp, "toque")
@@ -791,7 +1077,7 @@ class CameraManager(
     }
 
     /** Nudges focus with the lens in AF: [step] 1…3 towards near, −1…−3 towards far. */
-    fun driveLens(step: Int) = liveCommand("A lente não se moveu: deixe a chave da lente em AF") {
+    fun driveLens(step: Int) = liveCommand("A lente não se moveu: deixe a chave da lente em AF", _capabilities.value.driveLens) {
         val size = kotlin.math.abs(step).coerceIn(1, 3)
         it.transact(PtpOp.EOS_DRIVE_LENS, if (step < 0) 0x8000 or size else size)
     }
@@ -823,8 +1109,10 @@ class CameraManager(
         }
     }
 
-    private fun liveCommand(failure: String, block: suspend (PtpSession) -> Unit) {
+    /** Runs a live view command when the camera lists it ([supported]); nothing is sent otherwise. */
+    private fun liveCommand(failure: String, supported: Boolean, block: suspend (PtpSession) -> Unit) {
         val ptp = session ?: return
+        if (!supported) return
         scope.launch {
             try {
                 block(ptp)
@@ -890,7 +1178,7 @@ class CameraManager(
                     val arrived = scope.launch(start = CoroutineStart.UNDISPATCHED) {
                         withTimeoutOrNull((seconds * 1000).toLong() + 6_000) { newObjects.first() }
                     }
-                    shotLock.withLock { fireLogged(ptp, info, INTERVAL_WAIT_MS, liveJob?.isActive == true) }
+                    shotLock.withLock { shootOnce(ptp, info, INTERVAL_WAIT_MS + (seconds * 1000).toLong(), liveJob?.isActive == true) }
                     arrived.join()
                 }
             } catch (e: PtpException) {
@@ -970,7 +1258,7 @@ class CameraManager(
                     try {
                         if (inLive) cancelAf(ptp, "antes do intervalo")
                         AppLog.i("DISPARO", "Intervalômetro: foto $i de $shots${evfNote()}")
-                        runCatching { fireLogged(ptp, info, INTERVAL_WAIT_MS, inLive) }
+                        runCatching { shootOnce(ptp, info, INTERVAL_WAIT_MS, inLive) }
                             .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
                     } finally {
                         if (inLive) delay(LIVE_AFTER_SHOT_MS)
@@ -1004,17 +1292,30 @@ class CameraManager(
         retryJob?.cancel()
         if (_state.value is ConnectionState.Reconnecting) _state.value = ConnectionState.NoCamera
         val ptp = session ?: return
-        // Detach first so the event loop stops and its error handler ignores this session.
+        // Detach first so the event loop stops and its error handler ignores this session; the USB stays
+        // open until the camera has been told to leave remote mode and close its session.
+        closingPolitely = ptp
         closeSession(closeTransport = false)
         scope.launch {
-            withTimeoutOrNull(2_000) {
-                // Hand the picture back to the camera's screen before leaving remote mode.
-                runCatching { ptp.transact(PtpOp.EOS_SET_DEVICE_PROP_VALUE_EX, dataOut = PtpContainer.eosPropValue(EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_OFF), timeoutMs = 1_000) }
-                runCatching { ptp.transact(PtpOp.EOS_SET_EVENT_MODE, 0, timeoutMs = 1_000) }
-                runCatching { ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, 0, timeoutMs = 1_000) }
-                runCatching { ptp.transact(PtpOp.CLOSE_SESSION, timeoutMs = 1_000) }
+            // What the camera answered to each goodbye, for the log: a camera that missed them keeps its old session.
+            val answers = mutableListOf<String>()
+            suspend fun bye(name: String, call: suspend () -> Unit) {
+                answers += name + if (runCatching { call() }.isSuccess) " ok" else " falhou"
             }
+            // The order libgphoto2 uses to end an EOS capture: AF cancel, live view off, remote mode 0 (resets
+            // the camera) and back on (gives the display back), event mode off, then close. Up to 5.3.3 the app
+            // ended on remote mode 0, and the 50D then answered no new session until the cable came out.
+            withTimeoutOrNull(5_000) {
+                bye("fim do AF") { ptp.transact(PtpOp.EOS_AF_CANCEL, timeoutMs = 1_000) }
+                bye("live view") { ptp.transact(PtpOp.EOS_SET_DEVICE_PROP_VALUE_EX, dataOut = PtpContainer.eosPropValue(EosProp.EVF_OUTPUT_DEVICE, EosProp.EVF_OFF), timeoutMs = 1_000) }
+                bye("modo remoto 0") { ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, 0, timeoutMs = 1_000) }
+                bye("modo remoto 1") { ptp.transact(PtpOp.EOS_SET_REMOTE_MODE, 1, timeoutMs = 1_000) }
+                bye("eventos") { ptp.transact(PtpOp.EOS_SET_EVENT_MODE, 0, timeoutMs = 1_000) }
+                bye("sessão") { ptp.transact(PtpOp.CLOSE_SESSION, timeoutMs = 1_000) }
+            }
+            log("Despedida da câmera: ${answers.joinToString(", ").ifEmpty { "sem resposta" }}")
             ptp.close()
+            if (closingPolitely === ptp) closingPolitely = null
             _state.value = ConnectionState.NoCamera
             log("Sessão encerrada")
         }
@@ -1030,6 +1331,9 @@ class CameraManager(
         session = null
         device = null
         deviceInfo = null
+        _releaseInfo.value = null
+        _releaseMethod.value = null
+        _capabilities.value = CameraCapabilities()
         sessionJob?.cancel()
         sessionJob = null
         if (closeTransport) ptp?.close()
@@ -1064,6 +1368,12 @@ class CameraManager(
         private const val AF_WAIT_LIVE_MS = 2_800L
         private const val LIVE_AFTER_SHOT_MS = 600L
         private const val INTERVAL_WAIT_MS = 5_000L
+        /** What the screens and the shutter read from the camera; asked for when an event left one out. */
+        private val REQUESTED_PROPS = listOf(
+            EosProp.DRIVE_MODE, EosProp.SHOOTING_MODE, EosProp.ISO, EosProp.SHUTTER_SPEED, EosProp.APERTURE,
+            EosProp.EXPOSURE_COMPENSATION, EosProp.WHITE_BALANCE, EosProp.AVAILABLE_SHOTS, EosProp.BATTERY_POWER,
+            EosProp.CAPTURE_DESTINATION, EosProp.EVF_OUTPUT_DEVICE,
+        )
         private const val INTERVAL_MAX_FAILURES = 3
         /** Zoom position coordinates use the sensor's pixel grid (50D: 4752 × 3168). */
         private const val SENSOR_W = 4752

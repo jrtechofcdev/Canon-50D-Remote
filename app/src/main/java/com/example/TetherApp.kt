@@ -3,7 +3,9 @@ package com.example
 import android.app.Application
 import com.example.core.alerts.Alerts
 import com.example.core.camera.CameraManager
+import com.example.core.camera.ConnectionPrefs
 import com.example.core.camera.ConnectionState
+import com.example.core.camera.ReleasePrefs
 import com.example.core.data.AppBackup
 import com.example.core.log.AppLog
 import com.example.core.data.PhotoDatabase
@@ -152,6 +154,8 @@ class TetherApp : Application() {
             keepCameraAwake = { settings.current().keepCameraAwake },
             syncClock = { settings.current().syncCameraClock },
             onClockRefused = { settings.set(SettingKeys.syncCameraClock, false) },
+            releasePrefs = { settings.current().let { ReleasePrefs(if (it.developerMode) it.devShutterMethod else ReleasePrefs.AUTO, it.devReleaseFlag) } },
+            connectionPrefs = { settings.current().let { if (it.developerMode) ConnectionPrefs(it.devRemoteMode, it.devWriteDestination, it.devRestoreLiveOutput, it.devResetRemoteAfterLive) else ConnectionPrefs() } },
         )
         presets = PresetRepository(this, database.presetDao(), settings)
         engine = PresetEngine()
@@ -191,6 +195,11 @@ class TetherApp : Application() {
             settings.settings.collect {
                 AppLog.verbose = it.developerMode && it.devVerboseLog
                 engine.forceCpu = it.developerMode && it.devRender == "cpu"
+                camera.usbReset = when (if (it.developerMode) it.devUsbReset else "full") {
+                    "noclear" -> com.example.core.ptp.UsbReset.NO_CLEAR
+                    "none" -> com.example.core.ptp.UsbReset.NONE
+                    else -> com.example.core.ptp.UsbReset.FULL
+                }
             }
         }
 

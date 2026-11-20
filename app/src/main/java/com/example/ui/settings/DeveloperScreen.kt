@@ -16,6 +16,7 @@ import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Photo
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Usb
 import androidx.compose.material.icons.outlined.WifiTethering
@@ -38,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.example.TetherApp
 import com.example.core.camera.ConnectionState
+import com.example.core.camera.ReleasePrefs
 import com.example.core.data.SettingKeys
 import com.example.core.data.Settings
 import com.example.core.log.AppLog
@@ -59,6 +61,8 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
     val status by app.camera.status.collectAsState()
     val state by app.camera.state.collectAsState()
     val recent by AppLog.recent.collectAsState()
+    val releaseInfo by app.camera.releaseInfo.collectAsState()
+    val caps by app.camera.capabilities.collectAsState()
     var crashAsk by remember { mutableStateOf(false) }
     val connected = state is ConnectionState.Connected
     fun toast(t: String) = Toast.makeText(context, t, Toast.LENGTH_LONG).show()
@@ -69,9 +73,9 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
             DevButton("Testar foco", connected, Modifier.weight(1f)) { app.camera.liveAutofocus(); toast("Foco pedido. Veja as linhas FOCO abaixo.") }
             DevButton("Testar disparo", connected, Modifier.weight(1f)) { app.camera.capture(s.shutterWait, focusFirst = false) }
         }
+        DevButton("Liberar a câmera (modo remoto 0 → 1)", connected, Modifier.fillMaxWidth()) { app.camera.releaseCameraBody() }
         DevButton("Reconectar a USB", true, Modifier.fillMaxWidth()) {
-            app.camera.disconnect()
-            scope.launch { kotlinx.coroutines.delay(800); app.camera.findAndConnect() }
+            app.camera.reconnectQuietly()
         }
         Text("Propriedades lidas (${status.values.size})", style = MaterialTheme.typography.labelMedium, color = Tone.TextMuted, modifier = Modifier.padding(top = 10.dp))
         Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -80,6 +84,40 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
                 Text("0x%04X = 0x%X (%d)".format(prop, value, value), style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace), color = Tone.Text)
             }
         }
+    }
+
+    SettingsGroup("Disparo pelo cabo", Icons.Outlined.PhotoCamera) {
+        InfoText(releaseInfo?.let { "Na conexão: $it" } ?: "Conecte a câmera para ver quais comandos de disparo ela anuncia.")
+        ChoiceRow(
+            "Método",
+            listOf(ReleasePrefs.AUTO to "Automático", ReleasePrefs.PRESS to "Meio curso + completo", ReleasePrefs.LEGACY to "Disparo direto"),
+            s.devShutterMethod,
+        ) { scope.launch { app.settings.set(SettingKeys.devShutterMethod, it) } }
+        ChoiceRow("Segundo parâmetro do 0x9128", listOf(1 to "1 (padrão)", 0 to "0"), s.devReleaseFlag, enabled = s.devShutterMethod != ReleasePrefs.LEGACY) {
+            scope.launch { app.settings.set(SettingKeys.devReleaseFlag, it) }
+        }
+        InfoText("Vale a partir do próximo disparo. Cada disparo grava no log as respostas da câmera, o parâmetro e o modo de avanço.")
+    }
+
+    SettingsGroup("Conexão", Icons.Outlined.Usb) {
+        InfoText(if (connected) "Na conexão: ${caps.describe()}." else "Conecte a câmera para ver o que ela anuncia.")
+        ChoiceRow("Modo remoto (0x9114)", listOf(1 to "1 (padrão)", 5 to "5"), s.devRemoteMode) {
+            scope.launch { app.settings.set(SettingKeys.devRemoteMode, it) }
+        }
+        ToggleRow(Icons.Outlined.Storage, "Gravar destino: cartão", "Ao conectar, manda a 50D salvar no cartão (0xD11C = 2). Desligado, fica o que a câmera já usa", s.devWriteDestination) {
+            scope.launch { app.settings.set(SettingKeys.devWriteDestination, it) }
+        }
+        ToggleRow(Icons.Outlined.Usb, "Ao sair do live view, reiniciar o modo remoto", "Modo remoto 0 e depois 1, na mesma sessão, como o gphoto2 faz para devolver os botões da câmera", s.devResetRemoteAfterLive) {
+            scope.launch { app.settings.set(SettingKeys.devResetRemoteAfterLive, it) }
+        }
+        ToggleRow(Icons.Outlined.Usb, "Ao sair do live view, voltar a saída de antes", "Em vez de desligar a saída do live view (D1B0 = 0), devolve o valor que a câmera tinha antes de abrir o live view do app", s.devRestoreLiveOutput) {
+            scope.launch { app.settings.set(SettingKeys.devRestoreLiveOutput, it) }
+        }
+        ChoiceRow("Reset da USB ao abrir a sessão", listOf("full" to "Completo (padrão)", "noclear" to "Sem limpar endpoints", "none" to "Nenhum"), s.devUsbReset) {
+            scope.launch { app.settings.set(SettingKeys.devUsbReset, it) }
+        }
+        InfoText("Teste do reset: conecte, toque em Reconectar a USB (lá em cima) e veja se a sessão abre sem tirar o cabo. Repita com cada opção.")
+        InfoText("Vale a partir da próxima conexão (use Reconectar a USB). Compare no log quantas vezes aparece \"ocupada (0x2019)\".")
     }
 
     SettingsGroup("Log detalhado", Icons.Outlined.Code) {
@@ -146,6 +184,13 @@ fun DeveloperSettings(app: TetherApp, s: Settings) {
                 app.settings.set(SettingKeys.developerMode, false)
                 app.settings.set(SettingKeys.devVerboseLog, false)
                 app.settings.set(SettingKeys.devRender, "auto")
+                app.settings.set(SettingKeys.devShutterMethod, ReleasePrefs.AUTO)
+                app.settings.set(SettingKeys.devReleaseFlag, 1)
+                app.settings.set(SettingKeys.devRemoteMode, 1)
+                app.settings.set(SettingKeys.devWriteDestination, true)
+                app.settings.set(SettingKeys.devRestoreLiveOutput, false)
+                app.settings.set(SettingKeys.devResetRemoteAfterLive, true)
+                app.settings.set(SettingKeys.devUsbReset, "full")
             }
             toast("Modo desenvolvedor desligado")
         }

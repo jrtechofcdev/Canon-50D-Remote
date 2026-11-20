@@ -197,6 +197,20 @@ data class Settings(
     val devVerboseLog: Boolean = false,
     /** "auto" or "cpu": which engine renders the presets (cpu to compare when the GPU looks wrong). */
     val devRender: String = "auto",
+    /** Shutter over USB: "auto" (what the camera announces), "press" (0x9128/0x9129) or "legacy" (0x910F). */
+    val devShutterMethod: String = "auto",
+    /** RemoteReleaseOn's second parameter, 1 or 0, to compare on the camera. */
+    val devReleaseFlag: Int = 1,
+    /** SetRemoteMode's value at connection: 1 (always used) or 5 (what another tethering app sends). */
+    val devRemoteMode: Int = 1,
+    /** Writes "save to the card" as the capture destination at connection. */
+    val devWriteDestination: Boolean = true,
+    /** Leaving live view puts back the output the camera had before, instead of switching it off. */
+    val devRestoreLiveOutput: Boolean = false,
+    /** Leaving live view resets the remote mode (0, then on again), as libgphoto2 does: gives the camera body back. */
+    val devResetRemoteAfterLive: Boolean = true,
+    /** USB reset before a session: "full", "noclear" or "none" (to test reopening without replugging). */
+    val devUsbReset: String = "full",
 
     // Entrega local: the phone serves the photos on its own Wi-Fi, the client saves them on theirs.
     /** Off by default: with it off nothing starts and no new permission is asked. */
@@ -460,6 +474,13 @@ object SettingKeys {
     val developerMode = booleanPreferencesKey("developer_mode")
     val devVerboseLog = booleanPreferencesKey("dev_verbose_log")
     val devRender = stringPreferencesKey("dev_render")
+    val devShutterMethod = stringPreferencesKey("dev_shutter_method")
+    val devReleaseFlag = intPreferencesKey("dev_release_flag")
+    val devRemoteMode = intPreferencesKey("dev_remote_mode")
+    val devWriteDestination = booleanPreferencesKey("dev_write_destination")
+    val devRestoreLiveOutput = booleanPreferencesKey("dev_restore_live_output")
+    val devResetRemoteAfterLive = booleanPreferencesKey("dev_reset_remote_after_live")
+    val devUsbReset = stringPreferencesKey("dev_usb_reset")
     val deliveryEnabled = booleanPreferencesKey("delivery_enabled")
     val deliveryNetwork = stringPreferencesKey("delivery_network")
     val deliverySsid = stringPreferencesKey("delivery_ssid")
@@ -708,6 +729,13 @@ class SettingsRepository(private val context: Context) {
             developerMode = this[k.developerMode] ?: d.developerMode,
             devVerboseLog = this[k.devVerboseLog] ?: d.devVerboseLog,
             devRender = this[k.devRender] ?: d.devRender,
+            devShutterMethod = this[k.devShutterMethod] ?: d.devShutterMethod,
+            devReleaseFlag = this[k.devReleaseFlag] ?: d.devReleaseFlag,
+            devRemoteMode = this[k.devRemoteMode] ?: d.devRemoteMode,
+            devWriteDestination = this[k.devWriteDestination] ?: d.devWriteDestination,
+            devRestoreLiveOutput = this[k.devRestoreLiveOutput] ?: d.devRestoreLiveOutput,
+            devResetRemoteAfterLive = this[k.devResetRemoteAfterLive] ?: d.devResetRemoteAfterLive,
+            devUsbReset = this[k.devUsbReset] ?: d.devUsbReset,
             deliveryEnabled = this[k.deliveryEnabled] ?: d.deliveryEnabled,
             deliveryNetwork = this[k.deliveryNetwork] ?: d.deliveryNetwork,
             deliverySsid = this[k.deliverySsid]?.takeIf { it.isNotBlank() } ?: d.deliverySsid,

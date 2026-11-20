@@ -19,7 +19,7 @@ class ShutterReleaseTest {
         t.queueResponse(PtpResponse.DEVICE_BUSY, 2)
         t.queueResponse(PtpResponse.OK, 3, 0)                       // fired
         val waits = mutableListOf<Long>()
-        ShutterRelease.fire(PtpSession(t), remoteRelease = true, waitMs = 5_000) { waits += it }
+        ShutterRelease.fire(PtpSession(t), waitMs = 5_000) { waits += it }
         assertEquals(3, t.written.size)
         assertEquals(listOf(0L, 300L), waits)
     }
@@ -29,7 +29,7 @@ class ShutterReleaseTest {
         val t = FakeTransport()
         repeat(4) { t.queueResponse(PtpResponse.OK, it + 1, ShutterRelease.NO_FOCUS) }
         try {
-            ShutterRelease.fire(PtpSession(t), remoteRelease = true, waitMs = 1_000)
+            ShutterRelease.fire(PtpSession(t), waitMs = 1_000)
             fail("expected a failure")
         } catch (e: PtpException) {
             assertTrue(e.message!!.contains("focar"))
@@ -42,7 +42,7 @@ class ShutterReleaseTest {
         val t = FakeTransport()
         t.queueResponse(PtpResponse.OK, 1, ShutterRelease.CARD_FULL)
         try {
-            ShutterRelease.fire(PtpSession(t), remoteRelease = true, waitMs = 5_000)
+            ShutterRelease.fire(PtpSession(t), waitMs = 5_000)
             fail("expected a failure")
         } catch (e: PtpException) {
             assertTrue(e.message!!.contains("Cartão"))
@@ -58,7 +58,7 @@ class ShutterReleaseTest {
         t.queueResponse(PtpResponse.OK, 8, 0)
         var recoveries = 0
         var line = ""
-        ShutterRelease.fire(PtpSession(t), remoteRelease = true, waitMs = 5_000, onStuck = { recoveries++ }, report = { line = it })
+        ShutterRelease.fire(PtpSession(t), waitMs = 5_000, onStuck = { recoveries++ }, report = { line = it })
         assertEquals(1, recoveries)
         assertEquals(8, t.written.size)
         assertTrue(line, line.startsWith("8 tentativa(s)"))
@@ -73,7 +73,7 @@ class ShutterReleaseTest {
         repeat(4) { t.queueResponse(PtpResponse.NOT_READY, it + 1) }
         var line = ""
         try {
-            ShutterRelease.fire(PtpSession(t), remoteRelease = true, waitMs = 1_000, report = { line = it })
+            ShutterRelease.fire(PtpSession(t), waitMs = 1_000, report = { line = it })
             fail("expected a failure")
         } catch (e: PtpException) {
             assertTrue(e.message!!.contains("ocupada"))

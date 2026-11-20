@@ -82,6 +82,22 @@ class PhotoStore(private val context: Context) {
         return Target(Uri.fromFile(file), file.outputStream())
     }
 
+    /**
+     * Opens a file that broke off midway to continue writing at its end. Null when it no longer holds
+     * exactly [expected] bytes (or can't be opened for appending): the download then starts again from zero.
+     */
+    fun reopenForAppend(uri: String, expected: Long): Target? = runCatching {
+        val parsed = Uri.parse(uri)
+        if (parsed.scheme == "file") {
+            val file = File(parsed.path!!)
+            if (!file.isFile || file.length() != expected) return null
+            Target(parsed, java.io.FileOutputStream(file, true))
+        } else {
+            if (DocumentFile.fromSingleUri(context, parsed)?.length() != expected) return null
+            Target(parsed, context.contentResolver.openOutputStream(parsed, "wa") ?: return null)
+        }
+    }.getOrNull()
+
     /** Copies a saved file to [kind]'s folder (e.g. the client's picks). Returns the new file's URI. */
     fun copy(sourceUri: String, kind: FileKind, settings: Settings, moment: String? = null): String {
         val name = displayName(sourceUri).ifBlank { "foto_${System.currentTimeMillis()}" }

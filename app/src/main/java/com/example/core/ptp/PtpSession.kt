@@ -19,12 +19,16 @@ class ByteArraySink : PtpDataSink {
     fun bytes(): ByteArray = out.toByteArray()
 }
 
+/** Writes the data to [out]. [startAt] counts bytes already saved, when a download resumes midway. */
 class StreamSink(
     private val out: OutputStream,
+    startAt: Long = 0L,
     private val onProgress: (received: Long, total: Long) -> Unit = { _, _ -> },
 ) : PtpDataSink {
     private var total = 0L
-    private var received = 0L
+    /** Bytes in the file so far, the resumed part included. */
+    var received = startAt
+        private set
     override fun begin(totalBytes: Long) {
         total = totalBytes
     }

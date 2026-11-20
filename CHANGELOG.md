@@ -16,6 +16,100 @@ Para 50D que filmam com o botão SET (firmware extra; a 50D de fábrica não gra
 - **Download em pedaços de 1 MB** para os vídeos: o live view e o disparo continuam respondendo durante o download.
 - **Ajustes → Vídeo (experimental):** busca no cartão, comandos de teste (0xD1B8, 0x9133/0x9134, saída do live view), monitor de eventos da câmera e o log só do vídeo.
 - **Log do vídeo:** linhas VIDEO-… no mesmo arquivo do app, gravadas mesmo com o log completo desligado, com separadores no início e no fim de cada gravação. O envio do log traz no fim uma parte só com as linhas do vídeo. Se o app fechar por erro, o log diz o que o vídeo estava fazendo e se o erro passou pelo módulo de vídeo.
+## [5.3.4] · 2026-11-20
+
+O BUSY depois do live view continuava na 50D. A correção segue o que o gphoto2 (software livre de controle de câmeras) faz para devolver a câmera ao fotógrafo.
+
+- **Ao sair do live view, o modo remoto é reiniciado:**
+  - o app lê os eventos pendentes e manda o modo remoto 0, que zera o estado da câmera;
+  - em seguida, manda o modo remoto 1 de novo, que devolve o display e os botões;
+  - tudo na mesma sessão: sem desconectar, sem tirar o cabo e sem perder downloads;
+  - o log mostra "Modo remoto reiniciado ao sair do live view".
+- **Liberar a câmera na mão:** Desenvolvedor → Câmera → "Liberar a câmera (modo remoto 0 → 1)", para quando a câmera ficar em BUSY por outro motivo.
+- **Despedida na ordem do gphoto2:**
+  - ao desconectar: fim do AF, desliga o live view, modo remoto 0 e 1, desliga os eventos e fecha a sessão;
+  - antes, o app terminava com o modo remoto em 0. Pode ser por isso que a 50D não aceitava uma sessão nova sem tirar o cabo.
+- **Modo desenvolvedor:** opção para ligar e desligar o reinício do modo remoto ao sair do live view (vem ligada).
+
+## [5.3.3] · 2026-11-20
+
+O log da 5.3.2 mostrou que a 50D não abre uma sessão nova sem tirar o cabo: a despedida chega inteira ("live view ok, eventos ok, modo remoto ok, sessão ok"), e mesmo assim a sessão seguinte fica sem resposta.
+
+- **Sem reconexão automática depois do live view:** na 50D ela deixava a câmera sem resposta até tirar o cabo. Foi removida.
+- **Aviso claro:** quando a câmera não responde ao abrir a sessão, o app diz para tirar e pôr o cabo.
+- **Testes no modo desenvolvedor (Desenvolvedor → Conexão):**
+  - "Ao sair do live view, voltar a saída de antes": devolve à câmera a saída do live view que ela tinha antes, em vez de desligar;
+  - "Reset da USB ao abrir a sessão": completo, sem limpar endpoints ou nenhum, para descobrir se algum deles deixa reconectar sem tirar o cabo.
+- **Log:** mostra a saída do live view da câmera na conexão.
+
+## [5.3.2] · 2026-11-20
+
+Correção a partir do log da 5.3.1 na 50D: depois do live view, a câmera parava de responder até tirar o cabo.
+
+- **Despedida antes de soltar a USB:**
+  - ao desconectar (no botão, no Reconectar a USB e na reconexão depois do live view), o app soltava a USB antes de avisar a câmera;
+  - os avisos "sair do modo remoto" e "fechar a sessão" não chegavam, e a câmera recusava a sessão nova (`0x1002` sem resposta);
+  - agora a USB só é solta depois que a câmera recebe os quatro avisos, e o log mostra a resposta de cada um ("Despedida da câmera: …").
+- **`0xD1B3` intocado:** a 5.3.1 desligava essa propriedade ao sair do live view, mas ela já valia 1 antes do live view. Era um ajuste da câmera, não do live view.
+- **Reconexão rápida com novas tentativas:** se a câmera demorar a responder depois de fechar a sessão, o app tenta de novo mais duas vezes, com pausas maiores.
+
+## [5.3.1] · 2026-11-20
+
+Correção a partir do log da 5.3 na 50D: depois de sair do live view, o corpo da câmera ficava em BUSY (botões e dials sem resposta) até tirar o cabo.
+
+- **Saída do live view na ordem certa:** o fim do AF (0x9160) vai enquanto o live view ainda está ligado. Antes ele chegava depois, numa câmera que já tinha saído do live view.
+- **Câmera liberada sem tirar o cabo:**
+  - depois do live view, o app fecha e abre a sessão USB sozinho, como tirar e pôr o cabo;
+  - espera os downloads em andamento terminarem;
+  - não faz nada se você voltar ao live view, estiver disparando ou com o intervalômetro ou o bracketing rodando;
+  - dá para desligar em Desenvolvedor → Conexão → Reconectar ao sair do live view.
+- **Log:** mostra as propriedades da câmera que mudaram entre a entrada e a saída do live view.
+- **Aviso certo:** quando a pasta de cópias da Entrega ou do Express perde a permissão, o aviso fala dessa pasta, e não mais do 2º cartão.
+
+## [5.3] · 2026-11-20
+
+Download, conexão e live view revistos módulo a módulo, a partir da comparação com outro app que funciona na 50D.
+
+- **Download em blocos (0x101B):**
+  - o RAW vem em pedaços de 1 MB, e não mais num pedido só;
+  - entre um pedaço e outro, o live view e o disparador entram na vez: a imagem não congela mais depois de cada foto;
+  - enquanto o disparador trabalha, o download espera;
+  - câmeras sem esse comando continuam com o download inteiro (0x1009).
+- **Download que continua de onde parou:**
+  - se o cabo falhar no meio de um RAW, a próxima tentativa (ou a busca de fotos perdidas depois de reconectar) continua do byte em que parou;
+  - se o pedaço salvo não bater com o tamanho esperado, o app baixa do início;
+  - um pedaço esquecido por mais de 30 minutos é apagado, para não ficar foto quebrada na pasta.
+- **Valores pedidos à câmera (0x9127):** o que a 50D não informa sozinha (modo de avanço, por exemplo) é pedido ao conectar e ao abrir o live view.
+- **Só o que a câmera tem:**
+  - ao conectar, o app lê a lista de comandos da câmera e grava no log o que falta;
+  - zoom, AF e mover a lente só aparecem no live view se a câmera anunciar o comando;
+  - comandos não anunciados nunca são enviados.
+- **Modo desenvolvedor → Conexão:**
+  - modo remoto 1 ou 5;
+  - gravar ou não o destino "cartão";
+  - o log mostra o destino que a câmera informa.
+- **`PartialDownloadTest`:** testa os blocos, a retomada, a câmera ocupada e o bloco vazio.
+
+## [5.2] · 2026-11-20
+
+O disparador do app passa a apertar o botão da 50D em duas etapas, como o dedo faz.
+
+- **Meio curso e completo (0x9128/0x9129):**
+  - quando a câmera anuncia esses comandos, o app manda meio curso, depois completo, e solta os dois;
+  - se ela não anunciar ou recusar, o app volta para o disparo direto (0x910F) sozinho;
+  - o botão é solto sempre, mesmo com erro ou cabo puxado, e de novo a cada conexão: a câmera não fica mais "presa" respondendo ocupada.
+- **Botão que segue o dedo:**
+  - encostar faz o meio curso (a câmera foca) e soltar dispara;
+  - segurar faz sequência, se a câmera estiver num modo contínuo;
+  - arrastar o dedo para fora cancela sem foto.
+- **Foto confirmada pela câmera:** o app marca "Disparou" quando o arquivo novo chega, e não mais quando a câmera responde "OK". Sem foto no tempo, ele avisa e explica.
+- **Sem AF extra antes do disparo:** no meio curso, a câmera já foca. O "Focar antes de disparar" fica só para câmeras sem as duas etapas.
+- **Intervalômetro e bracketing** usam o mesmo caminho. Exposições longas e o temporizador ganham tempo de espera.
+- **Modo desenvolvedor → Disparo pelo cabo:**
+  - mostra o que a câmera anuncia;
+  - permite forçar o método e trocar o segundo parâmetro (1 ou 0) para testar na 50D;
+  - o log grava a sequência de cada disparo e o modo de avanço.
+- **`ShutterPressTest`:** testa a ordem dos comandos, a soltura em caso de erro, o cancelamento e a sequência.
 
 ## [5.1] · 2026-11-10
 

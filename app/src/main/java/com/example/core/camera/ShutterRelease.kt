@@ -42,8 +42,8 @@ object ShutterRelease {
     const val STUCK_MS = 1_500L
 
     /**
-     * Tries until the camera fires. [remoteRelease] is the 50D's one-step release; without it the
-     * newer press/release pair is used. [onWaiting] reports how long it has been waiting.
+     * The one-step release (RemoteRelease, 0x910F): tries until the camera fires. Cameras with the
+     * two-step press get [ShutterPress] instead. [onWaiting] reports how long it has been waiting.
      *
      * The wait is the longer of the retries counted and the real time spent: each RemoteRelease that
      * hunts for focus can take half a second on the camera, and a log showed "up to 5 s" lasting 10 s.
@@ -52,7 +52,6 @@ object ShutterRelease {
      */
     suspend fun fire(
         ptp: PtpSession,
-        remoteRelease: Boolean,
         waitMs: Long,
         onStuck: (suspend () -> Unit)? = null,
         report: (String) -> Unit = {},
@@ -67,13 +66,7 @@ object ShutterRelease {
         while (true) {
             val waited = maxOf(attempt++ * RETRY_MS, System.currentTimeMillis() - started)
             try {
-                val refusal = if (remoteRelease) {
-                    refusal(ptp.transact(PtpOp.EOS_REMOTE_RELEASE))
-                } else {
-                    ptp.transact(PtpOp.EOS_REMOTE_RELEASE_ON, 3, 0)
-                    ptp.transact(PtpOp.EOS_REMOTE_RELEASE_OFF, 3)
-                    null
-                }
+                val refusal = refusal(ptp.transact(PtpOp.EOS_REMOTE_RELEASE))
                 answers.add(refusal?.let { if (it == NO_FOCUS) "sem foco" else "recusou $it" } ?: "disparou")
                 if (refusal == null) {
                     report(answers.line(System.currentTimeMillis() - started))
