@@ -154,6 +154,8 @@ fun PhotosScreen(
         selected.clear()
     }
 
+    // Above the early return, so the grid keeps its scroll while the videos are open.
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
     var videosOpen by rememberSaveable { mutableStateOf(false) }
     if (videosOpen) {
         com.example.ui.video.VideoGallery(app, onBack = { videosOpen = false })
@@ -225,6 +227,7 @@ fun PhotosScreen(
 
         LazyVerticalGrid(
             columns = GridCells.Adaptive(settings.galleryThumb.dp),
+            state = gridState,
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
