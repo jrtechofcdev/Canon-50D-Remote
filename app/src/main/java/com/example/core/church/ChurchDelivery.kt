@@ -180,21 +180,27 @@ class ChurchDelivery(
         }
     }
 
-    override suspend fun thumb(id: Long): ServedFile? = small(id, THUMB_EDGE, "thumb")?.let { fileServed(it, "t.jpg") }
+    override suspend fun thumb(id: Long, member: ChurchMember, marked: Boolean): ServedFile? {
+        val clean = small(id, THUMB_EDGE, "thumb") ?: return null
+        return if (marked) markedCopy(clean, THUMB_EDGE, "mt${member.id}_$id.jpg", member)?.let { fileServed(it, "t.jpg") } else fileServed(clean, "t.jpg")
+    }
 
     override suspend fun preview(id: Long, member: ChurchMember, marked: Boolean): ServedFile? {
         val clean = small(id, PREVIEW_EDGE, "view") ?: return null
-        if (!marked) return fileServed(clean, "p.jpg")
-        // A copy with this person's name, role and the time: a screenshot of it shows who it came from.
-        val out = File(dir, "m${member.id}_$id.jpg")
+        return if (marked) markedCopy(clean, PREVIEW_EDGE, "m${member.id}_$id.jpg", member)?.let { fileServed(it, "p.jpg") } else fileServed(clean, "p.jpg")
+    }
+
+    /** A copy of [clean] with this person's name, role and the time: a screenshot of it shows who it came from. */
+    private suspend fun markedCopy(clean: File, edge: Int, name: String, member: ChurchMember): File? {
+        val out = File(dir, name)
         if (!out.exists()) withContext(Dispatchers.IO) {
-            val bitmap = BitmapLoader.load(context, Uri.fromFile(clean), PREVIEW_EDGE) ?: return@withContext
+            val bitmap = BitmapLoader.load(context, Uri.fromFile(clean), edge) ?: return@withContext
             val copy = bitmap.copy(Bitmap.Config.ARGB_8888, true).also { if (it !== bitmap) bitmap.recycle() }
             mark(copy, "${member.name} · ${member.role}", SimpleDateFormat("dd/MM HH:mm", Locale.ROOT).format(Date()))
             writeWhole(out) { copy.compress(Bitmap.CompressFormat.JPEG, 82, it) }
             copy.recycle()
         }
-        return out.takeIf { it.exists() }?.let { fileServed(it, "p.jpg") }
+        return out.takeIf { it.exists() }
     }
 
     override suspend fun logo(event: ChurchEvent): ServedFile? {

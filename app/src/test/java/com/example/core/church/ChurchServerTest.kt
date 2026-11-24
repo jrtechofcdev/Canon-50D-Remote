@@ -31,6 +31,7 @@ class ChurchServerTest {
     private val jpg = ByteArray(5_000) { (it % 199).toByte() }
     private val raw = ByteArray(9_000) { (it % 97).toByte() }
     private val marks = mutableListOf<Boolean>()
+    private val thumbMarks = mutableListOf<Boolean>()
 
     @Before
     fun setUp() {
@@ -48,7 +49,10 @@ class ChurchServerTest {
                     else -> ServedFile("${p.savedBase}.JPG", jpg.size.toLong()) { jpg.inputStream() }
                 }
             }
-            override suspend fun thumb(id: Long) = ServedFile("t.jpg", 3) { "jpg".byteInputStream() }
+            override suspend fun thumb(id: Long, member: ChurchMember, marked: Boolean): ServedFile {
+                thumbMarks += marked
+                return ServedFile("t.jpg", 3) { "jpg".byteInputStream() }
+            }
             override suspend fun preview(id: Long, member: ChurchMember, marked: Boolean): ServedFile {
                 marks += marked
                 return ServedFile("p.jpg", 3) { "pre".byteInputStream() }
@@ -153,6 +157,9 @@ class ChurchServerTest {
         assertEquals(403, call("/f/$m/$p?v=original&dl=1").status)
         assertEquals(200, call("/p/$m/$p").status)
         assertEquals(listOf(true), marks)
+        // The grid too: a screenshot of the thumbnails also carries the name.
+        assertEquals(200, call("/t/$m/$p").status)
+        assertEquals(listOf(true), thumbMarks)
         val state = call("/api/c/state?m=$m").text
         assertTrue(state.contains("\"original\":false") && state.contains("\"raw\":false"))
         assertTrue(eventually { runBlocking { db.churchDao().fullLog(e.id) }.any { it.action == "Tentou baixar sem permissão" } })

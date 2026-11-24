@@ -32,7 +32,8 @@ interface ChurchBackend {
     fun asset(name: String): InputStream?
     suspend fun photo(id: Long): ChurchPhotoInfo?
     suspend fun file(id: Long, kind: ChurchFile): ServedFile?
-    suspend fun thumb(id: Long): ServedFile?
+    /** The grid picture; [marked] = with the person's name, for who cannot download anything. */
+    suspend fun thumb(id: Long, member: ChurchMember, marked: Boolean): ServedFile?
     /** The big view; with [marked] it carries the person's name and role (they cannot download). */
     suspend fun preview(id: Long, member: ChurchMember, marked: Boolean): ServedFile?
     suspend fun logo(event: ChurchEvent): ServedFile?
@@ -297,18 +298,19 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
     }
 
     private suspend fun thumb(token: String, id: String, r: Request, out: OutputStream, head: Boolean) {
-        val (_, _, photoId) = visible(token, id, r, out) ?: return
-        val f = backend.thumb(photoId) ?: return text(out, 404, "Miniatura indisponível")
+        val (m, _, photoId) = visible(token, id, r, out) ?: return
+        val f = backend.thumb(photoId, m, marked(m)) ?: return text(out, 404, "Miniatura indisponível")
         serve(out, f, null, head, download = false, private = true) {}
     }
 
     private suspend fun preview(token: String, id: String, r: Request, out: OutputStream, head: Boolean) {
         val (m, _, photoId) = visible(token, id, r, out) ?: return
-        // Who cannot download at all only ever gets a copy with their own name on it.
-        val marked = m.perms and ChurchPerm.DOWNLOAD_ANY == 0
-        val f = backend.preview(photoId, m, marked) ?: return text(out, 404, "Foto indisponível")
+        val f = backend.preview(photoId, m, marked(m)) ?: return text(out, 404, "Foto indisponível")
         serve(out, f, null, head, download = false, private = true) {}
     }
+
+    /** Who cannot download at all only ever gets pictures with their own name on them. */
+    private fun marked(m: ChurchMember) = m.perms and ChurchPerm.DOWNLOAD_ANY == 0
 
     private suspend fun download(token: String, id: String, r: Request, out: OutputStream, head: Boolean) {
         val (m, e, photoId) = visible(token, id, r, out) ?: return
