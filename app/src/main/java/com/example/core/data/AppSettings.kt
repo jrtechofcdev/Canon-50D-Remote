@@ -99,6 +99,12 @@ data class Settings(
     val enhanceOnDelivery: Boolean = false,
     val enhanceOnShare: Boolean = false,
     val enhanceOnChurch: Boolean = false,
+    /** Entrega da igreja: "wifi" (the church's Wi-Fi), "hotspot" or "direct". */
+    val churchNetwork: String = "wifi",
+    val churchSsid: String = "DIRECT-JR-Igreja",
+    val churchPassword: String = "",
+    /** "igreja" answers as igreja.local on the Wi-Fi; blank turns the name off. */
+    val churchDomain: String = "igreja",
     /** A calibration carried to the next photos ("Aplicar às próximas"); empty = use the preset as is. */
     val sessionAdjust: String = "",
     val saveEditedCopy: Boolean = true,
@@ -423,6 +429,10 @@ object SettingKeys {
     val enhanceOnDelivery = booleanPreferencesKey("enhance_on_delivery")
     val enhanceOnShare = booleanPreferencesKey("enhance_on_share")
     val enhanceOnChurch = booleanPreferencesKey("enhance_on_church")
+    val churchNetwork = stringPreferencesKey("church_network")
+    val churchSsid = stringPreferencesKey("church_ssid")
+    val churchPassword = stringPreferencesKey("church_password")
+    val churchDomain = stringPreferencesKey("church_domain")
     val sessionAdjust = stringPreferencesKey("session_adjust")
     val saveEditedCopy = booleanPreferencesKey("save_edited_copy")
     val editedQuality = intPreferencesKey("edited_quality")
@@ -683,6 +693,10 @@ class SettingsRepository(private val context: Context) {
             enhanceOnDelivery = this[k.enhanceOnDelivery] ?: d.enhanceOnDelivery,
             enhanceOnShare = this[k.enhanceOnShare] ?: d.enhanceOnShare,
             enhanceOnChurch = this[k.enhanceOnChurch] ?: d.enhanceOnChurch,
+            churchNetwork = this[k.churchNetwork] ?: d.churchNetwork,
+            churchSsid = this[k.churchSsid]?.takeIf { it.isNotBlank() } ?: d.churchSsid,
+            churchPassword = this[k.churchPassword] ?: d.churchPassword,
+            churchDomain = this[k.churchDomain] ?: d.churchDomain,
             sessionAdjust = this[k.sessionAdjust] ?: d.sessionAdjust,
             saveEditedCopy = this[k.saveEditedCopy] ?: d.saveEditedCopy,
             editedQuality = this[k.editedQuality] ?: d.editedQuality,

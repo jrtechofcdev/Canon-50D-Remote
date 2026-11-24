@@ -78,6 +78,9 @@ class TetherApp : Application() {
         private set
     /** Fotografia Express: its own tool, no code, preview until paid. Independent of [delivery]. */
     lateinit var express: LocalDelivery
+
+    /** Entrega da igreja: the media team sees and downloads the event's photos live. */
+    lateinit var church: com.example.core.church.ChurchDelivery
         private set
     /** Deleted photos wait here a few seconds so Desfazer can bring them back. */
     lateinit var trash: com.example.core.data.PhotoTrash
@@ -181,6 +184,15 @@ class TetherApp : Application() {
         express.onLike = { session, item -> if (settings.current().expressNotifyLikes) likes.liked(session, item) }
         delivery.init()
         express.init()
+        church = com.example.core.church.ChurchDelivery(this, com.example.core.church.ChurchRepository(database.churchDao()), database.photoDao(), looks, store, settings)
+        // The church delivery also takes the Wi-Fi, so it and the other two stop each other.
+        church.stopOthers = {
+            if (delivery.status.value !is com.example.core.delivery.DeliveryStatus.Off) delivery.stop()
+            if (express.status.value !is com.example.core.delivery.DeliveryStatus.Off) express.stop()
+        }
+        val stopChurch: suspend () -> Unit = { if (church.status.value !is com.example.core.delivery.DeliveryStatus.Off) church.stop() }
+        delivery.stopOthers = stopChurch
+        express.stopOthers = stopChurch
         appScope.launch {
             events.events.collect { e ->
                 if ((e is PhotoEvent.Delivered || e is PhotoEvent.Approved) && settings.current().deliveryVibrate) alerts.photoReceived()
@@ -248,6 +260,8 @@ class TetherApp : Application() {
             tether.saved.collect {
                 AppLog.i("FOTO", "${it.savedBase} salva · ${AppLog.memory()}")
                 events.emit(PhotoEvent.Captured(it.id))
+                val photo = it
+                appScope.launch { runCatching { church.onPhotoSaved(photo) }.onFailure { e -> AppLog.w("IGREJA", "Foto não entrou no evento", e) } }
                 val s = settings.current()
                 if (s.blurAlert || s.eyesCheck || s.cullSuggestions) culler.enqueue(it.id)
                 if (s.vibrateOnReceive) alerts.photoReceived()

@@ -95,6 +95,9 @@ class LocalDelivery(
     /** The other tool: stopped before this one takes the Wi-Fi. */
     var peer: LocalDelivery? = null
 
+    /** Other tools outside this class (the church delivery): they let go of the Wi-Fi before this starts. */
+    var stopOthers: suspend () -> Unit = {}
+
     /** A client hearted a photo (the app shows a notification when that is on). */
     var onLike: suspend (DeliverySession, DeliveryItem) -> Unit = { _, _ -> }
 
@@ -206,6 +209,7 @@ class LocalDelivery(
     suspend fun start(test: File? = null): DeliveryStatus {
         // One Wi-Fi at a time: the other tool lets go first.
         peer?.takeIf { it.status.value !is DeliveryStatus.Off }?.stop()
+        stopOthers()
         return lock.withLock { startLocked(test) }
     }
 

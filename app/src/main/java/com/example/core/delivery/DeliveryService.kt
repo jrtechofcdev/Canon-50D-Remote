@@ -46,7 +46,7 @@ class DeliveryService : LifecycleService() {
         val app = application as TetherApp
         lifecycleScope.launch {
             // Whichever tool holds the Wi-Fi (only one at a time).
-            combine(line(app.delivery), line(app.express)) { a, b -> a ?: b }
+            combine(line(app.delivery), line(app.express), churchLine(app.church)) { a, b, c -> a ?: b ?: c }
                 .distinctUntilChanged().collect { text -> if (text == null) stopSelf() else update(text) }
         }
     }
@@ -64,6 +64,12 @@ class DeliveryService : LifecycleService() {
             "${tool.mode.label} · $people · $ready ${if (ready == 1) "foto" else "fotos"}"
         }
 
+    private fun churchLine(tool: com.example.core.church.ChurchDelivery) =
+        combine(tool.status, tool.server.online) { status, online ->
+            if (status !is DeliveryStatus.Running) return@combine null
+            "Entrega da igreja · " + if (online > 0) "$online ${if (online == 1) "celular" else "celulares"} na página" else "aguardando a mídia"
+        }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         if (intent?.action == ACTION_STOP) {
@@ -71,6 +77,7 @@ class DeliveryService : LifecycleService() {
                 val app = application as TetherApp
                 app.delivery.stop()
                 app.express.stop()
+                app.church.stop()
             }
         }
         return START_NOT_STICKY
@@ -97,8 +104,7 @@ class DeliveryService : LifecycleService() {
         .setContentIntent(
             PendingIntent.getActivity(
                 this, 1, Intent(this, MainActivity::class.java).setAction(MainActivity.ACTION_DELIVERY)
-                    // Opens the tab of the tool that is on the air.
-                    .putExtra(MainActivity.EXTRA_ROUTE, if ((application as TetherApp).express.status.value is DeliveryStatus.Running) "express" else "delivery"), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                    .putExtra(MainActivity.EXTRA_ROUTE, route()), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             ),
         )
         .addAction(
@@ -106,6 +112,16 @@ class DeliveryService : LifecycleService() {
             PendingIntent.getService(this, 2, Intent(this, DeliveryService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE),
         )
         .build()
+
+    /** Opens the tab of the tool that is on the air. */
+    private fun route(): String {
+        val app = application as TetherApp
+        return when {
+            app.express.status.value is DeliveryStatus.Running -> "express"
+            app.church.status.value is DeliveryStatus.Running -> "church"
+            else -> "delivery"
+        }
+    }
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
