@@ -20,6 +20,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
+import androidx.compose.foundation.background
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -547,6 +548,21 @@ class ScreenshotTest {
         rule.setContent { JrLinkTheme { com.example.ui.church.ChurchScreen(app, onBack = null, onSettings = {}) } }
         save("igreja_completo", androidx.compose.ui.test.hasText("Log do evento"))
         app.church.showStatusForPreview(com.example.core.delivery.DeliveryStatus.Off)
+    }
+
+    @Test
+    fun churchCongregations() {
+        seedChurch()
+        rule.setContent { JrLinkTheme { androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.background(com.example.ui.theme.Tone.Surface)) { com.example.ui.church.CongregationsContent(app, onDismiss = {}) } } }
+        save("igreja_congregacoes", androidx.compose.ui.test.hasText("Nova congregação"))
+    }
+
+    @Test
+    fun churchCongregationEditor() {
+        seedChurch()
+        val id = runBlocking { app.church.repo.dao.openEvent()!!.congregationId!! }
+        rule.setContent { JrLinkTheme { androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.background(com.example.ui.theme.Tone.Surface)) { com.example.ui.church.CongregationsContent(app, onDismiss = {}, editing = id) } } }
+        save("igreja_congregacao", androidx.compose.ui.test.hasText("Apagar congregação"))
     }
 
     @Test

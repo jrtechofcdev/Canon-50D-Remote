@@ -89,6 +89,11 @@ class ChurchRepository(
     suspend fun saveCongregation(c: Congregation): Long =
         if (c.id == 0L) dao.insertCongregation(c.copy(createdAt = clock())) else c.id.also { dao.updateCongregation(c) }
 
+    /** Takes the congregation off the list; its events keep the name, colours and look they copied. */
+    suspend fun deleteCongregation(id: Long) {
+        dao.deleteCongregation(id)
+    }
+
     /** A new event, open right away (others close), with its congregation's look and colours. */
     suspend fun newEvent(name: String, congregationId: Long?, date: Long = clock()): ChurchEvent {
         val c = congregationId?.let { dao.congregation(it) }

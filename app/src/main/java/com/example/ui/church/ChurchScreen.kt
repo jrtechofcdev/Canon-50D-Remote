@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Church
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.EventBusy
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.QrCode2
@@ -98,6 +99,7 @@ fun ChurchScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit) 
     val status by app.church.status.collectAsState()
     val online by app.church.server.online.collectAsState()
     val s = settings ?: return
+    var managing by remember { mutableStateOf(false) }
 
     val askPermissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         if (result.values.all { it }) scope.launch { app.church.start() }
@@ -114,7 +116,10 @@ fun ChurchScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit) 
                 title = "Entrega da igreja",
                 subtitle = event?.let { e -> listOf(e.name, e.congregation).filter { it.isNotBlank() }.joinToString(" · ") },
                 onBack = onBack,
-            ) { IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, contentDescription = "Ajustes da entrega da igreja", tint = Tone.TextMuted) } }
+            ) {
+                IconButton(onClick = { managing = true }) { Icon(Icons.Outlined.Groups, contentDescription = "Congregações", tint = Tone.TextMuted) }
+                IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, contentDescription = "Ajustes da entrega da igreja", tint = Tone.TextMuted) }
+            }
             Column(
                 Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = Space.l, vertical = Space.s),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -150,6 +155,7 @@ fun ChurchScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit) 
             }
         }
     }
+    if (managing) CongregationsSheet(app, onDismiss = { managing = false })
 }
 
 // ---- no event open --------------------------------------------------------------------------
@@ -191,16 +197,7 @@ private fun NewEventCard(app: TetherApp, congregations: List<Congregation>) {
             modifier = Modifier.fillMaxWidth(),
         )
     }
-    if (adding) TextDialog(
-        title = "Nova congregação", label = "Nome", initial = "",
-        onDismiss = { adding = false },
-        onSave = { text ->
-            adding = false
-            ChurchRules.cleanName(text)?.let { n ->
-                scope.launch { congregation = app.church.repo.saveCongregation(Congregation(name = n, createdAt = 0)) }
-            }
-        },
-    )
+    if (adding) CongregationsSheet(app, onDismiss = { adding = false }, editing = 0L, onSaved = { congregation = it })
 }
 
 @Composable

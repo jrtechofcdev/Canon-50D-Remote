@@ -404,13 +404,13 @@ internal fun ThemeCard(app: TetherApp, e: ChurchEvent) {
 }
 
 /** Colours that read on the dark page, plus the brand's own. */
-private val SWATCHES = listOf(
+internal val SWATCHES = listOf(
     ChurchTheme.ACCENT, ChurchTheme.SECONDARY, "#F2B544", "#FF8A5B", "#FF5C7A", "#C792EA", "#7FD1FF", "#9BE15D", "#FFFFFF", "#E8D5B0",
 )
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Swatches(current: String, onPick: (String) -> Unit) {
+internal fun Swatches(current: String, onPick: (String) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalArrangement = Arrangement.spacedBy(Space.s)) {
         SWATCHES.forEach { hex ->
             val on = hex.equals(current, ignoreCase = true)

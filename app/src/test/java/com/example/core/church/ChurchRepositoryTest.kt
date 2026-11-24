@@ -74,6 +74,20 @@ class ChurchRepositoryTest {
     }
 
     @Test
+    fun anEditedCongregationShapesTheNextEventAndDeletingItKeepsTheEvents() = runBlocking {
+        val id = repo.saveCongregation(Congregation(name = "AD Centro", createdAt = 0))
+        val c = db.churchDao().congregation(id)!!
+        repo.saveCongregation(c.copy(name = "AD Centro Sede", accent = "#F2B544", motto = "Ide", defaultPerms = ChurchPerm.VIEW))
+        val e = repo.newEvent("Santa Ceia", id)
+        assertEquals("AD Centro Sede", e.congregation)
+        assertEquals("#F2B544", e.accent)
+        assertEquals(ChurchPerm.VIEW, (join(e) as JoinResult.Ok).member.perms)
+        repo.deleteCongregation(id)
+        assertNull(db.churchDao().congregation(id))
+        assertEquals("AD Centro Sede", db.churchDao().event(e.id)!!.congregation)
+    }
+
+    @Test
     fun aWrongCodeIsRefusedAndTriesAreLimited() = runBlocking {
         val e = repo.newEvent("Cruzada", null)
         repeat(5) { assertTrue(join(e, code = "0000".takeIf { it != e.code } ?: "1111") is JoinResult.Denied) }
