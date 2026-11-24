@@ -248,6 +248,20 @@ class ChurchRepository(
         return changedOnes.size
     }
 
+    /**
+     * The event's look (the "pronta" of everyone who follows it): set by the main admin on the page or by the
+     * photographer ([by] null). Every change goes to the history, and the pages show who made it and when.
+     */
+    suspend fun setEventLook(eventId: Long, presetId: Long?, adjust: String?, by: ChurchMember?, lookName: String) {
+        val e = dao.event(eventId) ?: return
+        val who = by?.label ?: "Fotógrafo"
+        val now = clock()
+        dao.updateEvent(e.copy(presetId = presetId, adjust = adjust, lookBy = who, lookAt = now))
+        dao.insertLook(ChurchLook(eventId = eventId, presetId = presetId, adjust = adjust, byWho = who, at = now))
+        log(eventId, by, "Mudou o look do evento", lookName)
+        changed()
+    }
+
     /** Which presets the media may use: [ids] null releases all of them, empty releases none. */
     suspend fun setReleasedPresets(eventId: Long, ids: Set<Long>?) {
         val e = dao.event(eventId) ?: return

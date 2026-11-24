@@ -349,12 +349,36 @@ private fun ReadyCard(app: TetherApp, e: ChurchEvent, enhanceEverywhere: Boolean
         Text("Versão pronta", style = MaterialTheme.typography.titleMedium)
         Text("É a foto com o tratamento escolhido aqui. A original e o RAW saem como a câmera fez.", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalArrangement = Arrangement.spacedBy(Space.s)) {
-            JrChip("O da foto", e.presetId == null, onClick = { scope.launch { app.church.repo.updateEvent(e.copy(presetId = null, adjust = null)) } })
-            presets.forEach { p -> JrChip(p.name, e.presetId == p.id, onClick = { scope.launch { app.church.repo.updateEvent(e.copy(presetId = p.id, adjust = null)) } }) }
+            JrChip("O da foto", e.presetId == null, onClick = { scope.launch { app.church.repo.setEventLook(e.id, null, null, null, "o da foto"); app.church.onEventLook() } })
+            presets.forEach { p -> JrChip(p.name, e.presetId == p.id, onClick = { scope.launch { app.church.repo.setEventLook(e.id, p.id, null, null, p.name); app.church.onEventLook() } }) }
         }
+        e.lookBy?.let { by -> e.lookAt?.let { at -> Text("Último ajuste: $by às ${clock(at)}", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted) } }
+        LookHistory(app, e, presets)
         AccessSwitch(Icons.Outlined.AutoFixHigh, "Melhorar (menos granulado)", e.enhanceReady || enhanceEverywhere) { on ->
             if (enhanceEverywhere && !on) app.notice("O Melhorar está ligado para a igreja em Ajustes → Melhorar.")
             else scope.launch { app.church.repo.updateEvent(e.copy(enhanceReady = on)) }
+        }
+    }
+}
+
+/** The event's looks over time (main admin and photographer), with "Voltar a este". */
+@Composable
+private fun LookHistory(app: TetherApp, e: ChurchEvent, presets: List<com.example.core.preset.Preset>) {
+    val scope = rememberCoroutineScope()
+    val looks by app.church.repo.dao.observeLooks(e.id).collectAsState(initial = emptyList())
+    var open by remember { mutableStateOf(false) }
+    if (looks.size < 2) return
+    TextButton(onClick = { open = !open }) { Text(if (open) "Esconder o histórico" else "Histórico dos looks (${looks.size})") }
+    if (!open) return
+    looks.take(20).forEach { l ->
+        val name = l.presetId?.let { id -> presets.firstOrNull { it.id == id }?.name } ?: if (l.adjust != null) "ajuste próprio" else "o da foto"
+        val current = l.presetId == e.presetId && l.adjust == e.adjust
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${clock(l.at)} · ${l.byWho}", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+            }
+            if (!current) TextButton(onClick = { scope.launch { app.church.repo.setEventLook(e.id, l.presetId, l.adjust, null, name); app.church.onEventLook() } }) { Text("Voltar a este") }
         }
     }
 }

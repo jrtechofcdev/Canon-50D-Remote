@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.core.data.Photo
 import com.example.core.data.PhotoDatabase
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -299,6 +300,25 @@ class ChurchServerTest {
         assertEquals(200, call("/f/$m/$p?v=original&preset=1&dl=1").status)
         assertEquals(listOf(ReadyLook(1, null), null, null), fileLooks)
         assertTrue(eventually { runBlocking { db.churchDao().fullLog(e.id) }.any { it.detail == "IMG_1.JPG (pronta, Quente)" } })
+    }
+
+    @Test
+    fun onlyTheMainAdminChangesTheEventsLookAndEveryPageSeesWho() {
+        val e = event()
+        val ana = join(e)
+        val bia = join(e, name = "Bia")
+        val anaId = runBlocking { db.churchDao().memberByToken(ana)!!.id }
+        assertEquals(403, call("/api/c/look?m=$ana&preset=1", "POST").status)
+        runBlocking { repo.setRank(anaId, ChurchRank.MAIN) }
+        assertEquals(200, call("/api/c/look?m=$ana&preset=1", "POST").status)
+        val state = call("/api/c/state?m=$bia").text
+        assertTrue(state, state.contains("\"look\":{\"preset\":1,\"name\":\"Quente\",\"by\":\"Ana · Mídia\""))
+        assertEquals(200, call("/api/c/look?m=$ana&preset=none", "POST").status)
+        assertTrue(call("/api/c/state?m=$bia").text.contains("\"name\":\"o da foto\""))
+        val history = runBlocking { db.churchDao().observeLooks(e.id).first() }
+        assertEquals(listOf<Long?>(null, 1L), history.map { it.presetId })
+        runBlocking { repo.setReleasedPresets(e.id, setOf(2)) }
+        assertEquals(403, call("/api/c/look?m=$ana&preset=1", "POST").status)
     }
 
     @Test

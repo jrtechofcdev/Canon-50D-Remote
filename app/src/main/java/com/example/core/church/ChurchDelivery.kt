@@ -282,6 +282,11 @@ class ChurchDelivery(
         return if (e.enhanceReady || s.enhanceOnChurch) s.enhanceLevel else photo.enhance
     }
 
+    override suspend fun onEventLook() {
+        val e = repo.dao.openEvent() ?: return
+        repo.dao.photos(e.id).forEach { readyQueue.trySend(it.photoId) }
+    }
+
     override suspend fun params(presetId: Long): String? =
         presetRepo.get(presetId)?.settings?.let { RenderParamsJson.encode(RenderParams.from(it)) }
 

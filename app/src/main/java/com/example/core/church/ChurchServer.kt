@@ -50,6 +50,8 @@ interface ChurchBackend {
     suspend fun params(presetId: Long): String? = null
     /** The photo the page's live preview starts from: cropped and "Melhorar" applied, no look. */
     suspend fun base(id: Long, member: ChurchMember, marked: Boolean): ServedFile? = null
+    /** The event's look changed: the "pronta" of its photos are made again ahead. */
+    suspend fun onEventLook() {}
 }
 
 /**
@@ -215,6 +217,7 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
             seg == listOf("api", "c", "state") -> state(r, out)
             seg == listOf("api", "c", "presets") -> presets(r, out)
             seg == listOf("api", "c", "shader") -> shader(r, out)
+            seg == listOf("api", "c", "look") && r.method == "POST" -> eventLook(r, out)
             seg == listOf("api", "c", "params") -> params(r, out)
             seg.size == 3 && seg[0] == "b" -> base(seg[1], seg[2], r, out, head)
             seg == listOf("evento-logo") -> logo(out, head)
@@ -288,7 +291,10 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
         json(out, 200, buildString {
             append("""{"v":$v""")
             append(""","event":{"name":${q(e.name)},"congregation":${q(e.congregation)},"date":${e.date},"motto":${q(e.motto.orEmpty())}""")
-            append(""","accent":${q(ChurchTheme.color(e.accent) ?: ChurchTheme.ACCENT)},"secondary":${q(ChurchTheme.color(e.secondary) ?: ChurchTheme.SECONDARY)},"logo":${e.logoUri != null}}""")
+            append(""","accent":${q(ChurchTheme.color(e.accent) ?: ChurchTheme.ACCENT)},"secondary":${q(ChurchTheme.color(e.secondary) ?: ChurchTheme.SECONDARY)},"logo":${e.logoUri != null}""")
+            // The event's look and who last changed it, for the notice on every page.
+            val lookName = e.presetId?.let { p -> backend.presets().firstOrNull { it.id == p }?.name } ?: if (e.adjust != null) "ajuste próprio" else "o da foto"
+            append(""","look":{"preset":${e.presetId ?: "null"},"name":${q(lookName)},"by":${e.lookBy?.let(::q) ?: "null"},"at":${e.lookAt ?: "null"}}}""")
             append(""","me":{"name":${q(m.name)},"role":${q(m.role)}""")
             append(""","view":${ChurchPerm.has(perms, ChurchPerm.VIEW)}""")
             append(""","original":${ChurchPerm.has(perms, ChurchPerm.DOWNLOAD_ORIGINAL)}""")
@@ -328,6 +334,19 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
         if (!ChurchPerm.has(m.perms, ChurchPerm.PRESETS)) return false
         val released = ChurchRules.released(e)
         return released == null || presetId in released
+    }
+
+    /** The main admin sets the event's look: a released preset, or "none" for the photo's own look. */
+    private suspend fun eventLook(r: Request, out: OutputStream) {
+        val (m, e) = who(r, out, r.query["m"]) ?: return
+        if (m.rank != ChurchRank.MAIN) return json(out, 403, """{"error":"Só o ADM principal muda o look do evento."}""")
+        val raw = r.query["preset"] ?: return json(out, 400, """{"error":"Preset?"}""")
+        val id = if (raw == "none") null else raw.toLongOrNull() ?: return json(out, 400, """{"error":"Preset?"}""")
+        if (id != null && !presetAllowed(m, e, id)) return json(out, 403, """{"error":"Este preset não está liberado."}""")
+        val name = id?.let { p -> backend.presets().firstOrNull { it.id == p }?.name } ?: if (id == null) "o da foto" else return json(out, 404, """{"error":"Preset não encontrado"}""")
+        repo.setEventLook(e.id, id, null, m, name)
+        backend.onEventLook()
+        json(out, 200, """{"ok":true}""")
     }
 
     /** The app's own shader, so the page's preview is made by the same maths. */

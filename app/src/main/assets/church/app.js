@@ -188,6 +188,7 @@
     badge.hidden = !me.rank;
     badge.textContent = me.rankLabel || "";
     $("foot").innerHTML = 'Fotos de <span class="brandname">Jr_Tech_OFC</span>, entregues pelo JR C50D Sync';
+    paintLookNote(d.event.look);
 
     var protectedView = allowed().length === 0;
     document.body.classList.toggle("protected", protectedView);
@@ -212,6 +213,20 @@
     if (fresh.length) JR.toast(fresh.length === 1 ? "Chegou uma foto nova" : fresh.length + " fotos novas");
     viewerApi.presets();
     viewerApi.refresh();
+  }
+
+  // The event's look: who changed it and when, on every page; a toast when it changes while open.
+  var lastLookAt = null;
+  function hhmm(ms) { var d = new Date(ms); return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
+  function paintLookNote(look) {
+    var el = $("lookNote");
+    if (!look || !look.by) { el.hidden = true; return; }
+    el.hidden = false;
+    el.lastChild.innerHTML = "Look do evento: <b></b> · alterado por <span></span> às " + hhmm(look.at);
+    el.lastChild.querySelector("b").textContent = look.name;
+    el.lastChild.querySelector("span").textContent = look.by;
+    if (lastLookAt !== null && look.at !== lastLookAt) JR.toast(look.by + " mudou o look do evento: " + look.name, "info");
+    lastLookAt = look.at;
   }
 
   function paintVersions() {
@@ -341,7 +356,8 @@
     }
     function loadPresets() {
       if (!me || !me.presets) { presetList = null; presetFor = null; $("presetBar").hidden = true; return; }
-      if (presetFor === member) return;
+      // Already loaded: the strip is drawn again (the event's look may have changed).
+      if (presetFor === member) { paintPresets(); return; }
       presetFor = member;
       JR.get("/api/c/presets?m=" + member).then(function (r) {
         presetList = r.status === 200 ? r.body.presets : null;
@@ -354,7 +370,8 @@
       if (bar.hidden) return;
       var pick = chosenPreset();
       strip.innerHTML = "";
-      [{ id: null, name: "Do evento" }].concat(presetList).forEach(function (p) {
+      var look = eventInfo && eventInfo.look;
+      [{ id: null, name: "Do evento" + (look ? " (" + look.name + ")" : "") }].concat(presetList).forEach(function (p) {
         var b = document.createElement("button");
         b.type = "button"; b.setAttribute("role", "radio"); b.textContent = p.name;
         b.setAttribute("aria-checked", pick === p.id ? "true" : "false");
@@ -366,7 +383,22 @@
         };
         strip.appendChild(b);
       });
+      // The main admin can make the picked preset the event's look, for everyone who follows it.
+      var all = $("useForAll");
+      all.hidden = !(me && me.rank === 2 && pick !== null && (!look || look.preset !== pick));
     }
+    $("useForAll").addEventListener("click", function () {
+      var pick = chosenPreset();
+      if (pick === null) return;
+      fetch("/api/c/look?m=" + member + "&preset=" + pick, { method: "POST", cache: "no-store" }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (b) { return { status: r.status, body: b }; });
+      }).then(function (r) {
+        if (r.status !== 200) { JR.toast(r.body.error || "Não deu para trocar o look", "warn"); return; }
+        JR.toast("Look do evento trocado para todos");
+        // The event now has it: "Do evento" shows the same.
+        write(presetKey(), null); paintPresets(); paint(); refresh();
+      }).catch(function () { JR.toast("Sem conexão com o celular do fotógrafo", "warn"); });
+    });
     function useGl() {
       if (glBroken || !window.JRLook || !JRLook.supported()) return false;
       return true;
