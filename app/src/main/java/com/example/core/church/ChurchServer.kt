@@ -26,6 +26,9 @@ class ServedFile(val name: String, val length: Long, val open: () -> InputStream
 /** One photo as the media page lists it. */
 data class ChurchPhotoInfo(val id: Long, val name: String, val hasJpg: Boolean, val hasRaw: Boolean)
 
+/** A preset of the shop as the media page lists it; [installed] = already in the photographer's app. */
+data class ChurchStoreItem(val id: Long, val name: String, val category: String, val installed: Boolean)
+
 /** A preset as the media page lists it. */
 data class ChurchPresetInfo(val id: Long, val name: String, val group: String)
 
@@ -52,6 +55,12 @@ interface ChurchBackend {
     suspend fun base(id: Long, member: ChurchMember, marked: Boolean): ServedFile? = null
     /** The event's look changed: the "pronta" of its photos are made again ahead. */
     suspend fun onEventLook() {}
+    /** The shop's catalogue as saved on the phone (no internet needed to list it). */
+    suspend fun store(): List<ChurchStoreItem> = emptyList()
+    /** A shop item's picture; null when it is not on the phone and there is no internet. */
+    suspend fun storePicture(id: Long): ServedFile? = null
+    /** Installs a shop item into the photographer's presets: its preset id, or the reason it couldn't. */
+    suspend fun storeInstall(id: Long): Result<ChurchPresetInfo> = Result.failure(IllegalStateException("Loja indisponível"))
 }
 
 /**
@@ -222,6 +231,9 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
             seg == listOf("api", "c", "independent") && r.method == "POST" -> independent(r, out)
             seg == listOf("api", "c", "revert") && r.method == "POST" -> revert(r, out)
             seg == listOf("api", "c", "share") && r.method == "POST" -> share(r, out)
+            seg == listOf("api", "c", "store") -> store(r, out)
+            seg == listOf("api", "c", "store", "install") && r.method == "POST" -> storeInstall(r, out)
+            seg.size == 3 && seg[0] == "s" -> storePicture(seg[1], seg[2], r, out, head)
             seg == listOf("api", "c", "share", "accept") && r.method == "POST" -> closeShare(r, out, apply = true)
             seg == listOf("api", "c", "share", "dismiss") && r.method == "POST" -> closeShare(r, out, apply = false)
             seg == listOf("api", "c", "params") -> params(r, out)
@@ -436,6 +448,47 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
         }
         repo.closeShare(s.id, apply, m)
         json(out, 200, """{"ok":true}""")
+    }
+
+    // ---- the preset shop, for who has the Loja switch ----------------------------------------
+
+    private suspend fun storeMember(token: String?, r: Request, out: OutputStream): Pair<ChurchMember, ChurchEvent>? {
+        val (m, e) = who(r, out, token) ?: return null
+        if (!ChurchPerm.has(m.perms, ChurchPerm.STORE)) {
+            json(out, 403, """{"error":"O fotógrafo não liberou a Loja para você."}""")
+            return null
+        }
+        return m to e
+    }
+
+    private suspend fun store(r: Request, out: OutputStream) {
+        storeMember(r.query["m"], r, out) ?: return
+        json(out, 200, buildString {
+            append("""{"items":[""")
+            backend.store().forEachIndexed { i, it ->
+                if (i > 0) append(',')
+                append("""{"id":${it.id},"name":${q(it.name)},"category":${q(it.category)},"installed":${it.installed}}""")
+            }
+            append("]}")
+        })
+    }
+
+    private suspend fun storePicture(token: String, id: String, r: Request, out: OutputStream, head: Boolean) {
+        storeMember(token, r, out) ?: return
+        val f = id.toLongOrNull()?.let { backend.storePicture(it) } ?: return text(out, 404, "Sem prévia")
+        serve(out, f, null, head, download = false, private = false) {}
+    }
+
+    /** Installs into the photographer's app; when the event releases only some presets, the new one joins them. */
+    private suspend fun storeInstall(r: Request, out: OutputStream) {
+        val (m, e) = storeMember(r.query["m"], r, out) ?: return
+        val id = r.query["id"]?.toLongOrNull() ?: return json(out, 400, """{"error":"Preset?"}""")
+        val result = backend.storeInstall(id)
+        val p = result.getOrElse { return json(out, 409, """{"error":${q(it.message ?: "Não deu para instalar")}}""") }
+        ChurchRules.released(e)?.let { if (p.id !in it) repo.setReleasedPresets(e.id, it + p.id) }
+        repo.log(e.id, m, "Instalou da Loja", p.name, r.ip)
+        repo.changed()
+        json(out, 200, """{"ok":true,"preset":${p.id},"name":${q(p.name)}}""")
     }
 
     /** The app's own shader, so the page's preview is made by the same maths. */

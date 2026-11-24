@@ -67,6 +67,9 @@ class ChurchServerTest {
                 return ServedFile("p.jpg", 3) { "pre".byteInputStream() }
             }
             override suspend fun logo(event: ChurchEvent): ServedFile? = null
+            override suspend fun store() = listOf(ChurchStoreItem(70, "Dourado", "Retrato", false), ChurchStoreItem(71, "Neblina", "Externo", true))
+            override suspend fun storeInstall(id: Long): Result<ChurchPresetInfo> =
+                if (id == 70L) Result.success(ChurchPresetInfo(9, "Dourado", "Meus presets")) else Result.failure(IllegalStateException("Precisa de internet no celular do fotógrafo para baixar este preset"))
             override suspend fun presets() = listOf(ChurchPresetInfo(1, "Quente", "Meus"), ChurchPresetInfo(2, "P&B", "Meus"), ChurchPresetInfo(3, "Frio", "Loja"))
         }
         server = ChurchServer(backend)
@@ -370,6 +373,26 @@ class ChurchServerTest {
         assertTrue(call("/api/c/state?m=$bia").text.contains("\"shares\":[]"))
         val toPhotographer = runBlocking { db.churchDao().observeSharesToPhotographer(e.id).first() }
         assertEquals(listOf(2L), toPhotographer.map { it.presetId })
+    }
+
+    @Test
+    fun theShopIsOnlyForWhoHasTheSwitchAndInstallsIntoTheApp() {
+        val e = event()
+        val m = join(e)
+        assertEquals(403, call("/api/c/store?m=$m").status)
+        runBlocking {
+            repo.setPerm(db.churchDao().memberByToken(m)!!.id, ChurchPerm.STORE, true)
+            repo.setReleasedPresets(e.id, setOf(1))
+        }
+        assertTrue(call("/api/c/store?m=$m").text.contains("{\"id\":70,\"name\":\"Dourado\",\"category\":\"Retrato\",\"installed\":false}"))
+        val ok = call("/api/c/store/install?m=$m&id=70", "POST")
+        assertEquals(200, ok.status)
+        // The event released only some presets: the new one joins them.
+        assertEquals(setOf(1L, 9L), runBlocking { ChurchRules.released(db.churchDao().openEvent()!!) })
+        val failed = call("/api/c/store/install?m=$m&id=71", "POST")
+        assertEquals(409, failed.status)
+        assertTrue(failed.text.contains("internet"))
+        assertTrue(runBlocking { db.churchDao().fullLog(e.id) }.any { it.action == "Instalou da Loja" && it.detail == "Dourado" })
     }
 
     @Test

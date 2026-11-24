@@ -57,6 +57,7 @@
         <button id="mineRevert" type="button" class="btn ghost small">Voltar ao meu look anterior</button>
       </div>
       <div id="shares" class="shares" hidden></div>
+      <button id="openStore" type="button" class="btn secondary small store-open" hidden>Loja de presets</button>
       <p class="meta"><span id="who" class="who"></span><span id="rank" class="rank" hidden></span><span id="count" class="muted num"></span></p>
     </section>
 
@@ -108,6 +109,15 @@
     <div id="downloads" class="downloads"></div>
     <button id="next" class="round" aria-label="Próxima foto"></button>
   </div>
+</div>
+
+<div id="store" class="store" hidden role="dialog" aria-modal="true" aria-label="Loja de presets">
+  <div class="store-bar">
+    <button id="storeClose" class="round" aria-label="Fechar"></button>
+    <div><p class="store-title">Loja de presets</p><p class="store-sub">Instalar coloca o preset no app do fotógrafo e libera para o evento.</p></div>
+  </div>
+  <div id="storeGrid" class="store-grid"></div>
+  <p id="storeEmpty" class="store-sub store-empty" hidden>A Loja ainda não foi aberta no celular do fotógrafo. Peça para ele abrir a aba Loja uma vez com internet.</p>
 </div>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>

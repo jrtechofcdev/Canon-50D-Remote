@@ -184,7 +184,7 @@ class TetherApp : Application() {
         express.onLike = { session, item -> if (settings.current().expressNotifyLikes) likes.liked(session, item) }
         delivery.init()
         express.init()
-        church = com.example.core.church.ChurchDelivery(this, com.example.core.church.ChurchRepository(database.churchDao()), database.photoDao(), looks, store, settings, presets)
+        church = com.example.core.church.ChurchDelivery(this, com.example.core.church.ChurchRepository(database.churchDao()), database.photoDao(), looks, store, settings, presets, shop)
         // The church delivery also takes the Wi-Fi, so it and the other two stop each other.
         church.stopOthers = {
             if (delivery.status.value !is com.example.core.delivery.DeliveryStatus.Off) delivery.stop()

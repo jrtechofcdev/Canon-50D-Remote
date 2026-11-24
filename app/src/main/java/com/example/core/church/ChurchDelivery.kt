@@ -59,6 +59,7 @@ class ChurchDelivery(
     private val store: PhotoStore,
     private val settings: SettingsRepository,
     private val presetRepo: com.example.core.preset.PresetRepository,
+    private val shop: com.example.core.shop.PresetShop,
 ) : ChurchBackend {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + AppLog.handler(ChurchServer.TAG))
     private val lock = Mutex()
@@ -280,6 +281,30 @@ class ChurchDelivery(
     private suspend fun enhanceFor(photo: com.example.core.data.Photo, e: ChurchEvent): Int {
         val s = settings.current()
         return if (e.enhanceReady || s.enhanceOnChurch) s.enhanceLevel else photo.enhance
+    }
+
+    override suspend fun store(): List<ChurchStoreItem> {
+        shop.loadSaved()
+        val saved = presetRepo.all().map { it.source }.toSet()
+        return shop.items.value.map { ChurchStoreItem(it.id, it.name, it.categoryLabel, it.source in saved) }
+    }
+
+    override suspend fun storePicture(id: Long): ServedFile? {
+        val item = shop.items.value.firstOrNull { it.id == id } ?: return null
+        val bitmap = shop.preview(item) ?: return null
+        val bytes = withContext(Dispatchers.IO) { java.io.ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, 82, it) }.toByteArray() }
+        return ServedFile("loja.jpg", bytes.size.toLong()) { bytes.inputStream() }
+    }
+
+    override suspend fun storeInstall(id: Long): Result<ChurchPresetInfo> = runCatching {
+        shop.loadSaved()
+        val item = shop.items.value.firstOrNull { it.id == id } ?: error("Preset não está na Loja")
+        val presetId = try {
+            shop.save(item)
+        } catch (e: Exception) {
+            throw IllegalStateException(if (shop.hasOffline(item)) "Não deu para instalar" else "Precisa de internet no celular do fotógrafo para baixar este preset", e)
+        }
+        ChurchPresetInfo(presetId, item.name, com.example.core.preset.DEFAULT_CATEGORY)
     }
 
     override suspend fun onEventLook() {

@@ -214,6 +214,7 @@ internal val PERMS = listOf(
     ChurchPerm.DOWNLOAD_READY to "Pronta",
     ChurchPerm.DOWNLOAD_RAW to "RAW",
     ChurchPerm.PRESETS to "Presets",
+    ChurchPerm.STORE to "Loja",
 )
 
 /** The presets the media may preview and download with; "Todos" follows new presets as they are added. */

@@ -191,6 +191,7 @@
     paintLookNote(d.event.look);
     paintMine();
     paintShares(d.shares || []);
+    $("openStore").hidden = !me.store;
     admins = d.admins || [];
 
     var protectedView = allowed().length === 0;
@@ -291,6 +292,46 @@
       box.appendChild(card);
     });
   }
+
+  // ---------- The preset shop (for who has the Loja switch) ----------
+  $("storeClose").innerHTML = JR.icons.close;
+  $("storeClose").onclick = JR.closeLayer;
+  $("openStore").addEventListener("click", function () {
+    JR.openLayer($("store"));
+    var grid = $("storeGrid");
+    grid.innerHTML = JR.loader();
+    JR.get("/api/c/store?m=" + member).then(function (r) {
+      grid.innerHTML = "";
+      var items = r.status === 200 ? r.body.items : [];
+      $("storeEmpty").hidden = items.length > 0;
+      items.forEach(function (it) {
+        var card = document.createElement("div");
+        card.className = "store-card";
+        card.innerHTML = '<div class="pic"><img alt="" loading="lazy"></div><b></b><span></span>';
+        card.querySelector("img").src = "/s/" + member + "/" + it.id;
+        card.querySelector("img").onerror = function () { this.remove(); };
+        card.querySelector("b").textContent = it.name;
+        card.querySelector("span").textContent = it.category;
+        var b = document.createElement("button");
+        b.type = "button";
+        function done() { b.className = "btn ghost small"; b.textContent = "Instalado"; b.disabled = true; }
+        if (it.installed) done(); else {
+          b.className = "btn secondary small"; b.textContent = "Instalar";
+          b.onclick = function () {
+            b.disabled = true; b.textContent = "Instalando";
+            post("/api/c/store/install?id=" + it.id).then(function (r2) {
+              if (r2.status !== 200) { b.disabled = false; b.textContent = "Instalar"; JR.toast(r2.body.error || "Não deu para instalar", "warn"); return; }
+              done(); JR.toast(it.name + " instalado no app do fotógrafo");
+              // The new preset shows in the strip under the big picture.
+              viewerApi.reloadPresets(); refresh();
+            });
+          };
+        }
+        card.appendChild(b);
+        grid.appendChild(card);
+      });
+    });
+  });
 
   function paintVersions() {
     var list = allowed(), box = $("versions"), pick = chosen();
@@ -606,7 +647,10 @@
       if (canvas._im && !canvas.hidden) draw(canvas._im);
       if (glr && !glCanvas.hidden) fit(glCanvas, glr.width, glr.height);
     });
-    return { open: open, refresh: function () { if (!root.hidden) paint(); }, presets: loadPresets, chosenPreset: chosenPreset };
+    return {
+      open: open, refresh: function () { if (!root.hidden) paint(); }, presets: loadPresets, chosenPreset: chosenPreset,
+      reloadPresets: function () { presetFor = null; loadPresets(); },
+    };
   })();
 
   // ---------- Protections for who cannot download ----------
