@@ -527,6 +527,8 @@ class ScreenshotTest {
         listOf(com.example.core.church.ChurchPerm.DOWNLOAD_ORIGINAL, com.example.core.church.ChurchPerm.DOWNLOAD_READY, com.example.core.church.ChurchPerm.DOWNLOAD_RAW)
             .forEach { repo.setPerm(ok[2].id, it, false) }
         repo.log(e.id, ok[0], "Baixou", "IMG_1040.CR2 (RAW)", "192.168.49.13")
+        repo.setRank(ok[0].id, com.example.core.church.ChurchRank.MAIN)
+        app.presets.all().firstOrNull()?.let { repo.shareLook(ok[0], null, it.id, null, it.name) }
         repo.log(e.id, ok[2], "Tentou baixar sem permissão", "foto 2 (Original)", "192.168.49.13")
     }
 

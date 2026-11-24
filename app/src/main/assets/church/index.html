@@ -56,6 +56,7 @@
         <label class="mine-switch"><input type="checkbox" id="mineIndependent"><span>Independente: o look do ADM principal não muda a minha pronta</span></label>
         <button id="mineRevert" type="button" class="btn ghost small">Voltar ao meu look anterior</button>
       </div>
+      <div id="shares" class="shares" hidden></div>
       <p class="meta"><span id="who" class="who"></span><span id="rank" class="rank" hidden></span><span id="count" class="muted num"></span></p>
     </section>
 
@@ -90,8 +91,16 @@
   <div class="viewer-stage" id="viewerStage"><canvas id="big" aria-label="Foto ampliada"></canvas><canvas id="bigGl" aria-label="Foto com o preset" hidden></canvas><span id="bigWait" class="big-wait" hidden></span></div>
   <div id="presetBar" class="preset-bar" hidden>
     <div id="presetStrip" class="preset-strip" role="radiogroup" aria-label="Preset da versão pronta"></div>
-    <button id="useForAll" type="button" class="btn secondary small use-all" hidden>Usar no evento, para todos</button>
-    <button id="saveMine" type="button" class="btn secondary small use-all" hidden>Guardar como meu look</button>
+    <div class="look-actions">
+      <button id="useForAll" type="button" class="btn secondary small use-all" hidden>Usar no evento, para todos</button>
+      <button id="saveMine" type="button" class="btn secondary small use-all" hidden>Guardar como meu look</button>
+      <button id="shareLook" type="button" class="btn secondary small use-all" hidden>Compartilhar</button>
+    </div>
+    <div id="shareSheet" class="share-sheet" hidden>
+      <p class="share-title">Mandar este look para</p>
+      <div id="shareTargets" class="share-targets"></div>
+      <button id="shareCancel" type="button" class="btn ghost small">Cancelar</button>
+    </div>
     <p class="raw-note">A prévia e a pronta saem do JPG da câmera (ou do JPG dentro do RAW). O app não revela o RAW.</p>
   </div>
   <div class="viewer-actions">

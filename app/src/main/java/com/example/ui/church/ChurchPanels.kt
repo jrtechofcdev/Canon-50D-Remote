@@ -245,6 +245,46 @@ internal fun ReleasedPresetsCard(app: TetherApp, e: ChurchEvent) {
     }
 }
 
+/** Looks the admins sent to the photographer: apply to the event, keep as a preset in the app, or dismiss. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun ReceivedLooksCard(app: TetherApp, e: ChurchEvent) {
+    val scope = rememberCoroutineScope()
+    val all by app.church.repo.dao.observeSharesToPhotographer(e.id).collectAsState(initial = emptyList())
+    val presets by app.presets.presets.collectAsState(initial = emptyList())
+    val waiting = all.filter { it.doneAt == null }
+    if (waiting.isEmpty()) return
+    DeliveryCard {
+        Text("Looks recebidos", style = MaterialTheme.typography.titleMedium)
+        waiting.forEach { s ->
+            val name = s.presetId?.let { id -> presets.firstOrNull { it.id == id }?.name } ?: "ajuste próprio"
+            Column(Modifier.fillMaxWidth().padding(top = Space.s), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                Text("Look de ${s.fromLabel}", style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("$name · ${clock(s.at)}", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+                    TextButton(onClick = {
+                        scope.launch {
+                            app.church.repo.setEventLook(e.id, s.presetId, s.adjust, null, name)
+                            app.church.onEventLook()
+                            app.church.repo.closeShare(s.id, applied = true, by = null)
+                        }
+                    }) { Text("Aplicar ao evento") }
+                    TextButton(onClick = {
+                        scope.launch {
+                            val settings = s.presetId?.let { app.presets.get(it)?.settings } ?: s.adjust?.let { com.example.core.preset.PresetSettings.decode(it) }
+                            if (settings == null) { app.notice("Esse look não existe mais no app."); return@launch }
+                            app.presets.save(com.example.core.preset.Preset(name = "Look de ${s.fromLabel}", group = com.example.core.preset.DEFAULT_CATEGORY, settings = settings))
+                            app.church.repo.closeShare(s.id, applied = true, by = null)
+                            app.notice("Salvo em Meus presets como \"Look de ${s.fromLabel}\"")
+                        }
+                    }) { Text("Salvar como preset") }
+                    TextButton(onClick = { scope.launch { app.church.repo.closeShare(s.id, applied = false, by = null) } }) { Text("Dispensar", color = Tone.TextMuted) }
+                }
+            }
+        }
+    }
+}
+
 /** What a newcomer may do. Changing it doesn't touch who is already inside, until "Aplicar a todos". */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

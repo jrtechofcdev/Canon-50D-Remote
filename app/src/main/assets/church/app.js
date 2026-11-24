@@ -190,6 +190,8 @@
     $("foot").innerHTML = 'Fotos de <span class="brandname">Jr_Tech_OFC</span>, entregues pelo JR C50D Sync';
     paintLookNote(d.event.look);
     paintMine();
+    paintShares(d.shares || []);
+    admins = d.admins || [];
 
     var protectedView = allowed().length === 0;
     document.body.classList.toggle("protected", protectedView);
@@ -261,6 +263,34 @@
       refresh();
     });
   });
+
+  // Looks other admins sent to this one: Aplicar makes it their own look (the event's, for the main admin).
+  var admins = [];
+  function paintShares(list) {
+    var box = $("shares");
+    box.hidden = !list.length;
+    box.innerHTML = "";
+    list.forEach(function (s) {
+      var card = document.createElement("div");
+      card.className = "share-card";
+      card.innerHTML = '<p>Look de <b></b>: <span></span></p>';
+      card.querySelector("b").textContent = s.from;
+      card.querySelector("span").textContent = s.name;
+      [["Aplicar", "accept", "btn primary small"], ["Dispensar", "dismiss", "btn ghost small"]].forEach(function (a) {
+        var b = document.createElement("button");
+        b.type = "button"; b.className = a[2]; b.textContent = a[0];
+        b.onclick = function () {
+          post("/api/c/share/" + a[1] + "?id=" + s.id).then(function (r) {
+            if (r.status !== 200) { JR.toast(r.body.error || "Não deu", "warn"); return; }
+            JR.toast(a[1] === "accept" ? (me.rank === 2 ? "Agora é o look do evento" : "Agora é o seu look") : "Dispensado");
+            refresh();
+          });
+        };
+        card.appendChild(b);
+      });
+      box.appendChild(card);
+    });
+  }
 
   function paintVersions() {
     var list = allowed(), box = $("versions"), pick = chosen();
@@ -422,7 +452,27 @@
       var all = $("useForAll");
       all.hidden = !(me && me.rank === 2 && pick !== null && (!look || look.preset !== pick));
       $("saveMine").hidden = !(me && me.rank === 1 && pick !== null && (!me.own || me.own.preset !== pick));
+      $("shareLook").hidden = !(me && me.rank >= 1 && pick !== null);
+      if (pick === null) $("shareSheet").hidden = true;
     }
+    $("shareLook").addEventListener("click", function () {
+      var box = $("shareTargets");
+      box.innerHTML = "";
+      [{ id: "fotografo", label: "Fotógrafo" }].concat(admins).forEach(function (t) {
+        var b = document.createElement("button");
+        b.type = "button"; b.className = "btn small"; b.textContent = t.label;
+        b.onclick = function () {
+          post("/api/c/share?preset=" + chosenPreset() + "&to=" + t.id).then(function (r) {
+            if (r.status !== 200) { JR.toast(r.body.error || "Não deu para mandar", "warn"); return; }
+            JR.toast("Look mandado para " + t.label);
+            $("shareSheet").hidden = true;
+          });
+        };
+        box.appendChild(b);
+      });
+      $("shareSheet").hidden = false;
+    });
+    $("shareCancel").addEventListener("click", function () { $("shareSheet").hidden = true; });
     $("saveMine").addEventListener("click", function () {
       var pick = chosenPreset();
       if (pick === null) return;

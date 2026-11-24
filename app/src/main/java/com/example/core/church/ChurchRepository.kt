@@ -289,6 +289,24 @@ class ChurchRepository(
         changed()
     }
 
+    /** An admin sends a look to another admin ([toMemberId]) or to the photographer (null). */
+    suspend fun shareLook(from: ChurchMember, toMemberId: Long?, presetId: Long?, adjust: String?, lookName: String): Long {
+        val to = toMemberId?.let { dao.member(it) }
+        val id = dao.insertShare(ChurchShare(eventId = from.eventId, fromMemberId = from.id, fromLabel = from.label, toMemberId = to?.id, presetId = presetId, adjust = adjust, at = clock()))
+        log(from.eventId, from, "Compartilhou um look", "$lookName com ${to?.label ?: "o fotógrafo"}")
+        changed()
+        return id
+    }
+
+    /** A shared look was applied or dismissed by who got it. */
+    suspend fun closeShare(shareId: Long, applied: Boolean, by: ChurchMember?) {
+        val s = dao.share(shareId) ?: return
+        if (s.doneAt != null) return
+        dao.updateShare(s.copy(doneAt = clock()))
+        log(s.eventId, by, if (applied) "Aplicou o look de ${s.fromLabel}" else "Dispensou o look de ${s.fromLabel}", byPhotographer = by == null)
+        changed()
+    }
+
     /** Which presets the media may use: [ids] null releases all of them, empty releases none. */
     suspend fun setReleasedPresets(eventId: Long, ids: Set<Long>?) {
         val e = dao.event(eventId) ?: return

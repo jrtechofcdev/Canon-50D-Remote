@@ -346,6 +346,33 @@ class ChurchServerTest {
     }
 
     @Test
+    fun adminsShareLooksWithEachOtherAndThePhotographer() {
+        val e = event()
+        val ana = join(e)
+        val bia = join(e, name = "Bia")
+        val caio = join(e, name = "Caio")
+        val (anaId, biaId) = runBlocking { db.churchDao().memberByToken(ana)!!.id to db.churchDao().memberByToken(bia)!!.id }
+        runBlocking { repo.setRank(anaId, ChurchRank.ADMIN); repo.setRank(biaId, ChurchRank.MAIN) }
+        // A viewer can't share; nor can one send to a viewer.
+        assertEquals(403, call("/api/c/share?m=$caio&preset=1&to=fotografo", "POST").status)
+        val caioId = runBlocking { db.churchDao().memberByToken(caio)!!.id }
+        assertEquals(400, call("/api/c/share?m=$ana&preset=1&to=$caioId", "POST").status)
+        assertEquals(200, call("/api/c/share?m=$ana&preset=1&to=$biaId", "POST").status)
+        assertEquals(200, call("/api/c/share?m=$ana&preset=2&to=fotografo", "POST").status)
+        // Ana sees Bia among the admins; Bia sees the look waiting.
+        assertTrue(call("/api/c/state?m=$ana").text.contains("\"admins\":[{\"id\":$biaId,\"label\":\"Bia · Mídia\"}]"))
+        val state = call("/api/c/state?m=$bia").text
+        val shareId = Regex("\"shares\":\\[\\{\"id\":(\\d+),\"from\":\"Ana · Mídia\",\"name\":\"Quente\"").find(state)!!.groupValues[1]
+        // The main admin applying it: it becomes the event's look.
+        assertEquals(404, call("/api/c/share/accept?m=$ana&id=$shareId", "POST").status)
+        assertEquals(200, call("/api/c/share/accept?m=$bia&id=$shareId", "POST").status)
+        assertEquals(1L, runBlocking { db.churchDao().openEvent()!!.presetId })
+        assertTrue(call("/api/c/state?m=$bia").text.contains("\"shares\":[]"))
+        val toPhotographer = runBlocking { db.churchDao().observeSharesToPhotographer(e.id).first() }
+        assertEquals(listOf(2L), toPhotographer.map { it.presetId })
+    }
+
+    @Test
     fun aRawIsMissingUntilTheCameraSendsIt() {
         val e = event()
         val p = photo(1, withRaw = false)

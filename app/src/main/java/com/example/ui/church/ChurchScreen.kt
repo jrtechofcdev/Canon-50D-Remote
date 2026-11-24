@@ -150,6 +150,7 @@ fun ChurchScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit) 
                         },
                         second = { AccessCard(app, e, status) },
                     )
+                    ReceivedLooksCard(app, e)
                     EventPhotosCard(app, e)
                     DefaultPermsCard(app, e)
                     PeopleCard(app, e)

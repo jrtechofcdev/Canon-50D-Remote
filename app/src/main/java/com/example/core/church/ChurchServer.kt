@@ -221,6 +221,9 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
             seg == listOf("api", "c", "mylook") && r.method == "POST" -> ownLook(r, out)
             seg == listOf("api", "c", "independent") && r.method == "POST" -> independent(r, out)
             seg == listOf("api", "c", "revert") && r.method == "POST" -> revert(r, out)
+            seg == listOf("api", "c", "share") && r.method == "POST" -> share(r, out)
+            seg == listOf("api", "c", "share", "accept") && r.method == "POST" -> closeShare(r, out, apply = true)
+            seg == listOf("api", "c", "share", "dismiss") && r.method == "POST" -> closeShare(r, out, apply = false)
             seg == listOf("api", "c", "params") -> params(r, out)
             seg.size == 3 && seg[0] == "b" -> base(seg[1], seg[2], r, out, head)
             seg == listOf("evento-logo") -> logo(out, head)
@@ -309,6 +312,20 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
             val ownName = m.lookPresetId?.let { p -> backend.presets().firstOrNull { it.id == p }?.name } ?: m.lookAdjust?.let { "ajuste próprio" }
             append(""","independent":${m.independent},"own":${ownName?.let { """{"preset":${m.lookPresetId ?: "null"},"name":${q(it)}}""" } ?: "null"}""")
             append(""","canRevert":${m.prevPresetId != null || m.prevAdjust != null}}""")
+            // Admins: who else they can send a look to, and the looks sent to them still waiting.
+            if (m.rank >= ChurchRank.ADMIN) {
+                val presets = backend.presets()
+                val admins = repo.dao.members(e.id).filter { it.id != m.id && it.rank >= ChurchRank.ADMIN && it.isActive }
+                append(""","admins":[""")
+                admins.forEachIndexed { i, a -> if (i > 0) append(','); append("""{"id":${a.id},"label":${q(a.label)}}""") }
+                append("""],"shares":[""")
+                repo.dao.sharesTo(e.id, m.id).forEachIndexed { i, s ->
+                    if (i > 0) append(',')
+                    val name = s.presetId?.let { p -> presets.firstOrNull { it.id == p }?.name } ?: "ajuste próprio"
+                    append("""{"id":${s.id},"from":${q(s.fromLabel)},"name":${q(name)},"preset":${s.presetId ?: "null"}}""")
+                }
+                append("]")
+            }
             append(""","photos":[""")
             photos.forEachIndexed { i, p ->
                 if (i > 0) append(',')
@@ -385,6 +402,39 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
     private suspend fun revert(r: Request, out: OutputStream) {
         val (m, _) = admin(r, out) ?: return
         if (!repo.revertOwnLook(m.id)) return json(out, 409, """{"error":"Não há um look anterior."}""")
+        json(out, 200, """{"ok":true}""")
+    }
+
+    /** An admin (or the main admin) sends a released preset to another admin or to the photographer. */
+    private suspend fun share(r: Request, out: OutputStream) {
+        val (m, e) = who(r, out, r.query["m"]) ?: return
+        if (m.rank < ChurchRank.ADMIN) return json(out, 403, """{"error":"Só ADM compartilha looks."}""")
+        val id = r.query["preset"]?.toLongOrNull() ?: return json(out, 400, """{"error":"Preset?"}""")
+        if (!presetAllowed(m, e, id)) return json(out, 403, """{"error":"Este preset não está liberado."}""")
+        val to = when (val t = r.query["to"]) {
+            "fotografo" -> null
+            else -> t?.toLongOrNull()?.let { repo.dao.member(it) }
+                ?.takeIf { it.eventId == e.id && it.id != m.id && it.rank >= ChurchRank.ADMIN && it.isActive }
+                ?: return json(out, 400, """{"error":"Escolha um ADM ou o fotógrafo."}""")
+        }
+        val name = backend.presets().firstOrNull { it.id == id }?.name ?: return json(out, 404, """{"error":"Preset não encontrado"}""")
+        repo.shareLook(m, to?.id, id, null, name)
+        json(out, 200, """{"ok":true}""")
+    }
+
+    /** Apply (it becomes the admin's own look, or the event's for the main admin) or dismiss a look received. */
+    private suspend fun closeShare(r: Request, out: OutputStream, apply: Boolean) {
+        val (m, e) = who(r, out, r.query["m"]) ?: return
+        val s = r.query["id"]?.toLongOrNull()?.let { repo.dao.share(it) }
+            ?.takeIf { it.toMemberId == m.id && it.doneAt == null } ?: return json(out, 404, """{"error":"Look não encontrado"}""")
+        if (apply) {
+            val name = s.presetId?.let { p -> backend.presets().firstOrNull { it.id == p }?.name } ?: "ajuste de ${s.fromLabel}"
+            if (m.rank == ChurchRank.MAIN) {
+                repo.setEventLook(e.id, s.presetId, s.adjust, m, name)
+                backend.onEventLook()
+            } else repo.setOwnLook(m.id, s.presetId, s.adjust, name)
+        }
+        repo.closeShare(s.id, apply, m)
         json(out, 200, """{"ok":true}""")
     }
 
