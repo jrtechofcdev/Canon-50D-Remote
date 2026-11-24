@@ -46,9 +46,6 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.sqrt
 
-/** A look picked for one "pronta": a preset, or the full settings ([adjust]) as the editor saves them. */
-data class ReadyLook(val presetId: Long?, val adjust: String?)
-
 /**
  * The church delivery on the phone: brings the network up, runs [ChurchServer], takes each new photo into
  * the open event and gets the files ready (original and RAW as they are, the "pronta" with the event's look).
@@ -197,14 +194,14 @@ class ChurchDelivery(
         ChurchPhotoInfo(it.id, it.savedBase, hasJpg = it.jpgUri != null || it.previewPath != null, hasRaw = it.rawUri != null)
     }
 
-    override suspend fun file(id: Long, kind: ChurchFile): ServedFile? {
+    override suspend fun file(id: Long, kind: ChurchFile, look: ReadyLook?): ServedFile? {
         val p = photos.get(id) ?: return null
         return when (kind) {
             // The camera's own JPG, untouched. A RAW-only frame offers the JPEG the camera embedded in it.
             ChurchFile.ORIGINAL -> p.jpgUri?.let { uri(it, "${p.savedBase}.JPG", p.jpgSize) }
                 ?: p.previewPath?.let { fileServed(File(it), "${p.savedBase}.JPG") }
             ChurchFile.RAW -> p.rawUri?.let { uri(it, "${p.savedBase}.${p.rawCameraName?.substringAfterLast('.', "CR2") ?: "CR2"}", p.rawSize) }
-            ChurchFile.READY -> readyFile(id)?.let { fileServed(it, "${p.savedBase}_pronta.jpg") }
+            ChurchFile.READY -> readyFile(id, look)?.let { fileServed(it, "${p.savedBase}_pronta.jpg") }
         }
     }
 
@@ -213,9 +210,9 @@ class ChurchDelivery(
         return if (marked) markedCopy(clean, THUMB_EDGE, "mt${member.id}_$id.jpg", member)?.let { fileServed(it, "t.jpg") } else fileServed(clean, "t.jpg")
     }
 
-    override suspend fun preview(id: Long, member: ChurchMember, marked: Boolean, ready: Boolean, presetId: Long?): ServedFile? {
+    override suspend fun preview(id: Long, member: ChurchMember, marked: Boolean, ready: Boolean, look: ReadyLook?): ServedFile? {
         // The "pronta" to look at before downloading; while it can't be made, the photo as it is.
-        val clean = (if (ready) readyView(id, member.eventId, presetId?.let { ReadyLook(it, null) }) else null) ?: small(id, PREVIEW_EDGE, "view", member.eventId) ?: return null
+        val clean = (if (ready) readyView(id, member.eventId, look) else null) ?: small(id, PREVIEW_EDGE, "view", member.eventId) ?: return null
         return if (marked) markedCopy(clean, PREVIEW_EDGE, "m${member.id}_${clean.nameWithoutExtension}.jpg", member)?.let { fileServed(it, "p.jpg") } else fileServed(clean, "p.jpg")
     }
 

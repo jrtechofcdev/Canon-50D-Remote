@@ -34,6 +34,7 @@ class ChurchServerTest {
     private val thumbMarks = mutableListOf<Boolean>()
     private val readies = mutableListOf<Boolean>()
     private val previewPresets = mutableListOf<Long?>()
+    private val fileLooks = mutableListOf<ReadyLook?>()
 
     @Before
     fun setUp() {
@@ -44,7 +45,8 @@ class ChurchServerTest {
             override val repo = this@ChurchServerTest.repo
             override fun asset(name: String) = if (name == "index.html") "<html>igreja</html>".byteInputStream() else null
             override suspend fun photo(id: Long) = db.photoDao().get(id)?.let { ChurchPhotoInfo(it.id, it.savedBase, true, it.rawUri != null) }
-            override suspend fun file(id: Long, kind: ChurchFile): ServedFile? {
+            override suspend fun file(id: Long, kind: ChurchFile, look: ReadyLook?): ServedFile? {
+                fileLooks += look
                 val p = db.photoDao().get(id) ?: return null
                 return when (kind) {
                     ChurchFile.RAW -> p.rawUri?.let { ServedFile("${p.savedBase}.CR2", raw.size.toLong()) { raw.inputStream() } }
@@ -57,8 +59,8 @@ class ChurchServerTest {
             }
             override suspend fun params(presetId: Long) = if (presetId == 3L) null else com.example.core.render.RenderParamsJson.encode(com.example.core.render.RenderParams.IDENTITY)
             override suspend fun base(id: Long, member: ChurchMember, marked: Boolean) = ServedFile("b.jpg", 4) { "base".byteInputStream() }
-            override suspend fun preview(id: Long, member: ChurchMember, marked: Boolean, ready: Boolean, presetId: Long?): ServedFile {
-                previewPresets += presetId
+            override suspend fun preview(id: Long, member: ChurchMember, marked: Boolean, ready: Boolean, look: ReadyLook?): ServedFile {
+                previewPresets += look?.presetId
                 marks += marked
                 readies += ready
                 return ServedFile("p.jpg", 3) { "pre".byteInputStream() }
@@ -278,6 +280,25 @@ class ChurchServerTest {
         assertEquals(200, call("/p/$m/$p?preset=1").status)
         assertEquals(403, call("/p/$m/$p?preset=2").status)
         assertEquals(listOf<Long?>(1L), previewPresets)
+    }
+
+    @Test
+    fun theProntaGoesWithThePickedPresetWhenReleasedAndTheLogSaysWhich() {
+        val e = event()
+        val p = photo(1)
+        runBlocking { repo.addPhoto(e.id, p) }
+        val m = join(e)
+        val id = runBlocking { db.churchDao().memberByToken(m)!!.id }
+        // Without the Presets switch a picked preset is refused, not quietly ignored.
+        assertEquals(403, call("/f/$m/$p?v=pronta&preset=1&dl=1").status)
+        runBlocking { repo.setPerm(id, ChurchPerm.PRESETS, true); repo.setReleasedPresets(e.id, setOf(1)) }
+        assertEquals(200, call("/f/$m/$p?v=pronta&preset=1&dl=1").status)
+        assertEquals(403, call("/f/$m/$p?v=pronta&preset=2&dl=1").status)
+        assertEquals(200, call("/f/$m/$p?v=pronta&dl=1").status)
+        // The original never takes a look.
+        assertEquals(200, call("/f/$m/$p?v=original&preset=1&dl=1").status)
+        assertEquals(listOf(ReadyLook(1, null), null, null), fileLooks)
+        assertTrue(eventually { runBlocking { db.churchDao().fullLog(e.id) }.any { it.detail == "IMG_1.JPG (pronta, Quente)" } })
     }
 
     @Test

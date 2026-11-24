@@ -253,7 +253,11 @@
     paintSaveNew(); paintGrid([]);
   });
 
-  function fileUrl(p, kind) { return "/f/" + member + "/" + p.id + "?v=" + kind + "&dl=1"; }
+  function fileUrl(p, kind) {
+    // The "pronta" goes with the preset picked under the big picture, when there is one.
+    var preset = kind === "pronta" && viewerApi ? viewerApi.chosenPreset() : null;
+    return "/f/" + member + "/" + p.id + "?v=" + kind + "&dl=1" + (preset !== null ? "&preset=" + preset : "");
+  }
 
   function paintGrid(fresh) {
     var grid = $("grid"), keep = {}, v = chosen(), done = v ? downloaded(v.key) : {};

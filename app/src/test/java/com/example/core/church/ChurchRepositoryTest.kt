@@ -136,6 +136,22 @@ class ChurchRepositoryTest {
     }
 
     @Test
+    fun eachPersonsProntaFollowsThePickThenTheirOwnLookThenTheEvent() = runBlocking {
+        val e = repo.newEvent("Culto", null).copy(presets = "1,2")
+        val viewer = (join(e) as JoinResult.Ok).member
+        val withPresets = viewer.copy(perms = ChurchPerm.with(viewer.perms, ChurchPerm.PRESETS, true))
+        assertNull(ChurchRules.lookFor(e, viewer, 1))
+        assertEquals(ReadyLook(1, null), ChurchRules.lookFor(e, withPresets, 1))
+        assertNull(ChurchRules.lookFor(e, withPresets, 9))
+        val admin = withPresets.copy(rank = ChurchRank.ADMIN, lookPresetId = 2)
+        // Not independent: the event's look.
+        assertNull(ChurchRules.lookFor(e, admin, null))
+        assertEquals(ReadyLook(2, null), ChurchRules.lookFor(e, admin.copy(independent = true), null))
+        // A pick on the page wins for that download.
+        assertEquals(ReadyLook(1, null), ChurchRules.lookFor(e, admin.copy(independent = true), 1))
+    }
+
+    @Test
     fun aWrongCodeIsRefusedAndTriesAreLimited() = runBlocking {
         val e = repo.newEvent("Cruzada", null)
         repeat(5) { assertTrue(join(e, code = "0000".takeIf { it != e.code } ?: "1111") is JoinResult.Denied) }

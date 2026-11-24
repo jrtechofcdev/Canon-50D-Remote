@@ -34,14 +34,15 @@ interface ChurchBackend {
     val repo: ChurchRepository
     fun asset(name: String): InputStream?
     suspend fun photo(id: Long): ChurchPhotoInfo?
-    suspend fun file(id: Long, kind: ChurchFile): ServedFile?
+    /** [look]: the person's look for the "pronta" (null = the event's). */
+    suspend fun file(id: Long, kind: ChurchFile, look: ReadyLook? = null): ServedFile?
     /** The grid picture; [marked] = with the person's name, for who cannot download anything. */
     suspend fun thumb(id: Long, member: ChurchMember, marked: Boolean): ServedFile?
     /**
      * The big picture; [marked] carries the person's name, [ready] = the "pronta" instead of the photo as it
-     * is, and [presetId] makes that "pronta" with a released preset the person picked.
+     * is, and [look] is the person's look for it (null = the event's).
      */
-    suspend fun preview(id: Long, member: ChurchMember, marked: Boolean, ready: Boolean = false, presetId: Long? = null): ServedFile?
+    suspend fun preview(id: Long, member: ChurchMember, marked: Boolean, ready: Boolean = false, look: ReadyLook? = null): ServedFile?
     suspend fun logo(event: ChurchEvent): ServedFile?
     /** The photographer's presets, in the app's order (favourites and recent first). */
     suspend fun presets(): List<ChurchPresetInfo> = emptyList()
@@ -375,7 +376,7 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
         val ready = r.query["v"] == ChurchFile.READY.key
         val preset = r.query["preset"]?.toLongOrNull()
         if (preset != null && !presetAllowed(m, e, preset)) return text(out, 403, "Este preset não está liberado para você.")
-        val f = backend.preview(photoId, m, marked(m), ready || preset != null, preset) ?: return text(out, 404, "Foto indisponível")
+        val f = backend.preview(photoId, m, marked(m), ready || preset != null, ChurchRules.lookFor(e, m, preset)) ?: return text(out, 404, "Foto indisponível")
         serve(out, f, null, head, download = false, private = true) {}
         // Opening the big picture is "seeing" it: one line per person and photo, however often they come back.
         if (!head && viewed.add(m.id to photoId)) {
@@ -393,10 +394,15 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
             repo.log(e.id, m, "Tentou baixar sem permissão", "foto $photoId (${kind.label})", r.ip)
             return text(out, 403, "Você não tem permissão para baixar esta versão.")
         }
-        val f = backend.file(photoId, kind) ?: return text(out, 404, "Este arquivo ainda não chegou da câmera.")
+        val preset = r.query["preset"]?.toLongOrNull()?.takeIf { kind == ChurchFile.READY }
+        if (preset != null && !presetAllowed(m, e, preset)) return text(out, 403, "Este preset não está liberado para você.")
+        val look = if (kind == ChurchFile.READY) ChurchRules.lookFor(e, m, preset) else null
+        val f = backend.file(photoId, kind, look) ?: return text(out, 404, "Este arquivo ainda não chegou da câmera.")
         val range = r.headers["range"]
+        // The log says which look the "pronta" went with, when it was not the event's.
+        val lookName = look?.presetId?.let { id -> backend.presets().firstOrNull { it.id == id }?.name } ?: look?.let { "look próprio" }
         serve(out, f, range, head, download = r.query["dl"] == "1", private = true) {
-            runBlocking { repo.log(e.id, m, "Baixou", "${f.name} (${kind.label})", r.ip) }
+            runBlocking { repo.log(e.id, m, "Baixou", "${f.name} (${kind.label}${lookName?.let { ", $it" } ?: ""})", r.ip) }
         }
     }
 

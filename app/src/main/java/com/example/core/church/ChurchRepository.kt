@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 /** How someone reached the page: the link, the QR code or the plain address (no event token). */
+/** A look picked for one "pronta": a preset, or the full settings ([adjust]) as the editor saves them. */
+data class ReadyLook(val presetId: Long?, val adjust: String?)
+
 object ChurchVia {
     const val LINK = "link"
     const val QR = "qr"
@@ -53,6 +56,21 @@ object ChurchRules {
         val base = eventPhotos.sortedByDescending { it.addedAt }.filter { !it.hidden && it.photoId !in hidden }.map { it.photoId }
         val extras = rules.filter { it.rule == PhotoRule.EXTRA && it.photoId !in base }.map { it.photoId }
         return extras + base
+    }
+
+    /**
+     * The look of one person's "pronta" (null = the event's): the preset they picked on the page when they
+     * may and it is released; else their own look when they are an independent admin; else the event's.
+     */
+    fun lookFor(event: ChurchEvent, member: ChurchMember, picked: Long?): ReadyLook? {
+        if (picked != null && ChurchPerm.has(member.perms, ChurchPerm.PRESETS)) {
+            val released = released(event)
+            if (released == null || picked in released) return ReadyLook(picked, null)
+        }
+        if (member.rank == ChurchRank.ADMIN && member.independent && (member.lookPresetId != null || member.lookAdjust != null)) {
+            return ReadyLook(member.lookPresetId, member.lookAdjust)
+        }
+        return null
     }
 
     /** The presets released to the media (null = all of them). */
