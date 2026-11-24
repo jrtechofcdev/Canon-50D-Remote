@@ -164,6 +164,26 @@ class ChurchRepository(
         changed()
     }
 
+    /** What someone who comes in from now on may do; the people already inside keep theirs. */
+    suspend fun setDefaultPerm(eventId: Long, flag: Int, on: Boolean) {
+        val e = dao.event(eventId) ?: return
+        dao.updateEvent(e.copy(defaultPerms = ChurchPerm.with(e.defaultPerms, flag, on)))
+        log(eventId, null, "Quem entrar: ${permName(flag)} ${onOff(on)}")
+        changed()
+    }
+
+    /** Gives everyone already inside what a newcomer gets. Blocked people stay as they are. Returns how many changed. */
+    suspend fun applyDefaultToAll(eventId: Long): Int {
+        val e = dao.event(eventId) ?: return 0
+        val changedOnes = dao.members(eventId).filter { it.status != MemberStatus.BLOCKED && it.perms != e.defaultPerms }
+        changedOnes.forEach { dao.updateMember(it.copy(perms = e.defaultPerms)) }
+        if (changedOnes.isNotEmpty()) {
+            log(eventId, null, "Permissões de quem entra aplicadas a todos", "${changedOnes.size} pessoa(s)")
+            changed()
+        }
+        return changedOnes.size
+    }
+
     // Photographer: people.
 
     suspend fun setPerm(memberId: Long, flag: Int, on: Boolean) {

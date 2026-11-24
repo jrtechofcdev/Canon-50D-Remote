@@ -174,6 +174,46 @@ private fun PickPhotosSheet(title: String, subtitle: String, photos: List<Photo>
 
 // ---- people ---------------------------------------------------------------------------------
 
+/** The four permissions, in the order the media page shows them. */
+internal val PERMS = listOf(
+    ChurchPerm.VIEW to "Ver",
+    ChurchPerm.DOWNLOAD_ORIGINAL to "Original",
+    ChurchPerm.DOWNLOAD_READY to "Pronta",
+    ChurchPerm.DOWNLOAD_RAW to "RAW",
+)
+
+/** What a newcomer may do. Changing it doesn't touch who is already inside, until "Aplicar a todos". */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun DefaultPermsCard(app: TetherApp, e: ChurchEvent) {
+    val scope = rememberCoroutineScope()
+    val members by app.church.repo.dao.observeMembers(e.id).collectAsState(initial = emptyList())
+    val different = members.count { it.status != MemberStatus.BLOCKED && it.perms != e.defaultPerms }
+    DeliveryCard {
+        Text("Quem entrar pode", style = MaterialTheme.typography.titleMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalArrangement = Arrangement.spacedBy(Space.s)) {
+            PERMS.forEach { (flag, label) ->
+                val on = ChurchPerm.has(e.defaultPerms, flag)
+                JrChip(label, on, onClick = { scope.launch { app.church.repo.setDefaultPerm(e.id, flag, !on) } })
+            }
+        }
+        Text(
+            when {
+                !ChurchPerm.has(e.defaultPerms, ChurchPerm.VIEW) -> "Quem entrar fica esperando você liberar, sem ver as fotos."
+                e.defaultPerms and ChurchPerm.DOWNLOAD_ANY == 0 -> "Quem entrar só vê, com o nome na foto. Libere o download pessoa por pessoa em Pessoas."
+                else -> "Vale para quem entrar daqui para frente. Quem já entrou continua como está."
+            },
+            style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted,
+        )
+        if (different > 0) JrButton(
+            "Aplicar a quem já entrou ($different)",
+            kind = JrButtonKind.Secondary,
+            onClick = { scope.launch { val n = app.church.repo.applyDefaultToAll(e.id); app.notice("$n ${if (n == 1) "pessoa atualizada" else "pessoas atualizadas"}") } },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
 /** Who came in, with what each one may do. The role they typed gives no power: these switches do. */
 @Composable
 internal fun PeopleCard(app: TetherApp, e: ChurchEvent) {
@@ -227,12 +267,7 @@ private fun MemberRow(app: TetherApp, m: ChurchMember, now: Long, onPhotos: () -
             }
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalArrangement = Arrangement.spacedBy(Space.s)) {
-            listOf(
-                ChurchPerm.VIEW to "Ver",
-                ChurchPerm.DOWNLOAD_ORIGINAL to "Original",
-                ChurchPerm.DOWNLOAD_READY to "Pronta",
-                ChurchPerm.DOWNLOAD_RAW to "RAW",
-            ).forEach { (flag, label) ->
+            PERMS.forEach { (flag, label) ->
                 val on = ChurchPerm.has(m.perms, flag)
                 JrChip(label, on, onClick = { scope.launch { repo.setPerm(m.id, flag, !on) } }, enabled = m.status != MemberStatus.BLOCKED)
             }

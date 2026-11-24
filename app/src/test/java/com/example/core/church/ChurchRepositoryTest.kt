@@ -55,6 +55,25 @@ class ChurchRepositoryTest {
     }
 
     @Test
+    fun theDefaultDecidesWhatNewcomersMayDoAndCanBeAppliedToAll() = runBlocking {
+        val e = repo.newEvent("Culto", null)
+        val early = (join(e) as JoinResult.Ok).member
+        val blocked = (join(e, name = "Caio", ip = "10.0.0.3") as JoinResult.Ok).member
+        repo.block(blocked.id)
+        // From now on, newcomers only see.
+        listOf(ChurchPerm.DOWNLOAD_ORIGINAL, ChurchPerm.DOWNLOAD_READY, ChurchPerm.DOWNLOAD_RAW).forEach { repo.setDefaultPerm(e.id, it, false) }
+        val late = (join(e, name = "Bia", ip = "10.0.0.4") as JoinResult.Ok).member
+        assertEquals(ChurchPerm.VIEW, late.perms)
+        // Those already inside keep theirs until the photographer applies the default to all.
+        assertEquals(ChurchPerm.DEFAULT, db.churchDao().member(early.id)!!.perms)
+        assertEquals(1, repo.applyDefaultToAll(e.id))
+        assertEquals(ChurchPerm.VIEW, db.churchDao().member(early.id)!!.perms)
+        assertEquals(ChurchPerm.DEFAULT, db.churchDao().member(blocked.id)!!.perms)
+        val log = db.churchDao().fullLog(e.id).map { it.action }
+        assertTrue(log.toString(), "Quem entrar: baixar RAW desligado" in log && "Permissões de quem entra aplicadas a todos" in log)
+    }
+
+    @Test
     fun aWrongCodeIsRefusedAndTriesAreLimited() = runBlocking {
         val e = repo.newEvent("Cruzada", null)
         repeat(5) { assertTrue(join(e, code = "0000".takeIf { it != e.code } ?: "1111") is JoinResult.Denied) }
