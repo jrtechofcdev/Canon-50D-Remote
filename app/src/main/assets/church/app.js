@@ -184,6 +184,9 @@
     $("title").textContent = d.event.name;
     $("who").innerHTML = '<i class="mark on" aria-hidden="true"></i><span></span>';
     $("who").lastChild.textContent = me.name + " · " + me.role;
+    var badge = $("rank");
+    badge.hidden = !me.rank;
+    badge.textContent = me.rankLabel || "";
     $("foot").innerHTML = 'Fotos de <span class="brandname">Jr_Tech_OFC</span>, entregues pelo JR C50D Sync';
 
     var protectedView = allowed().length === 0;

@@ -1,5 +1,6 @@
 package com.example.core.church
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Index
@@ -62,6 +63,11 @@ data class ChurchEvent(
     val closedAt: Long? = null,
     /** When the event closes by itself (null: only when the photographer closes it). */
     val autoCloseAt: Long? = null,
+    /** Presets the media may preview and download with, as "3,7,12"; null = all of them. */
+    val presets: String? = null,
+    /** Who last changed the event's look ("Ana · Mídia" or "Fotógrafo") and when, for the notice on the page. */
+    val lookBy: String? = null,
+    val lookAt: Long? = null,
 ) {
     val isOpen get() = closedAt == null
 }
@@ -87,6 +93,15 @@ data class ChurchMember(
     val ip: String? = null,
     val joinedAt: Long,
     val lastSeenAt: Long = 0,
+    /** [ChurchRank]: given by the photographer; the role typed at the door gives nothing. */
+    @ColumnInfo(defaultValue = "0") val rank: Int = ChurchRank.VIEWER,
+    /** An admin's own look (preset and/or full settings), and the one before it for "Reverter". */
+    val lookPresetId: Long? = null,
+    val lookAdjust: String? = null,
+    val prevPresetId: Long? = null,
+    val prevAdjust: String? = null,
+    /** An independent admin keeps their own look when the main admin changes the event's. */
+    @ColumnInfo(defaultValue = "0") val independent: Boolean = false,
 ) {
     /** "Ana · Mídia", how the person appears in the panel and the log. */
     val label get() = if (role.isBlank()) name else "$name · $role"
@@ -101,6 +116,19 @@ object MemberStatus {
     const val KICKED = "kicked"
 }
 
+/** Who leads the looks: the main admin sets the event's, admins may keep their own, viewers follow. */
+object ChurchRank {
+    const val VIEWER = 0
+    const val ADMIN = 1
+    const val MAIN = 2
+
+    fun label(rank: Int) = when (rank) {
+        MAIN -> "ADM principal"
+        ADMIN -> "ADM"
+        else -> "Só ver"
+    }
+}
+
 /** What one person may do, as bit flags. */
 object ChurchPerm {
     const val VIEW = 1
@@ -108,6 +136,10 @@ object ChurchPerm {
     const val DOWNLOAD_READY = 4
     const val DOWNLOAD_RAW = 8
     const val DOWNLOAD_ANY = DOWNLOAD_ORIGINAL or DOWNLOAD_READY or DOWNLOAD_RAW
+    /** Browse the released presets on the page, preview them live and download the "pronta" with one. */
+    const val PRESETS = 16
+    /** See the preset shop and install a preset into the photographer's app. */
+    const val STORE = 32
     const val DEFAULT = VIEW or DOWNLOAD_ANY
 
     fun has(perms: Int, flag: Int) = perms and flag == flag
@@ -147,6 +179,32 @@ data class ChurchAudit(
     val detail: String? = null,
     val ip: String? = null,
     val at: Long,
+)
+
+/** The event's look over time: each change by the main admin or the photographer, to go back to one. */
+@Entity(tableName = "church_looks", indices = [Index(value = ["eventId"])])
+data class ChurchLook(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val eventId: Long,
+    val presetId: Long? = null,
+    val adjust: String? = null,
+    val byWho: String,
+    val at: Long,
+)
+
+/** A look one admin sends to another admin, or to the photographer ([toMemberId] null). */
+@Entity(tableName = "church_shares", indices = [Index(value = ["eventId"])])
+data class ChurchShare(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val eventId: Long,
+    val fromMemberId: Long? = null,
+    val fromLabel: String,
+    val toMemberId: Long? = null,
+    val presetId: Long? = null,
+    val adjust: String? = null,
+    val at: Long,
+    /** Applied or dismissed by who got it. */
+    val doneAt: Long? = null,
 )
 
 object ChurchTheme {
@@ -277,4 +335,32 @@ interface ChurchDao {
 
     @Query("DELETE FROM church_audit WHERE eventId = :eventId")
     suspend fun deleteLogOf(eventId: Long)
+
+    // Looks: the event's history and the looks admins share.
+    @Insert
+    suspend fun insertLook(l: ChurchLook): Long
+
+    @Query("SELECT * FROM church_looks WHERE eventId = :eventId ORDER BY at DESC, id DESC")
+    fun observeLooks(eventId: Long): Flow<List<ChurchLook>>
+
+    @Query("DELETE FROM church_looks WHERE eventId = :eventId")
+    suspend fun deleteLooksOf(eventId: Long)
+
+    @Insert
+    suspend fun insertShare(s: ChurchShare): Long
+
+    @Update
+    suspend fun updateShare(s: ChurchShare)
+
+    @Query("SELECT * FROM church_shares WHERE id = :id")
+    suspend fun share(id: Long): ChurchShare?
+
+    @Query("SELECT * FROM church_shares WHERE eventId = :eventId AND toMemberId = :memberId AND doneAt IS NULL ORDER BY at DESC")
+    suspend fun sharesTo(eventId: Long, memberId: Long): List<ChurchShare>
+
+    @Query("SELECT * FROM church_shares WHERE eventId = :eventId AND toMemberId IS NULL ORDER BY at DESC")
+    fun observeSharesToPhotographer(eventId: Long): Flow<List<ChurchShare>>
+
+    @Query("DELETE FROM church_shares WHERE eventId = :eventId")
+    suspend fun deleteSharesOf(eventId: Long)
 }

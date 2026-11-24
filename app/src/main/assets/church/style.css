@@ -69,6 +69,8 @@
 .eyebrow { margin: 0; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; color: var(--cyan); font-weight: 500; }
 .hello h1 { margin: var(--s1) 0 0; font-size: clamp(30px, 8.6vw, 48px); line-height: 1.06; font-weight: 600; letter-spacing: -.015em; overflow-wrap: anywhere; }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s3); margin: var(--s3) 0 0; font-size: 15px; }
+/* The rank the photographer gave (ADM, ADM principal): the person's colour, so it reads as theirs. */
+.rank { display: inline-flex; align-items: center; padding: 2px var(--s3); border-radius: var(--r-sm); background: var(--mint); color: var(--on-mint); font-size: 13px; font-weight: 600; letter-spacing: .02em; }
 .who { display: inline-flex; align-items: center; gap: var(--s2); padding: 2px var(--s3); border-radius: var(--r-sm); background: var(--surface); font-weight: 500; }
 
 /* The version picker and the one action of the page: download what arrived since the last time. */

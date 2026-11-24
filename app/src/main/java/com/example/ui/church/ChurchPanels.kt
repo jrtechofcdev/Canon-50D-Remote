@@ -66,6 +66,7 @@ import com.example.core.church.ChurchAudit
 import com.example.core.church.ChurchEvent
 import com.example.core.church.ChurchMember
 import com.example.core.church.ChurchPerm
+import com.example.core.church.ChurchRank
 import com.example.core.church.ChurchTheme
 import com.example.core.church.MemberStatus
 import com.example.core.church.PhotoRule
@@ -286,7 +287,10 @@ private fun MemberRow(app: TetherApp, m: ChurchMember, now: Long, onPhotos: () -
             )
             Spacer(Modifier.width(Space.m))
             Column(Modifier.weight(1f)) {
-                Text(m.label, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    m.label + if (m.rank != ChurchRank.VIEWER) " · ${ChurchRank.label(m.rank)}" else "",
+                    style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
                 Text(
                     when (m.status) {
                         MemberStatus.BLOCKED -> "Bloqueado"
@@ -295,6 +299,13 @@ private fun MemberRow(app: TetherApp, m: ChurchMember, now: Long, onPhotos: () -
                     },
                     style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted,
                 )
+            }
+        }
+        // The rank leads the looks: the main admin sets the event's, admins may keep their own.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalArrangement = Arrangement.spacedBy(Space.s)) {
+            Text("Cargo", style = MaterialTheme.typography.labelLarge, color = Tone.TextMuted, modifier = Modifier.padding(top = 10.dp))
+            listOf(ChurchRank.VIEWER, ChurchRank.ADMIN, ChurchRank.MAIN).forEach { r ->
+                JrChip(ChurchRank.label(r), m.rank == r, onClick = { scope.launch { repo.setRank(m.id, r) } }, enabled = m.status != MemberStatus.BLOCKED)
             }
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalArrangement = Arrangement.spacedBy(Space.s)) {

@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.core.data.Photo
 import com.example.core.data.PhotoDatabase
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -115,6 +116,23 @@ class ChurchRepositoryTest {
         repo.open(e.id)
         assertNull(db.churchDao().event(e.id)!!.autoCloseAt)
         assertFalse(repo.closeIfDue())
+    }
+
+    @Test
+    fun thereIsOneMainAdminAndAdminsGetThePresets() = runBlocking {
+        val e = repo.newEvent("Cruzada", null)
+        val ana = (join(e) as JoinResult.Ok).member
+        val bia = (join(e, name = "Bia", ip = "10.0.0.3") as JoinResult.Ok).member
+        repo.setRank(ana.id, ChurchRank.MAIN)
+        assertTrue(ChurchPerm.has(db.churchDao().member(ana.id)!!.perms, ChurchPerm.PRESETS))
+        repo.setRank(bia.id, ChurchRank.MAIN)
+        assertEquals(ChurchRank.ADMIN, db.churchDao().member(ana.id)!!.rank)
+        assertEquals(ChurchRank.MAIN, db.churchDao().member(bia.id)!!.rank)
+        // Back to viewer: the rank goes, the photographer's switches stay.
+        repo.setRank(bia.id, ChurchRank.VIEWER)
+        assertEquals(ChurchRank.VIEWER, db.churchDao().member(bia.id)!!.rank)
+        val log = db.churchDao().fullLog(e.id).map { it.who + ": " + it.action }
+        assertTrue(log.toString(), "Fotógrafo → Bia · Mídia: Virou ADM principal" in log && "Fotógrafo → Ana · Mídia: Virou ADM" in log)
     }
 
     @Test
@@ -260,6 +278,13 @@ class ChurchRepositoryTest {
             // Version 13: the deadline column.
             r.setAutoClose(e.id, 4)
             assertNotNull(room.churchDao().event(e.id)!!.autoCloseAt)
+            // Version 14: ranks, looks history and shared looks.
+            val m = (r.join(ChurchVia.QR, e.token, e.code, "Ana", "Mídia", "10.0.0.2", null, null) as JoinResult.Ok).member
+            r.setRank(m.id, ChurchRank.MAIN)
+            assertEquals(ChurchRank.MAIN, room.churchDao().member(m.id)!!.rank)
+            room.churchDao().insertLook(ChurchLook(eventId = e.id, presetId = null, byWho = "Fotógrafo", at = 1))
+            room.churchDao().insertShare(ChurchShare(eventId = e.id, fromLabel = "Ana · Mídia", at = 1))
+            assertEquals(1, room.churchDao().observeSharesToPhotographer(e.id).first().size)
         }
         room.close()
     }

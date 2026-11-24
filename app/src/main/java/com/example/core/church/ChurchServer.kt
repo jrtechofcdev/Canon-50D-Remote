@@ -277,7 +277,8 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
             append(""","view":${ChurchPerm.has(perms, ChurchPerm.VIEW)}""")
             append(""","original":${ChurchPerm.has(perms, ChurchPerm.DOWNLOAD_ORIGINAL)}""")
             append(""","pronta":${ChurchPerm.has(perms, ChurchPerm.DOWNLOAD_READY)}""")
-            append(""","raw":${ChurchPerm.has(perms, ChurchPerm.DOWNLOAD_RAW)}}""")
+            append(""","raw":${ChurchPerm.has(perms, ChurchPerm.DOWNLOAD_RAW)}""")
+            append(""","rank":${m.rank},"rankLabel":${q(ChurchRank.label(m.rank))}}""")
             append(""","photos":[""")
             photos.forEachIndexed { i, p ->
                 if (i > 0) append(',')

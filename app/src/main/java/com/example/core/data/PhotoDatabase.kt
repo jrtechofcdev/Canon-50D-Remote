@@ -251,8 +251,9 @@ interface PresetDao {
         com.example.core.church.Congregation::class, com.example.core.church.ChurchEvent::class,
         com.example.core.church.ChurchMember::class, com.example.core.church.MemberPhotoRule::class,
         com.example.core.church.EventPhoto::class, com.example.core.church.ChurchAudit::class,
+        com.example.core.church.ChurchLook::class, com.example.core.church.ChurchShare::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = false,
 )
 abstract class PhotoDatabase : RoomDatabase() {
@@ -265,7 +266,7 @@ abstract class PhotoDatabase : RoomDatabase() {
         /** [name] is only changed by tests, which must not share the file the app itself opens. */
         fun create(context: Context, name: String = "tether50d.db"): PhotoDatabase =
             Room.databaseBuilder(context, PhotoDatabase::class.java, name)
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
                 // Version 1 only ever held simulator entries, so dropping it loses nothing real.
                 .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1)
                 .build()
@@ -355,6 +356,27 @@ abstract class PhotoDatabase : RoomDatabase() {
         val MIGRATION_12_13 = object : Migration(12, 13) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE church_events ADD COLUMN autoCloseAt INTEGER")
+            }
+        }
+
+        /** Church: admins and their looks, the presets released to the media, the look history and shared looks. */
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf(
+                    "ALTER TABLE church_members ADD COLUMN `rank` INTEGER NOT NULL DEFAULT 0",
+                    "ALTER TABLE church_members ADD COLUMN `lookPresetId` INTEGER",
+                    "ALTER TABLE church_members ADD COLUMN `lookAdjust` TEXT",
+                    "ALTER TABLE church_members ADD COLUMN `prevPresetId` INTEGER",
+                    "ALTER TABLE church_members ADD COLUMN `prevAdjust` TEXT",
+                    "ALTER TABLE church_members ADD COLUMN `independent` INTEGER NOT NULL DEFAULT 0",
+                    "ALTER TABLE church_events ADD COLUMN `presets` TEXT",
+                    "ALTER TABLE church_events ADD COLUMN `lookBy` TEXT",
+                    "ALTER TABLE church_events ADD COLUMN `lookAt` INTEGER",
+                    "CREATE TABLE IF NOT EXISTS `church_looks` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `eventId` INTEGER NOT NULL, `presetId` INTEGER, `adjust` TEXT, `byWho` TEXT NOT NULL, `at` INTEGER NOT NULL)",
+                    "CREATE INDEX IF NOT EXISTS `index_church_looks_eventId` ON `church_looks` (`eventId`)",
+                    "CREATE TABLE IF NOT EXISTS `church_shares` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `eventId` INTEGER NOT NULL, `fromMemberId` INTEGER, `fromLabel` TEXT NOT NULL, `toMemberId` INTEGER, `presetId` INTEGER, `adjust` TEXT, `at` INTEGER NOT NULL, `doneAt` INTEGER)",
+                    "CREATE INDEX IF NOT EXISTS `index_church_shares_eventId` ON `church_shares` (`eventId`)",
+                ).forEach(db::execSQL)
             }
         }
 

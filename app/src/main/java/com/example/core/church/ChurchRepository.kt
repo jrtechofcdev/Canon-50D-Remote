@@ -182,6 +182,8 @@ class ChurchRepository(
         dao.deleteMembersOf(eventId)
         dao.deletePhotosOf(eventId)
         dao.deleteLogOf(eventId)
+        dao.deleteLooksOf(eventId)
+        dao.deleteSharesOf(eventId)
         dao.deleteEvent(eventId)
         changed()
     }
@@ -230,6 +232,25 @@ class ChurchRepository(
         val m = dao.member(memberId) ?: return
         dao.updateMember(m.copy(perms = ChurchPerm.with(m.perms, flag, on)))
         log(m.eventId, m, "Permissão ${permName(flag)} ${onOff(on)}", byPhotographer = true)
+        changed()
+    }
+
+    /**
+     * Who leads the looks. There is one main admin per event: naming a new one makes the old one an admin.
+     * Admins get the presets on the page; going back to viewer keeps the photographer's other switches.
+     */
+    suspend fun setRank(memberId: Long, rank: Int) {
+        val m = dao.member(memberId) ?: return
+        if (m.rank == rank) return
+        if (rank == ChurchRank.MAIN) {
+            dao.members(m.eventId).filter { it.id != m.id && it.rank == ChurchRank.MAIN }.forEach { old ->
+                dao.updateMember(old.copy(rank = ChurchRank.ADMIN))
+                log(m.eventId, old, "Virou ADM", "outra pessoa é o ADM principal", byPhotographer = true)
+            }
+        }
+        val perms = if (rank >= ChurchRank.ADMIN) ChurchPerm.with(m.perms, ChurchPerm.PRESETS, true) else m.perms
+        dao.updateMember(m.copy(rank = rank, perms = perms, independent = m.independent && rank == ChurchRank.ADMIN))
+        log(m.eventId, m, "Virou ${ChurchRank.label(rank)}", byPhotographer = true)
         changed()
     }
 
@@ -382,6 +403,8 @@ class ChurchRepository(
         ChurchPerm.DOWNLOAD_ORIGINAL -> "baixar original"
         ChurchPerm.DOWNLOAD_READY -> "baixar pronta"
         ChurchPerm.DOWNLOAD_RAW -> "baixar RAW"
+        ChurchPerm.PRESETS -> "presets"
+        ChurchPerm.STORE -> "Loja"
         else -> "0x%X".format(flag)
     }
 

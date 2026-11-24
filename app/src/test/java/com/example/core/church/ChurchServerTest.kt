@@ -224,6 +224,16 @@ class ChurchServerTest {
     }
 
     @Test
+    fun thePageKnowsThePersonsRank() {
+        val e = event()
+        val m = join(e)
+        assertTrue(call("/api/c/state?m=$m").text.contains("\"rank\":0"))
+        runBlocking { repo.setRank(db.churchDao().memberByToken(m)!!.id, ChurchRank.ADMIN) }
+        val state = call("/api/c/state?m=$m").text
+        assertTrue(state, state.contains("\"rank\":1") && state.contains("\"rankLabel\":\"ADM\""))
+    }
+
+    @Test
     fun aRawIsMissingUntilTheCameraSendsIt() {
         val e = event()
         val p = photo(1, withRaw = false)
