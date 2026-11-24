@@ -51,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -210,6 +211,7 @@ private fun PastEvents(app: TetherApp, past: List<ChurchEvent>) {
     if (past.isEmpty()) return
     val scope = rememberCoroutineScope()
     var deleting by remember { mutableStateOf<ChurchEvent?>(null) }
+    var cleaned by remember { mutableStateOf(0) }
     DeliveryCard {
         Text("Eventos anteriores", style = MaterialTheme.typography.titleMedium)
         past.take(20).forEach { e ->
@@ -218,6 +220,9 @@ private fun PastEvents(app: TetherApp, past: List<ChurchEvent>) {
                     Text(e.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(listOf(e.congregation, day(e.date)).filter { it.isNotBlank() }.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
                 }
+                // Copies left from an event closed without cleaning: one tap frees them.
+                val size by produceState(0L, e.id, cleaned) { value = app.church.filesSize(e.id) }
+                if (size > 0) TextButton(onClick = { scope.launch { app.church.clearFiles(e.id); cleaned++ } }) { Text("Liberar ${megabytes(size)}") }
                 TextButton(onClick = { scope.launch { app.church.repo.open(e.id) } }) { Text("Reabrir") }
                 IconButton(onClick = { deleting = e }) { Icon(Icons.Outlined.Delete, contentDescription = "Apagar ${e.name}", tint = Tone.TextMuted) }
             }
@@ -228,7 +233,7 @@ private fun PastEvents(app: TetherApp, past: List<ChurchEvent>) {
             onDismissRequest = { deleting = null },
             title = { Text("Apagar ${e.name}?") },
             text = { Text("Some o evento, as pessoas e o log. As fotos continuam no app.") },
-            confirmButton = { TextButton(onClick = { scope.launch { app.church.repo.deleteEvent(e.id) }; deleting = null }) { Text("Apagar", color = Tone.Error) } },
+            confirmButton = { TextButton(onClick = { scope.launch { app.church.repo.deleteEvent(e.id); app.church.clearFiles(e.id) }; deleting = null }) { Text("Apagar", color = Tone.Error) } },
             dismissButton = { TextButton(onClick = { deleting = null }) { Text("Cancelar") } },
         )
     }
@@ -415,15 +420,29 @@ private fun utcDayAsLocal(utcDay: Long, keepTimeOf: Long): Long {
 private fun CloseEventCard(app: TetherApp, e: ChurchEvent) {
     val scope = rememberCoroutineScope()
     var asking by remember { mutableStateOf(false) }
+    var clean by remember { mutableStateOf(true) }
+    val size by produceState(0L, asking) { if (asking) value = app.church.filesSize(e.id) }
     JrButton("Encerrar evento", onClick = { asking = true }, kind = JrButtonKind.Secondary, icon = Icons.Outlined.EventBusy, modifier = Modifier.fillMaxWidth())
     if (asking) AlertDialog(
         onDismissRequest = { asking = false },
         title = { Text("Encerrar ${e.name}?") },
-        text = { Text("Ninguém entra mais e quem está na página volta para a entrada. O evento fica na lista para reabrir.") },
+        text = {
+            Column {
+                Text("Ninguém entra mais e quem está na página volta para a entrada. O evento fica na lista para reabrir.")
+                if (size > 0) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = Space.s)) {
+                    Checkbox(checked = clean, onCheckedChange = { clean = it })
+                    Text("Apagar as cópias preparadas para a mídia (${megabytes(size)}). As fotos do app não são tocadas.")
+                }
+            }
+        },
         confirmButton = {
             TextButton(onClick = {
                 asking = false
-                scope.launch { app.church.repo.close(e.id); app.church.stop() }
+                scope.launch {
+                    app.church.repo.close(e.id)
+                    app.church.stop()
+                    if (clean) app.church.clearFiles(e.id)
+                }
             }) { Text("Encerrar") }
         },
         dismissButton = { TextButton(onClick = { asking = false }) { Text("Cancelar") } },
@@ -451,6 +470,8 @@ internal fun TextDialog(title: String, label: String, initial: String, numbers: 
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )
 }
+
+internal fun megabytes(bytes: Long): String = if (bytes < 1_000_000) "menos de 1 MB" else "${bytes / 1_000_000} MB"
 
 internal fun day(ms: Long): String = SimpleDateFormat("dd/MM/yyyy", Locale.ROOT).format(Date(ms))
 internal fun clock(ms: Long): String = SimpleDateFormat("HH:mm", Locale.ROOT).format(Date(ms))

@@ -31,6 +31,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -60,7 +61,9 @@ class ChurchDelivery(
     val server = ChurchServer(this)
     private var network: DeliveryNetwork? = null
     private var mdns: MdnsResponder? = null
-    private val dir get() = File(context.cacheDir, "church").apply { mkdirs() }
+    /** Prepared files (pronta, previews, thumbnails), one folder per event so they leave with it. */
+    private val root get() = File(context.cacheDir, "church").apply { mkdirs() }
+    private fun dirOf(eventId: Long) = File(root, eventId.toString()).apply { mkdirs() }
 
     private val _status = MutableStateFlow<DeliveryStatus>(DeliveryStatus.Off)
     val status: StateFlow<DeliveryStatus> = _status.asStateFlow()
@@ -82,6 +85,7 @@ class ChurchDelivery(
         (_status.value as? DeliveryStatus.Running)?.let { return it }
         stopOthers()
         _status.value = DeliveryStatus.Starting
+        runCatching { clearLeftovers() }
         val s = settings.current()
         val ssid = DeliveryRules.ssid(s.churchSsid)
         var password = s.churchPassword
@@ -181,18 +185,18 @@ class ChurchDelivery(
     }
 
     override suspend fun thumb(id: Long, member: ChurchMember, marked: Boolean): ServedFile? {
-        val clean = small(id, THUMB_EDGE, "thumb") ?: return null
+        val clean = small(id, THUMB_EDGE, "thumb", member.eventId) ?: return null
         return if (marked) markedCopy(clean, THUMB_EDGE, "mt${member.id}_$id.jpg", member)?.let { fileServed(it, "t.jpg") } else fileServed(clean, "t.jpg")
     }
 
     override suspend fun preview(id: Long, member: ChurchMember, marked: Boolean): ServedFile? {
-        val clean = small(id, PREVIEW_EDGE, "view") ?: return null
+        val clean = small(id, PREVIEW_EDGE, "view", member.eventId) ?: return null
         return if (marked) markedCopy(clean, PREVIEW_EDGE, "m${member.id}_$id.jpg", member)?.let { fileServed(it, "p.jpg") } else fileServed(clean, "p.jpg")
     }
 
     /** A copy of [clean] with this person's name, role and the time: a screenshot of it shows who it came from. */
     private suspend fun markedCopy(clean: File, edge: Int, name: String, member: ChurchMember): File? {
-        val out = File(dir, name)
+        val out = File(dirOf(member.eventId), name)
         if (!out.exists()) withContext(Dispatchers.IO) {
             val bitmap = BitmapLoader.load(context, Uri.fromFile(clean), edge) ?: return@withContext
             val copy = bitmap.copy(Bitmap.Config.ARGB_8888, true).also { if (it !== bitmap) bitmap.recycle() }
@@ -222,7 +226,7 @@ class ChurchDelivery(
         val enhance = if (e.enhanceReady || s.enhanceOnChurch) s.enhanceLevel else photo.enhance
         val looked = photo.copy(presetId = e.presetId ?: photo.presetId, adjust = if (e.presetId != null || e.adjust != null) e.adjust else photo.adjust, enhance = enhance)
         val key = listOf(looked.presetId, looked.adjust, looked.crop, Enhance.resolve(enhance, photo.iso), looked.displayUri).hashCode().toUInt().toString(16)
-        val out = File(dir, "${e.id}_${id}_$key.jpg")
+        val out = File(dirOf(e.id), "${id}_$key.jpg")
         if (out.exists()) return@withLock out
         val started = System.currentTimeMillis()
         val made = looks.exportFile(looked, 0, tag = "igreja_$id", forceEnhance = null) ?: return@withLock null
@@ -233,8 +237,8 @@ class ChurchDelivery(
     }
 
     /** A smaller JPG of the photo as it is (grid and big view), made once. */
-    private suspend fun small(id: Long, edge: Int, kind: String): File? {
-        val out = File(dir, "${id}_$kind.jpg")
+    private suspend fun small(id: Long, edge: Int, kind: String, eventId: Long): File? {
+        val out = File(dirOf(eventId), "${id}_$kind.jpg")
         if (out.exists()) return out
         val p = photos.get(id) ?: return null
         val source = p.displayUri ?: return null
@@ -266,8 +270,22 @@ class ChurchDelivery(
         if (!temp.renameTo(target)) temp.delete()
     }
 
-    /** Clears the prepared files (after an event, or to free space). */
-    suspend fun clearFiles() = withContext(Dispatchers.IO) { dir.deleteRecursively() }
+    /** Deletes what was prepared for [eventId]; it is made again if the event opens and the media asks. */
+    suspend fun clearFiles(eventId: Long) = withContext(Dispatchers.IO) {
+        File(root, eventId.toString()).deleteRecursively()
+        AppLog.i(ChurchServer.TAG, "Arquivos preparados do evento $eventId apagados")
+    }
+
+    /** Bytes prepared for [eventId] (to show how much a cleanup frees). */
+    suspend fun filesSize(eventId: Long): Long = withContext(Dispatchers.IO) {
+        File(root, eventId.toString()).walkTopDown().filter { it.isFile }.sumOf { it.length() }
+    }
+
+    /** Files of events that no longer exist, and the loose files of 5.4 (before the folder per event). */
+    internal suspend fun clearLeftovers() = withContext(Dispatchers.IO) {
+        val events = repo.dao.observeEvents().first().map { it.id.toString() }.toSet()
+        root.listFiles()?.forEach { f -> if (f.isFile || f.name !in events) f.deleteRecursively() }
+    }
 
     companion object {
         const val THUMB_EDGE = 480
