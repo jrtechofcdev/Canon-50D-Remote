@@ -30,8 +30,18 @@ object PlateExport {
     private const val MUTED = 0xFF5C5C5C.toInt()
     private const val MINT = 0xFF00C987.toInt()
 
-    /** [express]: Fotografia Express, no code; step 3 is choosing and paying. */
-    data class Plate(val ssid: String?, val password: String?, val url: String, val photographer: String, val express: Boolean = false)
+    /**
+     * [express]: Fotografia Express, no code; step 3 is choosing and paying. [church]: the church's event
+     * (title, its colour, and the code printed when it is asked; null when entry is free).
+     */
+    data class Plate(
+        val ssid: String?, val password: String?, val url: String, val photographer: String, val express: Boolean = false,
+        val church: Church? = null,
+        /** The address printed for typing, when shorter than the one in the QR. */
+        val typed: String? = null,
+    )
+
+    data class Church(val event: String, val congregation: String, val accent: Int, val code: String?)
 
     fun render(context: Context, plate: Plate): Bitmap {
         val bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
@@ -40,9 +50,11 @@ object PlateExport {
         val bold = ResourcesCompat.getFont(context, R.font.exo2_semibold) ?: Typeface.DEFAULT_BOLD
         val regular = ResourcesCompat.getFont(context, R.font.exo2_regular) ?: Typeface.DEFAULT
         val margin = 90f
+        val church = plate.church
+        val accent = church?.accent ?: MINT
 
         // Brand stripe and logo.
-        canvas.drawRect(0f, 0f, WIDTH.toFloat(), 18f, Paint().apply { color = MINT })
+        canvas.drawRect(0f, 0f, WIDTH.toFloat(), 18f, Paint().apply { color = accent })
         runCatching { context.assets.open("watermarks/horizontal_cores.png").use { BitmapFactory.decodeStream(it) } }.getOrNull()?.let { logo ->
             val w = 560f
             val h = w * logo.height / logo.width
@@ -51,15 +63,21 @@ object PlateExport {
         }
 
         var y = 290f
-        y = text(canvas, "Suas fotos na hora", bold, 76f, INK, y, center = true) + 14f
-        y = text(canvas, "Direto do celular do fotógrafo, sem internet e sem instalar nada.", regular, 34f, MUTED, y, center = true) + 50f
+        if (church != null) {
+            if (church.congregation.isNotBlank()) y = text(canvas, church.congregation.uppercase(), bold, 30f, MUTED, y, center = true) + 6f
+            y = text(canvas, church.event, bold, 68f, INK, y, center = true) + 14f
+            y = text(canvas, "Fotos ao vivo para a equipe de mídia, direto do celular do fotógrafo.", regular, 34f, MUTED, y, center = true) + 50f
+        } else {
+            y = text(canvas, "Suas fotos na hora", bold, 76f, INK, y, center = true) + 14f
+            y = text(canvas, "Direto do celular do fotógrafo, sem internet e sem instalar nada.", regular, 34f, MUTED, y, center = true) + 50f
+        }
 
         val qr = 400
         fun step(number: String, title: String, detail: String, qrText: String?) {
             val top = y
-            val badge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = MINT }
+            val badge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accent }
             canvas.drawCircle(margin + 34f, top + 34f, 34f, badge)
-            text(canvas, number, bold, 40f, 0xFF00261A.toInt(), top + 12f, left = margin + 2f, width = 64)
+            text(canvas, number, bold, 40f, 0xFF00261A.toInt(), top + 10f, center = true, left = margin, width = 68)
             val textLeft = margin + 96f
             val textWidth = (if (qrText != null) WIDTH - margin - qr - 40f else WIDTH - margin) - textLeft
             var ty = text(canvas, title, bold, 46f, INK, top, left = textLeft, width = textWidth.toInt()) + 10f
@@ -74,18 +92,23 @@ object PlateExport {
 
         if (plate.ssid != null && plate.password != null) {
             step("1", "Entre no Wi-Fi", "Aponte a câmera do celular para o código.\nRede: ${plate.ssid}\nSenha: ${plate.password}", com.example.core.delivery.DeliveryRules.wifiQr(plate.ssid, plate.password))
-            step("2", "Abra as fotos", "Aponte a câmera para o código ou digite no navegador:\n${plate.url}", plate.url)
-            if (plate.express) step("3", "Escolha e pague", "As fotos aparecem em prévia. Depois do pagamento, o fotógrafo libera e você salva sem marca.", null)
+            step("2", "Abra as fotos", "Aponte a câmera para o código ou digite no navegador:\n${plate.typed ?: plate.url}", plate.url)
+            if (church != null) step("3", church.code?.let { "Código $it" } ?: "Seu nome e cargo", churchLast(church), null)
+            else if (plate.express) step("3", "Escolha e pague", "As fotos aparecem em prévia. Depois do pagamento, o fotógrafo libera e você salva sem marca.", null)
             else step("3", "Digite seu código", "O fotógrafo te passa um código de 4 números. Toque em Salvar foto.", null)
         } else {
-            step("1", "Abra as fotos", "Conectado no Wi-Fi do local, aponte a câmera para o código ou digite:\n${plate.url}", plate.url)
-            step("2", "Digite seu código", "O fotógrafo te passa um código de 4 números. Toque em Salvar foto.", null)
+            step("1", "Abra as fotos", "Conectado no Wi-Fi do local, aponte a câmera para o código ou digite:\n${plate.typed ?: plate.url}", plate.url)
+            if (church != null) step("2", church.code?.let { "Código $it" } ?: "Seu nome e cargo", churchLast(church), null)
+            else step("2", "Digite seu código", "O fotógrafo te passa um código de 4 números. Toque em Salvar foto.", null)
         }
 
         text(canvas, "Se o celular avisar que o Wi-Fi não tem internet, toque em Manter conectado.", regular, 30f, MUTED, HEIGHT - 190f, center = true)
         text(canvas, plate.photographer, bold, 36f, INK, HEIGHT - 110f, center = true)
         return bitmap
     }
+
+    private fun churchLast(c: Church) =
+        if (c.code != null) "Digite o código, depois seu nome e seu cargo." else "Informe seu nome e seu cargo e veja as fotos ao vivo."
 
     /** Draws wrapped text; returns the y below it. */
     private fun text(canvas: Canvas, s: String, face: Typeface, size: Float, color: Int, top: Float, center: Boolean = false, left: Float = 90f, width: Int = WIDTH - 180): Float {
@@ -105,8 +128,9 @@ object PlateExport {
     fun share(context: Context, plate: Plate) {
         val dir = File(context.cacheDir, "export").apply { mkdirs() }
         val bitmap = render(context, plate)
-        val png = File(dir, "Placa_entrega.png").apply { outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } }
-        val pdf = File(dir, "Placa_entrega_A6.pdf")
+        val base = if (plate.church != null) "Placa_igreja" else "Placa_entrega"
+        val png = File(dir, "$base.png").apply { outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+        val pdf = File(dir, "${base}_A6.pdf")
         val doc = PdfDocument()
         // A6 in points (105 × 148 mm).
         val page = doc.startPage(PdfDocument.PageInfo.Builder(298, 420, 1).create())

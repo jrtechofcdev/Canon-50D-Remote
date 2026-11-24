@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
@@ -268,6 +269,11 @@ private fun AccessCard(app: TetherApp, e: ChurchEvent, status: DeliveryStatus) {
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+            JrButton(
+                "Placa para imprimir", kind = JrButtonKind.Secondary, icon = Icons.Outlined.Print,
+                onClick = { runCatching { com.example.ui.delivery.PlateExport.share(context, churchPlate(app, e, running)) }.onFailure { app.notice("A placa não foi criada: ${it.message}") } },
+                modifier = Modifier.fillMaxWidth(),
+            )
             if (!e.linkOn && !e.qrOn) Text("Link e QR desligados: só entra quem digitar o endereço ${running.url()}", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
         } else {
             Text("Inicie a entrega para mostrar os QR codes.", style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted)
@@ -309,6 +315,17 @@ private fun AccessCard(app: TetherApp, e: ChurchEvent, status: DeliveryStatus) {
             dismissButton = { TextButton(onClick = { resetting = false }) { Text("Cancelar") } },
         )
     }
+}
+
+/** The printed plate of the event: Wi-Fi, the page (QR way in, or the address) and the code when it is asked. */
+internal fun churchPlate(app: TetherApp, e: ChurchEvent, running: DeliveryStatus.Running): com.example.ui.delivery.PlateExport.Plate {
+    val url = (if (e.qrOn) app.church.eventUrl(e, ChurchVia.QR) else null) ?: running.niceUrl ?: running.url()
+    val accent = runCatching { android.graphics.Color.parseColor(com.example.core.church.ChurchTheme.color(e.accent) ?: com.example.core.church.ChurchTheme.ACCENT) }.getOrDefault(0xFF00C987.toInt())
+    return com.example.ui.delivery.PlateExport.Plate(
+        running.ssid, running.password, url, "Fotos por Jr_Tech_OFC",
+        typed = running.niceUrl ?: running.url(),
+        church = com.example.ui.delivery.PlateExport.Church(e.name, e.congregation, accent, e.code.takeIf { e.codeOn }),
+    )
 }
 
 @Composable

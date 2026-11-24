@@ -566,6 +566,16 @@ class ScreenshotTest {
     }
 
     @Test
+    fun churchPlate() {
+        seedChurch()
+        val e = runBlocking { app.church.repo.dao.openEvent()!! }
+        app.church.showStatusForPreview(running().copy(port = 8100, ssid = "DIRECT-JR-Igreja", password = "igreja2026"))
+        val plate = com.example.ui.delivery.PlateExport.render(app, com.example.ui.church.churchPlate(app, e, running().copy(port = 8100, ssid = "DIRECT-JR-Igreja", password = "igreja2026")))
+        File("build/screens").apply { mkdirs() }.resolve("igreja_placa.png").outputStream().use { plate.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        app.church.showStatusForPreview(com.example.core.delivery.DeliveryStatus.Off)
+    }
+
+    @Test
     fun churchNewEvent() {
         seedPhotos()
         runBlocking { app.church.repo.saveCongregation(com.example.core.church.Congregation(name = "AD Vila Nova", createdAt = 0)) }
