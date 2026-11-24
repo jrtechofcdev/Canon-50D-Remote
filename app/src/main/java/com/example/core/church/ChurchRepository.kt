@@ -140,10 +140,31 @@ class ChurchRepository(
         changed()
     }
 
+    /** Closes the event by itself [hours] from now; null takes the deadline off. */
+    suspend fun setAutoClose(eventId: Long, hours: Int?) {
+        val e = dao.event(eventId) ?: return
+        val at = hours?.let { clock() + it * 3_600_000L }
+        dao.updateEvent(e.copy(autoCloseAt = at))
+        log(eventId, null, if (at == null) "Validade tirada" else "Encerra sozinho em $hours h")
+        changed()
+    }
+
+    /** Closes the open event when its deadline passed. True when it did. */
+    suspend fun closeIfDue(): Boolean {
+        val e = dao.openEvent() ?: return false
+        val at = e.autoCloseAt ?: return false
+        if (clock() < at) return false
+        dao.updateEvent(e.copy(closedAt = clock()))
+        log(e.id, null, "Evento encerrado sozinho (validade)")
+        changed()
+        return true
+    }
+
     /** Opens [eventId] again (the others close). */
     suspend fun open(eventId: Long) {
         val e = dao.event(eventId) ?: return
-        dao.updateEvent(e.copy(closedAt = null))
+        // A deadline that already passed would close it again at once.
+        dao.updateEvent(e.copy(closedAt = null, autoCloseAt = null))
         dao.closeOthers(eventId, clock())
         log(eventId, null, "Evento aberto")
         changed()

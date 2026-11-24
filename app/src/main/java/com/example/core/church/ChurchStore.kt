@@ -60,6 +60,8 @@ data class ChurchEvent(
     val defaultPerms: Int = ChurchPerm.DEFAULT,
     val createdAt: Long,
     val closedAt: Long? = null,
+    /** When the event closes by itself (null: only when the photographer closes it). */
+    val autoCloseAt: Long? = null,
 ) {
     val isOpen get() = closedAt == null
 }

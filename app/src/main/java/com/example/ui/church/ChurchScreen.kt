@@ -359,8 +359,10 @@ private fun ReadyCard(app: TetherApp, e: ChurchEvent, enhanceEverywhere: Boolean
 }
 
 /** The event itself: name, congregation and date, with Editar for when something was typed wrong. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun EventCard(app: TetherApp, e: ChurchEvent) {
+    val scope = rememberCoroutineScope()
     var editing by remember { mutableStateOf(false) }
     DeliveryCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -370,6 +372,13 @@ private fun EventCard(app: TetherApp, e: ChurchEvent) {
             }
             JrButton("Editar", onClick = { editing = true }, kind = JrButtonKind.Secondary, icon = Icons.Outlined.Edit)
         }
+        // The deadline: the event closes by itself, so a forgotten event doesn't stay open overnight.
+        Text("Encerrar sozinho", style = MaterialTheme.typography.labelLarge, color = Tone.TextMuted)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalArrangement = Arrangement.spacedBy(Space.s)) {
+            JrChip("Não", e.autoCloseAt == null, onClick = { scope.launch { app.church.repo.setAutoClose(e.id, null) } })
+            listOf(3, 6, 12).forEach { h -> JrChip("Em $h h", false, onClick = { scope.launch { app.church.repo.setAutoClose(e.id, h) } }) }
+        }
+        e.autoCloseAt?.let { Text("Encerra às ${clock(it)}${if (day(it) != day(System.currentTimeMillis())) " de ${day(it)}" else ""}. Quem estiver na página volta para a entrada.", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted) }
     }
     if (editing) EditEventDialog(app, e) { editing = false }
 }

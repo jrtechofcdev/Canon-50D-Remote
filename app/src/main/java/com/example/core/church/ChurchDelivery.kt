@@ -76,6 +76,16 @@ class ChurchDelivery(
     private val renderLock = Mutex()
 
     init {
+        // The event's deadline: checked every minute while the delivery is on the air.
+        scope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(60_000)
+                if (_status.value is DeliveryStatus.Running && runCatching { repo.closeIfDue() }.getOrDefault(false)) {
+                    AppLog.i(ChurchServer.TAG, "Evento encerrado pela validade")
+                    stop()
+                }
+            }
+        }
         scope.launch { for (id in readyQueue) runCatching { readyFile(id) }.onFailure { AppLog.w(ChurchServer.TAG, "Pronta da foto $id falhou", it) } }
     }
 
@@ -86,6 +96,7 @@ class ChurchDelivery(
         stopOthers()
         _status.value = DeliveryStatus.Starting
         runCatching { clearLeftovers() }
+        if (repo.closeIfDue()) AppLog.i(ChurchServer.TAG, "Evento passou da validade e foi encerrado")
         val s = settings.current()
         val ssid = DeliveryRules.ssid(s.churchSsid)
         var password = s.churchPassword

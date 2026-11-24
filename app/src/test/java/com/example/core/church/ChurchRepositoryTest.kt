@@ -103,6 +103,21 @@ class ChurchRepositoryTest {
     }
 
     @Test
+    fun anEventClosesByItselfAtItsDeadlineAndReopensWithoutIt() = runBlocking {
+        val e = repo.newEvent("Vigília", null)
+        repo.setAutoClose(e.id, 3)
+        now += 2 * 3_600_000L
+        assertFalse(repo.closeIfDue())
+        now += 3_600_000L
+        assertTrue(repo.closeIfDue())
+        assertNull(db.churchDao().openEvent())
+        assertEquals("Evento encerrado sozinho (validade)", db.churchDao().fullLog(e.id).last().action)
+        repo.open(e.id)
+        assertNull(db.churchDao().event(e.id)!!.autoCloseAt)
+        assertFalse(repo.closeIfDue())
+    }
+
+    @Test
     fun aWrongCodeIsRefusedAndTriesAreLimited() = runBlocking {
         val e = repo.newEvent("Cruzada", null)
         repeat(5) { assertTrue(join(e, code = "0000".takeIf { it != e.code } ?: "1111") is JoinResult.Denied) }
@@ -242,6 +257,9 @@ class ChurchRepositoryTest {
             r.addPhoto(e.id, photo.id)
             assertNotNull(room.churchDao().openEvent())
             assertEquals(listOf(photo.id), room.churchDao().photos(e.id).map { it.photoId })
+            // Version 13: the deadline column.
+            r.setAutoClose(e.id, 4)
+            assertNotNull(room.churchDao().event(e.id)!!.autoCloseAt)
         }
         room.close()
     }
