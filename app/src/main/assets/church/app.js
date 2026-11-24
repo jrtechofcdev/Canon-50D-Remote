@@ -210,6 +210,7 @@
         : "O fotógrafo ainda não liberou a visualização para você. Esta página atualiza sozinha.";
     }
     if (fresh.length) JR.toast(fresh.length === 1 ? "Chegou uma foto nova" : fresh.length + " fotos novas");
+    viewerApi.presets();
     viewerApi.refresh();
   }
 
@@ -312,13 +313,82 @@
     $("close").innerHTML = JR.icons.close; $("prev").innerHTML = JR.icons.prev; $("next").innerHTML = JR.icons.next;
     $("bigWait").innerHTML = JR.loader();
 
+    var glCanvas = $("bigGl");
+    function fit(el, iw, ih) {
+      var w = stage.clientWidth, h = stage.clientHeight, scale = Math.min(w / iw, h / ih);
+      el.style.width = Math.round(iw * scale) + "px"; el.style.height = Math.round(ih * scale) + "px";
+      return scale;
+    }
     function draw(im) {
-      var ratio = window.devicePixelRatio || 1, w = stage.clientWidth, h = stage.clientHeight;
-      var scale = Math.min(w / im.naturalWidth, h / im.naturalHeight);
-      var cw = Math.round(im.naturalWidth * scale), ch = Math.round(im.naturalHeight * scale);
-      canvas.width = Math.round(cw * ratio); canvas.height = Math.round(ch * ratio);
-      canvas.style.width = cw + "px"; canvas.style.height = ch + "px";
+      var ratio = window.devicePixelRatio || 1;
+      var scale = fit(canvas, im.naturalWidth, im.naturalHeight);
+      canvas.width = Math.round(im.naturalWidth * scale * ratio); canvas.height = Math.round(im.naturalHeight * scale * ratio);
       canvas.getContext("2d").drawImage(im, 0, 0, canvas.width, canvas.height);
+    }
+
+    // ---- Presets: the "pronta" with another released preset, previewed live (WebGL2, the app's shader) ----
+    var presetList = null, presetFor = null, glr = null, glBroken = false, shader = null, paramsCache = {}, baseFor = null;
+    function presetKey() { return eventKey("preset"); }
+    function chosenPreset() {
+      var id = read(presetKey());
+      if (!id || !presetList) return null;
+      for (var i = 0; i < presetList.length; i++) if (String(presetList[i].id) === id) return presetList[i].id;
+      return null;
+    }
+    function loadPresets() {
+      if (!me || !me.presets) { presetList = null; presetFor = null; $("presetBar").hidden = true; return; }
+      if (presetFor === member) return;
+      presetFor = member;
+      JR.get("/api/c/presets?m=" + member).then(function (r) {
+        presetList = r.status === 200 ? r.body.presets : null;
+        paintPresets();
+      });
+    }
+    function paintPresets() {
+      var bar = $("presetBar"), strip = $("presetStrip");
+      bar.hidden = !presetList || !presetList.length;
+      if (bar.hidden) return;
+      var pick = chosenPreset();
+      strip.innerHTML = "";
+      [{ id: null, name: "Do evento" }].concat(presetList).forEach(function (p) {
+        var b = document.createElement("button");
+        b.type = "button"; b.setAttribute("role", "radio"); b.textContent = p.name;
+        b.setAttribute("aria-checked", pick === p.id ? "true" : "false");
+        b.onclick = function () {
+          write(presetKey(), p.id === null ? null : String(p.id));
+          // A preset is a "pronta": show it.
+          lookV = "pronta"; write("jr_c_look", "pronta"); paintLook();
+          paintPresets(); paint();
+        };
+        strip.appendChild(b);
+      });
+    }
+    function useGl() {
+      if (glBroken || !window.JRLook || !JRLook.supported()) return false;
+      return true;
+    }
+    function showGl(on) { glCanvas.hidden = !on; canvas.hidden = on; }
+    /** Draws photo [p] with preset [id] on the WebGL canvas; false when it can't (then the phone makes it). */
+    function drawPreset(p, id) {
+      var token = p.id + ":" + id;
+      glCanvas.dataset.want = token;
+      $("bigWait").hidden = false;
+      var shaderReady = shader ? Promise.resolve(shader) : JR.get("/api/c/shader?m=" + member).then(function (r) { if (r.status !== 200) throw new Error("shader"); shader = r.body; return shader; });
+      var paramsReady = paramsCache[id] ? Promise.resolve(paramsCache[id]) : JR.get("/api/c/params?m=" + member + "&preset=" + id).then(function (r) { if (r.status !== 200) throw new Error("params"); paramsCache[id] = r.body; return r.body; });
+      var baseReady = baseFor && baseFor.id === p.id ? Promise.resolve(baseFor.img) : new Promise(function (ok, no) {
+        var im = new Image(); im.onload = function () { ok(im); }; im.onerror = no; im.src = "/b/" + member + "/" + p.id;
+      });
+      Promise.all([shaderReady, paramsReady, baseReady]).then(function (all) {
+        if (glCanvas.dataset.want !== token) return;
+        if (!glr) glr = new JRLook.Renderer(glCanvas, all[0]);
+        if (!baseFor || baseFor.id !== p.id) { glr.setImage(all[2]); baseFor = { id: p.id, img: all[2] }; }
+        glr.draw(all[1]);
+        fit(glCanvas, glr.width, glr.height);
+        showGl(true); $("bigWait").hidden = true;
+      }).catch(function () {
+        // Old browser or a GPU problem: the phone makes the preview instead.
+        glBroken = true; showGl(false); canvas.dataset.src = ""; paint();
+      });
     }
     // Original or Pronta on the big picture, remembered for the next photos.
     var lookV = read("jr_c_look") === "pronta" ? "pronta" : "";
@@ -339,8 +409,16 @@
       var n = photos.length;
       if (!n) { if (!root.hidden) JR.closeLayer(); return; }
       current = Math.max(0, Math.min(current, n - 1));
-      var p = photos[current], src = "/p/" + member + "/" + p.id + (lookV ? "?v=" + lookV : "");
-      if (canvas.dataset.src !== src) {
+      var p = photos[current], preset = lookV ? chosenPreset() : null;
+      if (preset !== null && useGl()) {
+        canvas.dataset.src = "";
+        drawPreset(p, preset);
+      } else {
+        showGl(false);
+        glCanvas.dataset.want = "";
+      }
+      var src = "/p/" + member + "/" + p.id + (lookV ? "?v=" + lookV : "") + (preset !== null ? "&preset=" + preset : "");
+      if (preset === null || !useGl()) if (canvas.dataset.src !== src) {
         canvas.dataset.src = src;
         canvas.classList.add("wait"); $("bigWait").hidden = false;
         var im = new Image();
@@ -392,8 +470,12 @@
     stage.addEventListener("touchstart", function (e) { sx = e.touches.length === 1 ? e.touches[0].clientX : null; dx = 0; }, { passive: true });
     stage.addEventListener("touchmove", function (e) { if (sx !== null) dx = e.touches[0].clientX - sx; }, { passive: true });
     stage.addEventListener("touchend", function () { if (sx !== null && Math.abs(dx) > 60) go(dx < 0 ? 1 : -1); sx = null; });
-    window.addEventListener("resize", function () { if (!root.hidden && canvas._im) draw(canvas._im); });
-    return { open: open, refresh: function () { if (!root.hidden) paint(); } };
+    window.addEventListener("resize", function () {
+      if (root.hidden) return;
+      if (canvas._im && !canvas.hidden) draw(canvas._im);
+      if (glr && !glCanvas.hidden) fit(glCanvas, glr.width, glr.height);
+    });
+    return { open: open, refresh: function () { if (!root.hidden) paint(); }, presets: loadPresets, chosenPreset: chosenPreset };
   })();
 
   // ---------- Protections for who cannot download ----------

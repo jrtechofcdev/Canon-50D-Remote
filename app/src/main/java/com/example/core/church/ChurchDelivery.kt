@@ -24,6 +24,8 @@ import com.example.core.render.BitmapLoader
 import com.example.core.render.Enhance
 import com.example.core.preset.forPicking
 import com.example.core.render.Looks
+import com.example.core.render.RenderParams
+import com.example.core.render.RenderParamsJson
 import com.example.core.storage.PhotoStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +45,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.sqrt
+
+/** A look picked for one "pronta": a preset, or the full settings ([adjust]) as the editor saves them. */
+data class ReadyLook(val presetId: Long?, val adjust: String?)
 
 /**
  * The church delivery on the phone: brings the network up, runs [ChurchServer], takes each new photo into
@@ -208,15 +213,15 @@ class ChurchDelivery(
         return if (marked) markedCopy(clean, THUMB_EDGE, "mt${member.id}_$id.jpg", member)?.let { fileServed(it, "t.jpg") } else fileServed(clean, "t.jpg")
     }
 
-    override suspend fun preview(id: Long, member: ChurchMember, marked: Boolean, ready: Boolean): ServedFile? {
+    override suspend fun preview(id: Long, member: ChurchMember, marked: Boolean, ready: Boolean, presetId: Long?): ServedFile? {
         // The "pronta" to look at before downloading; while it can't be made, the photo as it is.
-        val clean = (if (ready) readyView(id, member.eventId) else null) ?: small(id, PREVIEW_EDGE, "view", member.eventId) ?: return null
+        val clean = (if (ready) readyView(id, member.eventId, presetId?.let { ReadyLook(it, null) }) else null) ?: small(id, PREVIEW_EDGE, "view", member.eventId) ?: return null
         return if (marked) markedCopy(clean, PREVIEW_EDGE, "m${member.id}_${clean.nameWithoutExtension}.jpg", member)?.let { fileServed(it, "p.jpg") } else fileServed(clean, "p.jpg")
     }
 
     /** The "pronta" at the size of the big view; its name carries the look, so a new look makes a new one. */
-    private suspend fun readyView(id: Long, eventId: Long): File? {
-        val full = readyFile(id) ?: return null
+    private suspend fun readyView(id: Long, eventId: Long, chosen: ReadyLook? = null): File? {
+        val full = readyFile(id, chosen) ?: return null
         val out = File(dirOf(eventId), "${full.nameWithoutExtension}_view.jpg")
         if (out.exists()) return out
         return withContext(Dispatchers.IO) {
@@ -255,21 +260,48 @@ class ChurchDelivery(
      * The "pronta": the photo with the event's look (preset, calibration) and "Melhorar" when the event or
      * Ajustes ask for it, at full size. Made once per look and kept; with no look at all it is the original.
      */
-    private suspend fun readyFile(id: Long): File? = renderLock.withLock {
+    private suspend fun readyFile(id: Long, chosen: ReadyLook? = null): File? = renderLock.withLock {
         val photo = photos.get(id) ?: return@withLock null
         val e = repo.dao.openEvent() ?: return@withLock null
-        val s = settings.current()
-        val enhance = if (e.enhanceReady || s.enhanceOnChurch) s.enhanceLevel else photo.enhance
-        val looked = photo.copy(presetId = e.presetId ?: photo.presetId, adjust = if (e.presetId != null || e.adjust != null) e.adjust else photo.adjust, enhance = enhance)
-        val key = listOf(looked.presetId, looked.adjust, looked.crop, Enhance.resolve(enhance, photo.iso), looked.displayUri).hashCode().toUInt().toString(16)
+        val enhance = enhanceFor(photo, e)
+        val looked = if (chosen != null) photo.copy(presetId = chosen.presetId, adjust = chosen.adjust, enhance = enhance)
+        else photo.copy(presetId = e.presetId ?: photo.presetId, adjust = if (e.presetId != null || e.adjust != null) e.adjust else photo.adjust, enhance = enhance)
+        // The look's content, not only its id: a preset edited in the app makes a new "pronta".
+        val lookText = looked.adjust ?: looked.presetId?.let { presetRepo.get(it)?.settings?.encode() }
+        val key = listOf(lookText, looked.crop, Enhance.resolve(enhance, photo.iso), looked.displayUri).hashCode().toUInt().toString(16)
         val out = File(dirOf(e.id), "${id}_$key.jpg")
         if (out.exists()) return@withLock out
         val started = System.currentTimeMillis()
         val made = looks.exportFile(looked, 0, tag = "igreja_$id", forceEnhance = null) ?: return@withLock null
         withContext(Dispatchers.IO) { if (!made.renameTo(out)) { made.copyTo(out, overwrite = true); made.delete() } }
         AppLog.i(ChurchServer.TAG, "Pronta de ${photo.savedBase} em ${System.currentTimeMillis() - started} ms")
-        repo.changed()
+        if (chosen == null) repo.changed()
         out
+    }
+
+    /** Melhorar on the "pronta": the event's switch or Ajustes, else what the photo itself has. */
+    private suspend fun enhanceFor(photo: com.example.core.data.Photo, e: ChurchEvent): Int {
+        val s = settings.current()
+        return if (e.enhanceReady || s.enhanceOnChurch) s.enhanceLevel else photo.enhance
+    }
+
+    override suspend fun params(presetId: Long): String? =
+        presetRepo.get(presetId)?.settings?.let { RenderParamsJson.encode(RenderParams.from(it)) }
+
+    override suspend fun base(id: Long, member: ChurchMember, marked: Boolean): ServedFile? {
+        val photo = photos.get(id) ?: return null
+        val e = repo.dao.openEvent() ?: return null
+        val enhance = enhanceFor(photo, e)
+        val key = listOf(photo.crop, Enhance.resolve(enhance, photo.iso), photo.displayUri).hashCode().toUInt().toString(16)
+        val out = File(dirOf(member.eventId), "${id}_base_$key.jpg")
+        if (!out.exists()) {
+            // Without crop or Melhorar there is nothing to apply: the big view is the base.
+            val made = looks.renderPhoto(photo, null, PREVIEW_EDGE, enhance)
+            if (made == null) small(id, PREVIEW_EDGE, "view", member.eventId)?.let { withContext(Dispatchers.IO) { it.copyTo(out, overwrite = true) } }
+            else withContext(Dispatchers.IO) { writeWhole(out) { made.compress(Bitmap.CompressFormat.JPEG, 90, it) } }
+        }
+        if (!out.exists()) return null
+        return if (marked) markedCopy(out, PREVIEW_EDGE, "m${member.id}_${out.nameWithoutExtension}.jpg", member)?.let { fileServed(it, "b.jpg") } else fileServed(out, "b.jpg")
     }
 
     /** A smaller JPG of the photo as it is (grid and big view), made once. */

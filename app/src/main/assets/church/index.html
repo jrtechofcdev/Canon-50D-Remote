@@ -81,7 +81,11 @@
       <button type="button" role="radio" data-v="pronta" aria-checked="false">Pronta</button>
     </div>
   </div>
-  <div class="viewer-stage" id="viewerStage"><canvas id="big" aria-label="Foto ampliada"></canvas><span id="bigWait" class="big-wait" hidden></span></div>
+  <div class="viewer-stage" id="viewerStage"><canvas id="big" aria-label="Foto ampliada"></canvas><canvas id="bigGl" aria-label="Foto com o preset" hidden></canvas><span id="bigWait" class="big-wait" hidden></span></div>
+  <div id="presetBar" class="preset-bar" hidden>
+    <div id="presetStrip" class="preset-strip" role="radiogroup" aria-label="Preset da versão pronta"></div>
+    <p class="raw-note">A prévia e a pronta saem do JPG da câmera (ou do JPG dentro do RAW). O app não revela o RAW.</p>
+  </div>
   <div class="viewer-actions">
     <button id="prev" class="round" aria-label="Foto anterior"></button>
     <div id="downloads" class="downloads"></div>
@@ -91,6 +95,7 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script src="/brand.js"></script>
+<script src="/look.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

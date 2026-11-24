@@ -37,11 +37,18 @@ interface ChurchBackend {
     suspend fun file(id: Long, kind: ChurchFile): ServedFile?
     /** The grid picture; [marked] = with the person's name, for who cannot download anything. */
     suspend fun thumb(id: Long, member: ChurchMember, marked: Boolean): ServedFile?
-    /** The big picture; [marked] carries the person's name, [ready] = the "pronta" instead of the photo as it is. */
-    suspend fun preview(id: Long, member: ChurchMember, marked: Boolean, ready: Boolean = false): ServedFile?
+    /**
+     * The big picture; [marked] carries the person's name, [ready] = the "pronta" instead of the photo as it
+     * is, and [presetId] makes that "pronta" with a released preset the person picked.
+     */
+    suspend fun preview(id: Long, member: ChurchMember, marked: Boolean, ready: Boolean = false, presetId: Long? = null): ServedFile?
     suspend fun logo(event: ChurchEvent): ServedFile?
     /** The photographer's presets, in the app's order (favourites and recent first). */
     suspend fun presets(): List<ChurchPresetInfo> = emptyList()
+    /** A preset's numbers for the page's live preview ([com.example.core.render.RenderParamsJson]); null when it is gone. */
+    suspend fun params(presetId: Long): String? = null
+    /** The photo the page's live preview starts from: cropped and "Melhorar" applied, no look. */
+    suspend fun base(id: Long, member: ChurchMember, marked: Boolean): ServedFile? = null
 }
 
 /**
@@ -206,6 +213,9 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
             seg == listOf("api", "c", "join") && r.method == "POST" -> join(r, out)
             seg == listOf("api", "c", "state") -> state(r, out)
             seg == listOf("api", "c", "presets") -> presets(r, out)
+            seg == listOf("api", "c", "shader") -> shader(r, out)
+            seg == listOf("api", "c", "params") -> params(r, out)
+            seg.size == 3 && seg[0] == "b" -> base(seg[1], seg[2], r, out, head)
             seg == listOf("evento-logo") -> logo(out, head)
             seg.size == 3 && seg[0] == "t" -> thumb(seg[1], seg[2], r, out, head)
             seg.size == 3 && seg[0] == "p" -> preview(seg[1], seg[2], r, out, head)
@@ -312,6 +322,35 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
         })
     }
 
+    /** May [m] use [presetId] on the page: the Presets switch, and the preset released for the event. */
+    private fun presetAllowed(m: ChurchMember, e: ChurchEvent, presetId: Long): Boolean {
+        if (!ChurchPerm.has(m.perms, ChurchPerm.PRESETS)) return false
+        val released = ChurchRules.released(e)
+        return released == null || presetId in released
+    }
+
+    /** The app's own shader, so the page's preview is made by the same maths. */
+    private suspend fun shader(r: Request, out: OutputStream) {
+        val (m, _) = who(r, out, r.query["m"]) ?: return
+        if (!ChurchPerm.has(m.perms, ChurchPerm.PRESETS)) return json(out, 403, """{"error":"Sem presets"}""")
+        json(out, 200, """{"vertex":${q(com.example.core.render.PresetShader.VERTEX)},"fragment":${q(com.example.core.render.PresetShader.FRAGMENT)}}""")
+    }
+
+    private suspend fun params(r: Request, out: OutputStream) {
+        val (m, e) = who(r, out, r.query["m"]) ?: return
+        val id = r.query["preset"]?.toLongOrNull() ?: return json(out, 400, """{"error":"Preset?"}""")
+        if (!presetAllowed(m, e, id)) return json(out, 403, """{"error":"Este preset não está liberado para você."}""")
+        val p = backend.params(id) ?: return json(out, 404, """{"error":"Preset não encontrado"}""")
+        json(out, 200, p)
+    }
+
+    private suspend fun base(token: String, id: String, r: Request, out: OutputStream, head: Boolean) {
+        val (m, _, photoId) = visible(token, id, r, out) ?: return
+        if (!ChurchPerm.has(m.perms, ChurchPerm.PRESETS)) return text(out, 403, "Sem presets")
+        val f = backend.base(photoId, m, marked(m)) ?: return text(out, 404, "Foto indisponível")
+        serve(out, f, null, head, download = false, private = true) {}
+    }
+
     // ---- pictures and files ------------------------------------------------------------------
 
     /** The person and the photo, when they may see it; otherwise an error answer is sent. */
@@ -332,9 +371,11 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
     }
 
     private suspend fun preview(token: String, id: String, r: Request, out: OutputStream, head: Boolean) {
-        val (m, _, photoId) = visible(token, id, r, out) ?: return
+        val (m, e, photoId) = visible(token, id, r, out) ?: return
         val ready = r.query["v"] == ChurchFile.READY.key
-        val f = backend.preview(photoId, m, marked(m), ready) ?: return text(out, 404, "Foto indisponível")
+        val preset = r.query["preset"]?.toLongOrNull()
+        if (preset != null && !presetAllowed(m, e, preset)) return text(out, 403, "Este preset não está liberado para você.")
+        val f = backend.preview(photoId, m, marked(m), ready || preset != null, preset) ?: return text(out, 404, "Foto indisponível")
         serve(out, f, null, head, download = false, private = true) {}
         // Opening the big picture is "seeing" it: one line per person and photo, however often they come back.
         if (!head && viewed.add(m.id to photoId)) {
@@ -477,7 +518,7 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
         const val VIEWED = "Viu a foto"
 
         val ASSETS = setOf(
-            "index.html", "app.js", "style.css", "brand.css", "brand.js",
+            "index.html", "app.js", "look.js", "style.css", "brand.css", "brand.js",
             "exo2-400.ttf", "exo2-500.ttf", "exo2-600.ttf", "logo.png", "icon.png",
         )
         private val COMMON = listOf(

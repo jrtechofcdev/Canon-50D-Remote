@@ -33,6 +33,7 @@ class ChurchServerTest {
     private val marks = mutableListOf<Boolean>()
     private val thumbMarks = mutableListOf<Boolean>()
     private val readies = mutableListOf<Boolean>()
+    private val previewPresets = mutableListOf<Long?>()
 
     @Before
     fun setUp() {
@@ -54,7 +55,10 @@ class ChurchServerTest {
                 thumbMarks += marked
                 return ServedFile("t.jpg", 3) { "jpg".byteInputStream() }
             }
-            override suspend fun preview(id: Long, member: ChurchMember, marked: Boolean, ready: Boolean): ServedFile {
+            override suspend fun params(presetId: Long) = if (presetId == 3L) null else com.example.core.render.RenderParamsJson.encode(com.example.core.render.RenderParams.IDENTITY)
+            override suspend fun base(id: Long, member: ChurchMember, marked: Boolean) = ServedFile("b.jpg", 4) { "base".byteInputStream() }
+            override suspend fun preview(id: Long, member: ChurchMember, marked: Boolean, ready: Boolean, presetId: Long?): ServedFile {
+                previewPresets += presetId
                 marks += marked
                 readies += ready
                 return ServedFile("p.jpg", 3) { "pre".byteInputStream() }
@@ -246,6 +250,34 @@ class ChurchServerTest {
         val list = call("/api/c/presets?m=$m").text
         assertTrue(list, list.contains("Quente") && list.contains("P&B") && !list.contains("Frio"))
         assertTrue(call("/api/c/state?m=$m").text.contains("\"presets\":true"))
+    }
+
+    @Test
+    fun theLivePreviewGetsTheShaderTheNumbersAndTheBaseOnlyForReleasedPresets() {
+        val e = event()
+        val p = photo(1)
+        runBlocking { repo.addPhoto(e.id, p) }
+        val m = join(e)
+        // Without the Presets switch nothing of it is served.
+        assertEquals(403, call("/api/c/shader?m=$m").status)
+        assertEquals(403, call("/api/c/params?m=$m&preset=1").status)
+        assertEquals(403, call("/b/$m/$p").status)
+        assertEquals(403, call("/p/$m/$p?preset=1").status)
+        runBlocking {
+            repo.setPerm(db.churchDao().memberByToken(m)!!.id, ChurchPerm.PRESETS, true)
+            repo.setReleasedPresets(e.id, setOf(1, 3))
+        }
+        val shader = call("/api/c/shader?m=$m").text
+        assertTrue(shader.contains("#version 300 es") && shader.contains("\"fragment\""))
+        val params = call("/api/c/params?m=$m&preset=1")
+        assertEquals(200, params.status)
+        assertTrue(params.text.contains("\"uExposure\":") && params.text.contains("\"lut\":[0,0,0,1,1,1"))
+        assertEquals(403, call("/api/c/params?m=$m&preset=2").status)
+        assertEquals(404, call("/api/c/params?m=$m&preset=3").status)
+        assertEquals("base", call("/b/$m/$p").text)
+        assertEquals(200, call("/p/$m/$p?preset=1").status)
+        assertEquals(403, call("/p/$m/$p?preset=2").status)
+        assertEquals(listOf<Long?>(1L), previewPresets)
     }
 
     @Test
