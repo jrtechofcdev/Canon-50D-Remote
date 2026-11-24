@@ -35,7 +35,8 @@ interface ChurchBackend {
     /** The grid picture; [marked] = with the person's name, for who cannot download anything. */
     suspend fun thumb(id: Long, member: ChurchMember, marked: Boolean): ServedFile?
     /** The big view; with [marked] it carries the person's name and role (they cannot download). */
-    suspend fun preview(id: Long, member: ChurchMember, marked: Boolean): ServedFile?
+    /** The big picture; [ready] = the "pronta" (with the event's look) instead of the photo as it is. */
+    suspend fun preview(id: Long, member: ChurchMember, marked: Boolean, ready: Boolean = false): ServedFile?
     suspend fun logo(event: ChurchEvent): ServedFile?
 }
 
@@ -305,7 +306,8 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
 
     private suspend fun preview(token: String, id: String, r: Request, out: OutputStream, head: Boolean) {
         val (m, _, photoId) = visible(token, id, r, out) ?: return
-        val f = backend.preview(photoId, m, marked(m)) ?: return text(out, 404, "Foto indisponível")
+        val ready = r.query["v"] == ChurchFile.READY.key
+        val f = backend.preview(photoId, m, marked(m), ready) ?: return text(out, 404, "Foto indisponível")
         serve(out, f, null, head, download = false, private = true) {}
     }
 

@@ -195,9 +195,23 @@ class ChurchDelivery(
         return if (marked) markedCopy(clean, THUMB_EDGE, "mt${member.id}_$id.jpg", member)?.let { fileServed(it, "t.jpg") } else fileServed(clean, "t.jpg")
     }
 
-    override suspend fun preview(id: Long, member: ChurchMember, marked: Boolean): ServedFile? {
-        val clean = small(id, PREVIEW_EDGE, "view", member.eventId) ?: return null
-        return if (marked) markedCopy(clean, PREVIEW_EDGE, "m${member.id}_$id.jpg", member)?.let { fileServed(it, "p.jpg") } else fileServed(clean, "p.jpg")
+    override suspend fun preview(id: Long, member: ChurchMember, marked: Boolean, ready: Boolean): ServedFile? {
+        // The "pronta" to look at before downloading; while it can't be made, the photo as it is.
+        val clean = (if (ready) readyView(id, member.eventId) else null) ?: small(id, PREVIEW_EDGE, "view", member.eventId) ?: return null
+        return if (marked) markedCopy(clean, PREVIEW_EDGE, "m${member.id}_${clean.nameWithoutExtension}.jpg", member)?.let { fileServed(it, "p.jpg") } else fileServed(clean, "p.jpg")
+    }
+
+    /** The "pronta" at the size of the big view; its name carries the look, so a new look makes a new one. */
+    private suspend fun readyView(id: Long, eventId: Long): File? {
+        val full = readyFile(id) ?: return null
+        val out = File(dirOf(eventId), "${full.nameWithoutExtension}_view.jpg")
+        if (out.exists()) return out
+        return withContext(Dispatchers.IO) {
+            val bitmap = BitmapLoader.load(context, Uri.fromFile(full), PREVIEW_EDGE) ?: return@withContext null
+            writeWhole(out) { bitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+            bitmap.recycle()
+            out.takeIf { it.exists() }
+        }
     }
 
     /** A copy of [clean] with this person's name, role and the time: a screenshot of it shows who it came from. */

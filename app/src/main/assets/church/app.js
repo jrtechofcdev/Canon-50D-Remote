@@ -317,11 +317,26 @@
       canvas.style.width = cw + "px"; canvas.style.height = ch + "px";
       canvas.getContext("2d").drawImage(im, 0, 0, canvas.width, canvas.height);
     }
+    // Original or Pronta on the big picture, remembered for the next photos.
+    var lookV = read("jr_c_look") === "pronta" ? "pronta" : "";
+    function paintLook() {
+      var buttons = $("look").querySelectorAll("button");
+      for (var i = 0; i < buttons.length; i++) buttons[i].setAttribute("aria-checked", buttons[i].getAttribute("data-v") === lookV ? "true" : "false");
+    }
+    $("look").addEventListener("click", function (e) {
+      var b = e.target.closest ? e.target.closest("button") : null;
+      if (!b) return;
+      lookV = b.getAttribute("data-v") || "";
+      write("jr_c_look", lookV || null);
+      paintLook(); paint();
+    });
+    paintLook();
+
     function paint() {
       var n = photos.length;
       if (!n) { if (!root.hidden) JR.closeLayer(); return; }
       current = Math.max(0, Math.min(current, n - 1));
-      var p = photos[current], src = "/p/" + member + "/" + p.id;
+      var p = photos[current], src = "/p/" + member + "/" + p.id + (lookV ? "?v=" + lookV : "");
       if (canvas.dataset.src !== src) {
         canvas.dataset.src = src;
         canvas.classList.add("wait"); $("bigWait").hidden = false;

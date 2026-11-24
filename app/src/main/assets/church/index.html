@@ -76,7 +76,10 @@
   <div class="viewer-bar">
     <button id="close" class="round" aria-label="Fechar"></button>
     <span id="pos" class="pos num"></span>
-    <span class="round-gap" aria-hidden="true"></span>
+    <div id="look" class="look" role="radiogroup" aria-label="Ver a foto como">
+      <button type="button" role="radio" data-v="" aria-checked="true">Original</button>
+      <button type="button" role="radio" data-v="pronta" aria-checked="false">Pronta</button>
+    </div>
   </div>
   <div class="viewer-stage" id="viewerStage"><canvas id="big" aria-label="Foto ampliada"></canvas><span id="bigWait" class="big-wait" hidden></span></div>
   <div class="viewer-actions">

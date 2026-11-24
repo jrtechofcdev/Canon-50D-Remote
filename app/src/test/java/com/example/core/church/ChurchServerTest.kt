@@ -32,6 +32,7 @@ class ChurchServerTest {
     private val raw = ByteArray(9_000) { (it % 97).toByte() }
     private val marks = mutableListOf<Boolean>()
     private val thumbMarks = mutableListOf<Boolean>()
+    private val readies = mutableListOf<Boolean>()
 
     @Before
     fun setUp() {
@@ -53,8 +54,9 @@ class ChurchServerTest {
                 thumbMarks += marked
                 return ServedFile("t.jpg", 3) { "jpg".byteInputStream() }
             }
-            override suspend fun preview(id: Long, member: ChurchMember, marked: Boolean): ServedFile {
+            override suspend fun preview(id: Long, member: ChurchMember, marked: Boolean, ready: Boolean): ServedFile {
                 marks += marked
+                readies += ready
                 return ServedFile("p.jpg", 3) { "pre".byteInputStream() }
             }
             override suspend fun logo(event: ChurchEvent): ServedFile? = null
@@ -204,6 +206,17 @@ class ChurchServerTest {
         assertTrue(call("/api/c/state?m=$m&v=$v").text.contains("\"same\":true"))
         runBlocking { repo.addPhoto(e.id, photo(9)) }
         assertFalse(call("/api/c/state?m=$m&v=$v").text.contains("\"same\""))
+    }
+
+    @Test
+    fun thePageCanShowTheProntaBeforeDownloading() {
+        val e = event()
+        val p = photo(1)
+        runBlocking { repo.addPhoto(e.id, p) }
+        val m = join(e)
+        assertEquals(200, call("/p/$m/$p").status)
+        assertEquals(200, call("/p/$m/$p?v=pronta").status)
+        assertEquals(listOf(false, true), readies)
     }
 
     @Test
