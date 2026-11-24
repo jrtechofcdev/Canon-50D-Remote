@@ -118,6 +118,12 @@ class ChurchDelivery(
         running
     }
 
+    /** Screenshots only: shows a status without bringing a network up. */
+    @androidx.annotation.VisibleForTesting
+    internal fun showStatusForPreview(status: DeliveryStatus) {
+        _status.value = status
+    }
+
     suspend fun stop() = lock.withLock {
         withContext(Dispatchers.IO) { server.stop() }
         mdns?.stop()

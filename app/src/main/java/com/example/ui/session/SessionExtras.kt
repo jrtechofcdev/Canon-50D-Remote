@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.WifiTethering
+import androidx.compose.material.icons.outlined.Church
 import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.draw.clip
@@ -200,6 +201,8 @@ fun ToolsRow(
     onExpress: (() -> Unit)? = null,
     expressState: String? = null,
     onExpressLatest: (() -> Unit)? = null,
+    onChurch: (() -> Unit)? = null,
+    churchState: String? = null,
 ) {
     val camera = buildList {
         if (settings.liveViewEnabled) add(ToolItem(Icons.Outlined.Videocam, "Live view", enabled = connected, onClick = onLive))
@@ -232,6 +235,7 @@ fun ToolsRow(
     val extras = buildList {
         onDelivery?.let { add(ToolItem(Icons.Outlined.WifiTethering, "Entrega", deliveryState, onClick = it)) }
         onExpress?.let { add(ToolItem(Icons.Outlined.Collections, "Express", expressState, onClick = it)) }
+        onChurch?.let { add(ToolItem(Icons.Outlined.Church, "Igreja", churchState, onClick = it)) }
         if (settings.clientModeEnabled) add(ToolItem(Icons.Outlined.Slideshow, "Modo cliente", onClick = onClient))
         if (settings.toolsEnabled) add(ToolItem(Icons.Outlined.Calculate, "Flash e foco", onClick = onTools))
         add(ToolItem(Icons.Outlined.Bedtime, if (settings.nightMode) "Modo normal" else "Modo noite", onClick = onNight))

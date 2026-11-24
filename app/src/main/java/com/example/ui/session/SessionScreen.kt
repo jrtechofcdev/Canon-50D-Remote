@@ -114,11 +114,14 @@ fun SessionScreen(
     onOpenSection: (com.example.ui.settings.SettingsSection) -> Unit = {},
     onOpenDelivery: () -> Unit = {},
     onOpenExpress: () -> Unit = {},
+    onOpenChurch: () -> Unit = {},
 ) {
     var deliverFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
     val deliveryStatus by app.delivery.status.collectAsState()
     val deliveryOnline by app.delivery.online.collectAsState()
     val expressStatus by app.express.status.collectAsState()
+    val churchStatus by app.church.status.collectAsState()
+    val churchOnline by app.church.server.online.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
     var whatsFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
     var noteFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
@@ -250,6 +253,10 @@ fun SessionScreen(
                     photos.firstOrNull()?.let { com.example.ui.delivery.sendToExpress(app, context, scope, listOf(it.id), onOpenExpress) }
                 }) else null,
                 onExpress = onOpenExpress,
+                onChurch = onOpenChurch,
+                churchState = if (churchStatus is com.example.core.delivery.DeliveryStatus.Running) {
+                    if (churchOnline > 0) "no ar · $churchOnline" else "no ar"
+                } else null,
                 expressState = if (settings.expressEnabled && expressStatus is com.example.core.delivery.DeliveryStatus.Running) {
                     if (settings.expressPreview) "no ar · prévia" else "no ar · liberado"
                 } else null,

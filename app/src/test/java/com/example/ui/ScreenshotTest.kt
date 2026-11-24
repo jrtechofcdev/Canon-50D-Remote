@@ -511,6 +511,58 @@ class ScreenshotTest {
         ana
     }
 
+    /** An open church event with three people, photos and a log, as on a Sunday service. */
+    private fun seedChurch() = runBlocking {
+        seedPhotos()
+        val repo = app.church.repo
+        if (repo.dao.openEvent() != null) return@runBlocking
+        val cid = repo.saveCongregation(com.example.core.church.Congregation(name = "AD Vila Nova", accent = "#F2B544", secondary = "#7FD1FF", motto = "Tudo posso naquele que me fortalece", createdAt = 0))
+        val e = repo.newEvent("Culto de Ação de Graças", cid)
+        app.database.photoDao().inSession("Geral").forEach { repo.addPhoto(e.id, it.id) }
+        val ok = listOf("Ana" to "Mídia", "Pr. Marcos" to "Pastor", "Bia" to "Recepção").map { (n, r) ->
+            (repo.join(com.example.core.church.ChurchVia.QR, e.token, e.code, n, r, "192.168.49.${n.length + 10}", "Android", null) as com.example.core.church.JoinResult.Ok).member
+        }
+        repo.memberFor(ok[0].token, "192.168.49.13")
+        listOf(com.example.core.church.ChurchPerm.DOWNLOAD_ORIGINAL, com.example.core.church.ChurchPerm.DOWNLOAD_READY, com.example.core.church.ChurchPerm.DOWNLOAD_RAW)
+            .forEach { repo.setPerm(ok[2].id, it, false) }
+        repo.log(e.id, ok[0], "Baixou", "IMG_1040.CR2 (RAW)", "192.168.49.13")
+        repo.log(e.id, ok[2], "Tentou baixar sem permissão", "foto 2 (Original)", "192.168.49.13")
+    }
+
+    @Test
+    fun church() {
+        seedChurch()
+        app.church.showStatusForPreview(running().copy(port = 8100, ssid = null, password = null, network = "Wi-Fi da igreja"))
+        rule.setContent { JrLinkTheme { com.example.ui.church.ChurchScreen(app, onBack = null, onSettings = {}) } }
+        save("igreja", androidx.compose.ui.test.hasText("Pessoas"))
+        app.church.showStatusForPreview(com.example.core.delivery.DeliveryStatus.Off)
+    }
+
+    /** The whole panel in one tall picture (people, theme and log under the fold). */
+    @Test
+    @Config(qualifiers = "w411dp-h2900dp-xxhdpi")
+    fun churchWhole() {
+        seedChurch()
+        app.church.showStatusForPreview(running().copy(port = 8100, ssid = null, password = null, network = "Wi-Fi da igreja"))
+        rule.setContent { JrLinkTheme { com.example.ui.church.ChurchScreen(app, onBack = null, onSettings = {}) } }
+        save("igreja_completo", androidx.compose.ui.test.hasText("Log do evento"))
+        app.church.showStatusForPreview(com.example.core.delivery.DeliveryStatus.Off)
+    }
+
+    @Test
+    fun churchNewEvent() {
+        seedPhotos()
+        runBlocking { app.church.repo.saveCongregation(com.example.core.church.Congregation(name = "AD Vila Nova", createdAt = 0)) }
+        rule.setContent { JrLinkTheme { com.example.ui.church.ChurchScreen(app, onBack = null, onSettings = {}) } }
+        save("igreja_novo_evento", androidx.compose.ui.test.hasText("Abrir evento"))
+    }
+
+    @Test
+    fun settingsChurch() {
+        rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Church, onBack = {}) } }
+        save("ajustes_igreja", androidx.compose.ui.test.hasText("Rede da igreja"))
+    }
+
     private fun running() = com.example.core.delivery.DeliveryStatus.Running("192.168.49.1", 8080, "DIRECT-JR-Fotos", "jrfotos2026", "Wi-Fi Direct")
 
     @Test

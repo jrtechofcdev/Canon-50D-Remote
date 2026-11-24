@@ -95,6 +95,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material.icons.outlined.WifiTethering
+import androidx.compose.material.icons.outlined.Church
 import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.offset
@@ -177,6 +178,7 @@ class MainActivity : ComponentActivity() {
                     (it != Tab.Shop || settings.shopEnabled) &&
                         (it != Tab.Delivery || settings.deliveryEnabled) &&
                         (it != Tab.Express || settings.expressEnabled) &&
+                        (it != Tab.Church || settings.churchEnabled) &&
                         (!it.hideable || it.route !in hidden)
                 }
                 val onTab = tabs.any { it.route == route }
@@ -312,6 +314,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenSection = { nav.navigate("settings/${it.route}") },
                                 onOpenDelivery = { openTool(Tab.Delivery) },
                                 onOpenExpress = { openTool(Tab.Express) },
+                                onOpenChurch = { openTool(Tab.Church) },
                             )
                         }
                         composable(Tab.Cull.route) { CullScreen(app, onBack = null, onOpenPhoto = { nav.navigate("photo/$it") }) }
@@ -329,6 +332,13 @@ class MainActivity : ComponentActivity() {
                                 app = app,
                                 onBack = if (Tab.Express in tabs) null else ({ nav.popBackStack() }),
                                 onSettings = { nav.navigate("settings/${SettingsSection.Express.route}") },
+                            )
+                        }
+                        composable(Tab.Church.route) {
+                            com.example.ui.church.ChurchScreen(
+                                app = app,
+                                onBack = if (Tab.Church in tabs) null else ({ nav.popBackStack() }),
+                                onSettings = { nav.navigate("settings/${SettingsSection.Church.route}") },
                             )
                         }
                         composable("tools") { ToolsScreen(onBack = { nav.popBackStack() }) }
@@ -578,6 +588,7 @@ enum class Tab(val route: String, val label: String, val icon: ImageVector, val 
     Photos("photos", "Fotos", Icons.Outlined.PhotoLibrary),
     Delivery("delivery", "Entrega", Icons.Outlined.WifiTethering),
     Express("express", "Express", Icons.Outlined.Collections),
+    Church("church", "Igreja", Icons.Outlined.Church),
     Cull("cull", "Culling", Icons.Outlined.Swipe),
     Presets("presets", "Presets", Icons.Outlined.Style),
     Shop("shop", "Loja", Icons.Outlined.Storefront),

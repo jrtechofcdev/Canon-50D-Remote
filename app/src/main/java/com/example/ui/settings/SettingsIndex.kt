@@ -231,6 +231,13 @@ val settingsIndex: Map<SettingsSection, List<String>> = mapOf(
         "Teste de fechamento",
         "Modo desenvolvedor",
     ),
+    SettingsSection.Church to listOf(
+        "Entrega da igreja",
+        "Aba Igreja",
+        "Rede da igreja",
+        "Wi-Fi da igreja",
+        "Endereço com nome",
+    ),
     SettingsSection.Enhance to listOf(
         "Intensidade",
         "Aplicar sozinho em",

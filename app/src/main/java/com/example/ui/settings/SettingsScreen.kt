@@ -32,6 +32,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.WifiTethering
+import androidx.compose.material.icons.outlined.Church
 import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.outlined.Tab
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -204,6 +205,7 @@ enum class SettingsSection(val route: String, val title: String, val summary: St
     Delivery("delivery", "Entrega local", "Wi-Fi do fotógrafo, portal, códigos e QR", Icons.Outlined.WifiTethering, SettingsModule.Delivery),
     Payments("payments", "Pagamentos", "Pix copia e cola, valores, pacotes e formas de pagamento", Icons.Outlined.Payments, SettingsModule.Delivery),
     Express("express", "Fotografia Express", "Sem código, prévia com marca e liberar após o pagamento", Icons.Outlined.Collections, SettingsModule.Delivery),
+    Church("church", "Entrega da igreja", "Mídia da igreja vê e baixa as fotos ao vivo: rede e aba", Icons.Outlined.Church, SettingsModule.Delivery),
     Presets("presets", "Presets", "Look das fotos novas, cópia editada, pastas", Icons.Outlined.Style, SettingsModule.Editing),
     Enhance("enhance", "Melhorar", "Menos granulado e mais definição, sem mexer na cor", Icons.Outlined.AutoFixHigh, SettingsModule.Editing),
     Messages("messages", "Mensagens", "Textos prontos para o WhatsApp do cliente", Icons.AutoMirrored.Outlined.Chat, SettingsModule.Delivery),
@@ -347,6 +349,7 @@ fun SettingsSectionScreen(app: TetherApp, section: SettingsSection, onBack: () -
             SettingsSection.Delivery -> DeliverySettings(app, settings)
             SettingsSection.Express -> ExpressSettings(app, settings)
             SettingsSection.Payments -> PaymentSettings(app, settings)
+            SettingsSection.Church -> ChurchSettings(app, settings)
         }
         Spacer(Modifier.height(88.dp))
     }
