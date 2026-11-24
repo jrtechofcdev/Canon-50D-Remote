@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.IosShare
@@ -90,6 +91,8 @@ internal fun EventPhotosCard(app: TetherApp, e: ChurchEvent) {
     val byId = remember(all) { all.associateBy { it.id } }
     var adding by remember { mutableStateOf(false) }
     var showAll by remember { mutableStateOf(false) }
+    // What a tap on a photo does: hide it from everybody, or turn Melhorar on/off for it.
+    var enhancing by remember { mutableStateOf(false) }
     DeliveryCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -105,17 +108,44 @@ internal fun EventPhotosCard(app: TetherApp, e: ChurchEvent) {
         if (inEvent.isEmpty()) {
             Text("Cada foto nova da câmera entra aqui sozinha enquanto o evento está aberto.", style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted)
         } else {
-            Text("Toque numa foto para ocultar de todos ou mostrar de novo.", style = MaterialTheme.typography.labelLarge, color = Tone.TextMuted)
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalAlignment = Alignment.CenterVertically) {
+                Text("Toque para", style = MaterialTheme.typography.labelLarge, color = Tone.TextMuted)
+                JrChip("Ocultar", !enhancing, onClick = { enhancing = false }, icon = Icons.Outlined.VisibilityOff)
+                JrChip("Melhorar", enhancing, onClick = { enhancing = true }, icon = Icons.Outlined.AutoFixHigh)
+            }
+            Text(
+                if (enhancing) "Liga ou desliga o Melhorar na versão pronta de cada foto. A original e o RAW não mudam."
+                else "Oculta a foto de todos na página da mídia, ou mostra de novo.",
+                style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted,
+            )
             val shown = if (showAll) inEvent else inEvent.take(24)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 shown.forEach { ep ->
+                    val photo = byId[ep.photoId]
+                    val improved = photo != null && photo.enhance != com.example.core.render.Enhance.OFF
                     key(ep.photoId) {
-                        Thumb(byId[ep.photoId], dimmed = ep.hidden, badge = if (ep.hidden) Icons.Outlined.VisibilityOff else null) {
-                            scope.launch { app.church.repo.hideForAll(e.id, listOf(ep.photoId), !ep.hidden) }
+                        Thumb(
+                            photo, dimmed = ep.hidden,
+                            badge = when {
+                                ep.hidden -> Icons.Outlined.VisibilityOff
+                                improved -> Icons.Outlined.AutoFixHigh
+                                else -> null
+                            },
+                        ) {
+                            if (!enhancing) scope.launch { app.church.repo.hideForAll(e.id, listOf(ep.photoId), !ep.hidden) }
+                            else if (photo != null) scope.launch {
+                                app.looks.setEnhance(photo, if (improved) com.example.core.render.Enhance.OFF else app.settings.current().enhanceLevel)
+                            }
                         }
                     }
                 }
             }
+            if (enhancing) JrButton(
+                if (inEvent.all { byId[it.photoId]?.enhance?.let { v -> v != com.example.core.render.Enhance.OFF } == true }) "Tirar o Melhorar de todas" else "Melhorar todas",
+                kind = JrButtonKind.Secondary, icon = Icons.Outlined.AutoFixHigh,
+                onClick = { scope.launch { app.notice(com.example.ui.delivery.toggleEnhance(app, inEvent.map { it.photoId })) } },
+                modifier = Modifier.fillMaxWidth(),
+            )
             if (inEvent.size > 24 && !showAll) TextButton(onClick = { showAll = true }) { Text("Ver todas as ${inEvent.size}") }
         }
     }

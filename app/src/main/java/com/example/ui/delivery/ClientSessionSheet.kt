@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Delete
@@ -126,6 +127,14 @@ fun ClientSessionSheet(app: TetherApp, actions: PhotoActions, session: DeliveryS
             )
             if (items.isEmpty()) Text("Nenhuma foto ainda. Na galeria, selecione as fotos e toque em Entregar.", style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted)
             items.forEach { item -> QueueRow(item, onRetry = { scope.launch { app.delivery.retry(item.id) } }, onRemove = { scope.launch { app.delivery.removeItem(item) } }) }
+            if (items.isNotEmpty()) OutlinedButton(
+                onClick = { scope.launch { app.notice(toggleEnhance(app, items.map { it.photoId })) } },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            ) {
+                Icon(Icons.Outlined.AutoFixHigh, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Melhorar as fotos deste cliente")
+            }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                 if (valid) {

@@ -154,6 +154,12 @@ class ChurchDelivery(
         readyQueue.trySend(photo.id)
     }
 
+    /** A photo's look, crop or Melhorar changed: its "pronta" is made again ahead, when it is in the open event. */
+    suspend fun onPhotoEdited(photoId: Long) {
+        val e = repo.dao.openEvent() ?: return
+        if (repo.dao.photos(e.id).any { it.photoId == photoId }) readyQueue.trySend(photoId)
+    }
+
     // ---- what the server reads ---------------------------------------------------------------
 
     @android.annotation.SuppressLint("ResourceType")

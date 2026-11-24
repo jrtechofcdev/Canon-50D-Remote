@@ -196,6 +196,7 @@ class TetherApp : Application() {
         appScope.launch {
             events.events.collect { e ->
                 if ((e is PhotoEvent.Delivered || e is PhotoEvent.Approved) && settings.current().deliveryVibrate) alerts.photoReceived()
+                if (e is PhotoEvent.Edited) runCatching { church.onPhotoEdited(e.photoId) }
             }
         }
 

@@ -36,6 +36,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.outlined.DoneAll
@@ -298,6 +299,17 @@ fun ExpressScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit)
                             }
                             OutlinedButton(onClick = { scope.launch { app.express.release(selected.toList(), on = false); selected.clear() } }, modifier = Modifier.heightIn(min = 48.dp)) {
                                 Text("Bloquear de novo")
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    val ids = items.filter { it.id in selected }.map { it.photoId }
+                                    scope.launch { toast(toggleEnhance(app, ids)); selected.clear() }
+                                },
+                                modifier = Modifier.heightIn(min = 48.dp),
+                            ) {
+                                Icon(Icons.Outlined.AutoFixHigh, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Melhorar")
                             }
                         } else {
                             if (picked.any { !it.released }) {
