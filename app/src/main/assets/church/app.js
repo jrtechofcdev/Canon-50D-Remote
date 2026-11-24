@@ -189,6 +189,7 @@
     badge.textContent = me.rankLabel || "";
     $("foot").innerHTML = 'Fotos de <span class="brandname">Jr_Tech_OFC</span>, entregues pelo JR C50D Sync';
     paintLookNote(d.event.look);
+    paintMine();
 
     var protectedView = allowed().length === 0;
     document.body.classList.toggle("protected", protectedView);
@@ -228,6 +229,38 @@
     if (lastLookAt !== null && look.at !== lastLookAt) JR.toast(look.by + " mudou o look do evento: " + look.name, "info");
     lastLookAt = look.at;
   }
+
+  // POST with the person's token; answers {status, body}.
+  function post(path) {
+    return fetch(path + (path.indexOf("?") < 0 ? "?" : "&") + "m=" + member, { method: "POST", cache: "no-store" }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (b) { return { status: r.status, body: b }; });
+    });
+  }
+
+  // An admin's own look: independent mode and going back to the previous one.
+  function paintMine() {
+    var box = $("mine");
+    box.hidden = !me || me.rank !== 1;
+    if (box.hidden) return;
+    $("mineName").textContent = me.own ? me.own.name : "o do evento";
+    $("mineIndependent").checked = !!me.independent;
+    $("mineRevert").hidden = !me.canRevert;
+  }
+  $("mineIndependent").addEventListener("change", function () {
+    var on = this.checked;
+    post("/api/c/independent?on=" + (on ? 1 : 0)).then(function (r) {
+      if (r.status !== 200) { JR.toast(r.body.error || "Não deu para mudar", "warn"); return; }
+      JR.toast(on ? "Sua pronta segue o seu look" : "Sua pronta segue o look do evento");
+      refresh();
+    });
+  });
+  $("mineRevert").addEventListener("click", function () {
+    post("/api/c/revert").then(function (r) {
+      if (r.status !== 200) { JR.toast(r.body.error || "Não deu para voltar", "warn"); return; }
+      JR.toast("Voltou ao seu look anterior");
+      refresh();
+    });
+  });
 
   function paintVersions() {
     var list = allowed(), box = $("versions"), pick = chosen();
@@ -371,7 +404,9 @@
       var pick = chosenPreset();
       strip.innerHTML = "";
       var look = eventInfo && eventInfo.look;
-      [{ id: null, name: "Do evento" + (look ? " (" + look.name + ")" : "") }].concat(presetList).forEach(function (p) {
+      // With no pick the "pronta" is the event's, or an independent admin's own look.
+      var first = me && me.independent && me.own ? "Meu look (" + me.own.name + ")" : "Do evento" + (look ? " (" + look.name + ")" : "");
+      [{ id: null, name: first }].concat(presetList).forEach(function (p) {
         var b = document.createElement("button");
         b.type = "button"; b.setAttribute("role", "radio"); b.textContent = p.name;
         b.setAttribute("aria-checked", pick === p.id ? "true" : "false");
@@ -386,7 +421,17 @@
       // The main admin can make the picked preset the event's look, for everyone who follows it.
       var all = $("useForAll");
       all.hidden = !(me && me.rank === 2 && pick !== null && (!look || look.preset !== pick));
+      $("saveMine").hidden = !(me && me.rank === 1 && pick !== null && (!me.own || me.own.preset !== pick));
     }
+    $("saveMine").addEventListener("click", function () {
+      var pick = chosenPreset();
+      if (pick === null) return;
+      post("/api/c/mylook?preset=" + pick).then(function (r) {
+        if (r.status !== 200) { JR.toast(r.body.error || "Não deu para guardar", "warn"); return; }
+        JR.toast(me.independent ? "Guardado: sua pronta usa este look" : "Guardado como seu look. Ligue Independente para usar na pronta");
+        write(presetKey(), null); paintPresets(); paint(); refresh();
+      }).catch(function () { JR.toast("Sem conexão com o celular do fotógrafo", "warn"); });
+    });
     $("useForAll").addEventListener("click", function () {
       var pick = chosenPreset();
       if (pick === null) return;

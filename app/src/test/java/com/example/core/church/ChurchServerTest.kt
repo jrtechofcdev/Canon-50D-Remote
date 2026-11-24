@@ -322,6 +322,30 @@ class ChurchServerTest {
     }
 
     @Test
+    fun anAdminKeepsTheirOwnLookGoesIndependentAndReverts() {
+        val e = event()
+        val m = join(e)
+        val id = runBlocking { db.churchDao().memberByToken(m)!!.id }
+        assertEquals(403, call("/api/c/mylook?m=$m&preset=1", "POST").status)
+        runBlocking { repo.setRank(id, ChurchRank.ADMIN) }
+        assertEquals(200, call("/api/c/mylook?m=$m&preset=1", "POST").status)
+        // Nothing before the first own look.
+        assertEquals(409, call("/api/c/revert?m=$m", "POST").status)
+        assertEquals(200, call("/api/c/mylook?m=$m&preset=2", "POST").status)
+        var state = call("/api/c/state?m=$m").text
+        assertTrue(state, state.contains("\"own\":{\"preset\":2,\"name\":\"P&B\"}") && state.contains("\"canRevert\":true") && state.contains("\"independent\":false"))
+        // Following the event, the "pronta" is the event's; independent, it is their own.
+        call("/f/$m/${photo(1).also { p -> runBlocking { repo.addPhoto(e.id, p) } }}?v=pronta&dl=1")
+        assertEquals(200, call("/api/c/independent?m=$m&on=1", "POST").status)
+        val p2 = photo(2).also { p -> runBlocking { repo.addPhoto(e.id, p) } }
+        call("/f/$m/$p2?v=pronta&dl=1")
+        assertEquals(listOf(null, ReadyLook(2, null)), fileLooks)
+        assertEquals(200, call("/api/c/revert?m=$m", "POST").status)
+        state = call("/api/c/state?m=$m").text
+        assertTrue(state, state.contains("\"own\":{\"preset\":1"))
+    }
+
+    @Test
     fun aRawIsMissingUntilTheCameraSendsIt() {
         val e = event()
         val p = photo(1, withRaw = false)

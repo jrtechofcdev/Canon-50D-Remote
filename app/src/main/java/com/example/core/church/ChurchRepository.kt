@@ -262,6 +262,33 @@ class ChurchRepository(
         changed()
     }
 
+    /** An admin keeps a look of their own; the one before goes to "Reverter". [lookName] is for the log. */
+    suspend fun setOwnLook(memberId: Long, presetId: Long?, adjust: String?, lookName: String) {
+        val m = dao.member(memberId) ?: return
+        dao.updateMember(m.copy(lookPresetId = presetId, lookAdjust = adjust, prevPresetId = m.lookPresetId, prevAdjust = m.lookAdjust))
+        log(m.eventId, m, "Mudou o próprio look", lookName)
+        changed()
+    }
+
+    /** Back to the admin's previous own look (and the current one becomes the previous). */
+    suspend fun revertOwnLook(memberId: Long): Boolean {
+        val m = dao.member(memberId) ?: return false
+        if (m.prevPresetId == null && m.prevAdjust == null) return false
+        dao.updateMember(m.copy(lookPresetId = m.prevPresetId, lookAdjust = m.prevAdjust, prevPresetId = m.lookPresetId, prevAdjust = m.lookAdjust))
+        log(m.eventId, m, "Voltou ao look anterior")
+        changed()
+        return true
+    }
+
+    /** Independent: the main admin's changes don't touch this admin's "pronta". */
+    suspend fun setIndependent(memberId: Long, on: Boolean) {
+        val m = dao.member(memberId) ?: return
+        if (m.independent == on) return
+        dao.updateMember(m.copy(independent = on))
+        log(m.eventId, m, if (on) "Ligou o modo independente" else "Voltou a seguir o look do evento")
+        changed()
+    }
+
     /** Which presets the media may use: [ids] null releases all of them, empty releases none. */
     suspend fun setReleasedPresets(eventId: Long, ids: Set<Long>?) {
         val e = dao.event(eventId) ?: return

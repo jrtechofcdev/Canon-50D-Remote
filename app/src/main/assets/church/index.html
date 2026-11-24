@@ -51,6 +51,11 @@
       <p id="church" class="eyebrow"></p>
       <h1 id="title"></h1>
       <p id="lookNote" class="look-note" hidden><i class="mark info" aria-hidden="true"></i><span></span></p>
+      <div id="mine" class="mine" hidden>
+        <p class="mine-line">Meu look: <b id="mineName"></b></p>
+        <label class="mine-switch"><input type="checkbox" id="mineIndependent"><span>Independente: o look do ADM principal não muda a minha pronta</span></label>
+        <button id="mineRevert" type="button" class="btn ghost small">Voltar ao meu look anterior</button>
+      </div>
       <p class="meta"><span id="who" class="who"></span><span id="rank" class="rank" hidden></span><span id="count" class="muted num"></span></p>
     </section>
 
@@ -86,6 +91,7 @@
   <div id="presetBar" class="preset-bar" hidden>
     <div id="presetStrip" class="preset-strip" role="radiogroup" aria-label="Preset da versão pronta"></div>
     <button id="useForAll" type="button" class="btn secondary small use-all" hidden>Usar no evento, para todos</button>
+    <button id="saveMine" type="button" class="btn secondary small use-all" hidden>Guardar como meu look</button>
     <p class="raw-note">A prévia e a pronta saem do JPG da câmera (ou do JPG dentro do RAW). O app não revela o RAW.</p>
   </div>
   <div class="viewer-actions">

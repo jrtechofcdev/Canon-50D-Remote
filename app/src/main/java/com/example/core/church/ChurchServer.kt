@@ -218,6 +218,9 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
             seg == listOf("api", "c", "presets") -> presets(r, out)
             seg == listOf("api", "c", "shader") -> shader(r, out)
             seg == listOf("api", "c", "look") && r.method == "POST" -> eventLook(r, out)
+            seg == listOf("api", "c", "mylook") && r.method == "POST" -> ownLook(r, out)
+            seg == listOf("api", "c", "independent") && r.method == "POST" -> independent(r, out)
+            seg == listOf("api", "c", "revert") && r.method == "POST" -> revert(r, out)
             seg == listOf("api", "c", "params") -> params(r, out)
             seg.size == 3 && seg[0] == "b" -> base(seg[1], seg[2], r, out, head)
             seg == listOf("evento-logo") -> logo(out, head)
@@ -301,7 +304,11 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
             append(""","pronta":${ChurchPerm.has(perms, ChurchPerm.DOWNLOAD_READY)}""")
             append(""","raw":${ChurchPerm.has(perms, ChurchPerm.DOWNLOAD_RAW)}""")
             append(""","rank":${m.rank},"rankLabel":${q(ChurchRank.label(m.rank))}""")
-            append(""","presets":${ChurchPerm.has(perms, ChurchPerm.PRESETS)},"store":${ChurchPerm.has(perms, ChurchPerm.STORE)}}""")
+            append(""","presets":${ChurchPerm.has(perms, ChurchPerm.PRESETS)},"store":${ChurchPerm.has(perms, ChurchPerm.STORE)}""")
+            // An admin's own look, whether it leads their "pronta", and whether there is one to go back to.
+            val ownName = m.lookPresetId?.let { p -> backend.presets().firstOrNull { it.id == p }?.name } ?: m.lookAdjust?.let { "ajuste próprio" }
+            append(""","independent":${m.independent},"own":${ownName?.let { """{"preset":${m.lookPresetId ?: "null"},"name":${q(it)}}""" } ?: "null"}""")
+            append(""","canRevert":${m.prevPresetId != null || m.prevAdjust != null}}""")
             append(""","photos":[""")
             photos.forEachIndexed { i, p ->
                 if (i > 0) append(',')
@@ -346,6 +353,38 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
         val name = id?.let { p -> backend.presets().firstOrNull { it.id == p }?.name } ?: if (id == null) "o da foto" else return json(out, 404, """{"error":"Preset não encontrado"}""")
         repo.setEventLook(e.id, id, null, m, name)
         backend.onEventLook()
+        json(out, 200, """{"ok":true}""")
+    }
+
+    /** The admin behind [r], or an error answer: only admins keep a look of their own. */
+    private suspend fun admin(r: Request, out: OutputStream): Pair<ChurchMember, ChurchEvent>? {
+        val (m, e) = who(r, out, r.query["m"]) ?: return null
+        if (m.rank != ChurchRank.ADMIN) {
+            json(out, 403, """{"error":"Só ADM guarda um look próprio."}""")
+            return null
+        }
+        return m to e
+    }
+
+    private suspend fun ownLook(r: Request, out: OutputStream) {
+        val (m, e) = admin(r, out) ?: return
+        val raw = r.query["preset"] ?: return json(out, 400, """{"error":"Preset?"}""")
+        val id = if (raw == "none") null else raw.toLongOrNull() ?: return json(out, 400, """{"error":"Preset?"}""")
+        if (id != null && !presetAllowed(m, e, id)) return json(out, 403, """{"error":"Este preset não está liberado."}""")
+        val name = id?.let { p -> backend.presets().firstOrNull { it.id == p }?.name } ?: "o do evento"
+        repo.setOwnLook(m.id, id, null, name)
+        json(out, 200, """{"ok":true}""")
+    }
+
+    private suspend fun independent(r: Request, out: OutputStream) {
+        val (m, _) = admin(r, out) ?: return
+        repo.setIndependent(m.id, r.query["on"] == "1")
+        json(out, 200, """{"ok":true}""")
+    }
+
+    private suspend fun revert(r: Request, out: OutputStream) {
+        val (m, _) = admin(r, out) ?: return
+        if (!repo.revertOwnLook(m.id)) return json(out, 409, """{"error":"Não há um look anterior."}""")
         json(out, 200, """{"ok":true}""")
     }
 
