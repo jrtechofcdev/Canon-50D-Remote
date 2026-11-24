@@ -26,6 +26,9 @@ class ServedFile(val name: String, val length: Long, val open: () -> InputStream
 /** One photo as the media page lists it. */
 data class ChurchPhotoInfo(val id: Long, val name: String, val hasJpg: Boolean, val hasRaw: Boolean)
 
+/** A preset as the media page lists it. */
+data class ChurchPresetInfo(val id: Long, val name: String, val group: String)
+
 /** What the server needs from the app; a fake one in tests. */
 interface ChurchBackend {
     val repo: ChurchRepository
@@ -34,10 +37,11 @@ interface ChurchBackend {
     suspend fun file(id: Long, kind: ChurchFile): ServedFile?
     /** The grid picture; [marked] = with the person's name, for who cannot download anything. */
     suspend fun thumb(id: Long, member: ChurchMember, marked: Boolean): ServedFile?
-    /** The big view; with [marked] it carries the person's name and role (they cannot download). */
-    /** The big picture; [ready] = the "pronta" (with the event's look) instead of the photo as it is. */
+    /** The big picture; [marked] carries the person's name, [ready] = the "pronta" instead of the photo as it is. */
     suspend fun preview(id: Long, member: ChurchMember, marked: Boolean, ready: Boolean = false): ServedFile?
     suspend fun logo(event: ChurchEvent): ServedFile?
+    /** The photographer's presets, in the app's order (favourites and recent first). */
+    suspend fun presets(): List<ChurchPresetInfo> = emptyList()
 }
 
 /**
@@ -201,6 +205,7 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
             seg == listOf("api", "c", "hello") -> hello(r, out)
             seg == listOf("api", "c", "join") && r.method == "POST" -> join(r, out)
             seg == listOf("api", "c", "state") -> state(r, out)
+            seg == listOf("api", "c", "presets") -> presets(r, out)
             seg == listOf("evento-logo") -> logo(out, head)
             seg.size == 3 && seg[0] == "t" -> thumb(seg[1], seg[2], r, out, head)
             seg.size == 3 && seg[0] == "p" -> preview(seg[1], seg[2], r, out, head)
@@ -278,11 +283,30 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
             append(""","original":${ChurchPerm.has(perms, ChurchPerm.DOWNLOAD_ORIGINAL)}""")
             append(""","pronta":${ChurchPerm.has(perms, ChurchPerm.DOWNLOAD_READY)}""")
             append(""","raw":${ChurchPerm.has(perms, ChurchPerm.DOWNLOAD_RAW)}""")
-            append(""","rank":${m.rank},"rankLabel":${q(ChurchRank.label(m.rank))}}""")
+            append(""","rank":${m.rank},"rankLabel":${q(ChurchRank.label(m.rank))}""")
+            append(""","presets":${ChurchPerm.has(perms, ChurchPerm.PRESETS)},"store":${ChurchPerm.has(perms, ChurchPerm.STORE)}}""")
             append(""","photos":[""")
             photos.forEachIndexed { i, p ->
                 if (i > 0) append(',')
                 append("""{"id":${p.id},"name":${q(p.name)},"jpg":${p.hasJpg},"raw":${p.hasRaw}}""")
+            }
+            append("]}")
+        })
+    }
+
+    // ---- presets ------------------------------------------------------------------------------
+
+    /** The presets released for this event, for who may use them on the page. */
+    private suspend fun presets(r: Request, out: OutputStream) {
+        val (m, e) = who(r, out, r.query["m"]) ?: return
+        if (!ChurchPerm.has(m.perms, ChurchPerm.PRESETS)) return json(out, 403, """{"error":"O fotógrafo não liberou os presets para você."}""")
+        val released = ChurchRules.released(e)
+        val list = backend.presets().filter { released == null || it.id in released }
+        json(out, 200, buildString {
+            append("""{"event":${e.presetId ?: "null"},"presets":[""")
+            list.forEachIndexed { i, p ->
+                if (i > 0) append(',')
+                append("""{"id":${p.id},"name":${q(p.name)},"group":${q(p.group)}}""")
             }
             append("]}")
         })

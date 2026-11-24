@@ -22,6 +22,7 @@ import com.example.core.delivery.network.WifiDirectNetwork
 import com.example.core.log.AppLog
 import com.example.core.render.BitmapLoader
 import com.example.core.render.Enhance
+import com.example.core.preset.forPicking
 import com.example.core.render.Looks
 import com.example.core.storage.PhotoStore
 import kotlinx.coroutines.CoroutineScope
@@ -55,6 +56,7 @@ class ChurchDelivery(
     private val looks: Looks,
     private val store: PhotoStore,
     private val settings: SettingsRepository,
+    private val presetRepo: com.example.core.preset.PresetRepository,
 ) : ChurchBackend {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + AppLog.handler(ChurchServer.TAG))
     private val lock = Mutex()
@@ -237,6 +239,9 @@ class ChurchDelivery(
         }
         return out.takeIf { it.exists() }
     }
+
+    override suspend fun presets(): List<ChurchPresetInfo> =
+        presetRepo.all().forPicking().map { ChurchPresetInfo(it.id, it.name, it.group) }
 
     override suspend fun logo(event: ChurchEvent): ServedFile? {
         val uri = event.logoUri ?: return null

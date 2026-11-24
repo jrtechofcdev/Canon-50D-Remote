@@ -60,6 +60,7 @@ class ChurchServerTest {
                 return ServedFile("p.jpg", 3) { "pre".byteInputStream() }
             }
             override suspend fun logo(event: ChurchEvent): ServedFile? = null
+            override suspend fun presets() = listOf(ChurchPresetInfo(1, "Quente", "Meus"), ChurchPresetInfo(2, "P&B", "Meus"), ChurchPresetInfo(3, "Frio", "Loja"))
         }
         server = ChurchServer(backend)
         port = server.start(0)
@@ -231,6 +232,20 @@ class ChurchServerTest {
         runBlocking { repo.setRank(db.churchDao().memberByToken(m)!!.id, ChurchRank.ADMIN) }
         val state = call("/api/c/state?m=$m").text
         assertTrue(state, state.contains("\"rank\":1") && state.contains("\"rankLabel\":\"ADM\""))
+    }
+
+    @Test
+    fun onlyPeopleWithPresetsSeeTheReleasedOnes() {
+        val e = event()
+        val m = join(e)
+        assertEquals(403, call("/api/c/presets?m=$m").status)
+        val id = runBlocking { db.churchDao().memberByToken(m)!!.id }
+        runBlocking { repo.setPerm(id, ChurchPerm.PRESETS, true) }
+        assertTrue(call("/api/c/presets?m=$m").text.contains("\"name\":\"Frio\""))
+        runBlocking { repo.setReleasedPresets(e.id, setOf(1, 2)) }
+        val list = call("/api/c/presets?m=$m").text
+        assertTrue(list, list.contains("Quente") && list.contains("P&B") && !list.contains("Frio"))
+        assertTrue(call("/api/c/state?m=$m").text.contains("\"presets\":true"))
     }
 
     @Test

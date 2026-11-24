@@ -71,6 +71,7 @@ import com.example.core.church.ChurchTheme
 import com.example.core.church.MemberStatus
 import com.example.core.church.PhotoRule
 import com.example.core.data.Photo
+import com.example.core.preset.forPicking
 import com.example.ui.components.JrButton
 import com.example.ui.components.JrButtonKind
 import com.example.ui.components.JrChip
@@ -212,7 +213,37 @@ internal val PERMS = listOf(
     ChurchPerm.DOWNLOAD_ORIGINAL to "Original",
     ChurchPerm.DOWNLOAD_READY to "Pronta",
     ChurchPerm.DOWNLOAD_RAW to "RAW",
+    ChurchPerm.PRESETS to "Presets",
 )
+
+/** The presets the media may preview and download with; "Todos" follows new presets as they are added. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun ReleasedPresetsCard(app: TetherApp, e: ChurchEvent) {
+    val scope = rememberCoroutineScope()
+    val all by app.presets.presets.collectAsState(initial = emptyList())
+    val presets = remember(all) { all.forPicking() }
+    val released = com.example.core.church.ChurchRules.released(e)
+    fun set(ids: Set<Long>?) = scope.launch { app.church.repo.setReleasedPresets(e.id, ids?.takeUnless { it.size == presets.size && it.containsAll(presets.map { p -> p.id }) }) }
+    DeliveryCard {
+        Text("Presets para a mídia", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Quem tem a chave Presets vê estes na página, com prévia ao vivo, e baixa a pronta com eles. O ADM principal escolhe entre eles o look do evento.",
+            style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted,
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.s), verticalArrangement = Arrangement.spacedBy(Space.s)) {
+            JrChip("Todos", released == null, onClick = { set(null) })
+            presets.forEach { p ->
+                val on = released == null || p.id in released
+                JrChip(p.name, on, onClick = {
+                    val now = released ?: presets.map { it.id }.toSet()
+                    set(if (on) now - p.id else now + p.id)
+                })
+            }
+        }
+        if (released != null) Text("${released.size} de ${presets.size} liberados", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
+    }
+}
 
 /** What a newcomer may do. Changing it doesn't touch who is already inside, until "Aplicar a todos". */
 @OptIn(ExperimentalLayoutApi::class)

@@ -55,6 +55,10 @@ object ChurchRules {
         return extras + base
     }
 
+    /** The presets released to the media (null = all of them). */
+    fun released(event: ChurchEvent): Set<Long>? =
+        event.presets?.split(',')?.mapNotNull { it.trim().toLongOrNull() }?.toSet()
+
     /** Whether [via] may be used to come in, and the message when not. */
     fun viaProblem(event: ChurchEvent, via: String, token: String?): String? = when (via) {
         ChurchVia.LINK, ChurchVia.QR -> when {
@@ -224,6 +228,14 @@ class ChurchRepository(
             changed()
         }
         return changedOnes.size
+    }
+
+    /** Which presets the media may use: [ids] null releases all of them, empty releases none. */
+    suspend fun setReleasedPresets(eventId: Long, ids: Set<Long>?) {
+        val e = dao.event(eventId) ?: return
+        dao.updateEvent(e.copy(presets = ids?.sorted()?.joinToString(",")))
+        log(eventId, null, "Presets liberados", if (ids == null) "todos" else "${ids.size}")
+        changed()
     }
 
     // Photographer: people.
