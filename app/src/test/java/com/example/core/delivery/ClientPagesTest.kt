@@ -5,8 +5,8 @@ import org.junit.Test
 import java.io.File
 
 /**
- * The client pages (assets/portal and assets/express) only load files the phone actually serves: a
- * file missing from [LocalServer.ASSETS] answers 404 and the page loses its look or its script.
+ * The client pages (assets/portal, assets/express and assets/church) only load files the phone actually
+ * serves: a file missing from the server's list answers 404 and the page loses its look or its script.
  */
 class ClientPagesTest {
     // Unit tests run from the module folder.
@@ -20,12 +20,13 @@ class ClientPagesTest {
 
     @Test
     fun everyFileThePagesAskForIsServed() {
-        for (mode in listOf("portal", "express")) {
+        for (mode in listOf("portal", "express", "church")) {
+            val served = if (mode == "church") com.example.core.church.ChurchServer.ASSETS else LocalServer.ASSETS
             val pages = listOf(File(assets, "$mode/index.html"), File(assets, "$mode/style.css"), File(assets, "shared/brand.css"))
             val names = pages.flatMap(::referenced).toSet()
             assertTrue("$mode: nothing referenced", names.contains("brand.css") && names.contains("app.js"))
             for (name in names) {
-                assertTrue("$mode asks for /$name, which the server does not serve", name in LocalServer.ASSETS)
+                assertTrue("$mode asks for /$name, which the server does not serve", name in served)
                 val onDisk = name in fromApp || File(assets, "$mode/$name").exists() || File(assets, "shared/$name").exists()
                 assertTrue("$mode asks for /$name, which is not in the APK", onDisk)
             }

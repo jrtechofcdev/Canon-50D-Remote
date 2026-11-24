@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f1f1f">
+<meta name="robots" content="noindex">
+<title>Fotos do evento</title>
+<link rel="icon" href="/icon.png">
+<link rel="stylesheet" href="/brand.css">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="opening">
+<header class="top" id="top">
+  <span class="brand-slot"><img id="eventLogo" class="logo" alt="" hidden><img id="jrLogo" class="logo" src="/logo.png" alt="Jr_Tech_OFC"></span>
+  <span id="live" class="state live" hidden><i class="mark on" aria-hidden="true"></i><span>Ao vivo</span></span>
+  <button id="leave" class="btn ghost small" hidden>Sair</button>
+</header>
+
+<div class="stage">
+  <!-- The door: the event, then the code (when it is on), then name and role. -->
+  <main id="door" class="gate" hidden>
+    <p id="doorChurch" class="eyebrow"></p>
+    <h1 id="doorTitle">Fotos do evento</h1>
+    <p id="doorMotto" class="muted lead"></p>
+
+    <form id="codeStep" class="step" autocomplete="off" novalidate hidden>
+      <p class="step-lead">Digite o código de 4 números que o fotógrafo passou.</p>
+      <label class="code" id="codeBox">
+        <span class="sr">Código de 4 números</span>
+        <input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" enterkeyhint="next">
+        <span class="cells" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </label>
+    </form>
+
+    <form id="nameStep" class="step" autocomplete="on" novalidate hidden>
+      <p class="step-lead">Quem está acessando? O fotógrafo vê o seu nome e o seu cargo.</p>
+      <label class="field"><span>Seu nome</span><input id="name" name="name" autocomplete="name" maxlength="40" enterkeyhint="next" required></label>
+      <label class="field"><span>Cargo ou função</span><input id="role" name="role" maxlength="40" list="roles" placeholder="Mídia, pastor, secretaria…" enterkeyhint="go" required></label>
+      <datalist id="roles"><option value="Mídia"><option value="Pastor"><option value="Secretaria"><option value="Comunicação"><option value="Diácono"></datalist>
+      <button class="btn primary wide" type="submit" id="enter">Entrar</button>
+    </form>
+
+    <p id="doorError" class="error" role="alert"></p>
+    <p id="doorClosed" class="note" hidden><i class="mark warn" aria-hidden="true"></i><span id="doorClosedText"></span></p>
+    <p class="note"><i class="mark info" aria-hidden="true"></i><span>Se o celular avisar que este Wi-Fi não tem internet, toque em <b>Manter conectado</b>. As fotos vêm direto do celular do fotógrafo.</span></p>
+  </main>
+
+  <main id="gallery" class="gallery" hidden>
+    <section class="hello">
+      <p id="church" class="eyebrow"></p>
+      <h1 id="title"></h1>
+      <p class="meta"><span id="who" class="who"></span><span id="count" class="muted num"></span></p>
+    </section>
+
+    <section id="tools" class="tools" hidden>
+      <div class="versions" role="radiogroup" aria-label="Versão para baixar" id="versions"></div>
+      <button id="saveNew" class="btn primary" hidden></button>
+    </section>
+
+    <p id="viewOnly" class="note" hidden><i class="mark warn" aria-hidden="true"></i><span>Você pode ver as fotos, mas não baixar. Cada imagem mostra o seu nome e o horário.</span></p>
+
+    <div id="grid" class="grid"></div>
+
+    <div id="empty" class="empty" hidden>
+      <div id="emptyArt"></div>
+      <p class="empty-title" id="emptyTitle">As fotos aparecem aqui</p>
+      <p class="muted" id="emptyText">Assim que o fotógrafo fizer as fotos, elas chegam nesta página sozinhas. Pode deixar aberta.</p>
+    </div>
+  </main>
+
+  <footer class="foot" id="foot"></footer>
+</div>
+
+<div id="viewer" class="viewer" hidden role="dialog" aria-modal="true" aria-label="Foto">
+  <div class="viewer-bar">
+    <button id="close" class="round" aria-label="Fechar"></button>
+    <span id="pos" class="pos num"></span>
+    <span class="round-gap" aria-hidden="true"></span>
+  </div>
+  <div class="viewer-stage" id="viewerStage"><canvas id="big" aria-label="Foto ampliada"></canvas><span id="bigWait" class="big-wait" hidden></span></div>
+  <div class="viewer-actions">
+    <button id="prev" class="round" aria-label="Foto anterior"></button>
+    <div id="downloads" class="downloads"></div>
+    <button id="next" class="round" aria-label="Próxima foto"></button>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="/brand.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

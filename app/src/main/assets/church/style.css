@@ -1,0 +1,151 @@
+/* Entrega da igreja: what this page adds to brand.css. The event's colors replace mint and cyan (app.js). */
+
+.stage { max-width: 1180px; margin: 0 auto; }
+
+.top .brand-slot { display: flex; align-items: center; min-width: 0; }
+.top .logo { max-width: 46vw; object-fit: contain; }
+.top #eventLogo { height: 34px; }
+.live { font-size: 13px; margin-left: auto; }
+.live.lost .mark { background: var(--amber); }
+.live .mark { animation: breathe 2.4s var(--ease) infinite; }
+@keyframes breathe { 50% { opacity: .45; } }
+
+/* ---------- The door ---------- */
+.gate {
+  max-width: 440px; margin: 0 auto; padding: clamp(24px, 7vh, 72px) var(--gutter) 0;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+}
+.gate .eyebrow { margin: 0; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; color: var(--cyan); font-weight: 500; }
+.gate h1 { font-size: clamp(28px, 7.4vw, 38px); line-height: 1.12; font-weight: 600; margin: var(--s2) 0 var(--s2); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.gate .lead { margin: 0; max-width: 34ch; font-style: italic; }
+.gate .lead:empty { display: none; }
+.step { width: 100%; max-width: 360px; margin-top: var(--s6); display: grid; gap: var(--s3); animation: fade var(--medium) var(--ease); }
+.step-lead { margin: 0 0 var(--s1); color: var(--muted); }
+
+/* Same code cells as the Entrega local: one real input over four slanted blocks. */
+.code { position: relative; display: block; width: 100%; padding: 0 var(--s3); cursor: text; }
+.code input {
+  position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2;
+  opacity: 0; border: 0; padding: 0; font-size: 16px; color: transparent; caret-color: transparent; background: transparent;
+}
+.cells { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s3); }
+.cells i {
+  height: 72px; border-radius: var(--r); border: 1.5px solid var(--line); background: var(--surface);
+  transform: skewX(-16deg); display: flex; align-items: center; justify-content: center;
+  font-style: normal; font-size: 34px; font-weight: 600; font-variant-numeric: tabular-nums;
+  transition: border-color var(--short) var(--ease), background-color var(--short) var(--ease);
+}
+.cells i span { transform: skewX(16deg); }
+.cells i.next { border-color: var(--mint); }
+.code:not(.focus) .cells i.next { border-color: var(--line); }
+.code.wrong .cells i { border-color: var(--error); }
+.code.wrong .cells { animation: shake 360ms var(--ease); }
+@keyframes shake { 20% { transform: translateX(-8px); } 40% { transform: translateX(7px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(2px); } }
+.code.ok .cells i { border-color: var(--mint); background: var(--high); }
+
+.field { display: grid; gap: var(--s1); text-align: left; font-size: 14px; color: var(--muted); font-weight: 500; }
+.field input {
+  min-height: 52px; padding: 0 var(--s4); border-radius: var(--r); border: 1.5px solid var(--line);
+  background: var(--surface); color: var(--text); font-size: 17px; outline: none;
+  transition: border-color var(--short) var(--ease);
+}
+.field input:focus { border-color: var(--mint); }
+.field input::placeholder { color: #707070; }
+
+.error { color: var(--error); min-height: 1.5em; margin: var(--s3) 0 0; font-weight: 500; font-size: 15px; }
+.error:empty { visibility: hidden; }
+.btn.wide { width: 100%; margin-top: var(--s2); }
+.note {
+  display: flex; gap: var(--s3); align-items: flex-start; text-align: left;
+  font-size: 14px; color: var(--muted); background: var(--surface); border-radius: var(--r);
+  padding: var(--s3) var(--s4); margin: var(--s5) 0 0;
+}
+.note .mark { margin-top: 6px; }
+.note b { color: var(--text); font-weight: 500; }
+
+/* ---------- Gallery ---------- */
+.gallery { padding: 0 var(--gutter); }
+.hello { padding: var(--s5) 0 var(--s4); }
+.eyebrow { margin: 0; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; color: var(--cyan); font-weight: 500; }
+.hello h1 { margin: var(--s1) 0 0; font-size: clamp(30px, 8.6vw, 48px); line-height: 1.06; font-weight: 600; letter-spacing: -.015em; overflow-wrap: anywhere; }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s3); margin: var(--s3) 0 0; font-size: 15px; }
+.who { display: inline-flex; align-items: center; gap: var(--s2); padding: 2px var(--s3); border-radius: var(--r-sm); background: var(--surface); font-weight: 500; }
+
+/* The version picker and the one action of the page: download what arrived since the last time. */
+.tools {
+  position: sticky; top: calc(58px + env(safe-area-inset-top)); z-index: 6;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3);
+  margin: 0 calc(-1 * var(--gutter)) var(--s4); padding: var(--s2) var(--gutter);
+  background: rgba(31, 31, 31, .92); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+.versions { display: inline-flex; padding: 3px; border-radius: var(--r); background: var(--surface); gap: 2px; }
+.versions button {
+  min-height: 40px; padding: 0 var(--s4); border: 0; border-radius: 6px; background: transparent; color: var(--muted);
+  font-weight: 600; font-size: 14px; transition: background-color var(--short) var(--ease), color var(--short) var(--ease);
+}
+.versions button[aria-checked="true"] { background: var(--high); color: var(--text); box-shadow: inset 0 -2px 0 var(--mint); }
+/* Fills the row it lands on: beside the picker on wide screens, its own full row on a phone. */
+.tools .btn.primary { flex: 1 1 220px; }
+
+/* Rows that keep every photo's shape and fill the width, newest first. */
+.grid { display: flex; flex-wrap: wrap; gap: var(--s1); --row: 132px; }
+.grid::after { content: ""; flex-grow: 1000; }
+.cell {
+  --ratio: 1.5;
+  position: relative; flex: var(--ratio) 1 calc(var(--ratio) * var(--row)); height: var(--row); max-width: 100%;
+  padding: 0; border: 0; border-radius: var(--r-sm); overflow: hidden; background: var(--surface); cursor: zoom-in;
+}
+.cell img, .cell canvas { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0;
+  transition: opacity var(--medium) var(--ease); }
+.cell .loaded { opacity: 1; }
+.cell .tag { position: absolute; left: var(--s1); bottom: var(--s1); padding: 1px 6px; border-radius: var(--r-sm);
+  background: var(--scrim); color: #fff; font-size: 11px; font-weight: 600; letter-spacing: .04em; }
+.cell .done { position: absolute; right: var(--s1); top: var(--s1); }
+.cell.new { outline: 2px solid var(--mint); outline-offset: -2px; }
+
+.empty { text-align: center; padding: var(--s6) var(--s4); max-width: 380px; margin: var(--s4) auto 0; }
+.empty .symbol { width: 72px; height: 72px; margin: 0 auto var(--s4); }
+.empty-title { font-size: 20px; font-weight: 600; margin: 0 0 var(--s2); }
+.empty .muted { margin: 0; }
+
+/* ---------- Viewer ---------- */
+.viewer-stage canvas { max-width: 100%; max-height: 100%; display: block; transition: opacity var(--medium) var(--ease); }
+.viewer-stage canvas.wait { opacity: .35; }
+.big-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.round-gap { width: 48px; flex: none; }
+.downloads { flex: 1 1 0; min-width: 0; display: flex; gap: var(--s2); }
+.downloads .btn { flex: 1 1 0; min-width: 0; padding: 0 var(--s3); }
+.downloads .btn.secondary { background: rgba(255, 255, 255, .12); color: #fff; }
+.downloads .only { flex: 1; text-align: center; font-size: 14px; color: #bdbdbd; }
+
+/* ---------- Who cannot download ---------- */
+/* Nothing to select, drag or long-press; the picture is a canvas, not a saveable image. */
+body.protected .cell, body.protected .viewer-stage, body.protected canvas {
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-user-drag: none;
+}
+/* Leaving the page (app switcher, another tab) hides the photos first. */
+body.protected.veiled .stage, body.protected.veiled .viewer { filter: blur(28px); }
+@media print { body.protected { display: none !important; } }
+
+/* Phone: the download buttons get their own row above the arrows, so their names are never cut. */
+@media (max-width: 599px) {
+  .viewer-actions { flex-wrap: wrap; justify-content: space-between; row-gap: var(--s2); }
+  .downloads { order: -1; flex: 1 1 100%; }
+}
+@media (min-width: 600px) {
+  .grid { --row: 168px; }
+  .tools .btn.primary { flex: 0 0 auto; margin-left: auto; }
+}
+@media (min-width: 900px) {
+  .grid { --row: 210px; }
+  .downloads { flex: 0 1 520px; margin: 0 auto; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .gate { padding-top: var(--s4); }
+  .gate h1 { font-size: 26px; }
+  .step { margin-top: var(--s4); }
+  .gate .note { display: none; }
+  .hello { padding: var(--s3) 0 var(--s2); }
+  .hello h1 { font-size: 28px; }
+  .tools { top: calc(50px + env(safe-area-inset-top)); }
+}
