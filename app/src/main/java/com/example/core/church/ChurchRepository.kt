@@ -126,6 +126,20 @@ class ChurchRepository(
         changed()
     }
 
+    /** Fixes the name or the date after the event was created; the media page shows the new ones on its next look. */
+    suspend fun editEvent(eventId: Long, name: String, date: Long) {
+        val e = dao.event(eventId) ?: return
+        val clean = name.trim().replace(Regex("\\s+"), " ").take(60).ifBlank { return }
+        if (clean == e.name && date == e.date) return
+        dao.updateEvent(e.copy(name = clean, date = date))
+        val what = listOfNotNull(
+            "nome: $clean".takeIf { clean != e.name },
+            "data: ${java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.ROOT).format(java.util.Date(date))}".takeIf { date != e.date },
+        )
+        log(eventId, null, "Evento editado", what.joinToString(", "))
+        changed()
+    }
+
     /** Opens [eventId] again (the others close). */
     suspend fun open(eventId: Long) {
         val e = dao.event(eventId) ?: return

@@ -88,6 +88,21 @@ class ChurchRepositoryTest {
     }
 
     @Test
+    fun theEventsNameAndDateCanBeFixedLater() = runBlocking {
+        val e = repo.newEvent("Culto de domigo", null)
+        val v = repo.version
+        repo.editEvent(e.id, "  Culto   de domingo ", 1_764_000_000_000L)
+        val fixed = db.churchDao().event(e.id)!!
+        assertEquals("Culto de domingo", fixed.name)
+        assertEquals(1_764_000_000_000L, fixed.date)
+        assertTrue(repo.version > v)
+        assertEquals("Evento editado", db.churchDao().fullLog(e.id).last().action)
+        // A blank name is ignored instead of erasing it.
+        repo.editEvent(e.id, "   ", fixed.date)
+        assertEquals("Culto de domingo", db.churchDao().event(e.id)!!.name)
+    }
+
+    @Test
     fun aWrongCodeIsRefusedAndTriesAreLimited() = runBlocking {
         val e = repo.newEvent("Cruzada", null)
         repeat(5) { assertTrue(join(e, code = "0000".takeIf { it != e.code } ?: "1111") is JoinResult.Denied) }

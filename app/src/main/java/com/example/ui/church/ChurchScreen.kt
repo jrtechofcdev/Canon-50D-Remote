@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Church
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Key
@@ -33,6 +34,10 @@ import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -114,7 +119,6 @@ fun ChurchScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit) 
         Column(Modifier.widthIn(max = 1100.dp).fillMaxWidth()) {
             ScreenHeader(
                 title = "Entrega da igreja",
-                subtitle = event?.let { e -> listOf(e.name, e.congregation).filter { it.isNotBlank() }.joinToString(" · ") },
                 onBack = onBack,
             ) {
                 IconButton(onClick = { managing = true }) { Icon(Icons.Outlined.Groups, contentDescription = "Congregações", tint = Tone.TextMuted) }
@@ -130,6 +134,7 @@ fun ChurchScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit) 
                     NewEventCard(app, congregations)
                     PastEvents(app, events.filter { !it.isOpen })
                 } else {
+                    EventCard(app, e)
                     TwoUp(
                         first = {
                             StatusCard(
@@ -329,6 +334,81 @@ private fun ReadyCard(app: TetherApp, e: ChurchEvent, enhanceEverywhere: Boolean
             else scope.launch { app.church.repo.updateEvent(e.copy(enhanceReady = on)) }
         }
     }
+}
+
+/** The event itself: name, congregation and date, with Editar for when something was typed wrong. */
+@Composable
+private fun EventCard(app: TetherApp, e: ChurchEvent) {
+    var editing by remember { mutableStateOf(false) }
+    DeliveryCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(e.name, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(listOf(e.congregation, day(e.date)).filter { it.isNotBlank() }.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted)
+            }
+            JrButton("Editar", onClick = { editing = true }, kind = JrButtonKind.Secondary, icon = Icons.Outlined.Edit)
+        }
+    }
+    if (editing) EditEventDialog(app, e) { editing = false }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditEventDialog(app: TetherApp, e: ChurchEvent, onDone: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var name by remember { mutableStateOf(e.name) }
+    var date by remember { mutableStateOf(e.date) }
+    var picking by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDone,
+        title = { Text("Editar evento") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Space.m)) {
+                OutlinedTextField(
+                    value = name, onValueChange = { name = it.take(60) },
+                    label = { Text("Nome do evento") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Data", style = MaterialTheme.typography.labelLarge, color = Tone.TextMuted)
+                        Text(day(date), style = MaterialTheme.typography.bodyLarge)
+                    }
+                    TextButton(onClick = { picking = true }) { Text("Trocar") }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { scope.launch { app.church.repo.editEvent(e.id, name, date) }; onDone() }, enabled = name.isNotBlank()) { Text("Salvar") }
+        },
+        dismissButton = { TextButton(onClick = onDone) { Text("Cancelar") } },
+    )
+    if (picking) {
+        // The picker works in UTC days; the event keeps its own time of day on the chosen day.
+        val state = rememberDatePickerState(initialSelectedDateMillis = localDayAsUtc(date))
+        DatePickerDialog(
+            onDismissRequest = { picking = false },
+            confirmButton = {
+                TextButton(onClick = { state.selectedDateMillis?.let { date = utcDayAsLocal(it, date) }; picking = false }) { Text("Ok") }
+            },
+            dismissButton = { TextButton(onClick = { picking = false }) { Text("Cancelar") } },
+        ) { DatePicker(state = state) }
+    }
+}
+
+private fun localDayAsUtc(ms: Long): Long {
+    val local = java.util.Calendar.getInstance().apply { timeInMillis = ms }
+    return java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+        clear(); set(local.get(java.util.Calendar.YEAR), local.get(java.util.Calendar.MONTH), local.get(java.util.Calendar.DAY_OF_MONTH))
+    }.timeInMillis
+}
+
+private fun utcDayAsLocal(utcDay: Long, keepTimeOf: Long): Long {
+    val day = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply { timeInMillis = utcDay }
+    return java.util.Calendar.getInstance().apply {
+        timeInMillis = keepTimeOf
+        set(day.get(java.util.Calendar.YEAR), day.get(java.util.Calendar.MONTH), day.get(java.util.Calendar.DAY_OF_MONTH))
+    }.timeInMillis
 }
 
 @Composable
