@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img alt="Versão 5.4" src="https://img.shields.io/badge/vers%C3%A3o-5.4-00FCA8?labelColor=292929">
+  <img alt="Versão 5.4.1" src="https://img.shields.io/badge/vers%C3%A3o-5.4.1-00FCA8?labelColor=292929">
   <img alt="Android 7 ou mais novo" src="https://img.shields.io/badge/Android-7%2B-1CDAFF?labelColor=292929&logo=android&logoColor=white">
   <img alt="Canon EOS 50D" src="https://img.shields.io/badge/c%C3%A2mera-Canon%20EOS%2050D-00FCA8?labelColor=292929">
   <img alt="Kotlin e Jetpack Compose" src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-1CDAFF?labelColor=292929&logo=kotlin&logoColor=white">
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="release/JR_C50D_Sync-v5.4.apk"><b>⬇ Baixar o APK 5.4</b></a>
+  <a href="release/JR_C50D_Sync-v5.4.1.apk"><b>⬇ Baixar o APK 5.4.1</b></a>
   &nbsp;·&nbsp;
   <a href="#instalar">Instalar</a>
   &nbsp;·&nbsp;
@@ -144,7 +144,7 @@ Cada função do app responde a uma etapa do trabalho no evento.
 
 ## Instalar
 
-1. Baixe o **[APK 5.4](release/JR_C50D_Sync-v5.4.apk)** (ou pela aba *Releases*, ao lado).
+1. Baixe o **[APK 5.4.1](release/JR_C50D_Sync-v5.4.1.apk)** (ou pela aba *Releases*, ao lado).
 2. Abra o arquivo no celular e permita **instalar apps desconhecidos** quando o Android pedir.
 3. As atualizações instalam por cima e mantêm suas fotos e ajustes.
 
@@ -276,9 +276,11 @@ Para cultos, cruzadas e festas, sem cobrança e sem limite de fotos:
 2. Dê o nome do evento, escolha a congregação e toque em **Abrir evento**. As fotos novas da câmera entram sozinhas.
 3. Toque em **Iniciar entrega**. O padrão é o **Wi-Fi da igreja**: o celular e a mídia na mesma rede. Sem Wi-Fi no local, troque para o roteador do celular ou Wi-Fi Direct em Ajustes.
 4. A mídia lê o QR (ou recebe o link pelo **Mandar o link**), digita o código, o nome e o cargo, e vê as fotos ao vivo.
-5. Em **Pessoas**, cada um tem as chaves **Ver**, **Original**, **Pronta** e **RAW**, além de **Fotos** (ocultar só dela ou dar fotos extras), **Bloquear** e **Expulsar**.
+5. Em **Quem entrar pode**, escolha o que quem chega pode fazer (por exemplo, só ver). Em **Pessoas**, cada um tem as chaves **Ver**, **Original**, **Pronta** e **RAW**, além de **Fotos** (ocultar só dela ou dar fotos extras), **Bloquear** e **Expulsar**.
 6. Em **Versão pronta**, escolha o preset do evento e ligue o **Melhorar** se quiser.
-7. **Encerrar evento** tira todos da página. O evento fica na lista para reabrir.
+7. **Encerrar evento** tira todos da página e oferece apagar as cópias preparadas. O evento fica na lista para reabrir. Ele também pode encerrar sozinho em 3, 6 ou 12 horas.
+
+As **congregações** (ícone no topo do painel) guardam cores, frase, logo, preset da pronta e "quem entrar pode" de cada igreja. A **Placa para imprimir** traz o QR do Wi-Fi, o QR da página e o código. Na página, a mídia alterna entre **Original** e **Pronta** na foto grande antes de baixar.
 
 **Quem não pode baixar** vê as fotos sem botão de baixar, desenhadas na tela com o próprio nome, cargo e hora. A página bloqueia salvar, arrastar e compartilhar, e embaça quando a pessoa sai dela. Nenhuma página da web consegue bloquear o print do celular; por isso a marca com o nome mostra de quem veio a imagem. O **Log do evento** guarda tudo, inclusive tentativas de baixar sem permissão, e exporta em texto.
 

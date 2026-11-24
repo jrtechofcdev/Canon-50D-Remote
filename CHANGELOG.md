@@ -2,6 +2,26 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [5.4.1] · 2026-11-24
+
+O que ficou de fora da 5.4 na Entrega da igreja e no Melhorar.
+
+- **Quem entrar pode:** um cartão no painel escolhe o que quem chega pode fazer (ver, baixar a original, a pronta e o RAW). Por exemplo, só ver, e você libera o download pessoa por pessoa. **Aplicar a quem já entrou** passa a regra para todos, menos os bloqueados. Antes, quem entrava já podia baixar tudo.
+- **Miniaturas com o nome:** para quem não pode baixar, as fotos pequenas da galeria também saem com nome, cargo e hora, e não só a foto grande.
+- **Congregações:** o ícone no topo do painel abre a lista. Em cada uma dá para editar nome, cores, frase, logo, preset da pronta e "quem entrar pode", ou apagar (os eventos dela continuam).
+- **Editar o evento:** corrigir o nome e a data depois de criado.
+- **Validade do evento:** encerra sozinho em 3, 6 ou 12 horas, para um evento esquecido não ficar aberto.
+- **Ver a Pronta antes de baixar:** na foto grande, a mídia alterna entre **Original** e **Pronta**.
+- **Quem viu cada foto:** o log registra quando alguém abre uma foto (uma linha por pessoa e foto). No painel, essas linhas aparecem com o filtro **Quem viu cada foto**.
+- **Placa para imprimir da igreja:** QR do Wi-Fi, QR da página e o código, com o nome e a cor do evento (PNG e PDF A6). Na placa da Entrega local, os números dos passos ficaram centralizados.
+- **Arquivos preparados:** as cópias para a mídia (pronta, prévias e miniaturas) ficam numa pasta por evento. Ao encerrar, o app oferece apagar e mostra quanto libera; apagar o evento apaga junto; e nos eventos anteriores há o botão **Liberar**.
+- **Melhorar em mais lugares:**
+  - no Express, com as fotos marcadas;
+  - na Entrega local, na folha de cada cliente ("Melhorar as fotos deste cliente");
+  - no painel da igreja, com **Toque para: Melhorar** na grade de fotos.
+
+  Quando uma foto do evento muda, a pronta dela é refeita sozinha.
+
 ## [5.4] · 2026-11-24
 
 ### Entrega da igreja (nova)
