@@ -246,20 +246,26 @@ interface PresetDao {
 }
 
 @Database(
-    entities = [Photo::class, PresetEntity::class, DeliverySession::class, DeliveryItem::class],
-    version = 11,
+    entities = [
+        Photo::class, PresetEntity::class, DeliverySession::class, DeliveryItem::class,
+        com.example.core.church.Congregation::class, com.example.core.church.ChurchEvent::class,
+        com.example.core.church.ChurchMember::class, com.example.core.church.MemberPhotoRule::class,
+        com.example.core.church.EventPhoto::class, com.example.core.church.ChurchAudit::class,
+    ],
+    version = 12,
     exportSchema = false,
 )
 abstract class PhotoDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
     abstract fun presetDao(): PresetDao
     abstract fun deliveryDao(): DeliveryDao
+    abstract fun churchDao(): com.example.core.church.ChurchDao
 
     companion object {
         /** [name] is only changed by tests, which must not share the file the app itself opens. */
         fun create(context: Context, name: String = "tether50d.db"): PhotoDatabase =
             Room.databaseBuilder(context, PhotoDatabase::class.java, name)
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
                 // Version 1 only ever held simulator entries, so dropping it loses nothing real.
                 .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1)
                 .build()
@@ -322,6 +328,26 @@ abstract class PhotoDatabase : RoomDatabase() {
         val MIGRATION_10_11 = object : Migration(10, 11) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE photos ADD COLUMN enhance INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /** The church tables exactly as Room creates them (copied from the generated schema). */
+        private val CHURCH_TABLES = listOf(
+            "CREATE TABLE IF NOT EXISTS `church_congregations` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `accent` TEXT NOT NULL, `secondary` TEXT NOT NULL, `motto` TEXT, `logoUri` TEXT, `presetId` INTEGER, `adjust` TEXT, `defaultPerms` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS `church_events` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `congregationId` INTEGER, `name` TEXT NOT NULL, `congregation` TEXT NOT NULL, `date` INTEGER NOT NULL, `accent` TEXT NOT NULL, `secondary` TEXT NOT NULL, `motto` TEXT, `logoUri` TEXT, `presetId` INTEGER, `adjust` TEXT, `enhanceReady` INTEGER NOT NULL, `linkOn` INTEGER NOT NULL, `qrOn` INTEGER NOT NULL, `codeOn` INTEGER NOT NULL, `code` TEXT NOT NULL, `token` TEXT NOT NULL, `defaultPerms` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `closedAt` INTEGER)",
+            "CREATE TABLE IF NOT EXISTS `church_members` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `eventId` INTEGER NOT NULL, `name` TEXT NOT NULL, `role` TEXT NOT NULL, `token` TEXT NOT NULL, `status` TEXT NOT NULL, `perms` INTEGER NOT NULL, `device` TEXT, `ip` TEXT, `joinedAt` INTEGER NOT NULL, `lastSeenAt` INTEGER NOT NULL)",
+            "CREATE INDEX IF NOT EXISTS `index_church_members_eventId` ON `church_members` (`eventId`)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_church_members_token` ON `church_members` (`token`)",
+            "CREATE TABLE IF NOT EXISTS `church_photo_rules` (`memberId` INTEGER NOT NULL, `photoId` INTEGER NOT NULL, `rule` TEXT NOT NULL, PRIMARY KEY(`memberId`, `photoId`))",
+            "CREATE TABLE IF NOT EXISTS `church_event_photos` (`eventId` INTEGER NOT NULL, `photoId` INTEGER NOT NULL, `addedAt` INTEGER NOT NULL, `hidden` INTEGER NOT NULL, PRIMARY KEY(`eventId`, `photoId`))",
+            "CREATE TABLE IF NOT EXISTS `church_audit` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `eventId` INTEGER NOT NULL, `memberId` INTEGER, `who` TEXT NOT NULL, `action` TEXT NOT NULL, `detail` TEXT, `ip` TEXT, `at` INTEGER NOT NULL)",
+            "CREATE INDEX IF NOT EXISTS `index_church_audit_eventId` ON `church_audit` (`eventId`)",
+        )
+
+        /** Church events: congregations, events, the media team, per-person photo rules and the log. Photos are untouched. */
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                CHURCH_TABLES.forEach(db::execSQL)
             }
         }
 
