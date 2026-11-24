@@ -123,7 +123,7 @@ class PhotoActions(
             withContext(Dispatchers.IO) {
                 photos.mapNotNull { p ->
                     // The client gets the photo as shown on screen: edited copy, or the look rendered now.
-                    val source = p.editedUri ?: looks?.exportFile(p, 0)?.let { "file://${it.path}" } ?: p.displayUri
+                    val source = p.editedUri ?: looks?.exportFile(p, 0, forceEnhance = settings.enhanceLevel.takeIf { settings.enhanceOnShare })?.let { "file://${it.path}" } ?: p.displayUri
                     source?.let { export.exportLight(it, p.savedBase, settings, p.lat, p.lon) }
                         ?.let { FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", it) }
                 }

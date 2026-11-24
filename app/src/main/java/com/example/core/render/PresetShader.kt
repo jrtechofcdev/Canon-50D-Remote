@@ -158,8 +158,10 @@ void main() {
 
     float detail = L - Ls;
     float edge = uMasking <= 0.0 ? 1.0 : smoothstep(0.0, uMasking * 0.08, abs(detail));
+    // Noise reduction smooths flat areas only; without masking it uses a fixed edge threshold (it did nothing before).
+    float nrEdge = smoothstep(0.0, max(uMasking, 0.5) * 0.08, abs(detail));
     c += uSharpen * detail * edge * 1.5;
-    c -= uNoise * 0.5 * detail * (1.0 - edge);
+    c -= uNoise * 0.5 * detail * (1.0 - nrEdge);
 
     vec2 p = (vUv - 0.5) * 2.0;
     p.x *= mix(1.0, uSize.x / uSize.y, clamp(uVigRound * 0.5 + 0.5, 0.0, 1.0));

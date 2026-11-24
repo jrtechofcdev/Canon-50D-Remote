@@ -39,6 +39,7 @@ import androidx.compose.material.icons.outlined.BlurOn
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Crop
+import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Flag
@@ -319,6 +320,12 @@ fun PhotosScreen(
                 onDeliver = { sheet = "deliver" },
                 onExpress = { com.example.ui.delivery.sendToExpress(app, context, scope, selection.map { it.id }, onOpenExpress) { selected.clear() } },
                 onCrop = { sheet = "crop" },
+                onEnhance = {
+                    // Any photo still without it: improve them all; all already improved: take it off.
+                    val on = selection.any { it.enhance == com.example.core.render.Enhance.OFF }
+                    val code = if (on) settings.enhanceLevel else com.example.core.render.Enhance.OFF
+                    runBatch(if (on) "Melhorando" else "Tirando o Melhorar", selection) { app.looks.setEnhance(it, code) }
+                },
                 onDelete = { sheet = "delete" },
                 onShare = { set -> scope.launch { actions.share(selection, set, settings) } },
                 onLightroom = { set -> scope.launch { actions.openInLightroom(selection, set, settings) } },
@@ -408,6 +415,7 @@ private fun BatchBar(
     onDeliver: () -> Unit,
     onExpress: () -> Unit,
     onCrop: () -> Unit,
+    onEnhance: () -> Unit,
     onDelete: () -> Unit,
     onShare: (ShareSet) -> Unit,
     onLightroom: (ShareSet) -> Unit,
@@ -424,6 +432,7 @@ private fun BatchBar(
         BarAction(Icons.Outlined.Collections, "Express", onExpress)
         BarAction(Icons.Outlined.Style, "Preset", onPreset)
         BarAction(Icons.Outlined.Crop, "Recorte", onCrop)
+        BarAction(Icons.Outlined.AutoFixHigh, "Melhorar", onEnhance)
         BarMenu(Icons.Outlined.Share, "Enviar", sets, onShare)
         BarMenu(Icons.Outlined.PhotoLibrary, "Lightroom", lrSets, onLightroom)
         BarAction(Icons.AutoMirrored.Outlined.Chat, "Mensagem", onMessage)

@@ -77,6 +77,8 @@ data class Photo(
     val dHash: Long? = null,
     /** Crop and straighten ([com.example.core.render.CropSpec] text); null = the whole frame. */
     val crop: String? = null,
+    /** "Melhorar" strength ([com.example.core.render.Enhance] codes: 0 off, 1–3, 9 by ISO). The file is never changed. */
+    @ColumnInfo(defaultValue = "0") val enhance: Int = 0,
 ) {
     /** What the viewer shows: the JPG when there is one, else the preview pulled out of the RAW. */
     val displayUri: String? get() = jpgUri ?: previewPath?.let { "file://$it" }
@@ -135,6 +137,9 @@ interface PhotoDao {
 
     @Query("UPDATE photos SET crop = :crop WHERE id IN (:ids)")
     suspend fun setCrop(ids: List<Long>, crop: String?)
+
+    @Query("UPDATE photos SET enhance = :enhance WHERE id IN (:ids)")
+    suspend fun setEnhance(ids: List<Long>, enhance: Int)
 
     @Query("UPDATE photos SET clientPick = :pick WHERE id = :id")
     suspend fun setClientPick(id: Long, pick: Boolean)
@@ -242,7 +247,7 @@ interface PresetDao {
 
 @Database(
     entities = [Photo::class, PresetEntity::class, DeliverySession::class, DeliveryItem::class],
-    version = 10,
+    version = 11,
     exportSchema = false,
 )
 abstract class PhotoDatabase : RoomDatabase() {
@@ -254,7 +259,7 @@ abstract class PhotoDatabase : RoomDatabase() {
         /** [name] is only changed by tests, which must not share the file the app itself opens. */
         fun create(context: Context, name: String = "tether50d.db"): PhotoDatabase =
             Room.databaseBuilder(context, PhotoDatabase::class.java, name)
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                 // Version 1 only ever held simulator entries, so dropping it loses nothing real.
                 .fallbackToDestructiveMigrationFrom(dropAllTables = true, 1)
                 .build()
@@ -310,6 +315,13 @@ abstract class PhotoDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE delivery_items ADD COLUMN label TEXT")
                 db.execSQL("DROP INDEX IF EXISTS `index_delivery_items_sessionId_photoId`")
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_delivery_items_sessionId_photoId_variant` ON `delivery_items` (`sessionId`, `photoId`, `variant`)")
+            }
+        }
+
+        /** "Melhorar" per photo; existing photos start without it. */
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE photos ADD COLUMN enhance INTEGER NOT NULL DEFAULT 0")
             }
         }
 

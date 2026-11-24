@@ -92,6 +92,13 @@ data class Settings(
     /** Preset applied to new photos; -1 = none. */
     val sessionPresetId: Long = -1,
     val applyPresetToNew: Boolean = true,
+    /** "Melhorar": strength used when it is turned on ([com.example.core.render.Enhance] code; 9 = by ISO). */
+    val enhanceLevel: Int = 9,
+    /** Areas where "Melhorar" applies by itself; with none, it is only applied by hand. */
+    val enhanceOnNew: Boolean = false,
+    val enhanceOnDelivery: Boolean = false,
+    val enhanceOnShare: Boolean = false,
+    val enhanceOnChurch: Boolean = false,
     /** A calibration carried to the next photos ("Aplicar às próximas"); empty = use the preset as is. */
     val sessionAdjust: String = "",
     val saveEditedCopy: Boolean = true,
@@ -411,6 +418,11 @@ object SettingKeys {
     val editedFolder = stringPreferencesKey("edited_folder")
     val sessionPresetId = longPreferencesKey("session_preset_id")
     val applyPresetToNew = booleanPreferencesKey("apply_preset_to_new")
+    val enhanceLevel = intPreferencesKey("enhance_level")
+    val enhanceOnNew = booleanPreferencesKey("enhance_on_new")
+    val enhanceOnDelivery = booleanPreferencesKey("enhance_on_delivery")
+    val enhanceOnShare = booleanPreferencesKey("enhance_on_share")
+    val enhanceOnChurch = booleanPreferencesKey("enhance_on_church")
     val sessionAdjust = stringPreferencesKey("session_adjust")
     val saveEditedCopy = booleanPreferencesKey("save_edited_copy")
     val editedQuality = intPreferencesKey("edited_quality")
@@ -666,6 +678,11 @@ class SettingsRepository(private val context: Context) {
             editedFolder = this[k.editedFolder],
             sessionPresetId = this[k.sessionPresetId] ?: d.sessionPresetId,
             applyPresetToNew = this[k.applyPresetToNew] ?: d.applyPresetToNew,
+            enhanceLevel = this[k.enhanceLevel] ?: d.enhanceLevel,
+            enhanceOnNew = this[k.enhanceOnNew] ?: d.enhanceOnNew,
+            enhanceOnDelivery = this[k.enhanceOnDelivery] ?: d.enhanceOnDelivery,
+            enhanceOnShare = this[k.enhanceOnShare] ?: d.enhanceOnShare,
+            enhanceOnChurch = this[k.enhanceOnChurch] ?: d.enhanceOnChurch,
             sessionAdjust = this[k.sessionAdjust] ?: d.sessionAdjust,
             saveEditedCopy = this[k.saveEditedCopy] ?: d.saveEditedCopy,
             editedQuality = this[k.editedQuality] ?: d.editedQuality,

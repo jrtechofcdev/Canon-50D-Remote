@@ -468,7 +468,7 @@ class LocalDelivery(
             input?.use { i -> target.outputStream().use { i.copyTo(it) } } ?: return@withContext false
         } else {
             val edge = if (c.size == "edited") 0 else s.lightShareSize.takeIf { it > 0 } ?: 2048
-            val looked = looks.exportFile(photo, edge, tag = "${mode.dir}${target.nameWithoutExtension}")
+            val looked = looks.exportFile(photo, edge, tag = "${mode.dir}${target.nameWithoutExtension}", forceEnhance = s.enhanceLevel.takeIf { s.enhanceOnDelivery })
             // Encoded once: without a watermark the rendered look (or the camera JPG at full size) is the file.
             val made = when {
                 !c.watermark && looked != null -> looked

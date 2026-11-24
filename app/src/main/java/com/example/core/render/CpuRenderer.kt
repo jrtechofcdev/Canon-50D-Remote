@@ -98,7 +98,8 @@ object CpuRenderer {
 
         val detail = l - ls
         val edge = if (p.sharpenMasking <= 0f) 1f else smoothstep(0f, p.sharpenMasking * 0.08f, abs(detail))
-        val sharp = p.sharpen * detail * edge * 1.5f - p.noiseReduction * 0.5f * detail * (1f - edge)
+        val nrEdge = smoothstep(0f, max(p.sharpenMasking, 0.5f) * 0.08f, abs(detail))
+        val sharp = p.sharpen * detail * edge * 1.5f - p.noiseReduction * 0.5f * detail * (1f - nrEdge)
         r += sharp; g += sharp; b += sharp
 
         var px = (u - 0.5f) * 2f

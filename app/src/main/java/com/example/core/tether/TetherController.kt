@@ -301,6 +301,10 @@ class TetherController(
         if (settings.applyPresetToNew && settings.sessionPresetId > 0 && photo.presetId == null) {
             photo = photo.copy(presetId = settings.sessionPresetId, adjust = settings.sessionAdjust.ifBlank { null })
         }
+        // "Melhorar" set to apply by itself on new photos (the file stays as the camera made it).
+        if (settings.enhanceOnNew && photo.enhance == com.example.core.render.Enhance.OFF) {
+            photo = photo.copy(enhance = settings.enhanceLevel)
+        }
 
         val id = if (photo.id == 0L) dao.insert(photo) else photo.id.also { dao.update(photo) }
         _received.update { it + 1 }
@@ -310,7 +314,7 @@ class TetherController(
 
         // Edited copy from the JPG (or from the RAW's embedded preview when no JPG is coming).
         val copySource = kind == FileKind.JPG || !settings.downloadMode.jpg
-        if (settings.saveEditedCopy && photo.presetId != null && copySource) {
+        if (settings.saveEditedCopy && (photo.presetId != null || photo.enhance != com.example.core.render.Enhance.OFF) && copySource) {
             scope.launch {
                 runCatching {
                     val name = photo.presetId?.let { presetName(it) }

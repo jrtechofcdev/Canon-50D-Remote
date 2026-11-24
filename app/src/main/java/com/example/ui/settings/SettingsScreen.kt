@@ -96,6 +96,7 @@ import androidx.compose.material.icons.outlined.UsbOff
 import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material.icons.outlined.Vibration
 import androidx.compose.material.icons.outlined.Videocam
+import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.WbSunny
@@ -204,6 +205,7 @@ enum class SettingsSection(val route: String, val title: String, val summary: St
     Payments("payments", "Pagamentos", "Pix copia e cola, valores, pacotes e formas de pagamento", Icons.Outlined.Payments, SettingsModule.Delivery),
     Express("express", "Fotografia Express", "Sem código, prévia com marca e liberar após o pagamento", Icons.Outlined.Collections, SettingsModule.Delivery),
     Presets("presets", "Presets", "Look das fotos novas, cópia editada, pastas", Icons.Outlined.Style, SettingsModule.Editing),
+    Enhance("enhance", "Melhorar", "Menos granulado e mais definição, sem mexer na cor", Icons.Outlined.AutoFixHigh, SettingsModule.Editing),
     Messages("messages", "Mensagens", "Textos prontos para o WhatsApp do cliente", Icons.AutoMirrored.Outlined.Chat, SettingsModule.Delivery),
     Alerts("alerts", "Alertas", "Vibração, desconexão, reenvio, resumo", Icons.Outlined.NotificationsActive, SettingsModule.System),
     Display("display", "Tela", "Modo escuro total, brilho, tela ligada", Icons.Outlined.DarkMode, SettingsModule.System),
@@ -341,6 +343,7 @@ fun SettingsSectionScreen(app: TetherApp, section: SettingsSection, onBack: () -
             SettingsSection.Diagnostics -> DiagnosticsSettings(app, settings)
             SettingsSection.Developer -> DeveloperSettings(app, settings)
             SettingsSection.Video -> VideoSettings(app, settings)
+            SettingsSection.Enhance -> EnhanceSettings(app, settings)
             SettingsSection.Delivery -> DeliverySettings(app, settings)
             SettingsSection.Express -> ExpressSettings(app, settings)
             SettingsSection.Payments -> PaymentSettings(app, settings)

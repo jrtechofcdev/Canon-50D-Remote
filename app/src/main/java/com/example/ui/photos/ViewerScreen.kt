@@ -40,6 +40,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.RotateRight
+import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.AlertDialog
@@ -365,6 +366,11 @@ fun ViewerScreen(
                 ActionTile(Icons.Outlined.FilterNone, "Versões") { moreOpen = false; versionsFor = current }
             }
             // A quarter turn of the photo itself (for frames the camera saved lying down).
+            // "Melhorar" on or off for this photo; the strength comes from Ajustes → Melhorar.
+            ActionTile(Icons.Outlined.AutoFixHigh, "Melhorar", selected = current.enhance != com.example.core.render.Enhance.OFF) {
+                val on = current.enhance == com.example.core.render.Enhance.OFF
+                scope.launch { app.looks.setEnhance(current, if (on) settings.enhanceLevel else com.example.core.render.Enhance.OFF) }
+            }
             ActionTile(Icons.Outlined.RotateRight, "Girar") {
                 scope.launch { app.looks.setCrop(current, com.example.core.render.PhotoShape.turnedClockwise(app.looks.cropOf(current))) }
             }
@@ -519,7 +525,7 @@ private fun PhotoPage(
         offset = if (scale == 1f) Offset.Zero else offset + pan
         onZoomChanged(scale > 1f)
     }
-    val edited = photo.presetId != null || photo.adjust != null || photo.crop != null
+    val edited = photo.presetId != null || photo.adjust != null || photo.crop != null || photo.enhance != com.example.core.render.Enhance.OFF
 
     Box(Modifier.fillMaxSize()) {
         Box(

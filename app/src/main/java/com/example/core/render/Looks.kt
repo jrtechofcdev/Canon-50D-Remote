@@ -49,6 +49,16 @@ class Looks(
         return presets.get(id)?.settings
     }
 
+    /** The "Melhorar" strength the photo is rendered with ([Enhance.OFF] when it has none). */
+    fun enhanceOf(photo: Photo): Int = Enhance.resolve(photo.enhance, photo.iso)
+
+    /**
+     * The strength for a copy leaving the phone: the photo's own, or [forced] (an area set to apply
+     * "Melhorar" by itself) when the photo has none.
+     */
+    private fun enhanceFor(photo: Photo, forced: Int?): Int =
+        if (photo.enhance != Enhance.OFF) enhanceOf(photo) else forced?.let { Enhance.resolve(it, photo.iso) } ?: Enhance.OFF
+
     /** The photo's crop, or null when it shows the whole frame. */
     fun cropOf(photo: Photo): CropSpec? = CropSpec.decode(photo.crop)?.takeUnless { it.isIdentity && it.targetW == 0 }
 
@@ -56,18 +66,33 @@ class Looks(
     suspend fun display(photo: Photo, maxEdge: Int = PREVIEW_EDGE): Bitmap? =
         renderPhoto(photo, settingsFor(photo), maxEdge)
 
-    /** [photo] cut by its crop and then given [look]; null when there is nothing to do. Cached like [render]. */
-    suspend fun renderPhoto(photo: Photo, look: PresetSettings?, maxEdge: Int): Bitmap? {
+    /** [photo] cut by its crop, improved and then given [look]; null when there is nothing to do. Cached like [render]. */
+    suspend fun renderPhoto(photo: Photo, look: PresetSettings?, maxEdge: Int, enhance: Int = enhanceOf(photo)): Bitmap? {
         val crop = cropOf(photo)
         val source = photo.displayUri ?: return null
-        if (crop == null) return look?.let { render(source, it, maxEdge) }
-        val key = "$source|${look?.encode()?.hashCode()}|${crop.encode()}|$maxEdge"
+        if (crop == null && enhance == Enhance.OFF) return look?.let { render(source, it, maxEdge) }
+        val key = "$source|${look?.encode()?.hashCode()}|${crop?.encode()}|e$enhance|$maxEdge"
         cache.get(key)?.let { return it }
         val base = base(source, maxEdge) ?: return null
-        val cut = CropRenderer.apply(base, crop.copy(targetW = 0, targetH = 0))
-        val out = look?.let { engine.render(cut, RenderParams.from(it)).also { if (cut !== base) cut.recycle() } } ?: cut
+        val cut = crop?.let { CropRenderer.apply(base, it.copy(targetW = 0, targetH = 0)) } ?: base
+        val better = if (enhance != Enhance.OFF) improve(cut, enhance).also { if (cut !== base) cut.recycle() } else cut
+        val out = look?.let { engine.render(better, RenderParams.from(it)).also { if (better !== base) better.recycle() } } ?: better
         cache.put(key, out)
         return out
+    }
+
+    /** "Melhorar" on [src] into a new bitmap; [src] is left as it is (it may be a cached base). */
+    private suspend fun improve(src: Bitmap, strength: Int): Bitmap = withContext(Dispatchers.Default) {
+        val started = System.currentTimeMillis()
+        val w = src.width
+        val h = src.height
+        val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val p = Enhance.params(strength, Enhance.scaleFor(maxOf(w, h)))
+        Enhance.applyBands(w, h, p,
+            read = { from, rows, dest -> src.getPixels(dest, 0, w, 0, from, w, rows) },
+            write = { y0, rows, result -> out.setPixels(result, 0, w, 0, y0, w, rows) })
+        AppLog.i("MELHORAR", "${w}×$h ${Enhance.label(strength).lowercase()} em ${System.currentTimeMillis() - started} ms")
+        out
     }
 
     /** Any photo with any settings, e.g. the editor preview or a preset's thumbnail. */
@@ -109,14 +134,15 @@ class Looks(
         val cfg = settings.current()
         val s = settingsFor(photo)
         val crop = cropOf(photo)
-        if (s == null && crop == null) return@withLock null
+        val enhance = enhanceOf(photo)
+        if (s == null && crop == null && enhance == Enhance.OFF) return@withLock null
         val source = photo.displayUri ?: return@withLock null
         val started = System.currentTimeMillis()
         val edge = fullSizeEdge()
-        val rendered = withContext(Dispatchers.IO) { finished(source, s, crop, edge) } ?: return@withLock null
+        val rendered = withContext(Dispatchers.IO) { finished(source, s, crop, enhance, edge) } ?: return@withLock null
         AppLog.i("EDITADA", "${photo.savedBase}: ${rendered.width}×${rendered.height} em ${System.currentTimeMillis() - started} ms · ${AppLog.memory()}")
         val suffix = presetName?.let { "_" + it.replace(Regex("[\\\\/:*?\"<>|]"), "-").replace(' ', '-') }
-            ?: if (s == null) "_recorte" else "_editada"
+            ?: if (s != null) "_editada" else if (crop != null) "_recorte" else "_melhorada"
         val uri = withContext(Dispatchers.IO) {
             // Rendered to a temp file first so the camera's EXIF (and GPS) can be added before it is stored.
             val temp = java.io.File(context.cacheDir, "edited_${photo.id}.jpg")
@@ -137,12 +163,13 @@ class Looks(
      * The photo as it should leave the phone (look applied), as a JPG in the cache, long edge [maxEdge]
      * (0 = full size). Null when the photo has no look: then the file itself is sent.
      */
-    suspend fun exportFile(photo: Photo, maxEdge: Int, tag: String? = null): java.io.File? {
+    suspend fun exportFile(photo: Photo, maxEdge: Int, tag: String? = null, forceEnhance: Int? = null): java.io.File? {
         val s = settingsFor(photo)
         val crop = cropOf(photo)
-        if (s == null && crop == null) return null
+        val enhance = enhanceFor(photo, forceEnhance)
+        if (s == null && crop == null && enhance == Enhance.OFF) return null
         val source = photo.displayUri ?: return null
-        val rendered = withContext(Dispatchers.IO) { finished(source, s, crop, maxEdge) } ?: return null
+        val rendered = withContext(Dispatchers.IO) { finished(source, s, crop, enhance, maxEdge) } ?: return null
         return withContext(Dispatchers.IO) {
             val dir = java.io.File(context.cacheDir, "export").apply { mkdirs() }
             // [tag] keeps two copies made at the same time (two clients, two tools) apart.
@@ -174,6 +201,12 @@ class Looks(
         setCrop(photo, spec)
     }
 
+    /** Turns "Melhorar" on ([Enhance] code) or off for [photo] and rewrites its edited copy. */
+    suspend fun setEnhance(photo: Photo, code: Int) {
+        photos.setEnhance(listOf(photo.id), code)
+        refreshEdited(photo.copy(enhance = code))
+    }
+
     /** Saves (or clears, with null) the photo's crop and rewrites its edited copy. */
     suspend fun setCrop(photo: Photo, crop: CropSpec?) {
         val text = crop?.takeUnless { it.isIdentity && it.targetW == 0 }?.encode()
@@ -187,7 +220,7 @@ class Looks(
     /** Edited copy in step with the photo's look and crop: rewritten when it has either, removed when it has neither. */
     private suspend fun refreshEdited(photo: Photo) {
         onEdited(photo.id)
-        val hasEdit = photo.presetId != null || photo.adjust != null || cropOf(photo) != null
+        val hasEdit = photo.presetId != null || photo.adjust != null || cropOf(photo) != null || photo.enhance != Enhance.OFF
         if (settings.current().saveEditedCopy && hasEdit) {
             writeEditedCopy(photo, photo.presetId?.let { presets.get(it)?.name })
         } else if (photo.editedUri != null) {
@@ -222,16 +255,18 @@ class Looks(
      * (the edited copy, a delivery at full size) take turns: two tools and the edited copy at once used to
      * hold three full frames in memory together.
      */
-    private suspend fun finished(source: String, look: PresetSettings?, crop: CropSpec?, maxEdge: Int): Bitmap? =
-        if (maxEdge == 0 || maxEdge > PREVIEW_EDGE) bigRender.withPermit { finishedNow(source, look, crop, maxEdge) }
-        else finishedNow(source, look, crop, maxEdge)
+    private suspend fun finished(source: String, look: PresetSettings?, crop: CropSpec?, enhance: Int, maxEdge: Int): Bitmap? =
+        if (maxEdge == 0 || maxEdge > PREVIEW_EDGE) bigRender.withPermit { finishedNow(source, look, crop, enhance, maxEdge) }
+        else finishedNow(source, look, crop, enhance, maxEdge)
 
-    private suspend fun finishedNow(source: String, look: PresetSettings?, crop: CropSpec?, maxEdge: Int): Bitmap? {
+    private suspend fun finishedNow(source: String, look: PresetSettings?, crop: CropSpec?, enhance: Int, maxEdge: Int): Bitmap? {
         val full = BitmapLoader.load(context, Uri.parse(source), maxEdge) ?: return null
         val cut = crop?.let { CropRenderer.apply(full, it) } ?: full
         if (cut !== full) full.recycle()
-        if (look == null) return cut
-        return engine.render(cut, RenderParams.from(look)).also { cut.recycle() }
+        // Before the look: the grain is taken out before contrast and clarity would make it stronger.
+        val better = if (enhance != Enhance.OFF) improve(cut, enhance).also { cut.recycle() } else cut
+        if (look == null) return better
+        return engine.render(better, RenderParams.from(look)).also { better.recycle() }
     }
 
     companion object {

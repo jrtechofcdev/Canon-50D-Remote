@@ -231,6 +231,14 @@ val settingsIndex: Map<SettingsSection, List<String>> = mapOf(
         "Teste de fechamento",
         "Modo desenvolvedor",
     ),
+    SettingsSection.Enhance to listOf(
+        "Intensidade",
+        "Aplicar sozinho em",
+        "Fotos novas",
+        "Entrega local e Express",
+        "Versão pronta da igreja",
+        "Envio e WhatsApp",
+    ),
     SettingsSection.Video to listOf(
         "Vídeos no cartão",
         "Baixar vídeos novos sozinho",
