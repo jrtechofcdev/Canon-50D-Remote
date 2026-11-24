@@ -38,7 +38,7 @@ object AppFolders {
         Folder(listOf("06 Logs"), "Logs", SettingKeys.logFolder),
         Folder(listOf("07 Entregas"), "Entregas (uma pasta por cliente)", SettingKeys.deliveryFolder),
         Folder(listOf("08 Express"), "Fotografia Express (uma pasta por cliente)", SettingKeys.expressFolder),
-        Folder(listOf(com.example.core.video.VideoLibrary.FOLDER_NAME), "Vídeos (câmera e live view gravado)", null),
+        Folder(listOf(com.example.core.video.VideoLibrary.FOLDER_NAME), "Vídeos baixados da câmera", null),
     )
 
     /** The folders a setting points at, for the checklist in Salvamento. */

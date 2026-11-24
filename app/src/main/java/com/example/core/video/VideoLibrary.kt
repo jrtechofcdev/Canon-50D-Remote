@@ -25,17 +25,10 @@ data class VideoItem(
     val size: Long,
     val modified: Long,
 ) {
-    /** Recorded by the phone from the live view (LV_…mp4), as opposed to filmed and saved by the camera. */
-    val fromPhone get() = name.startsWith(PHONE_PREFIX)
-
     /** Magic Lantern RAW video (.MLV/.RAW) needs a computer program; Android can't play it. */
     val playable get() = name.substringAfterLast('.', "").uppercase() !in setOf("MLV", "RAW")
 
     val extension get() = name.substringAfterLast('.', "").uppercase()
-
-    companion object {
-        const val PHONE_PREFIX = "LV_"
-    }
 }
 
 /**
@@ -50,8 +43,8 @@ class VideoLibrary(private val context: Context, private val settings: SettingsR
 
     private val thumbs = LruCache<String, Bitmap>(24)
 
-    /** Phone recordings are written here first (MediaMuxer needs a path) and moved when done. */
-    fun workDir(): File = File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), "Canon50D/Gravando").apply { mkdirs() }
+    /** Downloads are written here first and moved to the gallery folder when complete. */
+    fun workDir(): File = File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), "Canon50D/Baixando").apply { mkdirs() }
 
     fun localDir(): File = File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), "Canon50D/Videos").apply { mkdirs() }
 

@@ -231,23 +231,9 @@ val settingsIndex: Map<SettingsSection, List<String>> = mapOf(
         "Teste de fechamento",
         "Modo desenvolvedor",
     ),
-    SettingsSection.MagicLantern to listOf(
-        "Firmware da câmera",
-        "Firmware",
-        "O que muda com o Magic Lantern",
-        "Filmar pela câmera",
-        "Menus do Magic Lantern",
-        "Usar sem o Magic Lantern",
-    ),
     SettingsSection.Video to listOf(
-        "Sobre este módulo",
-        "Gravar pela câmera (botão SET)",
         "Vídeos no cartão",
         "Baixar vídeos novos sozinho",
-        "Gravação no celular",
-        "Comandos de teste",
-        "Monitor de eventos da câmera",
-        "Log do vídeo",
     ),
 )
 

@@ -89,7 +89,7 @@ fun VideoGallery(app: TetherApp, onBack: () -> Unit) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 EmptyState(
                     "Nenhum vídeo ainda",
-                    text = "Grave o live view pelo botão de vídeo no Live view, ou filme com o SET da câmera e busque o arquivo em Ajustes → Vídeo.",
+                    text = "Os vídeos que estão no cartão da câmera aparecem aqui depois de baixados. Procure e baixe em Ajustes → Vídeos da câmera.",
                 )
             }
             return@Column
@@ -113,7 +113,7 @@ fun VideoGallery(app: TetherApp, onBack: () -> Unit) {
             onDismissRequest = { deleting = null },
             containerColor = Tone.Surface,
             title = { Text("Apagar ${item.name}?") },
-            text = { Text("O arquivo sai do celular. Se veio da câmera, a cópia no cartão continua lá.") },
+            text = { Text("O arquivo sai do celular. A cópia no cartão da câmera continua lá.") },
             confirmButton = {
                 TextButton(onClick = {
                     deleting = null
@@ -174,7 +174,6 @@ private fun VideoTile(app: TetherApp, item: VideoItem, onPlay: () -> Unit, onDel
                 modifier = Modifier.size(40.dp),
             )
             Row(Modifier.align(Alignment.BottomStart).padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (item.fromPhone) Icon(Icons.Outlined.PhoneAndroid, contentDescription = "Gravado pelo celular", tint = Tone.OnPhoto, modifier = Modifier.size(16.dp))
                 Icon(Icons.Outlined.VideocamOff, contentDescription = "Sem áudio", tint = Tone.OnPhoto, modifier = Modifier.size(16.dp))
                 duration?.let { Text(" " + clock(it), style = MaterialTheme.typography.labelSmall, color = Tone.OnPhoto) }
             }

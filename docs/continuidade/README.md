@@ -14,20 +14,14 @@ Branch: `feature/video-experimental`. A `main` não foi alterada.
 
 Os números de linha citados nos dois documentos de correção são do commit `c3bd775` (main, versão 5.1). Confira as linhas no código atual antes de editar.
 
-## Módulo de vídeo experimental
+## Vídeo: só leitura dos vídeos da câmera
 
-Commit `55b5bb9`. Arquivos novos:
+O José pediu para retirar os módulos de filmar (método A pelo SET, método B gravando o live view, laboratório de comandos, monitor de eventos, log separado do vídeo e o módulo Magic Lantern). Ficou só:
+- `core/video/VideoController.kt`: procurar vídeos no cartão, baixar (`CameraManager.downloadInChunks`, que usa o `PartialDownload`) e baixar sozinho no ObjectAddedEx de vídeo;
+- `core/video/VideoLibrary.kt` + `ui/video/VideoGallery.kt`: pasta "09 Videos", galeria e player;
+- `ui/settings/VideoSettings.kt`: Ajustes → Vídeos da câmera.
 
-- `core/video/VideoLog.kt`, `LiveRecorder.kt`, `VideoController.kt`, `VideoLibrary.kt`
-- `ui/video/VideoGallery.kt`, `ui/video/LiveRecordSheet.kt`, `ui/settings/VideoSettings.kt`
-- Testes: `test/core/ptp/VideoFormatTest.kt` e um teste novo em `AppLogTest`
-
-Arquivos alterados:
-- `AppLog`, `CameraManager`, `PtpConstants`, `PtpDataReader`, `EosEventParser`
-- `AppFolders`, `TetherApp`, `PhotosScreen`, `LiveViewScreen`
-- `SettingsScreen`, `SettingsIndex`, `SettingsIndexTest`, `file_paths.xml`, `CHANGELOG.md`
-
-Compilado e com os testes passando (commit `a0ff9e9`). Ainda não testado na câmera.
+O código retirado está no histórico do branch (commits 55b5bb9 a b121e9d), se um dia voltar.
 
 ## Depois do live view (versões 5.3.1 a 5.3.4, testadas na 50D)
 

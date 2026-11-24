@@ -211,8 +211,6 @@ data class Settings(
     val devResetRemoteAfterLive: Boolean = true,
     /** USB reset before a session: "full", "noclear" or "none" (to test reopening without replugging). */
     val devUsbReset: String = "full",
-    /** Firmware on the camera: "auto" (asks the camera), "canon" or "ml" (Magic Lantern). */
-    val cameraFirmware: String = "auto",
 
     // Entrega local: the phone serves the photos on its own Wi-Fi, the client saves them on theirs.
     /** Off by default: with it off nothing starts and no new permission is asked. */
@@ -483,7 +481,6 @@ object SettingKeys {
     val devRestoreLiveOutput = booleanPreferencesKey("dev_restore_live_output")
     val devResetRemoteAfterLive = booleanPreferencesKey("dev_reset_remote_after_live")
     val devUsbReset = stringPreferencesKey("dev_usb_reset")
-    val cameraFirmware = stringPreferencesKey("camera_firmware")
     val deliveryEnabled = booleanPreferencesKey("delivery_enabled")
     val deliveryNetwork = stringPreferencesKey("delivery_network")
     val deliverySsid = stringPreferencesKey("delivery_ssid")
@@ -739,7 +736,6 @@ class SettingsRepository(private val context: Context) {
             devRestoreLiveOutput = this[k.devRestoreLiveOutput] ?: d.devRestoreLiveOutput,
             devResetRemoteAfterLive = this[k.devResetRemoteAfterLive] ?: d.devResetRemoteAfterLive,
             devUsbReset = this[k.devUsbReset] ?: d.devUsbReset,
-            cameraFirmware = this[k.cameraFirmware] ?: d.cameraFirmware,
             deliveryEnabled = this[k.deliveryEnabled] ?: d.deliveryEnabled,
             deliveryNetwork = this[k.deliveryNetwork] ?: d.deliveryNetwork,
             deliverySsid = this[k.deliverySsid]?.takeIf { it.isNotBlank() } ?: d.deliverySsid,

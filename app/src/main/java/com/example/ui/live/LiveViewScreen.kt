@@ -31,7 +31,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.CenterFocusStrong
 import androidx.compose.material.icons.outlined.Layers
-import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
@@ -148,7 +147,6 @@ fun LiveViewScreen(
     val frame = remember { mutableStateOf<LiveFrame?>(null) }
     var controls by remember { mutableStateOf(true) }
     var showOptions by remember { mutableStateOf(false) }
-    var showVideo by remember { mutableStateOf(false) }
     var picker by remember { mutableStateOf<Pair<String, Int>?>(null) }
     val focusMark = remember { mutableStateOf<Offset?>(null) }
     val processor = remember { LiveProcessor(app.engine) }
@@ -176,8 +174,6 @@ fun LiveViewScreen(
     val loaded by remember { app.settings.settings }.collectAsState(initial = null)
     LaunchedEffect(connected, loaded?.liveOnCamera, loaded?.liveSilentAf, loaded?.liveFps) {
         val real = loaded ?: return@LaunchedEffect
-        // In SET mode the camera keeps its live view: restarting ours would take it back mid-take.
-        if (app.video.filming.value is com.example.core.video.CameraFilming.Waiting) return@LaunchedEffect
         if (connected) {
             app.camera.stopLiveView()
             app.camera.startLiveView(alsoOnCamera = real.liveOnCamera, silentAf = real.liveSilentAf, fps = real.liveFps)
@@ -237,7 +233,6 @@ fun LiveViewScreen(
                     onDark = true,
                 )
                 if (controls) HistogramOverlay(frame, Modifier.align(Alignment.TopEnd).padding(8.dp).size(width = 112.dp, height = 52.dp))
-                com.example.ui.video.RecordingChip(app, Modifier.align(Alignment.TopCenter).padding(8.dp))
                 if (!controls) {
                     // Clean monitor: a small button brings the controls back, and the shutter stays at hand.
                     IconButton(
@@ -260,7 +255,7 @@ fun LiveViewScreen(
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         ExposureValues(status) { title, prop -> picker = title to prop }
                     }
-                    TopActions(app, settings, vertical = true, onOptions = { showOptions = true }, onHide = { controls = false }, onVideo = { showVideo = true })
+                    TopActions(app, settings, vertical = true, onOptions = { showOptions = true }, onHide = { controls = false })
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     picture(Modifier.fillMaxSize())
@@ -282,7 +277,7 @@ fun LiveViewScreen(
                 Row(Modifier.fillMaxWidth().background(Panel).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Tone.OnPhoto) }
                     Text(status1, style = MaterialTheme.typography.labelMedium, color = Tone.OnPhoto.copy(alpha = 0.8f), maxLines = 1, modifier = Modifier.weight(1f))
-                    TopActions(app, settings, vertical = false, onOptions = { showOptions = true }, onHide = { controls = false }, onVideo = { showVideo = true })
+                    TopActions(app, settings, vertical = false, onOptions = { showOptions = true }, onHide = { controls = false })
                 }
                 picture(Modifier.weight(1f).fillMaxWidth())
                 Column(
@@ -304,7 +299,6 @@ fun LiveViewScreen(
     }
 
     if (showOptions) LiveOptionsSheet(app, settings, presets, onDismiss = { showOptions = false })
-    if (showVideo) com.example.ui.video.LiveRecordSheet(app, onDismiss = { showVideo = false })
 
     picker?.let { (title, prop) ->
         ValuePickerSheet(
@@ -390,10 +384,9 @@ private fun StatusChip(text: String, modifier: Modifier) {
 }
 
 @Composable
-private fun TopActions(app: TetherApp, settings: Settings, vertical: Boolean, onOptions: () -> Unit, onHide: () -> Unit, onVideo: () -> Unit) {
+private fun TopActions(app: TetherApp, settings: Settings, vertical: Boolean, onOptions: () -> Unit, onHide: () -> Unit) {
     val items: @Composable () -> Unit = {
         RotateButton(app, settings.screenOrientation, tint = Tone.OnPhoto)
-        IconButton(onClick = onVideo) { Icon(Icons.Outlined.Videocam, contentDescription = "Vídeo: gravar no celular ou pelo SET da câmera", tint = Tone.OnPhoto) }
         IconButton(onClick = onOptions) { Icon(Icons.Outlined.Layers, contentDescription = "Preset, guias e ajustes do monitor", tint = Tone.OnPhoto) }
         IconButton(onClick = onHide) { Icon(Icons.Outlined.Fullscreen, contentDescription = "Só a imagem", tint = Tone.OnPhoto) }
     }

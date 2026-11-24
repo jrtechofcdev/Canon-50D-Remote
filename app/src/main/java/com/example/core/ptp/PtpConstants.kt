@@ -33,9 +33,6 @@ object PtpOp {
     const val EOS_AF_CANCEL = 0x9160
     const val EOS_REMOTE_RELEASE_ON = 0x9128
     const val EOS_REMOTE_RELEASE_OFF = 0x9129
-    /** Movie switch of bodies that film (libgphoto2: MovieSelectSWOn/Off). Experimental on the 50D. */
-    const val EOS_MOVIE_SELECT_SW_ON = 0x9133
-    const val EOS_MOVIE_SELECT_SW_OFF = 0x9134
     /** Asks the camera to send a property's current value in the next GetEvent. */
     const val EOS_REQUEST_DEVICE_PROP_VALUE = 0x9127
 }
@@ -93,11 +90,6 @@ object EosProp {
 
     /** Camera clock, seconds since 1970 in the camera's local time (no time zone on the 50D). */
     const val CAMERA_TIME = 0xD113
-
-    /** Movie recording on bodies that film (libgphoto2 EVFRecordStatus): 4 starts, 0 stops. Experimental on the 50D. */
-    const val EVF_RECORD_STATUS = 0xD1B8
-    const val EVF_RECORD_START = 4
-    const val EVF_RECORD_STOP = 0
 
     /** Capture destination values: the card keeps a backup, the phone gets a copy via ObjectAddedEx. */
     const val DESTINATION_CARD = 2

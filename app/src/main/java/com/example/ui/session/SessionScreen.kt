@@ -169,8 +169,7 @@ fun SessionScreen(
             Spacer(Modifier.height(12.dp))
             SessionChip(settings.sessionName, sessionCount, Modifier.fillMaxWidth()) { sessionSheet = false }
             Spacer(Modifier.height(16.dp))
-            val ml by app.magicLantern.state.collectAsState()
-            ConnectionHeader(state, received, status, settings.showBattery, onConnect = app.camera::findAndConnect, mlLoaded = ml is com.example.core.ml.MlState.Loaded)
+            ConnectionHeader(state, received, status, settings.showBattery, onConnect = app.camera::findAndConnect)
             // Camera warnings while it is connected; the phone's free space whenever it runs low.
             val phoneLow by app.phoneLowGb.collectAsState()
             com.example.ui.components.CameraWarningChips(
@@ -412,7 +411,7 @@ fun SessionScreen(
 }
 
 @Composable
-private fun ConnectionHeader(state: ConnectionState, received: Int, status: CameraStatus, showBattery: Boolean, onConnect: () -> Unit, mlLoaded: Boolean = false) {
+private fun ConnectionHeader(state: ConnectionState, received: Int, status: CameraStatus, showBattery: Boolean, onConnect: () -> Unit) {
     // One line for the state, with the brand block in the state's colour; the details below it.
     val mark by androidx.compose.animation.animateColorAsState(
         when (state) {
@@ -425,7 +424,7 @@ private fun ConnectionHeader(state: ConnectionState, received: Int, status: Came
         label = "state",
     )
     val title = when (state) {
-        is ConnectionState.Connected -> "Conectada · ${state.model.removePrefix("Canon ")}" + if (mlLoaded) " · Magic Lantern" else ""
+        is ConnectionState.Connected -> "Conectada · ${state.model.removePrefix("Canon ")}"
         ConnectionState.Connecting -> "Conectando…"
         ConnectionState.WaitingPermission -> "Permissão USB"
         ConnectionState.NoCamera -> "Desconectada"

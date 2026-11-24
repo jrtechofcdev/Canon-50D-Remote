@@ -94,28 +94,6 @@ object AppLog {
 
     private fun always(tag: String, message: String) = add("I", tag, message)
 
-    /**
-     * Experimental video module: always written (even with the full log off) and tagged VIDEO-<step>,
-     * so its lines stand apart from the photo ones in the same file.
-     */
-    fun video(level: String, step: String, message: String, error: Throwable? = null) =
-        add(level, "$VIDEO_TAG-$step", message + (error?.let { "\n" + stack(it) } ?: ""))
-
-    /** A separator line in the log, e.g. at the start and end of a recording. */
-    fun videoBanner(text: String) = add("I", VIDEO_TAG, "──────── VÍDEO · $text ────────")
-
-    private val crashNotes = java.util.concurrent.ConcurrentHashMap<String, () -> String?>()
-
-    /** State written next to a crash (what the video module was doing); read only if the app goes down. */
-    fun crashNote(key: String, provider: (() -> String?)?) {
-        if (provider == null) crashNotes.remove(key) else crashNotes[key] = provider
-    }
-
-    private fun crashNotesText(): String = crashNotes.entries.joinToString("") { (key, provider) ->
-        val text = runCatching { provider() }.getOrElse { "não deu para ler (${it.message})" } ?: return@joinToString ""
-        "${time.format(Date())} E/CRASH-$key: $text\n"
-    }
-
     /** For coroutine scopes that must never take the app down: the failure is written and the app carries on. */
     fun handler(tag: String) = CoroutineExceptionHandler { _, t -> e(tag, "Erro não tratado (o app continuou)", t) }
 
@@ -140,18 +118,9 @@ object AppLog {
         out.bufferedWriter().use { w ->
             w.write("JR C50D Sync ${BuildConfig.VERSION_NAME} · ${device()}\n")
             _lastExit.value?.let { w.write("Última saída anormal: $it\n") }
-            val picked = files().take(days).reversed()
-            picked.forEach { f ->
+            files().take(days).reversed().forEach { f ->
                 w.write("\n===== ${f.name} =====\n")
                 f.bufferedReader().use { it.copyTo(w) }
-            }
-            // The video lines again on their own, so a video problem reads without the photo noise.
-            w.write("\n===== Só o módulo de vídeo (linhas $VIDEO_TAG e fechamentos) =====\n")
-            picked.forEach { f ->
-                f.bufferedReader().useLines { lines ->
-                    lines.filter { isVideoLine(it) || it.contains("E/CRASH") || it.contains("/SAIDA:") }
-                        .forEach { w.write(it); w.write("\n") }
-                }
             }
         }
         return out
@@ -232,14 +201,9 @@ object AppLog {
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             runCatching {
                 flushNow()
-                val trace = stack(error)
-                val fromVideo = trace.contains("com.example.core.video") || trace.contains("com.example.ui.video") ||
-                    trace.contains("MediaCodec") || trace.contains("MediaMuxer")
                 append(
                     "${time.format(Date())} E/CRASH: O app fechou por um erro na linha \"${thread.name}\" · ${memory()}\n" +
-                        (if (fromVideo) "${time.format(Date())} E/CRASH-$VIDEO_TAG: o erro passou pelo módulo de vídeo\n" else "") +
-                        crashNotesText() +
-                        trace + "\n",
+                        stack(error) + "\n",
                 )
                 mirror()
             }
@@ -301,10 +265,6 @@ object AppLog {
     private fun device() = "${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
 
     private fun stack(t: Throwable): String = StringWriter().also { t.printStackTrace(PrintWriter(it)) }.toString().trimEnd()
-
-    const val VIDEO_TAG = "VIDEO"
-
-    fun isVideoLine(line: String) = line.contains("/$VIDEO_TAG-") || line.contains("/$VIDEO_TAG:") || line.contains("E/CRASH-$VIDEO_TAG")
 
     private const val MB = 1024L * 1024L
     private const val RECENT = 400
