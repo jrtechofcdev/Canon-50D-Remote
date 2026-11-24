@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img alt="Versão 5.3.4" src="https://img.shields.io/badge/vers%C3%A3o-5.3.4-00FCA8?labelColor=292929">
+  <img alt="Versão 5.4" src="https://img.shields.io/badge/vers%C3%A3o-5.4-00FCA8?labelColor=292929">
   <img alt="Android 7 ou mais novo" src="https://img.shields.io/badge/Android-7%2B-1CDAFF?labelColor=292929&logo=android&logoColor=white">
   <img alt="Canon EOS 50D" src="https://img.shields.io/badge/c%C3%A2mera-Canon%20EOS%2050D-00FCA8?labelColor=292929">
   <img alt="Kotlin e Jetpack Compose" src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-1CDAFF?labelColor=292929&logo=kotlin&logoColor=white">
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="release/JR_C50D_Sync-v5.3.4.apk"><b>⬇ Baixar o APK 5.3.4</b></a>
+  <a href="release/JR_C50D_Sync-v5.4.apk"><b>⬇ Baixar o APK 5.4</b></a>
   &nbsp;·&nbsp;
   <a href="#instalar">Instalar</a>
   &nbsp;·&nbsp;
@@ -74,6 +74,7 @@ Cada função do app responde a uma etapa do trabalho no evento.
   - a foto já chega com o look.
 - **Loja de presets:** prévias, antes e depois, "na minha foto" e download para o Lightroom.
 - **Recorte:** Instagram, Stories, impressão, endireitar automático e recorte em lote.
+- **Melhorar:** menos granulado de ISO alto e mais definição, sem mexer na cor. Por foto, em lote ou sozinho onde você escolher.
 - **Seleção local:** avisa foto tremida e olho fechado, agrupa as parecidas e o culling é por gestos. Roda sem internet.
 
 </td>
@@ -89,6 +90,10 @@ Cada função do app responde a uma etapa do trabalho no evento.
   - o cliente marca as favoritas;
   - Pix com o valor exato;
   - liberação sem marca depois do pagamento.
+- **Entrega da igreja:**
+  - a mídia vê as fotos ao vivo e baixa original, pronta ou RAW;
+  - entrada por QR, link ou código, com nome e cargo;
+  - você decide quem vê e quem baixa, foto por foto, e tudo fica no log.
 - **WhatsApp direto:** a conversa do cliente abre com a foto pronta (preset, recorte e marca d'água).
 - **Modo cliente:** tela cheia com PIN, o cliente escolhe as fotos e o preset.
 
@@ -139,7 +144,7 @@ Cada função do app responde a uma etapa do trabalho no evento.
 
 ## Instalar
 
-1. Baixe o **[APK 5.3.4](release/JR_C50D_Sync-v5.3.4.apk)** (ou pela aba *Releases*, ao lado).
+1. Baixe o **[APK 5.4](release/JR_C50D_Sync-v5.4.apk)** (ou pela aba *Releases*, ao lado).
 2. Abra o arquivo no celular e permita **instalar apps desconhecidos** quando o Android pedir.
 3. As atualizações instalam por cima e mantêm suas fotos e ajustes.
 
@@ -262,6 +267,25 @@ O app sempre cobra o preço mais barato para o cliente, e **Testar** confere o Q
 </details>
 
 <details>
+<summary><b>⛪ Entrega da igreja</b></summary>
+
+<p><img src="docs/images/igreja.png" width="24%" alt="Painel da igreja no app"> <img src="docs/images/portal_igreja_entrada.png" width="24%" alt="Entrada com nome e cargo"> <img src="docs/images/portal_igreja.png" width="24%" alt="Fotos ao vivo"> <img src="docs/images/portal_igreja_so_ver.png" width="24%" alt="Só visualização"></p>
+
+Para cultos, cruzadas e festas, sem cobrança e sem limite de fotos:
+1. Na Sessão, toque em **Igreja** (ou ligue a aba em **Ajustes → Entrega da igreja**).
+2. Dê o nome do evento, escolha a congregação e toque em **Abrir evento**. As fotos novas da câmera entram sozinhas.
+3. Toque em **Iniciar entrega**. O padrão é o **Wi-Fi da igreja**: o celular e a mídia na mesma rede. Sem Wi-Fi no local, troque para o roteador do celular ou Wi-Fi Direct em Ajustes.
+4. A mídia lê o QR (ou recebe o link pelo **Mandar o link**), digita o código, o nome e o cargo, e vê as fotos ao vivo.
+5. Em **Pessoas**, cada um tem as chaves **Ver**, **Original**, **Pronta** e **RAW**, além de **Fotos** (ocultar só dela ou dar fotos extras), **Bloquear** e **Expulsar**.
+6. Em **Versão pronta**, escolha o preset do evento e ligue o **Melhorar** se quiser.
+7. **Encerrar evento** tira todos da página. O evento fica na lista para reabrir.
+
+**Quem não pode baixar** vê as fotos sem botão de baixar, desenhadas na tela com o próprio nome, cargo e hora. A página bloqueia salvar, arrastar e compartilhar, e embaça quando a pessoa sai dela. Nenhuma página da web consegue bloquear o print do celular; por isso a marca com o nome mostra de quem veio a imagem. O **Log do evento** guarda tudo, inclusive tentativas de baixar sem permissão, e exporta em texto.
+
+<p align="center"><img src="docs/images/portal_igreja_computador.png" width="80%" alt="Página da igreja no computador"></p>
+</details>
+
+<details>
 <summary><b>💬 WhatsApp, recorte e mensagens</b></summary>
 
 - **Recortar:** no visualizador, toque no ícone de recorte e escolha a proporção (Instagram 4:5, Stories 9:16, 10×15…). **Endireitar** funciona com a régua, com o **Auto** ou com **Traçar horizonte**. O arquivo original não muda.
@@ -354,10 +378,11 @@ app/src/main/java/com/example/
 │   ├── preset/  render/           presets do Lightroom e processamento (GPU, com reserva na CPU)
 │   ├── analysis/  live/           histograma, peaking, seleção local e live view
 │   ├── delivery/                  entrega local e Express: Wi-Fi, servidor e páginas do cliente
+│   ├── church/                    entrega da igreja: eventos, pessoas, permissões, log e servidor
 │   ├── messages/  export/         WhatsApp, JPG leve e marca d'água
 │   └── service/  alerts/          conexão com a tela apagada e avisos
 └── ui/                            telas em Jetpack Compose
-app/src/main/assets/               páginas do cliente (portal, express, shared) e marcas d'água
+app/src/main/assets/               páginas do cliente (portal, express, church, shared) e marcas d'água
 ```
 </details>
 

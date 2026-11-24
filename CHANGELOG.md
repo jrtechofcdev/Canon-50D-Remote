@@ -2,7 +2,50 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
-## [Em teste] · Vídeos da câmera
+## [5.4] · 2026-11-24
+
+### Entrega da igreja (nova)
+
+Para cultos, cruzadas e festas: enquanto você fotografa, a equipe de mídia da igreja vê as fotos chegando e baixa na hora, no celular ou no notebook. Sem cobrança, sem limite de fotos, sem internet.
+
+- **Eventos e congregações:**
+  - cada congregação guarda as cores, a frase (tema ou versículo), a logo e o tratamento da versão pronta;
+  - o evento nasce com o tema da congregação e pode mudar só naquele dia;
+  - um evento aberto por vez; os anteriores ficam na lista para reabrir.
+- **Três versões de cada foto:**
+  - **Original:** o JPG da câmera, sem nenhuma mudança;
+  - **Pronta:** com o preset do evento e, se ligado, o Melhorar;
+  - **RAW:** o CR2, com download que continua de onde parou se o Wi-Fi cair.
+- **Entrada:**
+  - chaves separadas para QR, link e código de 4 números; sem código, a entrada é livre;
+  - o código é um só para todos, digitado por você ou gerado, e pode ser trocado tirando todo mundo;
+  - depois do código, a pessoa informa **nome e cargo**, e o aparelho fica lembrado.
+- **Controle por pessoa (o cargo digitado não dá poder nenhum):**
+  - ver, baixar original, baixar pronta e baixar RAW, cada um com sua chave;
+  - ocultar uma foto só de uma pessoa, mesmo que ela diga que é o pastor;
+  - fotos extras que só uma pessoa vê;
+  - bloquear (o aparelho e o nome) e expulsar (a página volta para a entrada na hora).
+- **Proteções para quem não pode baixar:**
+  - não aparece botão de baixar e o arquivo é recusado pelo celular (e a tentativa vai para o log);
+  - a foto grande leva o nome, o cargo e a hora da pessoa, em marca d'água;
+  - as fotos são desenhadas em canvas: sem "salvar imagem", sem toque longo, sem arrastar e sem compartilhar;
+  - a página embaça quando a pessoa sai dela (alternador de apps) e não imprime.
+  - *Limite honesto:* nenhuma página da web consegue impedir o print do próprio celular. Por isso a marca com o nome: o print mostra de quem veio.
+- **Log do evento:** quem entrou, viu, baixou (qual arquivo e qual versão), tentou baixar sem permissão e cada mudança sua, com nome, cargo, hora e IP. Filtra por pessoa e exporta em texto.
+- **Página da mídia:** com as cores e a logo do evento, "Ao vivo", foto nova com destaque, escolha da versão e **Baixar novas** (só o que ainda não foi baixado naquele aparelho).
+- **Rede:** Wi-Fi da igreja (o mais rápido para muitos aparelhos), roteador do celular ou Wi-Fi Direct, na porta 8100. Ligar a igreja desliga a Entrega local e o Express, e vice-versa: o Wi-Fi é um por vez.
+- **Onde fica:** ferramenta **Igreja** na Sessão, aba **Igreja** (ligue em Ajustes → Entrega da igreja) e a notificação "Entrega da igreja" com Parar.
+
+### Melhorar (novo)
+
+- Tira o granulado do ISO alto e devolve a definição das bordas, **sem mexer na cor**. Roda no celular, rápido e sem internet.
+- Intensidade **Auto pelo ISO**, Leve, Normal ou Forte.
+- **Manual:** no visualizador (Mais ações → Melhorar) e em lote na galeria.
+- **Automático, se você quiser:** fotos novas, Entrega local e Express, versão pronta da igreja e envio pelo WhatsApp (Ajustes → Melhorar).
+- O JPG e o RAW originais nunca são alterados: o resultado vai na cópia editada e nas cópias que saem do app.
+- A redução de ruído dos presets voltou a funcionar (antes ela não fazia efeito sem a máscara de nitidez).
+
+### Vídeos da câmera
 
 - **Vídeos do cartão:** o app lista os vídeos (.MOV e outros) que estão no cartão da 50D, baixa em blocos de 1 MB sem travar o live view e o disparo, e baixa sozinho quando a câmera avisa um vídeo novo. Em Ajustes → Vídeos da câmera.
 - **Galeria de vídeos:** ícone na aba Fotos, com prévia, duração, player, envio e apagar. RAW do Magic Lantern (.MLV) abre em outro app. Sem som: a 50D não tem microfone.
