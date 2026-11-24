@@ -217,6 +217,10 @@ class ChurchServerTest {
         assertEquals(200, call("/p/$m/$p").status)
         assertEquals(200, call("/p/$m/$p?v=pronta").status)
         assertEquals(listOf(false, true), readies)
+        // Seen once in the log, though it was opened twice.
+        val seen = runBlocking { db.churchDao().fullLog(e.id) }.filter { it.action == ChurchServer.VIEWED }
+        assertEquals(1, seen.size)
+        assertEquals("IMG_1", seen.single().detail)
     }
 
     @Test

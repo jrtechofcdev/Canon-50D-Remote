@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.IosShare
 import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -464,6 +465,8 @@ internal fun LogCard(app: TetherApp, e: ChurchEvent) {
     val log by app.church.repo.dao.observeLog(e.id, 500).collectAsState(initial = emptyList())
     var who by remember { mutableStateOf<String?>(null) }
     var showAll by remember { mutableStateOf(false) }
+    // "Viu a foto" lines are many; they show on request so downloads and refusals stay in sight.
+    var views by remember { mutableStateOf(false) }
     DeliveryCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Log do evento", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
@@ -478,7 +481,9 @@ internal fun LogCard(app: TetherApp, e: ChurchEvent) {
             JrChip("Todos", who == null, onClick = { who = null })
             people.forEach { p -> JrChip(p, who == p, onClick = { who = if (who == p) null else p }) }
         }
-        val lines = log.filter { who == null || it.who == who || it.who.endsWith("→ $who") }
+        val viewCount = log.count { it.action == com.example.core.church.ChurchServer.VIEWED && (who == null || it.who == who) }
+        if (viewCount > 0) JrChip("Quem viu cada foto", views, onClick = { views = !views }, count = viewCount, icon = Icons.Outlined.Visibility)
+        val lines = log.filter { (who == null || it.who == who || it.who.endsWith("→ $who")) && (views || it.action != com.example.core.church.ChurchServer.VIEWED) }
         if (lines.isEmpty()) Text("Nada ainda.", style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted)
         (if (showAll) lines else lines.take(25)).forEach { LogLine(it) }
         if (lines.size > 25 && !showAll) TextButton(onClick = { showAll = true }) { Text("Ver as ${lines.size} linhas") }

@@ -58,6 +58,8 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
 
     /** Devices that asked for something in the last 2 minutes. */
     val online: StateFlow<Int> = _online.asStateFlow()
+    /** Person and photo already logged as seen (kept while the server runs). */
+    private val viewed: MutableSet<Pair<Long, Long>> = ConcurrentHashMap.newKeySet()
     val port: Int get() = socket?.localPort ?: 0
     val running: Boolean get() = socket?.isClosed == false
 
@@ -309,6 +311,10 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
         val ready = r.query["v"] == ChurchFile.READY.key
         val f = backend.preview(photoId, m, marked(m), ready) ?: return text(out, 404, "Foto indisponível")
         serve(out, f, null, head, download = false, private = true) {}
+        // Opening the big picture is "seeing" it: one line per person and photo, however often they come back.
+        if (!head && viewed.add(m.id to photoId)) {
+            repo.log(m.eventId, m, VIEWED, backend.photo(photoId)?.name ?: "foto $photoId", r.ip)
+        }
     }
 
     /** Who cannot download at all only ever gets pictures with their own name on them. */
@@ -442,6 +448,9 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
         private const val HEAD_DEADLINE_MS = 10_000L
         private const val ONLINE_MS = 2 * 60_000L
         private val TOKEN = Regex("[0-9a-f]{32}")
+        /** The log line of a photo opened in the big view (the panel can hide these). */
+        const val VIEWED = "Viu a foto"
+
         val ASSETS = setOf(
             "index.html", "app.js", "style.css", "brand.css", "brand.js",
             "exo2-400.ttf", "exo2-500.ttf", "exo2-600.ttf", "logo.png", "icon.png",
