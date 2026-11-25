@@ -14,7 +14,10 @@ import org.robolectric.annotation.Config
 class EditorSpecJsonTest {
     @Test
     fun everySliderOfTheAppIsInTheJson() {
-        val json = JSONObject(EditorSpecJson.encode())
+        val text = EditorSpecJson.encode()
+        // Kept for the page check in a browser (app/src/test/web).
+        java.io.File("build/look-parity").apply { mkdirs() }.resolve("editor.json").writeText(text)
+        val json = JSONObject(text)
         val tabs = json.getJSONArray("tabs")
         assertEquals(EditorTab.entries.size, tabs.length())
         val keys = HashMap<String, JSONObject>()

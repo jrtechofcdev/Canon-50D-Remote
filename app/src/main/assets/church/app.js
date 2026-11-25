@@ -470,7 +470,9 @@
     }
     function paintPresets() {
       var bar = $("presetBar"), strip = $("presetStrip");
-      bar.hidden = !presetList || !presetList.length;
+      // The editor's button lives in this bar too: it shows for editors even without presets.
+      bar.hidden = (!presetList || !presetList.length) && !(me && me.editor);
+      $("editLook").hidden = !(me && me.editor);
       if (bar.hidden) return;
       var pick = chosenPreset();
       strip.innerHTML = "";
@@ -514,6 +516,16 @@
       $("shareSheet").hidden = false;
     });
     $("shareCancel").addEventListener("click", function () { $("shareSheet").hidden = true; });
+    // The editor starts from the picked preset, else the admin's own look, else the event's.
+    $("editLook").addEventListener("click", function () {
+      var pick = chosenPreset(), p = photos[current];
+      if (!p || !window.JREditor || !JRLook.supported()) { JR.toast("Este navegador não abre o editor. Use o Chrome ou o Safari atualizados.", "warn"); return; }
+      JREditor.open({
+        member: member, photoId: p.id, rank: me.rank, admins: admins, toast: JR.toast,
+        from: pick !== null ? "preset:" + pick : me.rank === 1 && me.own ? "own" : "event",
+        onSaved: function () { write(presetKey(), null); paintPresets(); refresh(); }
+      });
+    });
     $("saveMine").addEventListener("click", function () {
       var pick = chosenPreset();
       if (pick === null) return;

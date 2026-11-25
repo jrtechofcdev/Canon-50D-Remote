@@ -96,6 +96,7 @@
       <button id="useForAll" type="button" class="btn secondary small use-all" hidden>Usar no evento, para todos</button>
       <button id="saveMine" type="button" class="btn secondary small use-all" hidden>Guardar como meu look</button>
       <button id="shareLook" type="button" class="btn secondary small use-all" hidden>Compartilhar</button>
+      <button id="editLook" type="button" class="btn secondary small use-all" hidden>Editar</button>
     </div>
     <div id="shareSheet" class="share-sheet" hidden>
       <p class="share-title">Mandar este look para</p>
@@ -120,9 +121,26 @@
   <p id="storeEmpty" class="store-sub store-empty" hidden>A Loja ainda não foi aberta no celular do fotógrafo. Peça para ele abrir a aba Loja uma vez com internet.</p>
 </div>
 
+<div id="editor" class="editor" hidden role="dialog" aria-modal="true" aria-label="Editor">
+  <div class="ed-bar">
+    <button id="edClose" class="round" aria-label="Fechar"></button>
+    <p class="ed-title">Editar</p>
+    <button id="edUndo" class="round" aria-label="Desfazer"></button>
+    <button id="edRedo" class="round" aria-label="Refazer"></button>
+    <button id="edBefore" type="button" class="btn secondary small ed-before">Segure: antes</button>
+  </div>
+  <div class="ed-stage" id="edStage"><canvas id="edCanvas" aria-label="Foto com a edição"></canvas><span id="edWait" class="big-wait" hidden></span></div>
+  <div class="ed-side">
+    <div class="ed-tabs" id="edTabs" role="tablist" aria-label="Painéis"></div>
+    <div class="ed-panel" id="edPanel"></div>
+    <div class="ed-actions" id="edActions"></div>
+  </div>
+</div>
+
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script src="/brand.js"></script>
 <script src="/look.js"></script>
+<script src="/editor.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

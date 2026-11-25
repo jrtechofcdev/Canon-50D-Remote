@@ -61,6 +61,7 @@ class LookParityFixtureTest {
         val out = File("build/look-parity").apply { mkdirs() }
         save(src, w, h, File(out, "source.png"))
         File(out, "params.json").writeText(RenderParamsJson.encode(RenderParams.from(look)))
+        File(out, "identity.json").writeText(RenderParamsJson.encode(RenderParams.IDENTITY))
         save(CpuRenderer.render(src, w, h, RenderParams.from(look)), w, h, File(out, "app.png"))
         assertTrue(File(out, "app.png").length() > 0)
     }
