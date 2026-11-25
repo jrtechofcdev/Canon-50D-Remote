@@ -2,6 +2,24 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [5.6] · 2026-11-25
+
+Editor completo no navegador para os ADMs da igreja.
+
+- **Editar:** na foto grande, o ADM com a chave **Editor** toca em **Editar** e abre o editor na própria página, no celular ou no computador.
+  - **Painéis do app:** Luz, Cor (com HSL e preto e branco), Efeitos, Detalhe, Curva, Gradação e Calibração. Os controles vêm do app, com os mesmos nomes, limites e valores iniciais.
+  - **Curva de pontos:** toque para pôr um ponto, arraste para mover, toque duas vezes para tirar (até 16 pontos), por canal.
+  - **Desfazer e refazer**, **Desfazer tudo** e **Segure: antes** para comparar com a foto sem a edição.
+  - **Prévia ao vivo** feita no navegador pela mesma matemática da pronta: o shader do app e os números calculados no celular.
+  - A edição começa do preset que estava na tela, do look do ADM ou do look do evento.
+- **Salvar a edição:**
+  - **ADM principal:** **Usar no evento, para todos**, com o aviso de quem mudou em todas as páginas;
+  - **ADM:** **Guardar como meu look** (com **Voltar ao meu look anterior**, como na 5.5);
+  - **Mandar ao fotógrafo** ou **Mandar a um ADM**. No app, o cartão **Looks recebidos** aplica a edição ao evento ou salva como preset.
+  - Se fechar com alterações, a página pergunta antes de descartar.
+- **Chave Editor:** em **Pessoas**, junto de Presets e Loja. Quem vira ADM já ganha a chave; o fotógrafo pode tirar.
+- **Proteção:** o celular confere cada edição recebida. Fica só o que o app sabe aplicar, com os valores dentro dos limites; quem não tem a chave Editor recebe recusa.
+
 ## [5.5] · 2026-11-24
 
 Cargos de ADM e presets na página da mídia da igreja.
