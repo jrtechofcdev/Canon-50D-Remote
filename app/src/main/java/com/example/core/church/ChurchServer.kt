@@ -332,7 +332,7 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
             append(""","event":{"name":${q(e.name)},"congregation":${q(e.congregation)},"date":${e.date},"motto":${q(e.motto.orEmpty())}""")
             append(""","accent":${q(ChurchTheme.color(e.accent) ?: ChurchTheme.ACCENT)},"secondary":${q(ChurchTheme.color(e.secondary) ?: ChurchTheme.SECONDARY)},"logo":${e.logoUri != null}""")
             // The event's look and who last changed it, for the notice on every page.
-            val lookName = e.presetId?.let { p -> backend.presets().firstOrNull { it.id == p }?.name } ?: if (e.adjust != null) "ajuste próprio" else "o da foto"
+            val lookName = e.presetId?.let { p -> backend.presets().firstOrNull { it.id == p }?.name } ?: if (e.adjust != null) "edição" else "o da foto"
             append(""","look":{"preset":${e.presetId ?: "null"},"name":${q(lookName)},"by":${e.lookBy?.let(::q) ?: "null"},"at":${e.lookAt ?: "null"}}}""")
             append(""","me":{"name":${q(m.name)},"role":${q(m.role)}""")
             append(""","view":${ChurchPerm.has(perms, ChurchPerm.VIEW)}""")
@@ -342,7 +342,7 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
             append(""","rank":${m.rank},"rankLabel":${q(ChurchRank.label(m.rank))}""")
             append(""","presets":${ChurchPerm.has(perms, ChurchPerm.PRESETS)},"store":${ChurchPerm.has(perms, ChurchPerm.STORE)},"editor":${canEdit(m)}""")
             // An admin's own look, whether it leads their "pronta", and whether there is one to go back to.
-            val ownName = m.lookPresetId?.let { p -> backend.presets().firstOrNull { it.id == p }?.name } ?: m.lookAdjust?.let { "ajuste próprio" }
+            val ownName = m.lookPresetId?.let { p -> backend.presets().firstOrNull { it.id == p }?.name } ?: m.lookAdjust?.let { "minha edição" }
             append(""","independent":${m.independent},"own":${ownName?.let { """{"preset":${m.lookPresetId ?: "null"},"name":${q(it)}}""" } ?: "null"}""")
             append(""","canRevert":${m.prevPresetId != null || m.prevAdjust != null}}""")
             // Admins: who else they can send a look to, and the looks sent to them still waiting.
@@ -354,7 +354,7 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
                 append("""],"shares":[""")
                 repo.dao.sharesTo(e.id, m.id).forEachIndexed { i, s ->
                     if (i > 0) append(',')
-                    val name = s.presetId?.let { p -> presets.firstOrNull { it.id == p }?.name } ?: "ajuste próprio"
+                    val name = s.presetId?.let { p -> presets.firstOrNull { it.id == p }?.name } ?: "edição"
                     append("""{"id":${s.id},"from":${q(s.fromLabel)},"name":${q(name)},"preset":${s.presetId ?: "null"}}""")
                 }
                 append("]")
@@ -397,6 +397,12 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
     private suspend fun eventLook(r: Request, out: OutputStream) {
         val (m, e) = who(r, out, r.query["m"]) ?: return
         if (m.rank != ChurchRank.MAIN) return json(out, 403, """{"error":"Só o ADM principal muda o look do evento."}""")
+        if (r.body.isNotBlank()) {
+            val look = edited(r, m, out) ?: return
+            repo.setEventLook(e.id, null, look, m, "edição de ${m.name}")
+            backend.onEventLook()
+            return json(out, 200, """{"ok":true}""")
+        }
         val raw = r.query["preset"] ?: return json(out, 400, """{"error":"Preset?"}""")
         val id = if (raw == "none") null else raw.toLongOrNull() ?: return json(out, 400, """{"error":"Preset?"}""")
         if (id != null && !presetAllowed(m, e, id)) return json(out, 403, """{"error":"Este preset não está liberado."}""")
@@ -404,6 +410,17 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
         repo.setEventLook(e.id, id, null, m, name)
         backend.onEventLook()
         json(out, 200, """{"ok":true}""")
+    }
+
+    /**
+     * The look an editor sent in the body, cleaned and as settings text; null when there is no body.
+     * When there is one but it can't be used (no Editor switch, too big), the error answer is already sent.
+     */
+    private fun edited(r: Request, m: ChurchMember, out: OutputStream): String? {
+        if (r.body.isBlank()) return null
+        if (!canEdit(m)) { json(out, 403, """{"error":"O editor é para ADM com a chave Editor."}"""); return null }
+        val look = ChurchRules.cleanLook(r.body) ?: run { json(out, 413, """{"error":"Ajuste grande demais"}"""); return null }
+        return look.encode()
     }
 
     /** The admin behind [r], or an error answer: only admins keep a look of their own. */
@@ -418,6 +435,11 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
 
     private suspend fun ownLook(r: Request, out: OutputStream) {
         val (m, e) = admin(r, out) ?: return
+        if (r.body.isNotBlank()) {
+            val look = edited(r, m, out) ?: return
+            repo.setOwnLook(m.id, null, look, "edição de ${m.name}")
+            return json(out, 200, """{"ok":true}""")
+        }
         val raw = r.query["preset"] ?: return json(out, 400, """{"error":"Preset?"}""")
         val id = if (raw == "none") null else raw.toLongOrNull() ?: return json(out, 400, """{"error":"Preset?"}""")
         if (id != null && !presetAllowed(m, e, id)) return json(out, 403, """{"error":"Este preset não está liberado."}""")
@@ -442,16 +464,18 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
     private suspend fun share(r: Request, out: OutputStream) {
         val (m, e) = who(r, out, r.query["m"]) ?: return
         if (m.rank < ChurchRank.ADMIN) return json(out, 403, """{"error":"Só ADM compartilha looks."}""")
-        val id = r.query["preset"]?.toLongOrNull() ?: return json(out, 400, """{"error":"Preset?"}""")
-        if (!presetAllowed(m, e, id)) return json(out, 403, """{"error":"Este preset não está liberado."}""")
+        // An edit from the editor travels as its settings; otherwise a released preset.
+        val adjust = if (r.body.isNotBlank()) edited(r, m, out) ?: return else null
+        val id = if (adjust != null) null else r.query["preset"]?.toLongOrNull() ?: return json(out, 400, """{"error":"Preset?"}""")
+        if (id != null && !presetAllowed(m, e, id)) return json(out, 403, """{"error":"Este preset não está liberado."}""")
         val to = when (val t = r.query["to"]) {
             "fotografo" -> null
             else -> t?.toLongOrNull()?.let { repo.dao.member(it) }
                 ?.takeIf { it.eventId == e.id && it.id != m.id && it.rank >= ChurchRank.ADMIN && it.isActive }
                 ?: return json(out, 400, """{"error":"Escolha um ADM ou o fotógrafo."}""")
         }
-        val name = backend.presets().firstOrNull { it.id == id }?.name ?: return json(out, 404, """{"error":"Preset não encontrado"}""")
-        repo.shareLook(m, to?.id, id, null, name)
+        val name = if (adjust != null) "edição de ${m.name}" else backend.presets().firstOrNull { it.id == id }?.name ?: return json(out, 404, """{"error":"Preset não encontrado"}""")
+        repo.shareLook(m, to?.id, id, adjust, name)
         json(out, 200, """{"ok":true}""")
     }
 
@@ -742,7 +766,7 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
         const val VIEWED = "Viu a foto"
 
         val ASSETS = setOf(
-            "index.html", "app.js", "look.js", "style.css", "brand.css", "brand.js",
+            "index.html", "app.js", "look.js", "editor.js", "style.css", "brand.css", "brand.js",
             "exo2-400.ttf", "exo2-500.ttf", "exo2-600.ttf", "logo.png", "icon.png",
         )
         private val COMMON = listOf(

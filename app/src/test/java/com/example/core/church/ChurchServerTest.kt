@@ -429,6 +429,36 @@ class ChurchServerTest {
     }
 
     @Test
+    fun anEditFromThePageIsSavedAsTheAdminsLookTheEventsLookOrSentToThePhotographer() {
+        val e = event()
+        val ana = join(e)
+        val bia = join(e, name = "Bia")
+        val (anaId, biaId) = runBlocking { db.churchDao().memberByToken(ana)!!.id to db.churchDao().memberByToken(bia)!!.id }
+        val edit = "Exposure2012=0.4\nSaturation=-20\nBogus=1\n"
+        runBlocking { repo.setRank(anaId, ChurchRank.ADMIN); repo.setRank(biaId, ChurchRank.MAIN) }
+        // An admin keeps the edit as their own look, and their independent "pronta" goes with it.
+        assertEquals(200, call("/api/c/mylook?m=$ana", "POST", body = edit).status)
+        val clean = ChurchRules.cleanLook(edit)!!.encode()
+        assertEquals(clean, runBlocking { db.churchDao().member(anaId)!!.lookAdjust })
+        assertTrue(call("/api/c/state?m=$ana").text.contains("\"own\":{\"preset\":null,\"name\":\"minha edição\"}"))
+        call("/api/c/independent?m=$ana&on=1", "POST")
+        val p = photo(1).also { runBlocking { repo.addPhoto(e.id, it) } }
+        call("/f/$ana/$p?v=pronta&dl=1")
+        assertEquals(listOf(ReadyLook(null, clean)), fileLooks)
+        // The main admin's edit becomes the event's look, with the notice.
+        assertEquals(200, call("/api/c/look?m=$bia", "POST", body = edit).status)
+        assertEquals(clean, runBlocking { db.churchDao().openEvent()!!.adjust })
+        assertTrue(call("/api/c/state?m=$ana").text.contains("\"name\":\"edição\",\"by\":\"Bia · Mídia\""))
+        // Sent to the photographer, it arrives with its settings.
+        assertEquals(200, call("/api/c/share?m=$ana&to=fotografo", "POST", body = edit).status)
+        assertEquals(clean, runBlocking { db.churchDao().observeSharesToPhotographer(e.id).first().single().adjust })
+        // Without the Editor switch an edit is refused, not quietly turned into nothing.
+        runBlocking { repo.setPerm(anaId, ChurchPerm.EDITOR, false) }
+        assertEquals(403, call("/api/c/mylook?m=$ana", "POST", body = edit).status)
+        assertEquals(403, call("/api/c/share?m=$ana&to=fotografo", "POST", body = edit).status)
+    }
+
+    @Test
     fun aTooBigBodyIsRefused() {
         val e = event()
         val m = join(e)
