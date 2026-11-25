@@ -2,6 +2,9 @@ package com.example.core.church
 
 import com.example.core.delivery.AttemptLimiter
 import com.example.core.delivery.DeliveryRules
+import com.example.core.render.RenderParams
+import com.example.core.preset.CurvePoint
+import com.example.core.preset.PresetSettings
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -71,6 +74,35 @@ object ChurchRules {
             return ReadyLook(member.lookPresetId, member.lookAdjust)
         }
         return null
+    }
+
+    /** Keys the page's editor may set besides the ones the renderer reads (white balance mode, B&W). */
+    private val EDITOR_TEXT_KEYS = mapOf(
+        "WhiteBalance" to setOf("As Shot", "Custom"),
+        "ConvertToGrayscale" to setOf("True", "False"),
+        "Treatment" to setOf("Color", "Black & White"),
+    )
+
+    /**
+     * A look sent by the page's editor, made safe: only keys the renderer knows (numbers written as
+     * Lightroom writes them), the B&W and white-balance switches, and up to 16 points per tone curve.
+     * Null when the text is too big to be a look.
+     */
+    fun cleanLook(text: String): PresetSettings? {
+        if (text.length > 32_768) return null
+        val raw = PresetSettings.decode(text)
+        val values = HashMap<String, String>()
+        raw.values.forEach { (k, v) ->
+            when {
+                k in EDITOR_TEXT_KEYS -> if (v in EDITOR_TEXT_KEYS.getValue(k)) values[k] = v
+                k in RenderParams.RENDERED_KEYS || k == "Temperature" || k == "Tint" ->
+                    v.trim().removePrefix("+").toDoubleOrNull()?.takeIf { it.isFinite() }?.let { values[k] = PresetSettings.format(k, it.coerceIn(-100_000.0, 100_000.0)) }
+            }
+        }
+        val curves = raw.curves.filterKeys { it in PresetSettings.CURVE_KEYS }.mapValues { (_, pts) ->
+            pts.map { CurvePoint(it.x.coerceIn(0, 255), it.y.coerceIn(0, 255)) }.sortedBy { it.x }.distinctBy { it.x }.take(16)
+        }.filterValues { it.size >= 2 }
+        return PresetSettings(values, curves)
     }
 
     /** The presets released to the media (null = all of them). */
@@ -337,7 +369,8 @@ class ChurchRepository(
                 log(m.eventId, old, "Virou ADM", "outra pessoa é o ADM principal", byPhotographer = true)
             }
         }
-        val perms = if (rank >= ChurchRank.ADMIN) ChurchPerm.with(m.perms, ChurchPerm.PRESETS, true) else m.perms
+        // Admins get the presets and the editor on the page; the photographer can still turn either off.
+        val perms = if (rank >= ChurchRank.ADMIN) m.perms or ChurchPerm.PRESETS or ChurchPerm.EDITOR else m.perms
         dao.updateMember(m.copy(rank = rank, perms = perms, independent = m.independent && rank == ChurchRank.ADMIN))
         log(m.eventId, m, "Virou ${ChurchRank.label(rank)}", byPhotographer = true)
         changed()
@@ -494,6 +527,7 @@ class ChurchRepository(
         ChurchPerm.DOWNLOAD_RAW -> "baixar RAW"
         ChurchPerm.PRESETS -> "presets"
         ChurchPerm.STORE -> "Loja"
+        ChurchPerm.EDITOR -> "editor"
         else -> "0x%X".format(flag)
     }
 

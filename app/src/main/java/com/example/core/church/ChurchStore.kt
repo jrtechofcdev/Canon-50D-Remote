@@ -140,6 +140,8 @@ object ChurchPerm {
     const val PRESETS = 16
     /** See the preset shop and install a preset into the photographer's app. */
     const val STORE = 32
+    /** Admins only: the full editor on the page (the app's panels), saving their own edits. */
+    const val EDITOR = 64
     const val DEFAULT = VIEW or DOWNLOAD_ANY
 
     fun has(perms: Int, flag: Int) = perms and flag == flag

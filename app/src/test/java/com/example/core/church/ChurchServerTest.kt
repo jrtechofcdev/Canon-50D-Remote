@@ -70,6 +70,8 @@ class ChurchServerTest {
             override suspend fun store() = listOf(ChurchStoreItem(70, "Dourado", "Retrato", false), ChurchStoreItem(71, "Neblina", "Externo", true))
             override suspend fun storeInstall(id: Long): Result<ChurchPresetInfo> =
                 if (id == 70L) Result.success(ChurchPresetInfo(9, "Dourado", "Meus presets")) else Result.failure(IllegalStateException("Precisa de internet no celular do fotógrafo para baixar este preset"))
+            override fun editorSpec() = """{"tabs":[]}"""
+            override suspend fun lookText(look: ReadyLook) = look.adjust ?: look.presetId?.let { "Exposure2012=+0.${it}0\n" } ?: ""
             override suspend fun presets() = listOf(ChurchPresetInfo(1, "Quente", "Meus"), ChurchPresetInfo(2, "P&B", "Meus"), ChurchPresetInfo(3, "Frio", "Loja"))
         }
         server = ChurchServer(backend)
@@ -86,10 +88,15 @@ class ChurchServerTest {
         val text get() = String(body)
     }
 
-    private fun call(path: String, method: String = "GET", range: String? = null): Reply {
+    private fun call(path: String, method: String = "GET", range: String? = null, body: String? = null): Reply {
         val c = URL("http://127.0.0.1:$port$path").openConnection() as HttpURLConnection
         c.requestMethod = method
         range?.let { c.setRequestProperty("Range", it) }
+        body?.let { text ->
+            c.doOutput = true
+            c.setRequestProperty("Content-Type", "text/plain; charset=utf-8")
+            c.outputStream.use { it.write(text.toByteArray()) }
+        }
         val status = c.responseCode
         val body = (if (status < 400) c.inputStream else c.errorStream)?.use { it.readBytes() } ?: ByteArray(0)
         return Reply(status, body, c.headerFields.filterKeys { it != null })
@@ -393,6 +400,39 @@ class ChurchServerTest {
         assertEquals(409, failed.status)
         assertTrue(failed.text.contains("internet"))
         assertTrue(runBlocking { db.churchDao().fullLog(e.id) }.any { it.action == "Instalou da Loja" && it.detail == "Dourado" })
+    }
+
+    @Test
+    fun theEditorIsForAdminsAndThePhoneTurnsTheirLookIntoTheShadersNumbers() {
+        val e = event()
+        val m = join(e)
+        val id = runBlocking { db.churchDao().memberByToken(m)!!.id }
+        val look = "Exposure2012=0.5\nContrast2012=30\nBogus=7\ncurve:ToneCurvePV2012=0,10;128,140;255,250\n"
+        assertEquals(403, call("/api/c/editor?m=$m").status)
+        assertEquals(403, call("/api/c/params?m=$m", "POST", body = look).status)
+        runBlocking { repo.setRank(id, ChurchRank.ADMIN) }
+        assertEquals("{\"tabs\":[]}", call("/api/c/editor?m=$m").text)
+        val params = call("/api/c/params?m=$m", "POST", body = look)
+        assertEquals(200, params.status)
+        assertEquals(
+            com.example.core.render.RenderParamsJson.encode(com.example.core.render.RenderParams.from(ChurchRules.cleanLook(look)!!)),
+            params.text,
+        )
+        // Where an edit starts.
+        runBlocking { repo.setOwnLook(id, null, "Exposure2012=+1.00\n", "edição") }
+        assertEquals("Exposure2012=+1.00\n", call("/api/c/settings?m=$m&from=own").text)
+        assertEquals("Exposure2012=+0.10\n", call("/api/c/settings?m=$m&from=preset&id=1").text)
+        // The photographer can still turn the editor off for an admin.
+        runBlocking { repo.setPerm(id, ChurchPerm.EDITOR, false) }
+        assertEquals(403, call("/api/c/editor?m=$m").status)
+        assertTrue(call("/api/c/state?m=$m").text.contains("\"editor\":false"))
+    }
+
+    @Test
+    fun aTooBigBodyIsRefused() {
+        val e = event()
+        val m = join(e)
+        assertEquals(400, call("/api/c/params?m=$m", "POST", body = "x".repeat(40_000)).status)
     }
 
     @Test

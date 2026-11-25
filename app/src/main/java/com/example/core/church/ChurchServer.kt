@@ -51,6 +51,10 @@ interface ChurchBackend {
     suspend fun presets(): List<ChurchPresetInfo> = emptyList()
     /** A preset's numbers for the page's live preview ([com.example.core.render.RenderParamsJson]); null when it is gone. */
     suspend fun params(presetId: Long): String? = null
+    /** The editor's panels and sliders as the app defines them (JSON). */
+    fun editorSpec(): String = "{}"
+    /** A look's full settings as text ([com.example.core.preset.PresetSettings.encode]); "" for no look. */
+    suspend fun lookText(look: ReadyLook): String = ""
     /** The photo the page's live preview starts from: cropped and "Melhorar" applied, no look. */
     suspend fun base(id: Long, member: ChurchMember, marked: Boolean): ServedFile? = null
     /** The event's look changed: the "pronta" of its photos are made again ahead. */
@@ -156,7 +160,8 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
 
     // ---- one request -------------------------------------------------------------------------
 
-    private class Request(val method: String, val path: String, val query: Map<String, String>, val headers: Map<String, String>, val ip: String)
+    /** [body]: a POST's text (the editor's look), at most [MAX_BODY] bytes; empty otherwise. */
+    private class Request(val method: String, val path: String, val query: Map<String, String>, val headers: Map<String, String>, val ip: String, val body: String = "")
 
     private fun handle(client: Socket) = client.use { s ->
         s.soTimeout = READ_TIMEOUT_MS
@@ -197,7 +202,21 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
             val eq = it.indexOf('=')
             if (eq < 0) decode(it) to "" else decode(it.substring(0, eq)) to decode(it.substring(eq + 1))
         }
-        return Request(parts[0].uppercase(), path, query, headers, ip)
+        val method = parts[0].uppercase()
+        val length = headers["content-length"]?.toIntOrNull() ?: 0
+        if (length > MAX_BODY) return null
+        val body = if (method == "POST" && length > 0) {
+            val bytes = ByteArray(length)
+            var got = 0
+            while (got < length) {
+                if (System.nanoTime() > deadline) return null
+                val n = input.read(bytes, got, length - got)
+                if (n < 0) return null
+                got += n
+            }
+            String(bytes, Charsets.UTF_8)
+        } else ""
+        return Request(method, path, query, headers, ip, body)
     }
 
     private fun readLine(input: InputStream, deadline: Long): String? {
@@ -237,6 +256,8 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
             seg == listOf("api", "c", "share", "accept") && r.method == "POST" -> closeShare(r, out, apply = true)
             seg == listOf("api", "c", "share", "dismiss") && r.method == "POST" -> closeShare(r, out, apply = false)
             seg == listOf("api", "c", "params") -> params(r, out)
+            seg == listOf("api", "c", "editor") -> editor(r, out)
+            seg == listOf("api", "c", "settings") -> settings(r, out)
             seg.size == 3 && seg[0] == "b" -> base(seg[1], seg[2], r, out, head)
             seg == listOf("evento-logo") -> logo(out, head)
             seg.size == 3 && seg[0] == "t" -> thumb(seg[1], seg[2], r, out, head)
@@ -319,7 +340,7 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
             append(""","pronta":${ChurchPerm.has(perms, ChurchPerm.DOWNLOAD_READY)}""")
             append(""","raw":${ChurchPerm.has(perms, ChurchPerm.DOWNLOAD_RAW)}""")
             append(""","rank":${m.rank},"rankLabel":${q(ChurchRank.label(m.rank))}""")
-            append(""","presets":${ChurchPerm.has(perms, ChurchPerm.PRESETS)},"store":${ChurchPerm.has(perms, ChurchPerm.STORE)}""")
+            append(""","presets":${ChurchPerm.has(perms, ChurchPerm.PRESETS)},"store":${ChurchPerm.has(perms, ChurchPerm.STORE)},"editor":${canEdit(m)}""")
             // An admin's own look, whether it leads their "pronta", and whether there is one to go back to.
             val ownName = m.lookPresetId?.let { p -> backend.presets().firstOrNull { it.id == p }?.name } ?: m.lookAdjust?.let { "ajuste próprio" }
             append(""","independent":${m.independent},"own":${ownName?.let { """{"preset":${m.lookPresetId ?: "null"},"name":${q(it)}}""" } ?: "null"}""")
@@ -494,12 +515,46 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
     /** The app's own shader, so the page's preview is made by the same maths. */
     private suspend fun shader(r: Request, out: OutputStream) {
         val (m, _) = who(r, out, r.query["m"]) ?: return
-        if (!ChurchPerm.has(m.perms, ChurchPerm.PRESETS)) return json(out, 403, """{"error":"Sem presets"}""")
+        if (!canPreview(m)) return json(out, 403, """{"error":"Sem presets"}""")
         json(out, 200, """{"vertex":${q(com.example.core.render.PresetShader.VERTEX)},"fragment":${q(com.example.core.render.PresetShader.FRAGMENT)}}""")
+    }
+
+    /** The full editor: admins with the Editor switch. */
+    private fun canEdit(m: ChurchMember) = m.rank >= ChurchRank.ADMIN && ChurchPerm.has(m.perms, ChurchPerm.EDITOR)
+
+    /** The live preview (presets or editor). */
+    private fun canPreview(m: ChurchMember) = ChurchPerm.has(m.perms, ChurchPerm.PRESETS) || canEdit(m)
+
+    private suspend fun editor(r: Request, out: OutputStream) {
+        val (m, _) = who(r, out, r.query["m"]) ?: return
+        if (!canEdit(m)) return json(out, 403, """{"error":"O editor é para ADM com a chave Editor."}""")
+        json(out, 200, backend.editorSpec())
+    }
+
+    /** Where an edit starts: a released preset, the admin's own look or the event's (as settings text). */
+    private suspend fun settings(r: Request, out: OutputStream) {
+        val (m, e) = who(r, out, r.query["m"]) ?: return
+        if (!canEdit(m)) return json(out, 403, """{"error":"O editor é para ADM com a chave Editor."}""")
+        val look = when (r.query["from"]) {
+            "preset" -> {
+                val id = r.query["id"]?.toLongOrNull() ?: return json(out, 400, """{"error":"Preset?"}""")
+                if (!presetAllowed(m, e, id)) return json(out, 403, """{"error":"Este preset não está liberado."}""")
+                ReadyLook(id, null)
+            }
+            "own" -> ReadyLook(m.lookPresetId, m.lookAdjust)
+            else -> ReadyLook(e.presetId, e.adjust)
+        }
+        bytes(out, 200, "text/plain; charset=utf-8", backend.lookText(look))
     }
 
     private suspend fun params(r: Request, out: OutputStream) {
         val (m, e) = who(r, out, r.query["m"]) ?: return
+        // The editor sends a whole look: the phone turns it into the shader's numbers.
+        if (r.method == "POST") {
+            if (!canEdit(m)) return json(out, 403, """{"error":"O editor é para ADM com a chave Editor."}""")
+            val look = ChurchRules.cleanLook(r.body) ?: return json(out, 413, """{"error":"Ajuste grande demais"}""")
+            return json(out, 200, com.example.core.render.RenderParamsJson.encode(com.example.core.render.RenderParams.from(look)))
+        }
         val id = r.query["preset"]?.toLongOrNull() ?: return json(out, 400, """{"error":"Preset?"}""")
         if (!presetAllowed(m, e, id)) return json(out, 403, """{"error":"Este preset não está liberado para você."}""")
         val p = backend.params(id) ?: return json(out, 404, """{"error":"Preset não encontrado"}""")
@@ -508,7 +563,7 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
 
     private suspend fun base(token: String, id: String, r: Request, out: OutputStream, head: Boolean) {
         val (m, _, photoId) = visible(token, id, r, out) ?: return
-        if (!ChurchPerm.has(m.perms, ChurchPerm.PRESETS)) return text(out, 403, "Sem presets")
+        if (!canPreview(m)) return text(out, 403, "Sem presets")
         val f = backend.base(photoId, m, marked(m)) ?: return text(out, 404, "Foto indisponível")
         serve(out, f, null, head, download = false, private = true) {}
     }
@@ -679,6 +734,8 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
         private const val PER_DEVICE = 8
         private const val READ_TIMEOUT_MS = 10_000
         private const val HEAD_DEADLINE_MS = 10_000L
+        /** The biggest POST body read: a look with every slider and four curves is well under 4 KB. */
+        private const val MAX_BODY = 32_768
         private const val ONLINE_MS = 2 * 60_000L
         private val TOKEN = Regex("[0-9a-f]{32}")
         /** The log line of a photo opened in the big view (the panel can hide these). */

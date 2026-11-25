@@ -152,6 +152,21 @@ class ChurchRepositoryTest {
     }
 
     @Test
+    fun aLookFromThePageIsCleanedBeforeTheAppUsesIt() {
+        val clean = ChurchRules.cleanLook(
+            "Exposure2012=0.5\nContrast2012=+30.4\nCameraProfile=Hack\nTreatment=Black & White\nWhiteBalance=Daylight\n" +
+                "Saturation=NaN\ncurve:ToneCurvePV2012=300,-5;0,0;128,140\ncurve:Other=0,0;255,255\n",
+        )!!
+        assertEquals("+0.50", clean.values["Exposure2012"])
+        assertEquals("+30", clean.values["Contrast2012"])
+        assertEquals("Black & White", clean.values["Treatment"])
+        assertFalse("CameraProfile" in clean.values || "WhiteBalance" in clean.values || "Saturation" in clean.values)
+        assertEquals(listOf(com.example.core.preset.CurvePoint(0, 0), com.example.core.preset.CurvePoint(128, 140), com.example.core.preset.CurvePoint(255, 0)), clean.curves["ToneCurvePV2012"])
+        assertFalse("Other" in clean.curves)
+        assertNull(ChurchRules.cleanLook("x".repeat(40_000)))
+    }
+
+    @Test
     fun aWrongCodeIsRefusedAndTriesAreLimited() = runBlocking {
         val e = repo.newEvent("Cruzada", null)
         repeat(5) { assertTrue(join(e, code = "0000".takeIf { it != e.code } ?: "1111") is JoinResult.Denied) }

@@ -307,6 +307,11 @@ class ChurchDelivery(
         ChurchPresetInfo(presetId, item.name, com.example.core.preset.DEFAULT_CATEGORY)
     }
 
+    override fun editorSpec(): String = com.example.ui.preset.EditorSpecJson.encode()
+
+    override suspend fun lookText(look: ReadyLook): String =
+        look.adjust ?: look.presetId?.let { presetRepo.get(it)?.settings?.encode() } ?: ""
+
     override suspend fun onEventLook() {
         val e = repo.dao.openEvent() ?: return
         repo.dao.photos(e.id).forEach { readyQueue.trySend(it.photoId) }
