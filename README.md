@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img alt="Versão 5.4.1" src="https://img.shields.io/badge/vers%C3%A3o-5.4.1-00FCA8?labelColor=292929">
+  <img alt="Versão 5.5" src="https://img.shields.io/badge/vers%C3%A3o-5.5-00FCA8?labelColor=292929">
   <img alt="Android 7 ou mais novo" src="https://img.shields.io/badge/Android-7%2B-1CDAFF?labelColor=292929&logo=android&logoColor=white">
   <img alt="Canon EOS 50D" src="https://img.shields.io/badge/c%C3%A2mera-Canon%20EOS%2050D-00FCA8?labelColor=292929">
   <img alt="Kotlin e Jetpack Compose" src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-1CDAFF?labelColor=292929&logo=kotlin&logoColor=white">
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="release/JR_C50D_Sync-v5.4.1.apk"><b>⬇ Baixar o APK 5.4.1</b></a>
+  <a href="release/JR_C50D_Sync-v5.5.apk"><b>⬇ Baixar o APK 5.5</b></a>
   &nbsp;·&nbsp;
   <a href="#instalar">Instalar</a>
   &nbsp;·&nbsp;
@@ -93,7 +93,8 @@ Cada função do app responde a uma etapa do trabalho no evento.
 - **Entrega da igreja:**
   - a mídia vê as fotos ao vivo e baixa original, pronta ou RAW;
   - entrada por QR, link ou código, com nome e cargo;
-  - você decide quem vê e quem baixa, foto por foto, e tudo fica no log.
+  - você decide quem vê e quem baixa, foto por foto, e tudo fica no log;
+  - ADMs escolhem presets com prévia ao vivo, trocam o look do evento e compartilham looks.
 - **WhatsApp direto:** a conversa do cliente abre com a foto pronta (preset, recorte e marca d'água).
 - **Modo cliente:** tela cheia com PIN, o cliente escolhe as fotos e o preset.
 
@@ -144,7 +145,7 @@ Cada função do app responde a uma etapa do trabalho no evento.
 
 ## Instalar
 
-1. Baixe o **[APK 5.4.1](release/JR_C50D_Sync-v5.4.1.apk)** (ou pela aba *Releases*, ao lado).
+1. Baixe o **[APK 5.5](release/JR_C50D_Sync-v5.5.apk)** (ou pela aba *Releases*, ao lado).
 2. Abra o arquivo no celular e permita **instalar apps desconhecidos** quando o Android pedir.
 3. As atualizações instalam por cima e mantêm suas fotos e ajustes.
 
@@ -279,6 +280,12 @@ Para cultos, cruzadas e festas, sem cobrança e sem limite de fotos:
 5. Em **Quem entrar pode**, escolha o que quem chega pode fazer (por exemplo, só ver). Em **Pessoas**, cada um tem as chaves **Ver**, **Original**, **Pronta** e **RAW**, além de **Fotos** (ocultar só dela ou dar fotos extras), **Bloquear** e **Expulsar**.
 6. Em **Versão pronta**, escolha o preset do evento e ligue o **Melhorar** se quiser.
 7. **Encerrar evento** tira todos da página e oferece apagar as cópias preparadas. O evento fica na lista para reabrir. Ele também pode encerrar sozinho em 3, 6 ou 12 horas.
+
+**Cargos e presets:** em **Pessoas**, escolha **Só ver**, **ADM** ou **ADM principal**. Quem tem a chave **Presets** vê, embaixo da foto grande, os presets liberados no cartão **Presets para a mídia**, com prévia ao vivo feita pelo mesmo cálculo do app, e baixa a **Pronta** com o escolhido.
+- O ADM principal toca em **Usar no evento, para todos** e todas as páginas mostram quem mudou o look.
+- O ADM guarda o próprio look e pode ficar **Independente**.
+- Qualquer ADM pode **Compartilhar** um look com outro ADM ou com você. Você recebe em **Looks recebidos** e pode aplicar ao evento ou salvar como preset.
+- Com a chave **Loja**, a pessoa vê a Loja de presets e instala no seu app.
 
 As **congregações** (ícone no topo do painel) guardam cores, frase, logo, preset da pronta e "quem entrar pode" de cada igreja. A **Placa para imprimir** traz o QR do Wi-Fi, o QR da página e o código. Na página, a mídia alterna entre **Original** e **Pronta** na foto grande antes de baixar.
 

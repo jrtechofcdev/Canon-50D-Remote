@@ -2,6 +2,38 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [5.5] · 2026-11-24
+
+Cargos de ADM e presets na página da mídia da igreja.
+
+- **Cargos:** em **Pessoas**, cada um vira **Só ver**, **ADM** ou **ADM principal** (um por evento). O cargo digitado na entrada continua sem dar poder; quem decide é você. A página mostra o selo do cargo.
+- **Presets na página, com prévia ao vivo:**
+  - quem tem a chave **Presets** vê, embaixo da foto grande, os presets que você liberou (cartão **Presets para a mídia**: todos ou só alguns);
+  - tocar num preset mostra a foto com ele na hora, feita no navegador pela mesma matemática do app: o mesmo shader, e os números calculados no celular;
+  - em teste, a prévia ficou a menos de 1 ponto (numa escala de 0 a 255) do resultado do app;
+  - em navegador sem WebGL2, o celular faz a prévia;
+  - a **Pronta** baixada sai com o preset escolhido, e o log diz qual foi.
+- **Look do evento pelo ADM principal:**
+  - ele escolhe um preset e toca em **Usar no evento, para todos**;
+  - todas as páginas mostram "Look do evento: … alterado por Ana · Mídia às 20:31", com um aviso na hora;
+  - no app, a **Versão pronta** mostra o último ajuste e o **Histórico dos looks**, com **Voltar a este**;
+  - trocar o look pelo app também gera o aviso ("Fotógrafo").
+- **ADM:**
+  - **Guardar como meu look**;
+  - **Independente:** o look do ADM principal não muda a pronta dele;
+  - **Voltar ao meu look anterior**.
+- **Compartilhar looks:**
+  - ADM e ADM principal mandam um look para outro ADM ou para o fotógrafo;
+  - quem recebe vê "Look de Ana" com **Aplicar** ou **Dispensar**;
+  - no app, o cartão **Looks recebidos** tem **Aplicar ao evento**, **Salvar como preset** (vai para Meus presets) e **Dispensar**.
+- **Loja de presets na página:**
+  - quem tem a chave **Loja** vê o catálogo guardado no celular, com as prévias;
+  - **Instalar** coloca o preset no seu app (Meus presets) e o libera para o evento;
+  - se o preset ainda não foi baixado e o celular estiver sem internet, a página avisa.
+- **Sobre o RAW:** a prévia e a pronta saem do JPG da câmera (ou do JPG dentro do CR2). O app não revela o RAW, e a página diz isso embaixo dos presets.
+- **Pronta refeita:** quando um preset é editado no app, as prontas feitas com ele são refeitas.
+- **Banco versão 14:** os dados da 5.4.1 são mantidos.
+
 ## [5.4.1] · 2026-11-24
 
 O que ficou de fora da 5.4 na Entrega da igreja e no Melhorar.
