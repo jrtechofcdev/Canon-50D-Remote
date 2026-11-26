@@ -202,6 +202,7 @@
     photos = d.photos;
     paintVersions();
     paintGrid(fresh);
+    paintIg(d.ig);
     firstLoad = false;
 
     var n = photos.length;
@@ -377,6 +378,84 @@
     var preset = kind === "pronta" && viewerApi ? viewerApi.chosenPreset() : null;
     return "/f/" + member + "/" + p.id + "?v=" + kind + "&dl=1" + (preset !== null ? "&preset=" + preset : "");
   }
+
+  // ---------- Para o Instagram (experimental): the photographer's post, in carousel order ----------
+  var igPost = null, igAt = null;
+  function igUrl(id, story) { return "/f/" + member + "/" + id + "?v=ig&k=" + (story ? "story" : "feed") + "&dl=1"; }
+  function two(n) { return ("0" + n).slice(-2); }
+  function paintIg(ig) {
+    var box = $("ig");
+    if (!ig || !ig.photos.length) { box.hidden = true; igPost = null; igAt = null; return; }
+    if (igAt !== null && ig.at !== igAt) JR.toast("O fotógrafo atualizou o post do Instagram", "info");
+    else if (igAt === null && !firstLoad) JR.toast("O fotógrafo mandou o post do Instagram", "info");
+    igAt = ig.at; igPost = ig;
+    box.hidden = false;
+    var shielded = document.body.classList.contains("protected");
+    $("igSub").textContent = plural(ig.photos.length, "foto", "fotos") + " na ordem do carrossel" +
+      (ig.download ? ", com o look do evento e o recorte pronto." : ". Peça ao fotógrafo a permissão da pronta para baixar.");
+    $("igAll").hidden = !ig.download;
+    $("igCopy").hidden = !ig.caption;
+    $("igCaption").hidden = !ig.caption;
+    $("igText").textContent = ig.caption || "";
+    var strip = $("igStrip");
+    strip.innerHTML = "";
+    ig.photos.forEach(function (p, i) {
+      var card = document.createElement("figure");
+      card.className = "ig-card"; card.setAttribute("role", "listitem");
+      var pic = document.createElement("button");
+      pic.type = "button"; pic.className = "ig-pic";
+      pic.style.setProperty("--shape", p.shape.replace(":", " / "));
+      pic.setAttribute("aria-label", (i === 0 ? "Capa" : "Foto " + (i + 1)) + " do carrossel, abrir");
+      var src = "/t/" + member + "/" + p.id, img;
+      if (shielded) {
+        img = document.createElement("canvas");
+        var im = new Image();
+        im.onload = function () { img.width = im.naturalWidth; img.height = im.naturalHeight; img.getContext("2d").drawImage(im, 0, 0); };
+        im.src = src;
+      } else {
+        img = document.createElement("img"); img.alt = ""; img.loading = "lazy"; img.decoding = "async"; img.src = src;
+      }
+      var n = document.createElement("span"); n.className = "ig-n"; n.textContent = i === 0 ? "Capa" : String(i + 1);
+      pic.appendChild(img); pic.appendChild(n);
+      pic.onclick = function () {
+        var at = -1;
+        photos.forEach(function (q, k) { if (q.id === p.id) at = k; });
+        if (at >= 0) viewerApi.open(at);
+      };
+      card.appendChild(pic);
+      if (ig.download) {
+        var dl = document.createElement("div"); dl.className = "ig-dl";
+        dl.appendChild(igLink("Feed " + p.shape, igUrl(p.id, false)));
+        if (p.story) dl.appendChild(igLink("Stories", igUrl(p.id, true)));
+        card.appendChild(dl);
+      }
+      strip.appendChild(card);
+    });
+  }
+  function igLink(label, href) {
+    var a = document.createElement("a");
+    a.className = "btn secondary small"; a.href = href; a.textContent = label; a.setAttribute("download", "");
+    return a;
+  }
+  $("igAll").addEventListener("click", function () {
+    if (!igPost) return;
+    var list = igPost.photos.map(function (p, i) { return { id: p.id, name: two(i + 1) + "_feed.jpg" }; });
+    JR.toast("Baixando o carrossel: " + plural(list.length, "foto", "fotos"));
+    JR.saveMany(list, function (p) { return igUrl(p.id, false); });
+  });
+  $("igCopy").addEventListener("click", function () {
+    var text = igPost && igPost.caption || "";
+    function done() { JR.toast("Legenda copiada. É só colar no Instagram."); }
+    if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(text).then(done, fallback); } else fallback();
+    function fallback() {
+      // The page runs on plain http on the church Wi-Fi, where the clipboard API is off: a hidden textarea does it.
+      var t = document.createElement("textarea");
+      t.value = text; t.setAttribute("readonly", ""); t.style.position = "fixed"; t.style.opacity = "0";
+      document.body.appendChild(t); t.select();
+      try { document.execCommand("copy"); done(); } catch (e) { JR.toast("Não deu para copiar. Abra \"Ver a legenda\" e copie à mão."); }
+      t.remove();
+    }
+  });
 
   function paintGrid(fresh) {
     var grid = $("grid"), keep = {}, v = chosen(), done = v ? downloaded(v.key) : {};

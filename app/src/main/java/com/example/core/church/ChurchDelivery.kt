@@ -60,6 +60,7 @@ class ChurchDelivery(
     private val settings: SettingsRepository,
     private val presetRepo: com.example.core.preset.PresetRepository,
     private val shop: com.example.core.shop.PresetShop,
+    private val insta: com.example.core.insta.InstaDao? = null,
 ) : ChurchBackend {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + AppLog.handler(ChurchServer.TAG))
     private val lock = Mutex()
@@ -275,6 +276,52 @@ class ChurchDelivery(
         AppLog.i(ChurchServer.TAG, "Pronta de ${photo.savedBase} em ${System.currentTimeMillis() - started} ms")
         if (chosen == null) repo.changed()
         out
+    }
+
+    override suspend fun igPost(event: ChurchEvent): ChurchIgPost? {
+        val picks = insta?.picks(event.id).orEmpty()
+        if (picks.isEmpty()) return null
+        return ChurchIgPost(
+            event.igCaption.orEmpty(),
+            picks.map { p ->
+                val feed = com.example.core.render.CropSpec.decode(p.feedCrop)
+                ChurchIgPhoto(p.photoId, feed?.let(::shape) ?: "4:5", p.storyCrop != null)
+            },
+        )
+    }
+
+    private fun shape(c: com.example.core.render.CropSpec) = when (com.example.core.render.CropRatio.of(c.ratio)) {
+        com.example.core.render.CropRatio.IG_SQUARE -> "1:1"
+        com.example.core.render.CropRatio.IG_34 -> "3:4"
+        else -> "4:5"
+    }
+
+    /**
+     * A post photo for Instagram: the event's look (as the "pronta"), cut to the feed or Stories frame at
+     * the size Instagram wants. Named "01_feed_IMG_1234.jpg" so the carousel keeps its order in the downloads.
+     */
+    override suspend fun igFile(event: ChurchEvent, photoId: Long, story: Boolean, position: Int): ServedFile? {
+        val pick = insta?.picks(event.id)?.firstOrNull { it.photoId == photoId } ?: return null
+        val crop = (if (story) pick.storyCrop else pick.feedCrop) ?: return null
+        val made = renderLock.withLock {
+            val photo = photos.get(photoId) ?: return@withLock null
+            val enhance = enhanceFor(photo, event)
+            val looked = photo.copy(
+                presetId = event.presetId ?: photo.presetId,
+                adjust = if (event.presetId != null || event.adjust != null) event.adjust else photo.adjust,
+                enhance = enhance, crop = crop,
+            )
+            val lookText = looked.adjust ?: looked.presetId?.let { presetRepo.get(it)?.settings?.encode() }
+            val key = listOf(lookText, crop, Enhance.resolve(enhance, photo.iso), looked.displayUri).hashCode().toUInt().toString(16)
+            val out = File(dirOf(event.id), "ig_${photoId}_$key.jpg")
+            if (out.exists()) return@withLock out
+            val file = looks.exportFile(looked, 0, tag = "ig_$photoId", forceEnhance = null) ?: return@withLock null
+            withContext(Dispatchers.IO) { if (!file.renameTo(out)) { file.copyTo(out, overwrite = true); file.delete() } }
+            out
+        } ?: return null
+        val p = photos.get(photoId)
+        val name = "%02d_%s_%s.jpg".format(position, if (story) "stories" else "feed", p?.savedBase ?: photoId)
+        return fileServed(made, name)
     }
 
     /** Melhorar on the "pronta": the event's switch or Ajustes, else what the photo itself has. */

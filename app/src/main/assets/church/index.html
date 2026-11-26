@@ -68,6 +68,19 @@
 
     <p id="viewOnly" class="note" hidden><i class="mark warn" aria-hidden="true"></i><span>Você pode ver as fotos, mas não baixar. Cada imagem mostra o seu nome e o horário.</span></p>
 
+    <!-- The post the photographer picked for Instagram (experimental), in carousel order. -->
+    <section id="ig" class="ig" hidden aria-labelledby="igTitle">
+      <div class="ig-head">
+        <div class="ig-titles"><h2 id="igTitle" class="ig-title">Para o Instagram</h2><p id="igSub" class="ig-sub"></p></div>
+        <div class="ig-actions">
+          <button id="igAll" type="button" class="btn primary small" hidden>Baixar o carrossel</button>
+          <button id="igCopy" type="button" class="btn secondary small" hidden>Copiar legenda</button>
+        </div>
+      </div>
+      <div id="igStrip" class="ig-strip" role="list"></div>
+      <details id="igCaption" class="ig-caption" hidden><summary>Ver a legenda</summary><p id="igText"></p></details>
+    </section>
+
     <div id="grid" class="grid"></div>
 
     <div id="empty" class="empty" hidden>

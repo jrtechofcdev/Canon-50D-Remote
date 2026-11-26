@@ -26,6 +26,12 @@ class ServedFile(val name: String, val length: Long, val open: () -> InputStream
 /** One photo as the media page lists it. */
 data class ChurchPhotoInfo(val id: Long, val name: String, val hasJpg: Boolean, val hasRaw: Boolean)
 
+/** Instagram (experimental): the post the photographer sent to the media page, in carousel order. */
+data class ChurchIgPost(val caption: String, val photos: List<ChurchIgPhoto>)
+
+/** One photo of the post: its feed shape ("1:1", "3:4", "4:5") and whether it has a Stories version. */
+data class ChurchIgPhoto(val id: Long, val shape: String, val story: Boolean)
+
 /** A preset of the shop as the media page lists it; [installed] = already in the photographer's app. */
 data class ChurchStoreItem(val id: Long, val name: String, val category: String, val installed: Boolean)
 
@@ -65,6 +71,10 @@ interface ChurchBackend {
     suspend fun storePicture(id: Long): ServedFile? = null
     /** Installs a shop item into the photographer's presets: its preset id, or the reason it couldn't. */
     suspend fun storeInstall(id: Long): Result<ChurchPresetInfo> = Result.failure(IllegalStateException("Loja indisponível"))
+    /** Instagram (experimental): the post sent to the media page, null when none was sent. */
+    suspend fun igPost(event: ChurchEvent): ChurchIgPost? = null
+    /** A post photo cut for the feed or the Stories, with the event's look; [position] numbers the file. */
+    suspend fun igFile(event: ChurchEvent, photoId: Long, story: Boolean, position: Int): ServedFile? = null
 }
 
 /**
@@ -359,6 +369,17 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
                 }
                 append("]")
             }
+            // Instagram (experimental): the post the photographer sent, with only the photos this person may see.
+            val post = if (e.igSentAt != null && ChurchPerm.has(perms, ChurchPerm.VIEW)) backend.igPost(e) else null
+            if (post != null) {
+                val shown = post.photos.filter { it.id in ids }
+                append(""","ig":{"caption":${q(post.caption)},"download":${ChurchPerm.has(perms, ChurchPerm.DOWNLOAD_READY)},"at":${e.igSentAt},"photos":[""")
+                shown.forEachIndexed { i, p ->
+                    if (i > 0) append(',')
+                    append("""{"id":${p.id},"shape":${q(p.shape)},"story":${p.story}}""")
+                }
+                append("]}")
+            }
             append(""","photos":[""")
             photos.forEachIndexed { i, p ->
                 if (i > 0) append(',')
@@ -629,6 +650,7 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
 
     private suspend fun download(token: String, id: String, r: Request, out: OutputStream, head: Boolean) {
         val (m, e, photoId) = visible(token, id, r, out) ?: return
+        if (r.query["v"] == "ig") return igDownload(m, e, photoId, r, out, head)
         val kind = ChurchFile.of(r.query["v"]) ?: ChurchFile.ORIGINAL
         if (!repo.canDownload(m, kind)) {
             repo.log(e.id, m, "Tentou baixar sem permissão", "foto $photoId (${kind.label})", r.ip)
@@ -643,6 +665,23 @@ class ChurchServer(private val backend: ChurchBackend, private val clock: () -> 
         val lookName = look?.presetId?.let { id -> backend.presets().firstOrNull { it.id == id }?.name } ?: look?.let { "look próprio" }
         serve(out, f, range, head, download = r.query["dl"] == "1", private = true) {
             runBlocking { repo.log(e.id, m, "Baixou", "${f.name} (${kind.label}${lookName?.let { ", $it" } ?: ""})", r.ip) }
+        }
+    }
+
+    /** A photo of the Instagram post, cut for the feed or the Stories ("k=story"); same rule as the "pronta". */
+    private suspend fun igDownload(m: ChurchMember, e: ChurchEvent, photoId: Long, r: Request, out: OutputStream, head: Boolean) {
+        if (!repo.canDownload(m, ChurchFile.READY)) {
+            repo.log(e.id, m, "Tentou baixar sem permissão", "foto $photoId (Instagram)", r.ip)
+            return text(out, 403, "Você não tem permissão para baixar esta versão.")
+        }
+        val post = if (e.igSentAt != null) backend.igPost(e) else null
+        val index = post?.photos?.indexOfFirst { it.id == photoId } ?: -1
+        if (post == null || index < 0) return text(out, 404, "Esta foto não está no post do Instagram.")
+        val story = r.query["k"] == "story"
+        if (story && !post.photos[index].story) return text(out, 404, "Esta foto não tem versão para os Stories.")
+        val f = backend.igFile(e, photoId, story, index + 1) ?: return text(out, 404, "Este arquivo ainda não está pronto.")
+        serve(out, f, r.headers["range"], head, download = r.query["dl"] == "1", private = true) {
+            runBlocking { repo.log(e.id, m, "Baixou para o Instagram", f.name, r.ip) }
         }
     }
 

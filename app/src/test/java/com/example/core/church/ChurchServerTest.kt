@@ -73,6 +73,10 @@ class ChurchServerTest {
             override fun editorSpec() = """{"tabs":[]}"""
             override suspend fun lookText(look: ReadyLook) = look.adjust ?: look.presetId?.let { "Exposure2012=+0.${it}0\n" } ?: ""
             override suspend fun presets() = listOf(ChurchPresetInfo(1, "Quente", "Meus"), ChurchPresetInfo(2, "P&B", "Meus"), ChurchPresetInfo(3, "Frio", "Loja"))
+            override suspend fun igPost(event: ChurchEvent) = db.instaDao().picks(event.id).takeIf { it.isNotEmpty() }
+                ?.let { ps -> ChurchIgPost(event.igCaption.orEmpty(), ps.map { ChurchIgPhoto(it.photoId, "1:1", it.storyCrop != null) }) }
+            override suspend fun igFile(event: ChurchEvent, photoId: Long, story: Boolean, position: Int) =
+                ServedFile("%02d_%s_IMG.jpg".format(position, if (story) "stories" else "feed"), 3) { "ig!".byteInputStream() }
         }
         server = ChurchServer(backend)
         port = server.start(0)
@@ -456,6 +460,47 @@ class ChurchServerTest {
         runBlocking { repo.setPerm(anaId, ChurchPerm.EDITOR, false) }
         assertEquals(403, call("/api/c/mylook?m=$ana", "POST", body = edit).status)
         assertEquals(403, call("/api/c/share?m=$ana&to=fotografo", "POST", body = edit).status)
+    }
+
+    @Test
+    fun theInstagramPostShowsOnlyOnceSentAndOnlyWhatThePersonMaySee() {
+        val e = event()
+        val ana = join(e)
+        val anaId = runBlocking { db.churchDao().memberByToken(ana)!!.id }
+        val a = photo(1).also { runBlocking { repo.addPhoto(e.id, it) } }
+        val b = photo(2).also { runBlocking { repo.addPhoto(e.id, it) } }
+        val c = photo(3).also { runBlocking { repo.addPhoto(e.id, it) } }
+        runBlocking {
+            repo.setRule(anaId, c, PhotoRule.HIDDEN)
+            db.instaDao().replacePicks(e.id, listOf(
+                com.example.core.insta.ChurchIgPick(e.id, b, 0, 90f, "WORSHIP", "Mãos erguidas", "v1", "v1"),
+                com.example.core.insta.ChurchIgPick(e.id, a, 1, 80f, "PEOPLE", "Sorrisos", "v1", null),
+                com.example.core.insta.ChurchIgPick(e.id, c, 2, 70f, "DETAIL", "", "v1", null),
+            ))
+        }
+        // Chosen but not sent: nothing on the page, nothing to download.
+        assertFalse(call("/api/c/state?m=$ana").text.contains("\"ig\""))
+        assertEquals(404, call("/f/$ana/$b?v=ig&k=feed&dl=1").status)
+        runBlocking { db.instaDao().setPost(e.id, "Culto abençoado", null, 1000); repo.changed() }
+        val state = call("/api/c/state?m=$ana").text
+        assertTrue(state, state.contains("\"ig\":{\"caption\":\"Culto abençoado\",\"download\":true,\"at\":1000,\"photos\":[{\"id\":$b,\"shape\":\"1:1\",\"story\":true},{\"id\":$a,\"shape\":\"1:1\",\"story\":false}]}"))
+        // The feed file comes numbered in carousel order and the download is in the log.
+        val feed = call("/f/$ana/$b?v=ig&k=feed&dl=1")
+        assertEquals(200, feed.status)
+        assertEquals("ig!", feed.text)
+        assertTrue(feed.headers["Content-Disposition"].toString().contains("01_feed_IMG.jpg"))
+        assertEquals(200, call("/f/$ana/$b?v=ig&k=story&dl=1").status)
+        assertTrue(eventually { runBlocking { repo.dao.fullLog(e.id) }.any { it.action == "Baixou para o Instagram" } })
+        // No Stories version, a photo hidden from her, a photo not in the post.
+        assertEquals(404, call("/f/$ana/$a?v=ig&k=story&dl=1").status)
+        assertEquals(404, call("/f/$ana/$c?v=ig&k=feed&dl=1").status)
+        // Without the "pronta" she sees the post but cannot download it.
+        runBlocking { repo.setPerm(anaId, ChurchPerm.DOWNLOAD_READY, false) }
+        assertTrue(call("/api/c/state?m=$ana").text.contains("\"download\":false"))
+        assertEquals(403, call("/f/$ana/$b?v=ig&k=feed&dl=1").status)
+        // Taken off the page.
+        runBlocking { db.instaDao().setPost(e.id, "Culto abençoado", null, null); repo.changed() }
+        assertFalse(call("/api/c/state?m=$ana").text.contains("\"ig\""))
     }
 
     @Test

@@ -257,3 +257,34 @@ body.protected.veiled .stage, body.protected.veiled .viewer { filter: blur(28px)
   .hello h1 { font-size: 28px; }
   .tools { top: calc(50px + env(safe-area-inset-top)); }
 }
+
+/* ---------- Para o Instagram (experimental) ---------- */
+.ig { margin: var(--s4) 0 var(--s5); padding: var(--s4); border-radius: var(--r); background: var(--surface); border-left: 3px solid var(--mint); }
+.ig-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--s3); }
+.ig-titles { min-width: 0; }
+.ig-title { margin: 0; font-size: 19px; font-weight: 600; }
+.ig-sub { margin: var(--s1) 0 0; font-size: 14px; color: var(--muted); }
+.ig-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.ig-strip {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 148px; gap: var(--s3);
+  overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory;
+  margin: var(--s4) calc(var(--s4) * -1) 0; padding: 0 var(--s4) var(--s2);
+}
+.ig-card { scroll-snap-align: start; display: grid; gap: var(--s2); align-content: start; margin: 0; }
+.ig-pic {
+  position: relative; display: block; width: 100%; aspect-ratio: var(--shape, 4 / 5); padding: 0; border: 0; cursor: pointer;
+  border-radius: var(--r); overflow: hidden; background: var(--line);
+}
+.ig-pic img, .ig-pic canvas { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ig-n {
+  position: absolute; top: 6px; left: 6px; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
+  background: var(--scrim); color: #fff;
+}
+.ig-card:first-child .ig-n { background: var(--mint); color: var(--on-mint); }
+.ig-dl { display: flex; gap: var(--s2); }
+.ig-dl .btn { flex: 1; min-height: 36px; padding: 0 var(--s2); font-size: 13px; }
+.ig-caption { margin-top: var(--s3); }
+.ig-caption summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; color: var(--muted); font-size: 14px; }
+.ig-caption p { margin: var(--s2) 0 0; white-space: pre-wrap; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+@media (min-width: 720px) { .ig-strip { grid-auto-columns: 176px; } }
