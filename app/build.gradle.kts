@@ -84,6 +84,9 @@ dependencies {
   implementation(libs.kotlinx.coroutines.android)
   // Bundled face model: works offline, no Google Play services needed.
   implementation(libs.mlkit.face.detection)
+  // Instagram picker (experimental): scene labels and body pose, also bundled, offline and free.
+  implementation(libs.mlkit.image.labeling)
+  implementation(libs.mlkit.pose.detection)
   // QR codes for the local delivery (Wi-Fi and portal), drawn on the phone without internet.
   implementation(libs.zxing.core)
   testImplementation(libs.junit)

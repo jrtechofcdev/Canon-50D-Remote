@@ -316,6 +316,14 @@ class ChurchRepositoryTest {
             room.churchDao().insertLook(ChurchLook(eventId = e.id, presetId = null, byWho = "Fotógrafo", at = 1))
             room.churchDao().insertShare(ChurchShare(eventId = e.id, fromLabel = "Ana · Mídia", at = 1))
             assertEquals(1, room.churchDao().observeSharesToPhotographer(e.id).first().size)
+            // Version 15: Instagram measures, picks and the post of the event.
+            room.instaDao().putFeature(com.example.core.insta.IgFeatureRow(1, 1, "v=1", 1))
+            room.instaDao().replacePicks(e.id, listOf(com.example.core.insta.ChurchIgPick(0, 5, 9, 80f, "WORSHIP", "Mãos erguidas", "v1", null)))
+            assertEquals(0, room.instaDao().picks(e.id).single().position)
+            room.instaDao().setPost(e.id, "Legenda", "tema", 7)
+            assertEquals(7L, room.churchDao().event(e.id)!!.igSentAt)
+            r.deleteEvent(e.id)
+            assertTrue(room.instaDao().picks(e.id).isEmpty())
         }
         room.close()
     }

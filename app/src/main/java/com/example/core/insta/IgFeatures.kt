@@ -109,21 +109,24 @@ data class IgFeatures(
 
     fun label(vararg names: String): Float = names.maxOfOrNull { labels[it] ?: 0f } ?: 0f
 
+    /** A flyer, a screenshot or a drawing, not a photo: left out of the church's style. */
+    val graphic: Boolean get() = label(*GRAPHIC) >= 0.6f
+
     /** What the frame shows, from the labels, the faces and the poses. */
     val moment: IgMoment
         get() {
             val bigFace = largestFace
-            val music = label("musical instrument", "musician", "guitar", "drum", "piano", "microphone", "singer", "concert", "music", "keyboard")
+            val music = label(*MUSIC)
             return when {
-                label("swimwear", "swimming pool", "pool", "water", "river", "lake") >= 0.6f && faces.isNotEmpty() -> IgMoment.BAPTISM
+                label(*BAPTISM) >= 0.6f && faces.isNotEmpty() -> IgMoment.BAPTISM
                 praying -> IgMoment.PRAYER
                 atMic >= 1 && faces.size <= 3 -> IgMoment.MINISTRY
                 handsRaised >= 1 -> IgMoment.WORSHIP
                 music >= 0.55f -> IgMoment.WORSHIP
-                label("child", "baby", "toddler") >= 0.6f && faces.size <= 6 -> IgMoment.CHILDREN
-                lineUp && bigFace >= 0.002f -> IgMoment.GROUP
-                faces.size >= 6 || label("crowd", "audience") >= 0.6f -> IgMoment.CONGREGATION
-                faces.size == 1 && label("stage", "event", "speaker", "speech", "presentation") >= 0.5f -> IgMoment.MINISTRY
+                label(*KIDS) >= 0.6f && faces.size <= 6 -> IgMoment.CHILDREN
+                (lineUp || (label("team", "youth") >= 0.6f && faces.size >= 4)) && bigFace >= 0.002f -> IgMoment.GROUP
+                faces.size >= 6 || label(*CROWD) >= 0.6f -> IgMoment.CONGREGATION
+                faces.size == 1 && label("presentation", "event", "church") >= 0.5f -> IgMoment.MINISTRY
                 faces.isEmpty() && people == 0 -> IgMoment.DETAIL
                 bigFace < 0.004f && people <= 1 -> IgMoment.DETAIL
                 else -> IgMoment.PEOPLE
@@ -147,6 +150,13 @@ data class IgFeatures(
     }
 
     companion object {
+        // Names of the labels in ML Kit's base model (lower case) that matter in a church.
+        val MUSIC = arrayOf("musical instrument", "musical", "musician", "singer", "song", "concert", "piano", "pop music", "deejay")
+        val CROWD = arrayOf("crowd", "community")
+        val KIDS = arrayOf("child", "baby")
+        val BAPTISM = arrayOf("swimwear", "swimming", "pool", "river", "lake", "bathing", "underwater")
+        val GRAPHIC = arrayOf("poster", "screenshot", "web page", "icon", "comics")
+
         /** Bumped when the analysis changes, so old cached rows are measured again. */
         const val VERSION = 1
 
@@ -180,6 +190,28 @@ data class IgFeatures(
                 if (version != VERSION || w <= 0 || h <= 0) return null
                 IgFeatures(w, h, sharp, faceSharp, light[0], light[1], light[2], light[3], light[4], light[5], faces, people, hands, chest, mic, bodies, labels, tilt)
             }.getOrNull()
+        }
+
+        /**
+         * Puts together what the models saw and the pixel measures. [tone] is [IgFeatures.tone] of the
+         * same picture.
+         */
+        fun from(width: Int, height: Int, sharpness: Float, faceSharpness: Float?, tone: FloatArray, clipped: Float, dark: Float, seen: IgSeen, tilt: Float?): IgFeatures {
+            val bodies = seen.bodies
+            return IgFeatures(
+                width = width, height = height,
+                sharpness = sharpness, faceSharpness = faceSharpness,
+                brightness = tone[0], contrast = tone[1], saturation = tone[2], warmth = tone[3],
+                clipped = clipped, dark = dark,
+                faces = seen.faces,
+                people = maxOf(bodies.size, seen.faces.size),
+                handsRaised = bodies.count { it.handRaised },
+                handsOnChest = bodies.count { it.handOnChest && !it.handRaised },
+                atMic = bodies.count { it.handAtMouth },
+                bodies = bodies.mapNotNull { it.box },
+                labels = seen.labels,
+                tilt = tilt,
+            )
         }
 
         /** Mean luma, its spread, mean saturation and warmth of ARGB pixels (any size, sampled). */

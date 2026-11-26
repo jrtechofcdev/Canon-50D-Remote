@@ -68,6 +68,10 @@ data class ChurchEvent(
     /** Who last changed the event's look ("Ana · Mídia" or "Fotógrafo") and when, for the notice on the page. */
     val lookBy: String? = null,
     val lookAt: Long? = null,
+    /** Instagram (experimental): the caption, what was typed for it (theme, verse…), and when it went to the media page. */
+    val igCaption: String? = null,
+    val igNotes: String? = null,
+    val igSentAt: Long? = null,
 ) {
     val isOpen get() = closedAt == null
 }
@@ -365,4 +369,7 @@ interface ChurchDao {
 
     @Query("DELETE FROM church_shares WHERE eventId = :eventId")
     suspend fun deleteSharesOf(eventId: Long)
+
+    @Query("DELETE FROM church_ig_picks WHERE eventId = :eventId")
+    suspend fun deleteIgPicksOf(eventId: Long)
 }

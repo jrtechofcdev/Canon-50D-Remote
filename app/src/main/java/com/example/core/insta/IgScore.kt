@@ -126,15 +126,15 @@ object IgScore {
         set(IgSignal.EYES, if (faces.isEmpty() || f.praying) 1f else 1f - f.eyesClosed.toFloat() / faces.size)
         set(IgSignal.PEOPLE, if (faces.isNotEmpty()) min(1f, 0.5f + faces.size / 6f) else if (f.people > 0) 0.4f else 0f)
         val smiles = faces.mapNotNull { it.smile }
-        set(IgSignal.SMILE, if (smiles.isEmpty()) 0f else smiles.sortedDescending().take(3).average().toFloat())
+        set(IgSignal.SMILE, maxOf(f.label("laugh") * 0.8f, if (smiles.isEmpty()) 0f else smiles.sortedDescending().take(3).average().toFloat()))
         set(IgSignal.FACING, if (faces.isEmpty()) 0f else faces.count { abs(it.yaw) < 25f }.toFloat() / faces.size)
         // A face of about 3 % of the frame is a person you can read; much smaller is far away, much bigger a headshot.
         set(IgSignal.CLOSE, if (faces.isEmpty()) 0f else 1f - abs(ln(f.largestFace / 0.03f)) / 3f)
         set(IgSignal.HANDS, min(1f, f.handsRaised / 2f))
         set(IgSignal.PRAYER, if (f.praying) 1f else 0f)
         set(IgSignal.MIC, if (f.atMic > 0 && faces.size in 1..3) 1f else 0f)
-        set(IgSignal.MUSIC, f.label("musical instrument", "musician", "guitar", "drum", "piano", "microphone", "singer", "concert", "music", "keyboard"))
-        set(IgSignal.CROWD, maxOf(f.label("crowd", "audience"), min(1f, faces.size / 10f)))
+        set(IgSignal.MUSIC, f.label(*IgFeatures.MUSIC))
+        set(IgSignal.CROWD, maxOf(f.label(*IgFeatures.CROWD), min(1f, faces.size / 10f)))
         set(IgSignal.FEED, if (feed.fits) 1f else 0f)
         set(IgSignal.STORY, if (story.fits) 1f else 0f)
         set(IgSignal.THIRDS, IgCrop.thirds(f, feed.spec))

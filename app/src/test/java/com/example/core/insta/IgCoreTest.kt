@@ -39,11 +39,11 @@ class IgCoreTest {
     @Test
     fun momentsFollowHandsMusicCrowdAndChildren() {
         assertEquals(IgMoment.WORSHIP, shot(face(0.5f, 0.4f), hands = 1).moment)
-        assertEquals(IgMoment.WORSHIP, shot(face(0.5f, 0.4f), labels = mapOf("guitar" to 0.7f)).moment)
+        assertEquals(IgMoment.WORSHIP, shot(face(0.5f, 0.4f), labels = mapOf("musical instrument" to 0.7f)).moment)
         // Seated crowd: faces of very different sizes, many turned away.
         assertEquals(IgMoment.CONGREGATION, shot(*Array(8) { face(0.1f + it * 0.1f, 0.5f, size = 0.01f + it * 0.012f, yaw = if (it % 2 == 0) 40f else 0f) }).moment)
         assertEquals(IgMoment.CHILDREN, shot(face(0.5f, 0.4f), labels = mapOf("child" to 0.8f)).moment)
-        assertEquals(IgMoment.MINISTRY, shot(face(0.5f, 0.3f), labels = mapOf("stage" to 0.7f)).moment)
+        assertEquals(IgMoment.MINISTRY, shot(face(0.5f, 0.3f), labels = mapOf("presentation" to 0.7f)).moment)
         assertEquals(IgMoment.MINISTRY, shot(face(0.5f, 0.3f)).copy(atMic = 1).moment)
         // A department lined up facing the camera.
         assertEquals(IgMoment.GROUP, shot(*Array(7) { face(0.1f + it * 0.12f, 0.4f, size = 0.06f) }).moment)

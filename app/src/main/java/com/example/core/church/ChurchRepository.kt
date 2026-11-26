@@ -238,6 +238,7 @@ class ChurchRepository(
         dao.deleteLogOf(eventId)
         dao.deleteLooksOf(eventId)
         dao.deleteSharesOf(eventId)
+        dao.deleteIgPicksOf(eventId)
         dao.deleteEvent(eventId)
         changed()
     }

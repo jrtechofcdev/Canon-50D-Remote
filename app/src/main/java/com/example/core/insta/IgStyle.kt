@@ -83,7 +83,9 @@ data class IgStyle(
             else -> 3
         }
 
-        fun learn(refs: List<IgFeatures>): IgStyle {
+        /** Flyers and screenshots the page also posts say nothing about its photos and are skipped. */
+        fun learn(all: List<IgFeatures>): IgStyle {
+            val refs = all.filterNot { it.graphic }
             if (refs.isEmpty()) return EMPTY
             val vs = refs.map(::vector)
             val n = vs.first().size

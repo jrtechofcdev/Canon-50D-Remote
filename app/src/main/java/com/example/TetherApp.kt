@@ -81,6 +81,9 @@ class TetherApp : Application() {
 
     /** Entrega da igreja: the media team sees and downloads the event's photos live. */
     lateinit var church: com.example.core.church.ChurchDelivery
+
+    /** Instagram picker (experimental): models, measures and what it learned. */
+    lateinit var insta: com.example.core.insta.InstaPicker
         private set
     /** Deleted photos wait here a few seconds so Desfazer can bring them back. */
     lateinit var trash: com.example.core.data.PhotoTrash
@@ -185,6 +188,7 @@ class TetherApp : Application() {
         delivery.init()
         express.init()
         church = com.example.core.church.ChurchDelivery(this, com.example.core.church.ChurchRepository(database.churchDao()), database.photoDao(), looks, store, settings, presets, shop)
+        insta = com.example.core.insta.InstaPicker(this, database.instaDao(), com.example.core.insta.MlKitVision())
         // The church delivery also takes the Wi-Fi, so it and the other two stop each other.
         church.stopOthers = {
             if (delivery.status.value !is com.example.core.delivery.DeliveryStatus.Off) delivery.stop()
