@@ -33,7 +33,8 @@ data class IgResult(val candidates: List<IgCandidate>, val picked: List<IgCandid
  * measures light and sharpness, scores with the learned weights and the church's style, and builds the
  * carousel. Measures are cached per photo, so a second "Analisar" is quick. Nothing leaves the phone.
  *
- * Learned data lives in `filesDir/ig/`: `modelo.txt` (the weights) and `estilo-<congregação>.txt`.
+ * Learned data lives in `filesDir/ig/`: `modelo.txt` (the weights), `estilo-<congregação>.txt` (the look
+ * of its posts) and `voz-<congregação>.txt` (hashtags and photo credit from its captions).
  */
 class InstaPicker(
     private val context: Context,
@@ -67,7 +68,18 @@ class InstaPicker(
 
     fun saveStyle(congregationId: Long?, style: IgStyle) = write(styleFile(congregationId), style.encode())
 
-    fun clearStyle(congregationId: Long?) { File(dir, styleFile(congregationId)).delete() }
+    fun clearStyle(congregationId: Long?) {
+        File(dir, styleFile(congregationId)).delete()
+        File(dir, voiceFile(congregationId)).delete()
+    }
+
+    private fun voiceFile(congregationId: Long?) = "voz-${congregationId ?: "geral"}.txt"
+
+    /** The hashtags and photo credit learned from the church's captions, else the general ones. */
+    fun voice(congregationId: Long?): IgExport.Voice? =
+        IgExport.Voice.decode(read(voiceFile(congregationId))) ?: IgExport.Voice.decode(read(voiceFile(null)))
+
+    fun saveVoice(congregationId: Long?, voice: IgExport.Voice) = write(voiceFile(congregationId), voice.encode())
 
     private fun read(name: String): String? = runCatching { File(dir, name).takeIf { it.exists() }?.readText() }.getOrNull()
 
@@ -130,19 +142,6 @@ class InstaPicker(
             _progress.value = null
             running.unlock()
         }
-    }
-
-    /** Learns the church's look from its own posts (pictures already decoded by the importer). */
-    suspend fun learnStyle(congregationId: Long?, pictures: Sequence<suspend () -> Bitmap?>, onEach: (Int) -> Unit = {}): IgStyle {
-        val refs = mutableListOf<IgFeatures>()
-        for (load in pictures) {
-            val bmp = runCatching { load() }.getOrNull() ?: continue
-            try { refs += measure(bmp) } catch (e: Exception) { AppLog.e("INSTAGRAM", "Referência não lida", e) } finally { bmp.recycle() }
-            onEach(refs.size)
-        }
-        val style = IgStyle.learn(refs)
-        if (style.count > 0) saveStyle(congregationId, style)
-        return style
     }
 
     companion object {
