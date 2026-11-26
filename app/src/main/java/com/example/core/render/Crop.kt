@@ -84,6 +84,7 @@ enum class CropRatio(
 
     IG_SQUARE("ig_sq", "Instagram quadrado", "1080 × 1080", CropGroup.Social, 1f, 1f, 1080, 1080),
     IG_PORTRAIT("ig_45", "Instagram retrato", "4:5 · 1080 × 1350 (ocupa mais tela no feed)", CropGroup.Social, 4f, 5f, 1080, 1350),
+    IG_34("ig_34", "Instagram 3:4", "3:4 · 1080 × 1440 (formato da grade do perfil)", CropGroup.Social, 3f, 4f, 1080, 1440),
     IG_LANDSCAPE("ig_191", "Instagram paisagem", "1,91:1 · 1080 × 566", CropGroup.Social, 1.91f, 1f, 1080, 566),
     STORY("story", "Stories · Reels · Status", "9:16 · 1080 × 1920 (Instagram, Facebook, WhatsApp, TikTok)", CropGroup.Social, 9f, 16f, 1080, 1920),
     FB_POST("fb_post", "Facebook post", "1,91:1 · 1200 × 630", CropGroup.Social, 1.91f, 1f, 1200, 630),
