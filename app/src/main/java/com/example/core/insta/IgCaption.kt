@@ -1,10 +1,11 @@
 package com.example.core.insta
 
 import java.text.Normalizer
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Caption suggestion made from text models, on the phone and free. No AI service, so it never invents
@@ -62,20 +63,22 @@ object IgCaption {
         val notes: Notes = Notes(),
         val credit: String = "",
         val hashtags: String = "",
-        val zone: ZoneId = ZoneId.systemDefault(),
+        val zone: TimeZone = TimeZone.getDefault(),
     )
 
     /** The [index]-th suggestion (it wraps), so "Outra sugestão" walks through the models. */
     fun suggest(facts: Facts, index: Int = 0, templates: List<String> = DEFAULT_TEMPLATES): String {
         val t = templates[Math.floorMod(index, templates.size)]
-        val time = Instant.ofEpochMilli(facts.at).atZone(facts.zone)
+        // java.util dates: java.time needs Android 8, and the app runs from Android 7.
         val pt = Locale.forLanguageTag("pt-BR")
+        fun fmt(pattern: String) = SimpleDateFormat(pattern, pt).apply { timeZone = facts.zone }.format(Date(facts.at))
+        val hour = Calendar.getInstance(facts.zone).apply { timeInMillis = facts.at }.get(Calendar.HOUR_OF_DAY)
         val values = mapOf(
             "evento" to facts.event.trim(),
             "igreja" to facts.church?.trim().orEmpty(),
-            "data" to time.format(DateTimeFormatter.ofPattern("d 'de' MMMM", pt)),
-            "dia" to time.format(DateTimeFormatter.ofPattern("EEEE", pt)),
-            "periodo" to when (time.hour) { in 5..11 -> "manhã"; in 12..17 -> "tarde"; else -> "noite" },
+            "data" to fmt("d 'de' MMMM"),
+            "dia" to fmt("EEEE"),
+            "periodo" to when (hour) { in 5..11 -> "manhã"; in 12..17 -> "tarde"; else -> "noite" },
             "tema" to facts.notes.theme.trim(),
             "versiculo" to facts.notes.verse.trim(),
             "pregador" to facts.notes.preacher.trim(),

@@ -205,8 +205,8 @@ class IgCoreTest {
 
     @Test
     fun captionUsesOnlyWhatTheAppKnowsAndWhatWasTyped() {
-        val zone = ZoneId.of("America/Sao_Paulo")
-        val at = LocalDateTime.of(2026, 11, 21, 19, 30).atZone(zone).toInstant().toEpochMilli()
+        val zone = java.util.TimeZone.getTimeZone("America/Sao_Paulo")
+        val at = LocalDateTime.of(2026, 11, 21, 19, 30).atZone(ZoneId.of("America/Sao_Paulo")).toInstant().toEpochMilli()
         val notes = IgCaption.Notes(theme = "Estamos em uma grande obra", verse = "Neemias 6:3", preacher = "Pr. Fulano")
         val facts = IgCaption.Facts("Culto da Família", "@iead_estrela_de_luz", at, listOf(IgMoment.WORSHIP, IgMoment.MINISTRY, IgMoment.GROUP), notes, credit = "@fotografo", zone = zone)
         val a = IgCaption.suggest(facts, 0)

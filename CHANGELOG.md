@@ -2,6 +2,44 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [5.7] · 2026-11-26
+
+Seleção para o Instagram da igreja (experimental). Tudo no celular, sem internet e sem custo.
+
+- **Ligar:** em **Ajustes → Entrega da igreja → Instagram · experimental**. Aparece no painel da Igreja (com um evento aberto) e nas ferramentas da Sessão.
+- **Analisar:** o celular olha as fotos do evento e escolhe as com mais chance no Instagram.
+  - **Rostos, pose e cena:** três modelos do ML Kit que vêm dentro do app. Eles reconhecem mãos erguidas, mão no peito, microfone na boca, sorrisos, rostos de frente, instrumentos, cantores, multidão e crianças.
+  - **Momentos da igreja:** louvor, oração, ministração, grupos e corais, crianças, batismo, pessoas, detalhes e a igreja cheia.
+  - **Olhos fechados em oração** contam como momento forte, não como piscada.
+  - **Técnica:** nitidez (no rosto, quando há), luz, horizonte reto e composição.
+  - **Pré-seleção:** antes da análise, saem as fotos rejeitadas e as tremidas, e cada rajada fica com no máximo duas fotos.
+  - **Tempo:** a barra mostra quanto falta. Uma segunda análise é rápida, porque as medidas ficam guardadas.
+- **Carrossel:**
+  - de 6 a 20 fotos (padrão 10), sem duas parecidas e sem um momento tomando o post;
+  - a capa é a foto mais forte com pessoas; depois o culto na ordem em que aconteceu, e a igreja cheia para fechar;
+  - cada foto mostra a nota, o momento e o motivo ("Mãos erguidas", "Momento de oração", "Nítida no rosto"), e avisa o que atrapalha;
+  - você muda a ordem, escolhe a capa, tira ou põe fotos.
+- **Recortes:** feed e Stories 9:16 centrados nas pessoas, sem cortar cabeça.
+  - O feed sai no formato que a igreja mais usa: 1:1, 3:4 (1080 × 1440, novo no recorte do app) ou 4:5.
+  - Quando o Stories cortaria alguém, a foto avisa.
+  - A posição de cada recorte pode ser ajustada à mão.
+- **Aprende com você:** cada foto que você tira ou põe ajusta a nota. Com o uso, a seleção fica com a sua cara. **Esquecer** recomeça.
+- **Estilo da igreja:**
+  - importe o ZIP do "Baixar suas informações" do Instagram, ou escolha posts na galeria;
+  - o app aprende a luz, a cor, quantas pessoas e o formato do feed dos posts, e das legendas as hashtags mais usadas e o crédito ("Fotos: @…");
+  - lê JPG, WEBP e HEIC (este no Android 9 ou mais novo);
+  - só as medidas ficam guardadas, nenhuma foto.
+- **Legenda:** feita no celular a partir de modelos de texto, no jeito das legendas de igreja.
+  - Usa o nome do evento, a data, os momentos do carrossel, o crédito, as hashtags e o que você preencher (tema, versículo, pregador, louvor).
+  - Linha sem informação fica de fora. **Outra sugestão** troca o modelo, e os modelos são editáveis em Ajustes.
+- **Para a mídia:** **Mandar para a mídia** põe a seção **Para o Instagram** no topo da página da igreja.
+  - Cada foto vem na ordem do carrossel, com **Feed** e **Stories** já recortados e com o look do evento, em 1080 px.
+  - Também tem **Baixar o carrossel** (numerado 01, 02…) e **Copiar legenda**.
+  - Baixar segue a permissão da pronta; quem só vê enxerga a seção sem os botões.
+  - O log registra cada download.
+- **Banco versão 15:** os dados da 5.6 são mantidos.
+- **APK:** passa de 33 para 62 MB, quase tudo por causa do modelo de pose (mãos erguidas, mão no peito, microfone), que traz uma biblioteca para celulares de 64 e de 32 bits.
+
 ## [5.6] · 2026-11-25
 
 Editor completo no navegador para os ADMs da igreja.
