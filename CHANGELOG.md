@@ -2,6 +2,30 @@
 
 Versões do **JR C50D Sync** (até a 2.7, Jr_Link). A mais recente fica no topo.
 
+## [5.8] · 2026-11-26
+
+Mensagens prontas do atendimento: as 35 da Central de Atendimento v1.3 da Jr_Tech_OFC Fotografia.
+
+- **Textos do documento, sem mudança:** cada mensagem foi copiada do documento por um script, com acentos, emojis, asteriscos e quebras de linha. Um teste confere letra por letra.
+- **As 14 que já existiam** (Envio das fotos, Prévia pronta, Fotos entregues, Lembrete de pagamento, Seleção recebida, Confirmação do ensaio, Local e horário, Reserva da data, Dados do Pix, Orçamento, Edição em andamento, Impressos prontos, Fotos no Wi-Fi e Agradecimento) passam a usar o texto do documento. Nomes e atalhos continuam os mesmos.
+- **21 novas:**
+  - Boas-vindas (`oi`), Entender o pedido (`duvida`);
+  - Disponibilidade (`disp`), Data disponível (`disponivel`), Data indisponível (`indisponivel`);
+  - Pagamento confirmado (`pago`), Preparação para o ensaio (`preparo`), Lembrete do ensaio (`lembrete`);
+  - Reagendamento (`reag`), Cancelamento (`cancel`), Imprevisto ou atraso (`imprevisto`);
+  - Seleção pendente (`pendente`), Prazo de entrega (`prazo`), Andamento do pedido (`andamento`);
+  - Suporte à galeria (`suporte`), Impressos retirados (`retirado`);
+  - Avaliação do atendimento (`avaliacao`), Autorização para divulgação (`autoriza`), Retorno ao cliente (`retorno`), Agradecimento pela indicação (`indicacao`), Cliente insatisfeito (`insatisfacao`).
+- **Quem já tinha mensagens salvas:**
+  - as prontas que você nunca editou recebem o texto novo;
+  - as que você reescreveu ficam como estão, e **Voltar ao padrão** traz o texto do documento;
+  - as mensagens que você criou não mudam;
+  - se uma das novas usar um atalho que já era seu, ela entra com outro (por exemplo `prazo2`), e o app avisa.
+- **Preencher antes de enviar:** quando a mensagem pede o que o app não sabe (local, horário, serviço, valor, prazo de entrega, previsão de entrega), ou a chave Pix e o Wi-Fi estão vazios, a folha de envio mostra um campo para cada um.
+  - Enquanto sobrar um campo como `{local}`, o botão avisa "Falta preencher" e o WhatsApp não abre. Nenhuma chave vazia chega ao cliente.
+- **Etapas do atendimento:** na hora de escolher a mensagem e em Ajustes → Mensagens, as 35 ficam separadas em Início e orçamento, Reserva e pagamento, Agendamento e preparação, Prévia, seleção e edição, Entrega e suporte, Relacionamento e qualidade, e Minhas mensagens.
+- **Sem o nome do cliente**, as frases novas também ficam certas ("Claro! Será um prazer…").
+
 ## [5.7] · 2026-11-26
 
 Seleção para o Instagram da igreja (experimental). Tudo no celular, sem internet e sem custo.

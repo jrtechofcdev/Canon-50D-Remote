@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img alt="Versão 5.7" src="https://img.shields.io/badge/vers%C3%A3o-5.7-00FCA8?labelColor=292929">
+  <img alt="Versão 5.8" src="https://img.shields.io/badge/vers%C3%A3o-5.8-00FCA8?labelColor=292929">
   <img alt="Android 7 ou mais novo" src="https://img.shields.io/badge/Android-7%2B-1CDAFF?labelColor=292929&logo=android&logoColor=white">
   <img alt="Canon EOS 50D" src="https://img.shields.io/badge/c%C3%A2mera-Canon%20EOS%2050D-00FCA8?labelColor=292929">
   <img alt="Kotlin e Jetpack Compose" src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-1CDAFF?labelColor=292929&logo=kotlin&logoColor=white">
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="release/JR_C50D_Sync-v5.7.apk"><b>⬇ Baixar o APK 5.7</b></a>
+  <a href="release/JR_C50D_Sync-v5.8.apk"><b>⬇ Baixar o APK 5.8</b></a>
   &nbsp;·&nbsp;
   <a href="#instalar">Instalar</a>
   &nbsp;·&nbsp;
@@ -147,7 +147,7 @@ Cada função do app responde a uma etapa do trabalho no evento.
 
 ## Instalar
 
-1. Baixe o **[APK 5.7](release/JR_C50D_Sync-v5.7.apk)** (ou pela aba *Releases*, ao lado).
+1. Baixe o **[APK 5.8](release/JR_C50D_Sync-v5.8.apk)** (ou pela aba *Releases*, ao lado).
 2. Abra o arquivo no celular e permita **instalar apps desconhecidos** quando o Android pedir.
 3. As atualizações instalam por cima e mantêm suas fotos e ajustes.
 
@@ -313,7 +313,7 @@ As **congregações** (ícone no topo do painel) guardam cores, frase, logo, pre
   1. Coloque o nome e o número com DDD.
   2. **Abrir conversa** abre o chat já com a mensagem automática; envie a mensagem.
   3. Volte ao app e toque em **Enviar fotos**: elas vão para a mesma conversa.
-- **Mensagens prontas** (Ajustes → Mensagens): cada uma tem um atalho (`fotos`, `ent`, `pix`, `agenda`…). Digite o atalho e o texto vem com o nome do cliente e a data.
+- **Mensagens prontas** (Ajustes → Mensagens): as 35 da Central de Atendimento v1.3, do primeiro contato (`oi`) à retirada dos impressos (`retirado`), separadas por etapa. Cada uma tem um atalho (`fotos`, `ent`, `pix`, `agenda`, `disp`, `pago`…). Digite o atalho e o texto vem com o nome do cliente e a data; o que o app não sabe (local, horário, valor, prazo) é pedido antes de abrir o WhatsApp.
 </details>
 
 <details>

@@ -209,6 +209,8 @@ data class Settings(
     val notesFolder: String? = null,
     /** Every WhatsApp template (JSON), each with a short code typed when sending. Empty = the defaults. */
     val messageLibrary: String = "",
+    /** 2 once the library was brought to the 5.8 messages (Central de Atendimento v1.3). */
+    val messageLibraryVersion: Int = 0,
     /** Filled into {pix} in the templates. */
     val pixKey: String = "",
     /** The watermark over the photo in client mode, so a phone photo of the screen carries the brand. */
@@ -506,6 +508,7 @@ object SettingKeys {
     val mirrorFolder = stringPreferencesKey("mirror_folder")
     val notesFolder = stringPreferencesKey("notes_folder")
     val messageLibrary = stringPreferencesKey("message_library")
+    val messageLibraryVersion = intPreferencesKey("message_library_version")
     val pixKey = stringPreferencesKey("pix_key")
     val clientWatermark = booleanPreferencesKey("client_watermark")
     val clientWatermarkOpacity = intPreferencesKey("client_watermark_opacity")
@@ -776,6 +779,7 @@ class SettingsRepository(private val context: Context) {
             mirrorFolder = this[k.mirrorFolder],
             notesFolder = this[k.notesFolder],
             messageLibrary = this[k.messageLibrary] ?: d.messageLibrary,
+            messageLibraryVersion = this[k.messageLibraryVersion] ?: d.messageLibraryVersion,
             pixKey = this[k.pixKey] ?: d.pixKey,
             clientWatermark = this[k.clientWatermark] ?: d.clientWatermark,
             clientWatermarkOpacity = this[k.clientWatermarkOpacity] ?: d.clientWatermarkOpacity,

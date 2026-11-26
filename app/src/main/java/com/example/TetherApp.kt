@@ -129,6 +129,32 @@ class TetherApp : Application() {
     /** Messages that say what to do next: shown at the bottom, longer than a Toast and with a close button. */
     val notices: kotlinx.coroutines.flow.SharedFlow<String> = _notices
 
+    /**
+     * Once: the messages become the 35 of the Central de Atendimento v1.3. Ready messages never edited take
+     * the new text, the new ones join, the photographer's own texts and messages stay as they are.
+     */
+    private suspend fun upgradeMessages() {
+        val s = settings.current()
+        if (s.messageLibraryVersion >= 2) return
+        val lib = com.example.core.messages.MessageLibrary
+        listOf(
+            Triple(com.example.core.messages.MessageKind.WhatsApp, SettingKeys.msgWhatsApp, s.msgWhatsApp),
+            Triple(com.example.core.messages.MessageKind.Preview, SettingKeys.msgPreview, s.msgPreview),
+            Triple(com.example.core.messages.MessageKind.Delivered, SettingKeys.msgDelivered, s.msgDelivered),
+            Triple(com.example.core.messages.MessageKind.Payment, SettingKeys.msgPayment, s.msgPayment),
+            Triple(com.example.core.messages.MessageKind.Selection, SettingKeys.msgSelection, s.msgSelection),
+        ).forEach { (kind, key, current) -> lib.upgradeLegacy(kind, current)?.let { settings.set(key, it) } }
+        val saved = lib.decode(s.messageLibrary)
+        if (saved.isNotEmpty()) {
+            val up = lib.upgrade(saved)
+            settings.set(SettingKeys.messageLibrary, lib.encode(up.list))
+            if (up.renamed.isNotEmpty()) {
+                notice("Mensagens novas com atalho que já era seu: " + up.renamed.joinToString(", ") { (name, code) -> "$name ficou \"$code\"" })
+            }
+        }
+        settings.set(SettingKeys.messageLibraryVersion, 2)
+    }
+
     fun notice(text: String) {
         _notices.tryEmit(text)
     }
@@ -204,6 +230,7 @@ class TetherApp : Application() {
             }
         }
 
+        appScope.launch { upgradeMessages() }
         appScope.launch {
             settings.settings.distinctUntilChangedBy { it.logEnabled to it.logFolder }.collect { AppLog.configure(it.logEnabled, it.logFolder) }
         }

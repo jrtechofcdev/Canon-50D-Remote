@@ -101,7 +101,11 @@ fun WhatsAppSheet(
     val library = remember(settings) { settings.messages() }
     var templateId by remember { mutableStateOf(if (settings.whatsAutoMessage) com.example.core.messages.MessageLibrary.kindIds[MessageKind.WhatsApp] else null) }
     var edited by remember(templateId) { mutableStateOf<String?>(null) }
-    val text = edited ?: library.firstOrNull { it.id == templateId }?.let { MessageTemplates.fill(it.text, data) }.orEmpty()
+    val filled = library.firstOrNull { it.id == templateId }?.let { MessageTemplates.fill(it.text, data) }.orEmpty()
+    // Local, horário, valor…: typed in the sheet; the text follows them until it is edited by hand.
+    val extra = remember(templateId) { androidx.compose.runtime.mutableStateMapOf<String, String>() }
+    val text = MessageTemplates.applyExtra(edited ?: filled, extra)
+    val left = MessageTemplates.missing(text)
     var numberError by remember { mutableStateOf<String?>(null) }
     var nameError by remember { mutableStateOf(false) }
     // Which step is next: the chat first, then the photos.
@@ -187,12 +191,14 @@ fun WhatsAppSheet(
             SheetLabel(Icons.AutoMirrored.Outlined.Chat, "Mensagem")
             TemplatePicker(library, templateId, allowNone = true) { templateId = it?.id }
             if (templateId != null) {
+                FieldsToFill(MessageTemplates.missing(filled), extra)
                 OutlinedTextField(
                     value = text,
                     onValueChange = { edited = it },
                     label = { Text("Vai assim (dá para ajustar)") },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 240.dp),
                 )
+                MissingNote(left)
             }
 
             StepButton(
@@ -201,6 +207,7 @@ fun WhatsAppSheet(
                 text = normalized?.let { "Abrir conversa com ${WhatsAppNumber.pretty(it)}" } ?: "Abrir conversa",
                 primary = !chatOpened,
                 done = chatOpened,
+                enabled = left.isEmpty(),
             ) {
                 val digits = valid() ?: return@StepButton
                 scope.launch {

@@ -78,7 +78,12 @@ fun MessageSheet(
     }
     val library = remember(settings) { settings.messages() }
     var templateId by remember { mutableStateOf(com.example.core.messages.MessageLibrary.kindIds[initial]) }
-    var text by remember(templateId) { mutableStateOf(MessageTemplates.fill(library.firstOrNull { it.id == templateId }?.text.orEmpty(), data)) }
+    val filled = remember(templateId, data) { MessageTemplates.fill(library.firstOrNull { it.id == templateId }?.text.orEmpty(), data) }
+    // Local, horário, valor…: typed here; the text follows them until it is edited by hand.
+    val extra = remember(templateId) { androidx.compose.runtime.mutableStateMapOf<String, String>() }
+    var typed by remember(templateId) { mutableStateOf<String?>(null) }
+    val text = MessageTemplates.applyExtra(typed ?: filled, extra)
+    val left = MessageTemplates.missing(text)
     val attachOptions = buildList {
         add(null)
         if (settings.lightShareEnabled) add(ShareSet.LIGHT)
@@ -90,11 +95,13 @@ fun MessageSheet(
         Column(Modifier.padding(horizontal = 16.dp).navigationBarsPadding().padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Mensagem", style = MaterialTheme.typography.titleMedium)
             TemplatePicker(library, templateId) { templateId = it?.id }
+            FieldsToFill(MessageTemplates.missing(filled), extra)
             OutlinedTextField(
                 value = text,
-                onValueChange = { text = it },
+                onValueChange = { typed = it },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 320.dp),
             )
+            MissingNote(left)
             if (photos.isNotEmpty() && attachOptions.size > 1) {
                 Text("Enviar junto", style = MaterialTheme.typography.labelMedium, color = Tone.TextMuted)
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -105,7 +112,7 @@ fun MessageSheet(
             }
             Button(
                 onClick = { scope.launch { actions.sendMessage(text, photos, attach, settings); onDismiss() } },
-                enabled = text.isNotBlank(),
+                enabled = text.isNotBlank() && left.isEmpty(),
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Tone.Accent, contentColor = Tone.OnAccent),
             ) { Text("Abrir no WhatsApp") }
@@ -125,7 +132,11 @@ fun TemplatePicker(
     onPick: (com.example.core.messages.MessageTemplate?) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    val found = remember(library, query) { com.example.core.messages.MessageLibrary.search(library, query) }
+    var category by remember { mutableStateOf<com.example.core.messages.MessageLibrary.Category?>(null) }
+    val found = remember(library, query, category) {
+        com.example.core.messages.MessageLibrary.search(library, query).filter { category == null || com.example.core.messages.MessageLibrary.categoryOf(it) == category }
+    }
+    val present = remember(library) { library.map { com.example.core.messages.MessageLibrary.categoryOf(it) }.toSet() }
     OutlinedTextField(
         value = query,
         onValueChange = { q ->
@@ -139,11 +150,45 @@ fun TemplatePicker(
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
+    // Steps of the job, to narrow 35 messages down to a handful.
+    if (present.size > 1) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        SheetChip("Todas", category == null) { category = null }
+        com.example.core.messages.MessageLibrary.Category.entries.filter { it in present }.forEach { c -> SheetChip(c.label, category == c) { category = c } }
+    }
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (allowNone) SheetChip("Sem texto", selectedId == null) { onPick(null) }
         found.forEach { t -> SheetChip("${t.name} · ${t.code}", t.id == selectedId) { onPick(t) } }
         if (found.isEmpty()) Text("Nenhuma mensagem com \"$query\". Crie em Ajustes → Mensagens.", style = MaterialTheme.typography.bodySmall, color = Tone.TextMuted)
     }
+}
+
+/**
+ * What a message needs and the app doesn't know (local, horário, serviço, valor, prazo, and an empty
+ * Pix key or Wi-Fi): one field each, so no {campo} reaches the client.
+ */
+@Composable
+fun FieldsToFill(keys: List<String>, values: MutableMap<String, String>) {
+    if (keys.isEmpty()) return
+    Text("Preencher antes de enviar", style = MaterialTheme.typography.labelLarge, color = Tone.TextMuted)
+    keys.forEach { key ->
+        OutlinedTextField(
+            value = values[key].orEmpty(),
+            onValueChange = { values[key] = it.take(200) },
+            label = { Text(MessageTemplates.FIELDS[key] ?: key) },
+            singleLine = key != "lista",
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/** Says which fields are still empty; the send button waits for them (or for the line to be removed). */
+@Composable
+fun MissingNote(left: List<String>) {
+    if (left.isEmpty()) return
+    Text(
+        "Falta preencher: " + left.joinToString(", ") { MessageTemplates.FIELDS[it] ?: it } + ". Preencha acima ou apague a linha no texto.",
+        style = MaterialTheme.typography.bodySmall, color = Tone.Warning,
+    )
 }
 
 @Composable

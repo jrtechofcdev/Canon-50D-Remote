@@ -11,7 +11,8 @@ data class MessageTemplate(val id: String, val name: String, val code: String, v
 
 /**
  * Every message the photographer keeps: the five of earlier versions (their edited texts carry over)
- * plus ready ones for the rest of a job, from booking to pickup. Stored as JSON in Ajustes.
+ * plus ready ones for the rest of a job, from the first contact to the pickup ([MessageCatalog], 35 in
+ * all). Stored as JSON in Ajustes.
  */
 object MessageLibrary {
 
@@ -24,9 +25,13 @@ object MessageLibrary {
         MessageKind.Selection to "sel",
     )
 
+    /** Every ready message but the five above: from [MessageCatalog], the document of the atendimento. */
+    val extras: List<MessageTemplate> = MessageCatalog.ALL.filter { it.id !in kindIds.values }
+
     private const val SIGN = "\n\n*Jr_Tech_OFC*"
 
-    val extras = listOf(
+    /** The other nine messages as they were before 5.8 (same reason). */
+    internal val previousExtras = listOf(
         MessageTemplate(
             "agenda", "Confirmação do ensaio", "agenda",
             "Olá, {cliente}! 📅\n\nPassando para confirmar nosso ensaio do dia {data}.\n\n" +
@@ -71,6 +76,62 @@ object MessageLibrary {
                 "Se puder, marque *@jr_tech_ofc* quando postar as fotos." + SIGN,
         ),
     )
+
+    /** Text each ready message had before 5.8, by id. */
+    internal val previous: Map<String, String> by lazy {
+        mapOf(
+            "fotos" to PreviousDefaults.WHATSAPP, "previa" to PreviousDefaults.PREVIEW, "entrega" to PreviousDefaults.DELIVERED,
+            "pag" to PreviousDefaults.PAYMENT, "sel" to PreviousDefaults.SELECTION,
+        ) + previousExtras.associate { it.id to it.text }
+    }
+
+    /** What [upgrade] did: the list to save, and the new messages whose code was already taken (name to the code used). */
+    data class Upgrade(val list: List<MessageTemplate>, val renamed: List<Pair<String, String>>)
+
+    /**
+     * Brings a saved list to the 5.8 catalogue, once: a ready message still with its old text gets the
+     * document's text (one the photographer rewrote stays his), and the new messages join at the end.
+     * A new message whose code he already uses for one of his own gets another code, never his.
+     */
+    fun upgrade(saved: List<MessageTemplate>): Upgrade {
+        val updated = saved.map { t ->
+            val old = previous[t.id]
+            val new = MessageCatalog.byId(t.id)
+            if (old != null && new != null && t.text.trim() == old.trim()) t.copy(text = new.text) else t
+        }
+        val ids = updated.map { it.id }.toSet()
+        val taken = updated.map { it.code }.toMutableSet()
+        val renamed = mutableListOf<Pair<String, String>>()
+        val added = MessageCatalog.ALL.filter { it.id !in ids }.map { n ->
+            val code = if (n.code in taken) codeFor(n.code, taken).also { renamed += n.name to it } else n.code
+            taken += code
+            n.copy(code = code)
+        }
+        return Upgrade(updated + added, renamed)
+    }
+
+    /** A legacy per-kind setting still with its old default text gets the document's text. */
+    fun upgradeLegacy(kind: MessageKind, current: String): String? {
+        val id = kindIds.getValue(kind)
+        return if (current.trim() == previous[id]?.trim()) MessageCatalog.byId(id)?.text else null
+    }
+
+    /** Steps of the job (section 10.4 of the document), to find a message among many. */
+    enum class Category(val label: String, val codes: Set<String>) {
+        START("Início e orçamento", setOf("oi", "duvida", "orc", "disp", "disponivel", "indisponivel", "retorno", "indicacao")),
+        PAYMENT("Reserva e pagamento", setOf("sinal", "pix", "pago", "pag")),
+        BOOKING("Agendamento e preparação", setOf("agenda", "local", "preparo", "lembrete", "reag", "cancel", "imprevisto")),
+        SELECTION("Prévia, seleção e edição", setOf("previa", "fotos", "sel", "pendente", "edit", "prazo", "andamento")),
+        DELIVERY("Entrega e suporte", setOf("entrega", "wifi", "suporte", "ret", "retirado")),
+        RELATION("Relacionamento e qualidade", setOf("obg", "avaliacao", "autoriza", "insatisfacao")),
+        MINE("Minhas mensagens", emptySet()),
+    }
+
+    /** The step of a message, by the ready message it is (its id), else by its code; the photographer's own are [Category.MINE]. */
+    fun categoryOf(t: MessageTemplate): Category {
+        val code = MessageCatalog.byId(t.id)?.code ?: t.code
+        return Category.entries.firstOrNull { code in it.codes } ?: Category.MINE
+    }
 
     /** Ids of the ready messages added after the list became editable (4.0: the local delivery one). */
     private val addedLater = setOf("wifi")
@@ -124,4 +185,29 @@ object MessageLibrary {
         while ("$base$n" in taken) n++
         return "$base$n"
     }
+}
+
+/** The texts of the five first messages before 5.8, to recognise them when the library is brought up to date. */
+internal object PreviousDefaults {
+    const val WHATSAPP = "Olá, {cliente}! 📸\n\n" +
+        "Aqui estão suas fotos: *{quantidade}* do dia {data}.\n\n" +
+        "Qualquer dúvida, estou à disposição.\n\n" +
+        "*Jr_Tech_OFC*"
+    const val PREVIEW = "Olá, {cliente}! 📸\n\n" +
+        "Suas fotos já estão prontas para escolher: *{quantidade} fotos* do dia {data}.\n\n" +
+        "Me envie os números das que você mais gostou.\n\n" +
+        "*Jr_Tech_OFC*"
+    const val DELIVERED = "Olá, {cliente}! ✨\n\n" +
+        "Suas *{quantidade} fotos* editadas estão entregues. Foi um prazer fotografar vocês.\n\n" +
+        "Se puder, marque *@jr_tech_ofc* quando postar.\n\n" +
+        "*Jr_Tech_OFC*"
+    const val PAYMENT = "Olá, {cliente}! Tudo bem?\n\n" +
+        "*Lembrete:* o restante do pagamento do ensaio de {data} fica para a entrega das fotos.\n\n" +
+        "Qualquer dúvida, estou à disposição.\n\n" +
+        "*Jr_Tech_OFC*"
+    const val SELECTION = "Olá, {cliente}! 💚\n\n" +
+        "Recebi sua seleção: *{quantidade} fotos*.\n\n" +
+        "{lista}\n\n" +
+        "Agora sigo com a edição e aviso quando estiver pronto.\n\n" +
+        "*Jr_Tech_OFC*"
 }

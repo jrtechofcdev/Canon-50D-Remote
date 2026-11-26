@@ -323,6 +323,31 @@ class ScreenshotTest {
         save("ferramentas", androidx.compose.ui.test.hasText("Flash direto"))
     }
 
+    /** The send sheet's parts for "Orçamento": steps, the fields the app asks for, and the note while one is empty. */
+    @Test
+    @Config(qualifiers = "w411dp-h1400dp-xxhdpi")
+    fun messageFields() {
+        val library = com.example.core.messages.MessageCatalog.ALL
+        val orc = library.first { it.id == "orcamento" }
+        rule.setContent {
+            JrLinkTheme {
+                androidx.compose.foundation.layout.Column(
+                    androidx.compose.ui.Modifier.background(com.example.ui.theme.Tone.Surface),
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(androidx.compose.ui.unit.Dp(10f)),
+                ) {
+                    com.example.ui.photos.TemplatePicker(library, orc.id) {}
+                    val extra = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateMapOf("servico" to "Ensaio externo", "valor" to "R$ 350,00") }
+                    val filled = com.example.core.messages.MessageTemplates.fill(orc.text, com.example.core.messages.MessageData("Ana", 0, 0))
+                    com.example.ui.photos.FieldsToFill(com.example.core.messages.MessageTemplates.missing(filled), extra)
+                    val text = com.example.core.messages.MessageTemplates.applyExtra(filled, extra)
+                    androidx.compose.material3.OutlinedTextField(text, {})
+                    com.example.ui.photos.MissingNote(com.example.core.messages.MessageTemplates.missing(text))
+                }
+            }
+        }
+        save("mensagem_campos", androidx.compose.ui.test.hasText("Preencher antes de enviar"))
+    }
+
     @Test
     fun settingsMessages() {
         rule.setContent { JrLinkTheme { SettingsSectionScreen(app, SettingsSection.Messages, onBack = {}) } }

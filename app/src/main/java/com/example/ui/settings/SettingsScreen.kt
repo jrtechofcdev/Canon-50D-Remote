@@ -604,7 +604,11 @@ private fun MessageSettings(app: TetherApp, s: Settings) {
             scope.launch { app.settings.set(SettingKeys.whatsAutoMessage, it) }
         }
     }
-    InfoText("Campos preenchidos sozinhos: {cliente} (nome digitado ou da sessão), {quantidade}, {data}, {lista} (nomes das fotos) e {pix}. Use *asteriscos* para negrito no WhatsApp.")
+    InfoText(
+        "Campos preenchidos sozinhos: {cliente} (nome digitado ou da sessão), {quantidade}, {data}, {lista} (nomes das fotos), {pix} e, na entrega local, {wifi}, {senha}, {link} e {codigo}. " +
+            "Na hora de enviar, o app pede o que ele não sabe: {local}, {horario}, {servico}, {valor}, {entrega} e {prazo}. Use *asteriscos* para negrito no WhatsApp.",
+    )
+    InfoText("As mensagens prontas vêm da ${com.example.core.messages.MessageCatalog.SOURCE} da Jr_Tech_OFC Fotografia, separadas pelas etapas do atendimento.")
     SettingsGroup("Pix", Icons.Outlined.Payments) {
         var pix by remember { mutableStateOf(s.pixKey) }
         OutlinedTextField(
@@ -633,7 +637,11 @@ private fun MessageLibraryEditor(app: TetherApp, s: Settings) {
         scope.launch { app.settings.set(SettingKeys.messageLibrary, com.example.core.messages.MessageLibrary.encode(next)) }
     }
     SettingsGroup("Mensagens (${list.size})", Icons.AutoMirrored.Outlined.Chat) {
-        list.forEach { t ->
+        // Grouped by step of the job; the order inside each step is the saved one.
+        val byStep = list.groupBy { com.example.core.messages.MessageLibrary.categoryOf(it) }
+        com.example.core.messages.MessageLibrary.Category.entries.filter { it in byStep }.forEach { step ->
+        Text(step.label, style = MaterialTheme.typography.labelLarge, color = Tone.TextMuted, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+        byStep.getValue(step).forEach { t ->
             val expanded = open == t.id
             Row(
                 Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable { open = if (expanded) null else t.id }
@@ -664,6 +672,7 @@ private fun MessageLibraryEditor(app: TetherApp, s: Settings) {
                     TextButton(onClick = { open = null; save(list.filter { it.id != t.id }) }) { Text("Apagar", color = Tone.Error) }
                 }
             }
+        }
         }
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = {

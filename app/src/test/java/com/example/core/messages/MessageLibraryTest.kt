@@ -29,6 +29,36 @@ class MessageLibraryTest {
     }
 
     @Test
+    fun aSavedListTakesTheNewTextsOnlyWhereThePhotographerDidNotWrite() {
+        // As saved by 5.7: the old ready texts, one of them rewritten, one deleted, and a message of his own on "prazo".
+        val old = MessageLibrary.previous
+        val saved = listOf(
+            MessageTemplate("fotos", "Envio das fotos", "fotos", old.getValue("fotos")),
+            MessageTemplate("pix", "Dados do Pix", "pix", "Minha chave é {pix}, obrigado!"),
+            MessageTemplate("agenda", "Confirmação do ensaio", "agenda", old.getValue("agenda")),
+            MessageTemplate("m9", "Prazo do álbum", "prazo", "Seu álbum fica pronto em 30 dias."),
+        )
+        val up = MessageLibrary.upgrade(saved)
+        val byId = up.list.associateBy { it.id }
+        assertEquals(MessageCatalog.byId("fotos")!!.text, byId.getValue("fotos").text)
+        assertEquals(MessageCatalog.byId("agenda")!!.text, byId.getValue("agenda").text)
+        assertEquals("Minha chave é {pix}, obrigado!", byId.getValue("pix").text)
+        assertEquals("Seu álbum fica pronto em 30 dias.", byId.getValue("m9").text)
+        assertEquals("prazo", byId.getValue("m9").code)
+        // The 21 new ones joined; the one whose code was his got another code, and that is said.
+        assertEquals("prazo2", byId.getValue("prazo").code)
+        assertEquals(listOf("Prazo de entrega" to "prazo2"), up.renamed)
+        assertTrue(listOf("oi", "cancel", "disponivel", "retirado").all { it in byId })
+        // Messages deleted before (local, sinal…) come back once with the update, as the whole catalogue does.
+        assertEquals(4 + 32, up.list.size)
+        // Running it again changes nothing.
+        assertEquals(up.list, MessageLibrary.upgrade(up.list).list)
+        // The old per-kind setting still with its default text goes to the new one; a written one stays.
+        assertEquals(MessageDefaults.PREVIEW, MessageLibrary.upgradeLegacy(MessageKind.Preview, old.getValue("previa")))
+        assertEquals(null, MessageLibrary.upgradeLegacy(MessageKind.Preview, "Meu texto"))
+    }
+
+    @Test
     fun savedListRoundTripsAndPixIsFilled() {
         val list = listOf(MessageTemplate("m1", "Parabéns", "parabens", "Oi {cliente}, Pix: {pix}"))
         val back = MessageLibrary.decode(MessageLibrary.encode(list))
