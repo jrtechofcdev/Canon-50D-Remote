@@ -107,6 +107,14 @@ data class Settings(
     val churchPassword: String = "",
     /** "igreja" answers as igreja.local on the Wi-Fi; blank turns the name off. */
     val churchDomain: String = "igreja",
+    /** Instagram (experimental): the picker on church events, how many photos it suggests, and the caption bits. */
+    val instaEnabled: Boolean = false,
+    val instaSize: Int = 10,
+    /** "Fotos: @…" and the hashtags; blank = what was learned from the church's own captions. */
+    val instaCredit: String = "",
+    val instaHashtags: String = "",
+    /** Caption models separated by a "---" line; blank = the app's models. */
+    val instaTemplates: String = "",
     /** A calibration carried to the next photos ("Aplicar às próximas"); empty = use the preset as is. */
     val sessionAdjust: String = "",
     val saveEditedCopy: Boolean = true,
@@ -436,6 +444,11 @@ object SettingKeys {
     val churchSsid = stringPreferencesKey("church_ssid")
     val churchPassword = stringPreferencesKey("church_password")
     val churchDomain = stringPreferencesKey("church_domain")
+    val instaEnabled = booleanPreferencesKey("insta_enabled")
+    val instaSize = intPreferencesKey("insta_size")
+    val instaCredit = stringPreferencesKey("insta_credit")
+    val instaHashtags = stringPreferencesKey("insta_hashtags")
+    val instaTemplates = stringPreferencesKey("insta_templates")
     val sessionAdjust = stringPreferencesKey("session_adjust")
     val saveEditedCopy = booleanPreferencesKey("save_edited_copy")
     val editedQuality = intPreferencesKey("edited_quality")
@@ -700,6 +713,11 @@ class SettingsRepository(private val context: Context) {
             churchNetwork = this[k.churchNetwork] ?: d.churchNetwork,
             churchSsid = this[k.churchSsid]?.takeIf { it.isNotBlank() } ?: d.churchSsid,
             churchPassword = this[k.churchPassword] ?: d.churchPassword,
+            instaEnabled = this[k.instaEnabled] ?: d.instaEnabled,
+            instaSize = (this[k.instaSize] ?: d.instaSize).coerceIn(1, 20),
+            instaCredit = this[k.instaCredit] ?: d.instaCredit,
+            instaHashtags = this[k.instaHashtags] ?: d.instaHashtags,
+            instaTemplates = this[k.instaTemplates] ?: d.instaTemplates,
             churchDomain = this[k.churchDomain] ?: d.churchDomain,
             sessionAdjust = this[k.sessionAdjust] ?: d.sessionAdjust,
             saveEditedCopy = this[k.saveEditedCopy] ?: d.saveEditedCopy,

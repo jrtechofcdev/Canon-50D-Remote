@@ -52,11 +52,6 @@ class InstaPicker(
 
     fun weights(): IgWeights = IgWeights.decode(read("modelo.txt")) ?: IgWeights.DEFAULT
 
-    /** An approve or remove in the module: the weights move a little towards the photographer's eye. */
-    fun learn(rating: IgRating, approved: Boolean) {
-        write("modelo.txt", weights().learn(rating.signals, approved).encode())
-    }
-
     fun forgetChoices() { File(dir, "modelo.txt").delete() }
 
     private fun styleFile(congregationId: Long?) = "estilo-${congregationId ?: "geral"}.txt"
@@ -143,6 +138,60 @@ class InstaPicker(
             running.unlock()
         }
     }
+
+    // --- The post being prepared ----------------------------------------------------------------
+
+    private val _draft = MutableStateFlow<IgDraft?>(null)
+
+    /** The post on screen; kept while the app runs, so leaving the screen loses nothing. */
+    val draft: StateFlow<IgDraft?> = _draft.asStateFlow()
+
+    fun update(change: (IgDraft) -> IgDraft) { _draft.value = _draft.value?.let(change) }
+
+    /** Takes a photo out of the post: the model learns this kind of frame is not the photographer's pick. */
+    fun remove(id: Long) {
+        val d = _draft.value ?: return
+        d.chosen.firstOrNull { it.photoId == id }?.signals?.let { learn(it, approved = false) }
+        _draft.value = d.remove(id)
+    }
+
+    /** Puts one of the other good photos in the post: the model learns it was a good pick. */
+    fun add(id: Long, max: Int) {
+        val d = _draft.value ?: return
+        d.others.firstOrNull { it.photoId == id }?.signals?.let { learn(it, approved = true) }
+        _draft.value = d.add(id, max)
+    }
+
+    private fun learn(signals: FloatArray, approved: Boolean) = write("modelo.txt", weights().learn(signals, approved).encode())
+
+    /** A new draft from an analysis ([aspects]: width / height of each photo). */
+    fun startDraft(eventId: Long, result: IgResult, aspects: Map<Long, Float>) {
+        _draft.value = IgDraft.from(eventId, result, aspects)
+    }
+
+    /** The post already sent for the event, when there is no draft in memory (the app was closed). */
+    suspend fun loadSent(eventId: Long, notes: String?, caption: String?, photos: Map<Long, Photo>) {
+        if (_draft.value?.eventId == eventId) return
+        val picks = dao.picks(eventId)
+        if (picks.isEmpty()) { _draft.value = null; return }
+        val items = picks.mapNotNull { p ->
+            val photo = photos[p.photoId] ?: return@mapNotNull null
+            val f = dao.feature(p.photoId)?.let { IgFeatures.decode(it.data) }
+            IgItem.of(p, photo.capturedAt, f?.aspect ?: 1.5f)
+        }
+        _draft.value = IgDraft(eventId, items, emptyList(), caption.orEmpty(), captionEdited = !caption.isNullOrBlank(), notes = IgCaption.Notes.decode(notes))
+    }
+
+    fun clearDraft() { _draft.value = null }
+
+    /** Saves the carousel and the caption for the media page ([sentAt] null takes it off the page). */
+    suspend fun save(d: IgDraft, sentAt: Long?) {
+        dao.replacePicks(d.eventId, d.chosen.mapIndexed { i, it -> it.toPick(d.eventId, i) })
+        dao.setPost(d.eventId, d.caption.ifBlank { null }, d.notes.encode(), sentAt)
+    }
+
+    /** Takes the post off the media page; the draft stays to be sent again. */
+    suspend fun unsend(d: IgDraft) = dao.setPost(d.eventId, d.caption.ifBlank { null }, d.notes.encode(), null)
 
     companion object {
         const val EDGE = 1024

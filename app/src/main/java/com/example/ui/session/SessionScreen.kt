@@ -115,6 +115,7 @@ fun SessionScreen(
     onOpenDelivery: () -> Unit = {},
     onOpenExpress: () -> Unit = {},
     onOpenChurch: () -> Unit = {},
+    onOpenInsta: () -> Unit = {},
 ) {
     var deliverFor by remember { mutableStateOf<com.example.core.data.Photo?>(null) }
     val deliveryStatus by app.delivery.status.collectAsState()
@@ -254,6 +255,7 @@ fun SessionScreen(
                 }) else null,
                 onExpress = onOpenExpress,
                 onChurch = onOpenChurch,
+                onInsta = if (settings.instaEnabled) onOpenInsta else null,
                 churchState = if (churchStatus is com.example.core.delivery.DeliveryStatus.Running) {
                     if (churchOnline > 0) "no ar · $churchOnline" else "no ar"
                 } else null,

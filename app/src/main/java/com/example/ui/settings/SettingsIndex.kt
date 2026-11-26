@@ -237,6 +237,10 @@ val settingsIndex: Map<SettingsSection, List<String>> = mapOf(
         "Rede da igreja",
         "Wi-Fi da igreja",
         "Endereço com nome",
+        "Instagram",
+        "Seleção para o Instagram",
+        "Legenda",
+        "Hashtags",
     ),
     SettingsSection.Enhance to listOf(
         "Intensidade",

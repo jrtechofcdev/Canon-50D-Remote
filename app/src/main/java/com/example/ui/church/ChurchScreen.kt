@@ -95,7 +95,7 @@ import java.util.Locale
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ChurchScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit) {
+fun ChurchScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit, onInstagram: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repo = app.church.repo
@@ -152,6 +152,7 @@ fun ChurchScreen(app: TetherApp, onBack: (() -> Unit)?, onSettings: () -> Unit) 
                     )
                     ReceivedLooksCard(app, e)
                     EventPhotosCard(app, e)
+                    if (s.instaEnabled) InstaEntryCard(app, e, onInstagram)
                     DefaultPermsCard(app, e)
                     PeopleCard(app, e)
                     ReadyCard(app, e, s.enhanceOnChurch)

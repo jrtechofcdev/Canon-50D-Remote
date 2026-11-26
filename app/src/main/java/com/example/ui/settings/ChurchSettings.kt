@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Church
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Wifi
@@ -38,6 +39,57 @@ fun ChurchSettings(app: TetherApp, s: Settings) {
         )
         ToggleRow(Icons.Outlined.Church, "Aba Igreja na barra", "Sem a aba, o painel abre pelas ferramentas da Sessão", s.churchEnabled) {
             scope.launch { app.settings.set(SettingKeys.churchEnabled, it) }
+        }
+    }
+
+    SettingsGroup("Instagram · experimental", Icons.Outlined.AutoAwesome) {
+        InfoText(
+            "Escolhe, entre as fotos do evento aberto, as que têm mais chance no Instagram da igreja: louvor, oração, " +
+                "ministração, grupos e a igreja cheia. Monta o carrossel, os recortes de feed e Stories e uma legenda. " +
+                "Roda no celular, sem internet e sem custo. Você aprova e manda para a página da mídia.",
+        )
+        ToggleRow(Icons.Outlined.AutoAwesome, "Seleção para o Instagram", "Aparece no painel da Igreja e nas ferramentas da Sessão", s.instaEnabled) {
+            scope.launch { app.settings.set(SettingKeys.instaEnabled, it) }
+        }
+        if (s.instaEnabled) {
+            ChoiceRow(
+                "Fotos no carrossel",
+                listOf("6" to "6", "10" to "10", "15" to "15", "20" to "20"),
+                s.instaSize.toString(),
+                icon = Icons.Outlined.AutoAwesome,
+            ) { scope.launch { app.settings.set(SettingKeys.instaSize, it.toInt()) } }
+            var credit by remember { mutableStateOf(s.instaCredit) }
+            OutlinedTextField(
+                value = credit,
+                onValueChange = { credit = it.take(60); scope.launch { app.settings.set(SettingKeys.instaCredit, credit) } },
+                label = { Text("Crédito das fotos") },
+                supportingText = { Text("Entra na legenda como \"Fotos: …\". Vazio: o que o módulo aprendeu das legendas da igreja") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            )
+            var tags by remember { mutableStateOf(s.instaHashtags) }
+            OutlinedTextField(
+                value = tags,
+                onValueChange = { tags = it.take(300); scope.launch { app.settings.set(SettingKeys.instaHashtags, tags) } },
+                label = { Text("Hashtags") },
+                supportingText = { Text("Vazio: as que a igreja mais usa, aprendidas do Instagram") },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            )
+            var models by remember { mutableStateOf(s.instaTemplates.ifBlank { com.example.core.insta.IgCaption.DEFAULT_TEMPLATES.joinToString(com.example.core.insta.IgCaption.SEPARATOR) }) }
+            OutlinedTextField(
+                value = models,
+                onValueChange = { models = it.take(4000); scope.launch { app.settings.set(SettingKeys.instaTemplates, models) } },
+                label = { Text("Modelos de legenda") },
+                supportingText = {
+                    Text("Um modelo por bloco, separados por uma linha com ---. Campos: {evento} {igreja} {data} {dia} {periodo} {tema} {versiculo} {pregador} {louvor} {momentos} {credito} {hashtags}")
+                },
+                minLines = 6,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            )
+            TextButton(onClick = {
+                models = com.example.core.insta.IgCaption.DEFAULT_TEMPLATES.joinToString(com.example.core.insta.IgCaption.SEPARATOR)
+                scope.launch { app.settings.set(SettingKeys.instaTemplates, "") }
+            }) { Text("Voltar aos modelos do app") }
         }
     }
 

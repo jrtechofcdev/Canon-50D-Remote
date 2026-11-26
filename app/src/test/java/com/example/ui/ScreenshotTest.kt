@@ -591,6 +591,41 @@ class ScreenshotTest {
         save("ajustes_igreja", androidx.compose.ui.test.hasText("Rede da igreja"))
     }
 
+    /** A suggested carousel for the open church event, scored from made-up measures (the models don't run on the JVM). */
+    private fun seedInsta() = runBlocking {
+        seedChurch()
+        val e = app.church.repo.dao.openEvent()!!
+        val photos = app.database.photoDao().inSession("Geral")
+        fun face(cx: Float, size: Float = 0.1f, closed: Boolean = false) =
+            com.example.core.insta.IgFace(com.example.core.insta.IgBox(cx - size / 2, 0.3f - size / 2, cx + size / 2, 0.3f + size / 2), 0.8f, eyesClosed = closed)
+        val kinds = listOf(
+            com.example.core.insta.IgFeatures(1536, 1024, 82f, 85f, faces = listOf(face(0.5f), face(0.65f)), people = 2, handsRaised = 2, labels = mapOf("singer" to 0.8f)),
+            com.example.core.insta.IgFeatures(1536, 1024, 78f, 80f, faces = listOf(face(0.4f, closed = true)), people = 1, handsOnChest = 1),
+            com.example.core.insta.IgFeatures(1536, 1024, 80f, 84f, faces = listOf(face(0.55f, 0.08f)), people = 1, atMic = 1),
+            com.example.core.insta.IgFeatures(1536, 1024, 70f, 72f, faces = List(6) { face(0.15f + it * 0.14f, 0.05f) }, people = 6),
+            com.example.core.insta.IgFeatures(1536, 1024, 74f, null, labels = mapOf("flower" to 0.9f)),
+            com.example.core.insta.IgFeatures(1536, 1024, 60f, 62f, faces = List(9) { face(0.08f + it * 0.1f, 0.02f + it * 0.006f) }, people = 9, labels = mapOf("crowd" to 0.8f)),
+        )
+        val candidates = photos.mapIndexed { i, p ->
+            com.example.core.insta.IgCandidate(p.id, p.capturedAt, com.example.core.insta.IgScore.rate(kinds[i % kinds.size]), null, null)
+        }
+        val result = com.example.core.insta.IgResult(candidates.sortedByDescending { it.rating.score }, com.example.core.insta.IgCarousel.pick(candidates, 6), com.example.core.insta.IgStyle.EMPTY)
+        app.insta.startDraft(e.id, result, candidates.associate { it.photoId to 1.5f })
+        app.insta.update {
+            it.copy(caption = com.example.core.insta.IgCaption.suggest(com.example.core.insta.IgCaption.Facts(e.name, e.congregation, e.date, it.moments, com.example.core.insta.IgCaption.Notes(theme = "Gratidão"), credit = "@fotografo")))
+        }
+        app.settings.set(com.example.core.data.SettingKeys.instaEnabled, true)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h2400dp-xxhdpi")
+    fun instagram() {
+        seedInsta()
+        rule.setContent { JrLinkTheme { com.example.ui.insta.InstaScreen(app, onBack = {}) } }
+        save("instagram", androidx.compose.ui.test.hasText("Estilo da igreja"))
+        app.insta.clearDraft()
+    }
+
     private fun running() = com.example.core.delivery.DeliveryStatus.Running("192.168.49.1", 8080, "DIRECT-JR-Fotos", "jrfotos2026", "Wi-Fi Direct")
 
     @Test

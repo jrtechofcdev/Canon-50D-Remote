@@ -315,6 +315,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenDelivery = { openTool(Tab.Delivery) },
                                 onOpenExpress = { openTool(Tab.Express) },
                                 onOpenChurch = { openTool(Tab.Church) },
+                                onOpenInsta = { nav.navigate("insta") },
                             )
                         }
                         composable(Tab.Cull.route) { CullScreen(app, onBack = null, onOpenPhoto = { nav.navigate("photo/$it") }) }
@@ -339,8 +340,10 @@ class MainActivity : ComponentActivity() {
                                 app = app,
                                 onBack = if (Tab.Church in tabs) null else ({ nav.popBackStack() }),
                                 onSettings = { nav.navigate("settings/${SettingsSection.Church.route}") },
+                                onInstagram = { nav.navigate("insta") },
                             )
                         }
+                        composable("insta") { com.example.ui.insta.InstaScreen(app, onBack = { nav.popBackStack() }) }
                         composable("tools") { ToolsScreen(onBack = { nav.popBackStack() }) }
                         composable("card") { CardScreen(app = app, onBack = { nav.popBackStack() }) }
                         composable("client") {

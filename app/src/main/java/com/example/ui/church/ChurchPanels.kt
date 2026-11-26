@@ -1,5 +1,6 @@
 package com.example.ui.church
 
+import androidx.compose.material.icons.outlined.AutoAwesome
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -596,6 +597,28 @@ private fun share(context: android.content.Context, e: ChurchEvent, log: List<Ch
         context.startActivity(
             Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, "Log · ${e.name}").putExtra(Intent.EXTRA_TEXT, text), "Exportar o log")
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+}
+
+/** Instagram (experimental): what was sent to the media page, and the way into the picker. */
+@Composable
+internal fun InstaEntryCard(app: TetherApp, e: ChurchEvent, onOpen: () -> Unit) {
+    val picks by app.database.instaDao().observePicks(e.id).collectAsState(initial = emptyList())
+    DeliveryCard {
+        Text("Instagram · experimental", style = MaterialTheme.typography.titleMedium)
+        Text(
+            when {
+                e.igSentAt != null -> "${picks.size} fotos na página da mídia, em \"Para o Instagram\", desde ${clock(e.igSentAt)}."
+                else -> "O celular escolhe as fotos com mais chance no Instagram da igreja, monta o carrossel e a legenda. Você aprova e manda para a mídia."
+            },
+            style = MaterialTheme.typography.bodyMedium, color = Tone.TextMuted,
+        )
+        com.example.ui.components.JrButton(
+            if (e.igSentAt != null) "Abrir o post" else "Escolher para o Instagram",
+            kind = com.example.ui.components.JrButtonKind.Secondary,
+            icon = Icons.Outlined.AutoAwesome,
+            onClick = onOpen,
         )
     }
 }

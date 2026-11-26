@@ -34,6 +34,7 @@ import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Videocam
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.outlined.Exposure
@@ -203,6 +204,7 @@ fun ToolsRow(
     onExpressLatest: (() -> Unit)? = null,
     onChurch: (() -> Unit)? = null,
     churchState: String? = null,
+    onInsta: (() -> Unit)? = null,
 ) {
     val camera = buildList {
         if (settings.liveViewEnabled) add(ToolItem(Icons.Outlined.Videocam, "Live view", enabled = connected, onClick = onLive))
@@ -236,6 +238,7 @@ fun ToolsRow(
         onDelivery?.let { add(ToolItem(Icons.Outlined.WifiTethering, "Entrega", deliveryState, onClick = it)) }
         onExpress?.let { add(ToolItem(Icons.Outlined.Collections, "Express", expressState, onClick = it)) }
         onChurch?.let { add(ToolItem(Icons.Outlined.Church, "Igreja", churchState, onClick = it)) }
+        onInsta?.let { add(ToolItem(Icons.Outlined.AutoAwesome, "Instagram", "experimental", onClick = it)) }
         if (settings.clientModeEnabled) add(ToolItem(Icons.Outlined.Slideshow, "Modo cliente", onClick = onClient))
         if (settings.toolsEnabled) add(ToolItem(Icons.Outlined.Calculate, "Flash e foco", onClick = onTools))
         add(ToolItem(Icons.Outlined.Bedtime, if (settings.nightMode) "Modo normal" else "Modo noite", onClick = onNight))
